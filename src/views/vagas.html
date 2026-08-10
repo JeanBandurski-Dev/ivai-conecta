@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vagas & Algoritmo de Match | Ivaí Conecta</title>
+  <meta name="description" content="Painel de vagas publicadas por empresas do Vale do Ivaí com indicador automático de % de compatibilidade de habilidades.">
+  <link rel="stylesheet" href="../../public/css/styles.css?v=3">
+  <script src="../../public/js/app.js?v=3"></script>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="container navbar-container">
+      <a href="index.html" class="logo-brand">
+        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="8" fill="#0052FF"/>
+          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF"/>
+          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14" stroke-linecap="round" fill="none"/>
+          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="72" cy="20" r="7" fill="#22C55E"/>
+          <circle cx="56" cy="36" r="6" fill="#0052FF"/>
+          <circle cx="88" cy="40" r="6" fill="#0052FF"/>
+        </svg>
+        <span><span class="logo-ivai">Ivaí</span> <span class="logo-conecta">Conecta</span></span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Dashboard</a></li>
+        <li><a href="vagas.html" class="nav-link active">Vagas & Match</a></li>
+        <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
+        <li><a href="perfil-aluno.html" class="nav-link">Perfil do Aluno</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div class="city-selector-pill">
+          <select class="city-select-global" id="jobsPageCitySelect">
+            <!-- Preenchido via app.js -->
+          </select>
+        </div>
+        <a href="perfil-aluno.html" class="btn btn-primary btn-sm">Ver Meu Perfil</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header style="background: linear-gradient(135deg, var(--primary-dark), var(--primary-blue)); color: var(--white); padding: 3.5rem 0;">
+    <div class="container">
+      <span class="hero-tag" style="margin-bottom: 0.75rem;">🤖 Algoritmo de Matching de Habilidades</span>
+      <h1 style="color: var(--white); font-size: 2.4rem; margin-bottom: 0.5rem;">Painel de Vagas & Compatibilidade</h1>
+      <p style="color: var(--gray-300); max-width: 650px;">
+        As vagas abaixo calculam dinamicamente a % de alinhamento com base nos requisitos e nas competências do perfil do aluno selecionado.
+      </p>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="container section">
+    
+    <!-- SEARCH & FILTER BAR -->
+    <div style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+        
+        <div class="search-input-group" style="max-width: 480px; width: 100%; border: 1px solid var(--gray-300);">
+          <span>🔍</span>
+          <input type="text" id="jobSearchInput" placeholder="Filtrar por cargo, tecnologia ou empresa...">
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <span style="font-size: 0.875rem; font-weight: 600; color: var(--gray-600);">Filtrar por Skill:</span>
+          <div class="filter-pills" style="margin: 0; display: flex; gap: 0.4rem; flex-wrap: wrap;" id="skillPillsFilter">
+            <span class="tag active" style="cursor: pointer;" data-skill="TODAS">Todas</span>
+            <span class="tag" style="cursor: pointer;" data-skill="JavaScript">JavaScript</span>
+            <span class="tag" style="cursor: pointer;" data-skill="React">React</span>
+            <span class="tag" style="cursor: pointer;" data-skill="Excel Avançado">Excel Avançado</span>
+            <span class="tag" style="cursor: pointer;" data-skill="NR-10">NR-10</span>
+            <span class="tag" style="cursor: pointer;" data-skill="Figma">Figma</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- LISTA DE VAGAS -->
+    <div class="grid-3" id="jobsListContainer">
+      <!-- Preenchido via script -->
+    </div>
+  </main>
+
+  <!-- MODAL DE CANDIDATURA DE VAGA -->
+  <div class="modal-backdrop" id="applyJobModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalJobTitle">Candidatar-se à Vaga</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+
+      <div id="modalJobDetails">
+        <!-- Preenchido via script -->
+      </div>
+
+      <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button class="btn btn-outline" data-close-modal>Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmApply">Confirmar Envio de Perfil Verificado</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p>&copy; 2026 Ivaí Conecta. Vagas com Inteligência de Compatibilidade Regional em Ivaiporã.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let activeSkillFilter = 'TODAS';
+    let selectedJobForModal = null;
+    let studentSkillsDemo = ['JavaScript', 'HTML5/CSS3', 'React', 'Node.js', 'Git', 'SQL'];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const talents = IvaiConecta.getTalents();
+      if (talents.length > 0) {
+        studentSkillsDemo = talents[0].skills;
+      }
+
+      renderJobs();
+
+      window.addEventListener('cityChanged', () => {
+        renderJobs();
+      });
+
+      document.getElementById('jobSearchInput')?.addEventListener('input', renderJobs);
+
+      // Skill Pills
+      document.querySelectorAll('#skillPillsFilter .tag').forEach(pill => {
+        pill.addEventListener('click', () => {
+          document.querySelectorAll('#skillPillsFilter .tag').forEach(p => {
+            p.style.background = 'var(--gray-100)';
+            p.style.color = 'var(--gray-700)';
+          });
+          pill.style.background = 'var(--primary-blue)';
+          pill.style.color = 'var(--white)';
+          activeSkillFilter = pill.getAttribute('data-skill');
+          renderJobs();
+        });
+      });
+
+      // Confirmar Candidatura
+      document.getElementById('btnConfirmApply')?.addEventListener('click', () => {
+        IvaiConecta.closeModal('applyJobModal');
+        IvaiConecta.showToast(`Candidatura enviada para "${selectedJobForModal?.title}"! A empresa receberá seu perfil com endossos verificados.`);
+      });
+
+      // URL search params
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryParam = urlParams.get('q');
+      if (queryParam) {
+        document.getElementById('jobSearchInput').value = queryParam;
+        renderJobs();
+      }
+    });
+
+    function renderJobs() {
+      const container = document.getElementById('jobsListContainer');
+      const selectedCity = IvaiConecta.getSelectedCity();
+      const searchQuery = document.getElementById('jobSearchInput').value.toLowerCase().trim();
+
+      const jobs = IvaiConecta.getJobs(selectedCity);
+
+      const filtered = jobs.filter(job => {
+        if (searchQuery) {
+          const matchTitle = job.title.toLowerCase().includes(searchQuery);
+          const matchCompany = job.company.toLowerCase().includes(searchQuery);
+          const matchSkill = job.requiredSkills.some(s => s.toLowerCase().includes(searchQuery));
+          if (!matchTitle && !matchCompany && !matchSkill) return false;
+        }
+
+        if (activeSkillFilter !== 'TODAS') {
+          const hasSkill = job.requiredSkills.some(s => s.toLowerCase() === activeSkillFilter.toLowerCase());
+          if (!hasSkill) return false;
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="grid-column: 1/-1; padding: 3rem; text-align: center; color: var(--gray-500);">Nenhuma vaga encontrada com os filtros selecionados em ${selectedCity}.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(job => {
+        const score = IvaiConecta.calculateMatchScore(studentSkillsDemo, job.requiredSkills);
+        return `
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+              <div style="font-weight: 700; color: var(--primary-dark); font-size: 1.1rem;">${job.company}</div>
+              <span class="badge-match ${score >= 75 ? 'high' : ''}">${score}% Match</span>
+            </div>
+            <h3 style="font-size: 1.15rem; margin-bottom: 0.4rem;">${job.title}</h3>
+            <div style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.75rem;">
+              <span>📍 ${job.city}</span> &bull; <span>💼 ${job.type}</span>
+            </div>
+            <div class="skill-tags">
+              ${job.requiredSkills.map(skill => `<span class="tag">${skill}</span>`).join('')}
+            </div>
+            <div style="margin-top: auto; padding-top: 1.25rem;">
+              <button class="btn btn-primary btn-sm btn-apply-job" data-id="${job.id}" style="width: 100%;">Candidatar com Perfil Verificado</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.btn-apply-job').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          selectedJobForModal = jobs.find(j => j.id == id);
+          if (selectedJobForModal) {
+            const score = IvaiConecta.calculateMatchScore(studentSkillsDemo, selectedJobForModal.requiredSkills);
+            document.getElementById('modalJobTitle').textContent = selectedJobForModal.title;
+            document.getElementById('modalJobDetails').innerHTML = `
+              <div style="padding: 1rem; background: var(--gray-50); border-radius: var(--radius-md); border: 1px solid var(--gray-200); margin-top: 1rem;">
+                <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary-blue);">${selectedJobForModal.company}</div>
+                <div style="font-size: 0.9rem; color: var(--gray-700); margin-top: 0.25rem;">📍 ${selectedJobForModal.city} &bull; 💼 ${selectedJobForModal.type}</div>
+                <div style="margin-top: 1rem; font-size: 0.95rem; font-weight: 600;">
+                  Seu índice de compatibilidade nesta vaga é de <span style="color: var(--accent-green); font-weight: 800; font-size: 1.2rem;">${score}%</span>.
+                </div>
+              </div>
+            `;
+            IvaiConecta.openModal('applyJobModal');
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>

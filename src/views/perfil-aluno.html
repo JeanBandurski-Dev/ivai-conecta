@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfil do Aluno - Lucas Eduardo Silva | Ivaí Conecta</title>
+  <meta name="description" content="Perfil do estudante com endossos acadêmicos verificados por professores do IFPR Campus Ivaiporã e cálculo dinâmico de match.">
+  <link rel="stylesheet" href="../../public/css/styles.css?v=3">
+  <script src="../../public/js/app.js?v=3"></script>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="container navbar-container">
+      <a href="index.html" class="logo-brand">
+        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="8" fill="#0052FF"/>
+          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF"/>
+          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14" stroke-linecap="round" fill="none"/>
+          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="72" cy="20" r="7" fill="#22C55E"/>
+          <circle cx="56" cy="36" r="6" fill="#0052FF"/>
+          <circle cx="88" cy="40" r="6" fill="#0052FF"/>
+        </svg>
+        <span><span class="logo-ivai">Ivaí</span> <span class="logo-conecta">Conecta</span></span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Dashboard</a></li>
+        <li><a href="vagas.html" class="nav-link">Vagas & Match</a></li>
+        <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
+        <li><a href="perfil-aluno.html" class="nav-link active">Perfil do Aluno</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div class="city-selector-pill">
+          <select class="city-select-global">
+            <!-- Preenchido via app.js -->
+          </select>
+        </div>
+        <a href="vagas.html" class="btn btn-teal btn-sm">Ver Minhas Vagas</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PROFILE HEADER / COVER -->
+  <section class="hero" style="padding: 3rem 0;">
+    <div class="container">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: #6EE7B7; margin-bottom: 0.5rem;">
+        <span>🎓 Banco de Talentos Regionais</span> &bull; <span>IFPR Campus Ivaiporã</span>
+      </div>
+      <h1 style="color: var(--white); font-size: 2.2rem;">Perfil Acadêmico Verificado</h1>
+    </div>
+  </section>
+
+  <!-- PROFILE CONTENT CONTAINER -->
+  <main class="container" style="padding-bottom: 4rem; margin-top: -2rem;">
+    <div class="card" style="padding: 2rem;">
+      
+      <!-- TOP STUDENT INFO -->
+      <div style="display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;" id="studentProfileHeader">
+        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250" alt="Lucas Eduardo Silva" class="avatar" style="width: 90px; height: 90px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <h2 style="font-size: 1.8rem;" id="studentName">Lucas Eduardo Silva</h2>
+            <span class="badge-endosso" id="studentBadgeCount">🎓 2 Endossos Acadêmicos</span>
+          </div>
+          <p style="font-size: 1.05rem; color: var(--gray-700); font-weight: 600; margin-top: 0.25rem;" id="studentCourse">
+            Análise e Desenvolvimento de Sistemas • <span style="color: var(--primary-blue);" id="studentInstitution">IFPR Campus Ivaiporã</span>
+          </p>
+          <div style="font-size: 0.875rem; color: var(--gray-500); margin-top: 0.25rem;" id="studentCity">
+            📍 Morador de Ivaiporã / PR
+          </div>
+        </div>
+      </div>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--gray-200);">
+
+      <!-- TWO COLUMNS: SKILLS & ENDORSEMENTS -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem;" id="profileMainGrid">
+        
+        <!-- LEFT COLUMN: SKILLS & MATCH SIMULATOR -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.25rem;">Minhas Competências</h3>
+            <button class="btn btn-outline btn-sm" id="btnAddSkillModal">+ Adicionar Skill</button>
+          </div>
+
+          <div class="skill-tags" id="studentSkillsContainer" style="margin-bottom: 2rem;">
+            <!-- Preenchido via script -->
+          </div>
+
+          <div style="background: var(--gray-50); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+            <h4 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--primary-dark);">💡 Dica do Algoritmo de Match</h4>
+            <p style="font-size: 0.875rem; color: var(--gray-600);">
+              Suas competências são comparadas automaticamente com as vagas abertas em Ivaiporã. Adicionar tags recomendadas por professores aumenta seu índice de destaque.
+            </p>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: ACADEMIC ENDORSEMENTS LIST -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.25rem;">Endossos Docentes</h3>
+            <button class="btn btn-primary btn-sm" id="btnEmitEndorsement">+ Emitir Parecer</button>
+          </div>
+
+          <div id="endorsementsListContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Preenchido via script -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODAL ADICIONAR SKILL -->
+  <div class="modal-backdrop" id="addSkillModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Adicionar Competência ao Perfil</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="addSkillForm">
+        <div class="form-group">
+          <label for="newSkillName">Nome da Habilidade ou Tecnologia</label>
+          <input type="text" id="newSkillName" class="form-control" placeholder="Ex: TypeScript, Docker, Laravel, AutoCAD..." required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Adicionar Competência</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL EMITIR ENDOSSO DOCENTE -->
+  <div class="modal-backdrop" id="emitEndorsementModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Emitir Parecer de Endosso Acadêmico</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="endorsementForm">
+        <div class="form-group">
+          <label for="profName">Nome Completo do Professor</label>
+          <input type="text" id="profName" class="form-control" placeholder="Ex: Prof. Dr. Ricardo Oliveira" required>
+        </div>
+
+        <div class="form-group">
+          <label for="profEmail">E-mail Institucional</label>
+          <input type="email" id="profEmail" class="form-control" placeholder="Ex: ricardo.oliveira@ifpr.edu.br" required>
+        </div>
+
+        <div class="form-group">
+          <label for="profInstitution">Instituição de Ensino</label>
+          <select id="profInstitution" class="form-control" required>
+            <option value="IFPR Campus Ivaiporã">IFPR Campus Ivaiporã</option>
+            <option value="UENP">UENP</option>
+            <option value="Univale Ivaiporã">Univale Ivaiporã</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="profDiscipline">Disciplina / Projeto Recomendado</label>
+          <input type="text" id="profDiscipline" class="form-control" placeholder="Ex: Programação Orientada a Objetos" required>
+        </div>
+
+        <div class="form-group">
+          <label for="profQuote">Parecer / Recomendação do Aluno</label>
+          <textarea id="profQuote" class="form-control" rows="3" placeholder="Descreva os pontos fortes técnicos e atitudinais do aluno..." required></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-teal">Salvar & Publicar Endosso</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p>&copy; 2026 Ivaí Conecta. Conectando talentos e oportunidades em Ivaiporã com Selo de Verificação Acadêmica.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let currentStudent = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const studentId = urlParams.get('id') || 1;
+
+      const talents = IvaiConecta.getTalents();
+      currentStudent = talents.find(t => t.id == studentId) || talents[0];
+
+      renderStudentProfile();
+
+      document.getElementById('btnAddSkillModal')?.addEventListener('click', () => {
+        IvaiConecta.openModal('addSkillModal');
+      });
+
+      document.getElementById('btnEmitEndorsement')?.addEventListener('click', () => {
+        IvaiConecta.openModal('emitEndorsementModal');
+      });
+
+      // Adicionar Skill
+      document.getElementById('addSkillForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const skillInput = document.getElementById('newSkillName').value.trim();
+        if (skillInput) {
+          if (!currentStudent.skills.includes(skillInput)) {
+            currentStudent.skills.push(skillInput);
+            renderStudentSkills();
+            IvaiConecta.showToast(`Competência "${skillInput}" adicionada com sucesso!`);
+          }
+          IvaiConecta.closeModal('addSkillModal');
+          document.getElementById('addSkillForm').reset();
+        }
+      });
+
+      // Salvar Endosso
+      document.getElementById('endorsementForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const data = {
+          profName: document.getElementById('profName').value,
+          profEmail: document.getElementById('profEmail').value,
+          institution: document.getElementById('profInstitution').value,
+          discipline: document.getElementById('profDiscipline').value,
+          quote: document.getElementById('profQuote').value
+        };
+
+        const validation = IvaiConecta.validateEndorsement(data);
+        if (!validation.isValid) {
+          alert(validation.error);
+          return;
+        }
+
+        const payload = IvaiConecta.createEndorsementPayload(data);
+        IvaiConecta.addEndorsementToTalent(currentStudent.id, payload);
+
+        if (!currentStudent.endorsements) currentStudent.endorsements = [];
+        currentStudent.endorsements.unshift(payload);
+
+        renderEndorsements();
+        document.getElementById('studentBadgeCount').textContent = `🎓 ${currentStudent.endorsements.length} Endossos Acadêmicos`;
+        
+        IvaiConecta.closeModal('emitEndorsementModal');
+        IvaiConecta.showToast('Endosso acadêmico publicado com selo de verificação docente!');
+        document.getElementById('endorsementForm').reset();
+      });
+    });
+
+    function renderStudentProfile() {
+      if (!currentStudent) return;
+
+      document.getElementById('studentName').textContent = currentStudent.name;
+      document.getElementById('studentCourse').innerHTML = `${currentStudent.course} • <span style="color: var(--primary-blue);">${currentStudent.institution}</span>`;
+      document.getElementById('studentCity').textContent = `📍 Morador de ${currentStudent.city} / PR`;
+      document.getElementById('studentBadgeCount').textContent = `🎓 ${currentStudent.endorsements?.length || 0} Endossos Acadêmicos`;
+
+      renderStudentSkills();
+      renderEndorsements();
+    }
+
+    function renderStudentSkills() {
+      const container = document.getElementById('studentSkillsContainer');
+      if (!currentStudent || !currentStudent.skills) return;
+
+      container.innerHTML = currentStudent.skills.map((skill, idx) => `
+        <span class="tag" style="padding: 0.4rem 0.8rem; font-size: 0.875rem;">
+          ${skill} 
+          <span class="remove-skill-btn" data-index="${idx}" style="cursor: pointer; margin-left: 0.35rem; font-weight: 700; color: var(--danger);">&times;</span>
+        </span>
+      `).join('');
+
+      document.querySelectorAll('.remove-skill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-index'));
+          currentStudent.skills.splice(idx, 1);
+          renderStudentSkills();
+          IvaiConecta.showToast('Competência removida.');
+        });
+      });
+    }
+
+    function renderEndorsements() {
+      const container = document.getElementById('endorsementsListContainer');
+      if (!currentStudent || !currentStudent.endorsements || currentStudent.endorsements.length === 0) {
+        container.innerHTML = `<div style="font-size: 0.9rem; color: var(--gray-500);">Nenhum endosso acadêmico registrado ainda.</div>`;
+        return;
+      }
+
+      container.innerHTML = currentStudent.endorsements.map(end => `
+        <div style="background: var(--gray-50); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--gray-200);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-dark);">🎓 ${end.profName}</div>
+              <div style="font-size: 0.8rem; color: var(--gray-600);">${end.discipline} &bull; ${end.institution}</div>
+            </div>
+            <span class="badge-endosso">Verificado ✓</span>
+          </div>
+          <p style="font-size: 0.875rem; color: var(--gray-700); font-style: italic;">"${end.quote}"</p>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
