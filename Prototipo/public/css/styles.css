@@ -12,11 +12,11 @@
   --primary-blue: #0052FF;
   --primary-blue-hover: #0043D0;
   --primary-light: #EFF6FF;
-  
+
   --accent-green: #22C55E;
   --accent-green-soft: #DCFCE7;
   --accent-sky: #38BDF8;
-  
+
   --teal-dark: #0A1128;
   --teal-main: #0052FF;
   --teal-light: #38BDF8;
@@ -25,7 +25,7 @@
   --accent-gold: #F59E0B;
   --accent-amber: #D97706;
   --accent-gold-soft: #FEF3C7;
-  
+
   --gray-900: #0A1128;
   --gray-800: #1E293B;
   --gray-700: #334155;
@@ -65,7 +65,9 @@
 }
 
 /* Reset & Base */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -84,7 +86,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   color: var(--primary-dark);
   line-height: 1.25;
@@ -107,7 +114,10 @@ img {
   display: block;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: inherit;
 }
@@ -185,7 +195,8 @@ button, input, select, textarea {
   position: relative;
 }
 
-.nav-link:hover, .nav-link.active {
+.nav-link:hover,
+.nav-link.active {
   color: var(--primary-blue);
   font-weight: 600;
 }
@@ -269,6 +280,7 @@ button, input, select, textarea {
   color: var(--white);
   transform: translateY(-1px);
 }
+
 
 .btn-whatsapp {
   background: linear-gradient(135deg, #25D366, #16A34A);
@@ -709,6 +721,7 @@ button, input, select, textarea {
   .hero-grid {
     grid-template-columns: 1fr;
   }
+
   .footer-grid {
     grid-template-columns: 1fr 1fr;
   }
