@@ -32,15 +32,14 @@
         <li><a href="index.html" class="nav-link">Dashboard</a></li>
         <li><a href="vagas.html" class="nav-link">Vagas & Match</a></li>
         <li><a href="servicos.html" class="nav-link active">Serviços Locais</a></li>
-        <li><a href="perfil-aluno.html" class="nav-link">Perfil do Aluno</a></li>
+        <li><a href="banco-de-talentos.html" class="nav-link">Banco de Talentos</a></li>
       </ul>
 
       <div class="nav-actions">
-        <div class="city-selector-pill">
-          <select class="city-select-global">
-            <!-- Preenchido via app.js -->
-          </select>
+        <div id="navbarAuthContainer">
+          <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
         </div>
+
         <button class="btn btn-teal btn-sm" id="btnRegisterService">Cadastrar Meu Serviço</button>
       </div>
     </div>
@@ -49,7 +48,7 @@
   <!-- HEADER -->
   <header style="background: linear-gradient(135deg, #0A1128, #0052FF); color: var(--white); padding: 3.5rem 0;">
     <div class="container">
-      <span class="hero-tag" style="margin-bottom: 0.75rem;">🛠️ Autônomos e Empreendedores do Vale do Ivaí</span>
+      <span class="hero-tag" style="margin-bottom: 0.75rem;">Autônomos e Empreendedores do Vale do Ivaí</span>
       <h1 style="color: var(--white); font-size: 2.4rem; margin-bottom: 0.5rem;">Marketplace de Serviços Locais</h1>
       <p style="color: var(--gray-200); max-width: 650px;">
         Encontre profissionais qualificados em Ivaiporã, Jardim Alegre, São João do Ivaí e região com avaliações de clientes e contato imediato por WhatsApp.
@@ -64,9 +63,16 @@
     <div style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
       <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
         
-        <div class="search-input-group" style="max-width: 420px; width: 100%; border: 1px solid var(--gray-300);">
-          <span>🔍</span>
-          <input type="text" id="serviceSearchInput" placeholder="Busque por eletricista, técnico, aulas, designer...">
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; flex-wrap: wrap;">
+          <div class="search-input-group" style="max-width: 380px; width: 100%; border: 1px solid var(--gray-300);">
+            <input type="text" id="serviceSearchInput" placeholder="Busque por eletricista, técnico, aulas, designer...">
+          </div>
+
+          <div class="city-selector-pill" style="border: 1px solid var(--gray-300); background: var(--gray-50);" title="Filtrar por cidade no Vale do Ivaí">
+            <select class="city-select-global">
+              <!-- Preenchido via app.js -->
+            </select>
+          </div>
         </div>
 
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;" id="categoryPillsFilter">
@@ -239,14 +245,14 @@
           <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
               <span class="badge-endosso" style="background: var(--primary-light); color: var(--primary-blue); border-color: rgba(0, 82, 255, 0.2);">${service.category}</span>
-              <span style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600);">📍 ${service.city}</span>
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600);">${service.city}</span>
             </div>
             <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem;">${service.providerName}</h3>
             <div style="font-size: 0.85rem; color: var(--accent-amber); margin-bottom: 0.75rem;">
-              ⭐ <strong>${service.rating}</strong> (${service.reviewsCount} avaliações)
+              <strong>${service.rating}</strong> (${service.reviewsCount} avaliações)
             </div>
             <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 1rem; flex: 1;">${service.description}</p>
-            <a href="${waLink}" target="_blank" class="btn btn-whatsapp btn-sm">💬 Contatar via WhatsApp</a>
+            <a href="${waLink}" target="_blank" class="btn btn-whatsapp btn-sm">Contatar via WhatsApp</a>
           </div>
         `;
       }).join('');

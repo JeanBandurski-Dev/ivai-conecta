@@ -18,7 +18,40 @@
       "institution": "IFPR Campus Ivaiporã",
       "city": "Ivaiporã",
       "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
+      "bio": "Desenvolvedor de software em formação no IFPR, com foco em desenvolvimento web frontend (React) e backend (Node.js). Entusiasta de metodologias ágeis e inovação aberta no Vale do Ivaí.",
       "skills": ["JavaScript", "HTML5/CSS3", "React", "Node.js", "Git", "SQL"],
+      "education": [
+        {
+          "id": "edu_01",
+          "degree": "Tecnologia em Análise e Desenvolvimento de Sistemas",
+          "institution": "Instituto Federal do Paraná (IFPR - Campus Ivaiporã)",
+          "period": "2024 - Cursando (Previsão 2026)",
+          "status": "Em andamento"
+        },
+        {
+          "id": "edu_02",
+          "degree": "Técnico em Informática Integrado ao Ensino Médio",
+          "institution": "IFPR Campus Ivaiporã",
+          "period": "2020 - 2023",
+          "status": "Concluído"
+        }
+      ],
+      "experiences": [
+        {
+          "id": "exp_01",
+          "role": "Desenvolvedor Web Freelancer",
+          "company": "Projetos Locais Ivaiporã",
+          "period": "Jan 2025 - Presente",
+          "description": "Criação de landing pages e sistemas de agendamento online para empresas e comércios locais do Vale do Ivaí."
+        },
+        {
+          "id": "exp_02",
+          "role": "Monitor de Programação Orientada a Objetos",
+          "company": "IFPR Campus Ivaiporã",
+          "period": "Mar 2024 - Nov 2024",
+          "description": "Auxílio a alunos do curso técnico com dúvidas em Java, algoritmos e estrutura de dados."
+        }
+      ],
       "endorsements": [
         {
           "id": "end_01",
@@ -26,7 +59,7 @@
           "profEmail": "ricardo.oliveira@ifpr.edu.br",
           "institution": "IFPR Campus Ivaiporã",
           "discipline": "Desenvolvimento Web & Banco de Dados",
-          "quote": "Aluno exemplar, com ótimo raciocínio lógico e liderança em projetos práticos da comunidade acadêmica.",
+          "quote": "Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.",
           "isVerified": true
         },
         {
@@ -47,7 +80,26 @@
       "institution": "Univale Ivaiporã",
       "city": "Jardim Alegre",
       "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250",
+      "bio": "Estudante de Administração com forte atuação em controle financeiro, planejamento estratégico e processos operacionais.",
       "skills": ["Gestão Financeira", "Excel Avançado", "Marketing Digital", "ERP", "Atendimento ao Cliente"],
+      "education": [
+        {
+          "id": "edu_03",
+          "degree": "Bacharelado em Administração",
+          "institution": "Univale Ivaiporã",
+          "period": "2023 - Cursando (Previsão 2026)",
+          "status": "Em andamento"
+        }
+      ],
+      "experiences": [
+        {
+          "id": "exp_03",
+          "role": "Auxiliar Administrativo & Financeiro",
+          "company": "Comercial Vale do Ivaí",
+          "period": "Jun 2024 - Presente",
+          "description": "Lançamento de notas fiscais, controle de fluxo de caixa e conciliação bancária."
+        }
+      ],
       "endorsements": [
         {
           "id": "end_03",
@@ -67,7 +119,26 @@
       "institution": "IFPR Campus Ivaiporã",
       "city": "São João do Ivaí",
       "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250",
+      "bio": "Técnico focado em comandos elétricos, automação industrial e manutenção preventiva residencial e predial.",
       "skills": ["Instalações Elétricas", "Automação Industrial", "Comandos Elétricos", "AutoCAD", "NR-10"],
+      "education": [
+        {
+          "id": "edu_04",
+          "degree": "Curso Técnico Subsequente em Eletrotécnica",
+          "institution": "IFPR Campus Ivaiporã",
+          "period": "2023 - 2025",
+          "status": "Concluído"
+        }
+      ],
+      "experiences": [
+        {
+          "id": "exp_04",
+          "role": "Eletricista de Manutenção Industrial",
+          "company": "EletroVale Manutenções",
+          "period": "Fev 2024 - Jan 2025",
+          "description": "Montagem de quadros de distribuição, manutenção em motores elétricos e vistoria sob normas da Copel."
+        }
+      ],
       "endorsements": [
         {
           "id": "end_04",
@@ -87,7 +158,26 @@
       "institution": "UENP / Unicesumar",
       "city": "Manoel Ribas",
       "avatar": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250",
+      "bio": "Designer especializada em identidade visual, interfaces de usuário (UI/UX) e estratégias de mídias sociais para empresas do Vale do Ivaí.",
       "skills": ["Figma", "Photoshop", "Branding", "UI/UX Design", "Social Media"],
+      "education": [
+        {
+          "id": "edu_05",
+          "degree": "Tecnólogo em Design de Interiores e Mídias Digitais",
+          "institution": "UENP / Unicesumar",
+          "period": "2022 - 2024",
+          "status": "Concluído"
+        }
+      ],
+      "experiences": [
+        {
+          "id": "exp_05",
+          "role": "Designer de Marcas e UI",
+          "company": "Estúdio Criativo Vale",
+          "period": "Mai 2023 - Presente",
+          "description": "Criação de marcas, manuais de identidade visual e protótipos interativos no Figma."
+        }
+      ],
       "endorsements": [
         {
           "id": "end_05",

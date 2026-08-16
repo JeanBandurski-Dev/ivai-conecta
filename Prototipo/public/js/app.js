@@ -23,6 +23,280 @@
   const STORAGE_KEY_TALENTS = 'ivai_conecta_db_talents';
   const STORAGE_KEY_JOBS = 'ivai_conecta_db_jobs';
   const STORAGE_KEY_SERVICES = 'ivai_conecta_db_services';
+  const STORAGE_KEY_USER_ROLE = 'ivai_conecta_current_user_role';
+  const STORAGE_KEY_AUTH_USER = 'ivai_conecta_auth_user';
+  const STORAGE_KEY_USERS_DB = 'ivai_conecta_users_db';
+
+  // Configuração dos Perfis de Usuários Suportados
+  const USER_ROLES = {
+    aluno: {
+      id: 'aluno',
+      name: 'Aluno / Estudante',
+      badge: 'Estudante (IFPR/UENP/Univale)',
+      desc: 'Foco em estágios, qualificações acadêmicas e endossos docentes.'
+    },
+    freelancer: {
+      id: 'freelancer',
+      name: 'Freelancer / Autônomo',
+      badge: 'Prestador de Serviço Autônomo',
+      desc: 'Foco em divulgar serviços locais, orçamentos e trabalhos sob demanda.'
+    },
+    candidato: {
+      id: 'candidato',
+      name: 'Candidato / Profissional',
+      badge: 'Candidato / Profissional',
+      desc: 'Foco em vagas de emprego CLT/PJ e oportunidades na região.'
+    },
+    empresa: {
+      id: 'empresa',
+      name: 'Empresa / Recrutador',
+      badge: 'Empresa / Recrutador',
+      desc: 'Foco em publicar vagas, encontrar talentos e contratar.'
+    }
+  };
+
+  // Base de Contas Cadastradas (Inicialização Seed + LocalStorage)
+  function getUsersDB() {
+    let users = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS_DB));
+    if (!users || users.length === 0) {
+      users = [
+        {
+          email: 'aluno@ivaiconecta.com.br',
+          password: '123456',
+          name: 'Lucas Eduardo Silva',
+          city: 'Ivaiporã',
+          role: 'aluno',
+          badge: 'Estudante (IFPR Campus Ivaiporã)',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+        },
+        {
+          email: 'freelancer@ivaiconecta.com.br',
+          password: '123456',
+          name: 'Marcos Eletricista & Automação',
+          city: 'Ivaiporã',
+          role: 'freelancer',
+          badge: 'Prestador de Serviço Autônomo',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
+        },
+        {
+          email: 'candidato@ivaiconecta.com.br',
+          password: '123456',
+          name: 'Beatriz Santos',
+          city: 'Jardim Alegre',
+          role: 'candidato',
+          badge: 'Candidato / Profissional',
+          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150'
+        },
+        {
+          email: 'empresa@ivaiconecta.com.br',
+          password: '123456',
+          name: 'ValeTech Soluções Digitais',
+          city: 'Ivaiporã',
+          role: 'empresa',
+          badge: 'Empresa / Recrutador',
+          avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+        }
+      ];
+      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
+    }
+    return users;
+  }
+
+  function getUserRole() {
+    return localStorage.getItem(STORAGE_KEY_USER_ROLE) || 'aluno';
+  }
+
+  function setUserRole(roleId) {
+    if (USER_ROLES[roleId]) {
+      localStorage.setItem(STORAGE_KEY_USER_ROLE, roleId);
+      updateDOMRoleVisibility(roleId);
+      window.dispatchEvent(new CustomEvent('userRoleChanged', { detail: { role: roleId } }));
+    }
+  }
+
+  function getUserRoles() {
+    return Object.values(USER_ROLES);
+  }
+
+  function updateDOMRoleVisibility(currentRole = getUserRole()) {
+    document.querySelectorAll('[data-show-role]').forEach(el => {
+      const allowedRoles = el.getAttribute('data-show-role').split(',').map(r => r.trim());
+      if (allowedRoles.includes(currentRole) || allowedRoles.includes('all')) {
+        el.style.display = el.getAttribute('data-display-type') || 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+  }
+
+  // Camada de Autenticação & Sessão
+  function getAuthUser() {
+    const raw = localStorage.getItem(STORAGE_KEY_AUTH_USER);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Login com Verificação Real de Credenciais
+  function login(email, password, fallbackRole = 'aluno') {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanEmail) {
+      return { success: false, error: 'Por favor, informe seu e-mail de acesso.' };
+    }
+    if (!cleanPassword) {
+      return { success: false, error: 'Por favor, informe sua senha.' };
+    }
+
+    const usersDB = getUsersDB();
+    const account = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
+
+    if (!account) {
+      return {
+        success: false,
+        error: 'Nenhuma conta encontrada com este e-mail. Crie uma conta na aba "Criar Nova Conta".'
+      };
+    }
+
+    if (account.password !== cleanPassword) {
+      return {
+        success: false,
+        error: 'Senha incorreta. Verifique suas credenciais e tente novamente.'
+      };
+    }
+
+    const userRoleConfig = USER_ROLES[account.role] || USER_ROLES[fallbackRole] || USER_ROLES.aluno;
+    const authUser = {
+      email: account.email,
+      name: account.name,
+      city: account.city || 'Ivaiporã',
+      role: account.role,
+      roleName: userRoleConfig.name,
+      badge: account.badge || userRoleConfig.badge,
+      avatar: account.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      loggedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+    setUserRole(account.role);
+    if (account.city) setSelectedCity(account.city);
+    renderNavbarAuthStatus();
+
+    return { success: true, user: authUser };
+  }
+
+  // Cadastro de Novo Usuário com Verificação de E-mail Único
+  function register(userData) {
+    const { name, email, city, role, password } = userData;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim() || '123456';
+    const cleanName = (name || '').trim();
+    const roleId = role || 'aluno';
+
+    if (!cleanName || cleanName.length < 2) {
+      return { success: false, error: 'Informe seu nome completo ou razão social.' };
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Informe um e-mail válido.' };
+    }
+    if (cleanPassword.length < 6) {
+      return { success: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
+    }
+
+    const usersDB = getUsersDB();
+    const existing = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
+
+    if (existing) {
+      return {
+        success: false,
+        error: 'Este e-mail já está cadastrado na plataforma. Faça login na aba "Entrar na Conta".'
+      };
+    }
+
+    const userRoleConfig = USER_ROLES[roleId] || USER_ROLES.aluno;
+    const defaultAvatars = {
+      aluno: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      freelancer: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+      candidato: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
+      empresa: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+    };
+
+    const newUser = {
+      email: cleanEmail,
+      password: cleanPassword,
+      name: cleanName,
+      city: city || 'Ivaiporã',
+      role: roleId,
+      badge: userRoleConfig.badge,
+      avatar: defaultAvatars[roleId] || defaultAvatars.aluno,
+      createdAt: new Date().toISOString()
+    };
+
+    usersDB.push(newUser);
+    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDB));
+
+    // Logar automaticamente o novo usuário
+    const authUser = {
+      email: newUser.email,
+      name: newUser.name,
+      city: newUser.city,
+      role: newUser.role,
+      roleName: userRoleConfig.name,
+      badge: newUser.badge,
+      avatar: newUser.avatar,
+      loggedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+    if (city) setSelectedCity(city);
+    setUserRole(newUser.role);
+    renderNavbarAuthStatus();
+
+    return { success: true, user: authUser };
+  }
+
+  function logout() {
+    localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    renderNavbarAuthStatus();
+    showToast('Sessão encerrada com sucesso.');
+    setTimeout(() => {
+      window.location.href = 'login.html';
+    }, 300);
+  }
+
+  function renderNavbarAuthStatus() {
+    const user = getAuthUser();
+    const container = document.getElementById('navbarAuthContainer');
+    if (!container) return;
+
+    if (user) {
+      const avatarUrl = user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+      container.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <a href="perfil-aluno.html" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none;" title="Ver Perfil">
+            <img src="${avatarUrl}" alt="${user.name}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-blue); box-shadow: var(--shadow-sm);">
+            <div style="font-size: 0.85rem; text-align: left; line-height: 1.2;">
+              <div style="font-weight: 700; color: var(--primary-dark);">${user.name}</div>
+              <div style="font-size: 0.725rem; color: var(--primary-blue); font-weight: 600;">${user.badge || USER_ROLES[user.role]?.badge}</div>
+            </div>
+          </a>
+          <button class="btn btn-outline btn-sm" id="btnNavLogout" title="Sair da Conta" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Sair</button>
+        </div>
+      `;
+
+      document.getElementById('btnNavLogout')?.addEventListener('click', () => {
+        logout();
+      });
+    } else {
+      container.innerHTML = `
+        <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
+      `;
+    }
+  }
 
   // Seed Data Fallback incorporado para funcionamento offline e zero-config
   const seedData = {
@@ -53,7 +327,7 @@
             profEmail: "ricardo.oliveira@ifpr.edu.br",
             institution: "IFPR Campus Ivaiporã",
             discipline: "Desenvolvimento Web & Banco de Dados",
-            quote: "Aluno exemplar, com ótimo raciocínio lógico e liderança em projetos práticos da comunidade acadêmica.",
+            quote: "Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.",
             isVerified: true
           },
           {
@@ -237,12 +511,12 @@
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
   }
 
-  // Validação de Endosso
+  // Validação de Endosso / Recomendação
   function validateEndorsement(data) {
     const { profName, profEmail, institution, discipline, quote } = data || {};
-    if (!profName || profName.trim().length < 3) return { isValid: false, error: 'Informe o nome do professor.' };
-    if (!profEmail || !profEmail.includes('@')) return { isValid: false, error: 'Informe um e-mail válido.' };
-    if (!discipline || discipline.trim().length < 3) return { isValid: false, error: 'Informe a disciplina recomendada.' };
+    if (!profName || profName.trim().length < 3) return { isValid: false, error: 'Informe o nome do recomendador.' };
+    if (!profEmail || !profEmail.includes('@')) return { isValid: false, error: 'Informe um e-mail de contato válido.' };
+    if (!discipline || discipline.trim().length < 3) return { isValid: false, error: 'Informe o cargo, disciplina ou área recomendada.' };
     if (!quote || quote.trim().length < 10) return { isValid: false, error: 'O parecer deve ter no mínimo 10 caracteres.' };
     return { isValid: true };
   }
@@ -300,6 +574,49 @@
     if (talent) {
       if (!talent.endorsements) talent.endorsements = [];
       talent.endorsements.unshift(payload);
+      localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(talents));
+    }
+    return true;
+  }
+
+  function updateTalentProfile(id, updatedData) {
+    const talents = getTalents('Todas as Cidades');
+    const idx = talents.findIndex(t => t.id == id);
+    if (idx !== -1) {
+      talents[idx] = { ...talents[idx], ...updatedData };
+      localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(talents));
+
+      const authUser = getAuthUser();
+      if (authUser) {
+        if (updatedData.name) authUser.name = updatedData.name;
+        if (updatedData.city) authUser.city = updatedData.city;
+        if (updatedData.avatar) authUser.avatar = updatedData.avatar;
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+        renderNavbarAuthStatus();
+      }
+
+      return talents[idx];
+    }
+    return null;
+  }
+
+  function addEducationToTalent(id, payload) {
+    const talents = getTalents('Todas as Cidades');
+    const talent = talents.find(t => t.id == id);
+    if (talent) {
+      if (!talent.education) talent.education = [];
+      talent.education.unshift(payload);
+      localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(talents));
+    }
+    return true;
+  }
+
+  function addExperienceToTalent(id, payload) {
+    const talents = getTalents('Todas as Cidades');
+    const talent = talents.find(t => t.id == id);
+    if (talent) {
+      if (!talent.experiences) talent.experiences = [];
+      talent.experiences.unshift(payload);
       localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(talents));
     }
     return true;
@@ -364,7 +681,7 @@
       `;
       document.body.appendChild(toast);
     }
-    toast.innerHTML = `<span>✨ ${message}</span>`;
+    toast.innerHTML = `<span>${message}</span>`;
     toast.style.opacity = '1';
     toast.style.transform = 'translateY(0)';
 
@@ -412,7 +729,7 @@
       cities.forEach(city => {
         const option = document.createElement('option');
         option.value = city;
-        option.textContent = city === 'Todas as Cidades' ? '📍 Vale do Ivaí (Todas)' : `📍 ${city}`;
+        option.textContent = city === 'Todas as Cidades' ? 'Vale do Ivaí (Todas)' : `${city}`;
         if (city === currentCity) option.selected = true;
         select.appendChild(option);
       });
@@ -423,16 +740,61 @@
     });
   }
 
+  function addJob(payload) {
+    let local = JSON.parse(localStorage.getItem(STORAGE_KEY_JOBS));
+    if (!local || local.length === 0) {
+      local = seedData.jobs;
+    }
+    local.unshift(payload);
+    localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(local));
+    return payload;
+  }
+
+  function initRoleSelectors() {
+    const roleSelects = document.querySelectorAll('.role-select-global');
+    const currentRole = getUserRole();
+    const roles = getUserRoles();
+
+    roleSelects.forEach(select => {
+      select.innerHTML = '';
+      roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name;
+        if (role.id === currentRole) option.selected = true;
+        select.appendChild(option);
+      });
+
+      select.addEventListener('change', (e) => {
+        setUserRole(e.target.value);
+      });
+    });
+
+    updateDOMRoleVisibility(currentRole);
+  }
+
   // Exportação Global window.IvaiConecta
   window.IvaiConecta = {
     firebaseConfig,
     getCities,
     getSelectedCity,
     setSelectedCity,
+    getUserRole,
+    setUserRole,
+    getUserRoles,
+    getAuthUser,
+    login,
+    register,
+    logout,
+    renderNavbarAuthStatus,
     getTalents,
     getTalentById,
     addEndorsementToTalent,
+    updateTalentProfile,
+    addEducationToTalent,
+    addExperienceToTalent,
     getJobs,
+    addJob,
     getServices,
     addService,
     calculateMatchScore,
@@ -443,12 +805,15 @@
     openModal,
     closeModal,
     setupModalListeners,
-    initCitySelectors
+    initCitySelectors,
+    initRoleSelectors
   };
 
   // Init DOM
   document.addEventListener('DOMContentLoaded', () => {
     initCitySelectors();
+    initRoleSelectors();
+    renderNavbarAuthStatus();
     setupModalListeners();
   });
 

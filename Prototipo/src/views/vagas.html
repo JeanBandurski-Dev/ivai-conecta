@@ -32,28 +32,35 @@
         <li><a href="index.html" class="nav-link">Dashboard</a></li>
         <li><a href="vagas.html" class="nav-link active">Vagas & Match</a></li>
         <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
-        <li><a href="perfil-aluno.html" class="nav-link">Perfil do Aluno</a></li>
+        <li><a href="banco-de-talentos.html" class="nav-link">Banco de Talentos</a></li>
       </ul>
 
       <div class="nav-actions">
-        <div class="city-selector-pill">
-          <select class="city-select-global" id="jobsPageCitySelect">
-            <!-- Preenchido via app.js -->
-          </select>
+        <div id="navbarAuthContainer">
+          <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
         </div>
-        <a href="perfil-aluno.html" class="btn btn-primary btn-sm">Ver Meu Perfil</a>
+
+        <div data-show-role="empresa" style="display: none;">
+          <button class="btn btn-teal btn-sm" id="btnOpenPublishModal">+ Publicar Nova Vaga</button>
+        </div>
       </div>
     </div>
   </nav>
 
   <!-- HEADER -->
   <header style="background: linear-gradient(135deg, var(--primary-dark), var(--primary-blue)); color: var(--white); padding: 3.5rem 0;">
-    <div class="container">
-      <span class="hero-tag" style="margin-bottom: 0.75rem;">🤖 Algoritmo de Matching de Habilidades</span>
-      <h1 style="color: var(--white); font-size: 2.4rem; margin-bottom: 0.5rem;">Painel de Vagas & Compatibilidade</h1>
-      <p style="color: var(--gray-300); max-width: 650px;">
-        As vagas abaixo calculam dinamicamente a % de alinhamento com base nos requisitos e nas competências do perfil do aluno selecionado.
-      </p>
+    <div class="container" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1.5rem;">
+      <div>
+        <span class="hero-tag" style="margin-bottom: 0.75rem;">Algoritmo de Matching de Habilidades</span>
+        <h1 style="color: var(--white); font-size: 2.4rem; margin-bottom: 0.5rem;">Painel de Vagas & Compatibilidade</h1>
+        <p style="color: var(--gray-300); max-width: 650px;">
+          As vagas abaixo calculam dinamicamente a % de alinhamento com base nos requisitos da oportunidade e nas competências do perfil profissional selecionado.
+        </p>
+      </div>
+
+      <div data-show-role="empresa" style="display: none;">
+        <button class="btn btn-teal" id="btnPublishJobHero">+ Publicar Vaga da Sua Empresa</button>
+      </div>
     </div>
   </header>
 
@@ -64,9 +71,16 @@
     <div style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
       <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
         
-        <div class="search-input-group" style="max-width: 480px; width: 100%; border: 1px solid var(--gray-300);">
-          <span>🔍</span>
-          <input type="text" id="jobSearchInput" placeholder="Filtrar por cargo, tecnologia ou empresa...">
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; flex-wrap: wrap;">
+          <div class="search-input-group" style="max-width: 400px; width: 100%; border: 1px solid var(--gray-300);">
+            <input type="text" id="jobSearchInput" placeholder="Filtrar por cargo, tecnologia ou empresa...">
+          </div>
+
+          <div class="city-selector-pill" style="border: 1px solid var(--gray-300); background: var(--gray-50);" title="Filtrar por cidade no Vale do Ivaí">
+            <select class="city-select-global" id="jobsPageCitySelect">
+              <!-- Preenchido via app.js -->
+            </select>
+          </div>
         </div>
 
         <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
@@ -89,6 +103,60 @@
       <!-- Preenchido via script -->
     </div>
   </main>
+
+  <!-- MODAL DE PUBLICAR NOVA VAGA (EMPRESA / RECRUTADOR) -->
+  <div class="modal-backdrop" id="publishJobModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Publicar Nova Vaga de Trabalho</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+
+      <form id="newJobForm">
+        <div class="form-group">
+          <label for="newJobTitle">Título do Cargo / Vaga</label>
+          <input type="text" id="newJobTitle" class="form-control" placeholder="Ex: Desenvolvedor Web Junior ou Assistente Financeiro" required>
+        </div>
+
+        <div class="form-group">
+          <label for="newJobCompany">Nome da Empresa / Contratante</label>
+          <input type="text" id="newJobCompany" class="form-control" placeholder="Ex: ValeTech Soluções Digitais ou Mercado Central" required>
+        </div>
+
+        <div class="form-group">
+          <label for="newJobCity">Cidade da Vaga</label>
+          <select id="newJobCity" class="form-control" required>
+            <option value="Ivaiporã">Ivaiporã</option>
+            <option value="Jardim Alegre">Jardim Alegre</option>
+            <option value="São João do Ivaí">São João do Ivaí</option>
+            <option value="Manoel Ribas">Manoel Ribas</option>
+            <option value="Lunardelli">Lunardelli</option>
+            <option value="Borrazópolis">Borrazópolis</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="newJobType">Modalidade / Tipo de Contrato</label>
+          <select id="newJobType" class="form-control" required>
+            <option value="Estágio / Trainee">Estágio / Trainee (Alunos/Estudantes)</option>
+            <option value="Tempo Integral (CLT)">Tempo Integral (CLT)</option>
+            <option value="Prestador de Serviço (PJ)">Prestador de Serviço (PJ / Freelancer)</option>
+            <option value="Meio Período">Meio Período</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="newJobSkills">Competências Requeridas (separadas por vírgula)</label>
+          <input type="text" id="newJobSkills" class="form-control" placeholder="Ex: JavaScript, React, Git, Excel Avançado" required>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-teal">Publicar Vaga no Ivaí Conecta</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- MODAL DE CANDIDATURA DE VAGA -->
   <div class="modal-backdrop" id="applyJobModal">
@@ -135,7 +203,44 @@
         renderJobs();
       });
 
+      window.addEventListener('userRoleChanged', () => {
+        renderJobs();
+      });
+
       document.getElementById('jobSearchInput')?.addEventListener('input', renderJobs);
+
+      // Abrir modal de publicação
+      document.getElementById('btnOpenPublishModal')?.addEventListener('click', () => {
+        IvaiConecta.openModal('publishJobModal');
+      });
+      document.getElementById('btnPublishJobHero')?.addEventListener('click', () => {
+        IvaiConecta.openModal('publishJobModal');
+      });
+
+      // Form de Publicação de Vaga
+      document.getElementById('newJobForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = document.getElementById('newJobTitle').value;
+        const company = document.getElementById('newJobCompany').value;
+        const city = document.getElementById('newJobCity').value;
+        const type = document.getElementById('newJobType').value;
+        const rawSkills = document.getElementById('newJobSkills').value;
+        const requiredSkills = rawSkills.split(',').map(s => s.trim()).filter(Boolean);
+
+        IvaiConecta.addJob({
+          id: Date.now(),
+          title,
+          company,
+          city,
+          type,
+          requiredSkills
+        });
+
+        renderJobs();
+        IvaiConecta.closeModal('publishJobModal');
+        IvaiConecta.showToast(`Vaga de "${title}" publicada com sucesso pela empresa ${company}!`);
+        document.getElementById('newJobForm').reset();
+      });
 
       // Skill Pills
       document.querySelectorAll('#skillPillsFilter .tag').forEach(pill => {
@@ -153,8 +258,10 @@
 
       // Confirmar Candidatura
       document.getElementById('btnConfirmApply')?.addEventListener('click', () => {
+        const userRole = IvaiConecta.getUserRole();
+        const roleLabel = userRole === 'aluno' ? 'Estudante (Estágio/Júnior)' : 'Candidato Profissional';
         IvaiConecta.closeModal('applyJobModal');
-        IvaiConecta.showToast(`Candidatura enviada para "${selectedJobForModal?.title}"! A empresa receberá seu perfil com endossos verificados.`);
+        IvaiConecta.showToast(`Candidatura enviada para "${selectedJobForModal?.title}" como ${roleLabel}!`);
       });
 
       // URL search params
@@ -163,6 +270,10 @@
       if (queryParam) {
         document.getElementById('jobSearchInput').value = queryParam;
         renderJobs();
+      }
+      if (urlParams.get('action') === 'new') {
+        IvaiConecta.setUserRole('empresa');
+        IvaiConecta.openModal('publishJobModal');
       }
     });
 
@@ -204,7 +315,7 @@
             </div>
             <h3 style="font-size: 1.15rem; margin-bottom: 0.4rem;">${job.title}</h3>
             <div style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.75rem;">
-              <span>📍 ${job.city}</span> &bull; <span>💼 ${job.type}</span>
+              <span>${job.city}</span> &bull; <span>${job.type}</span>
             </div>
             <div class="skill-tags">
               ${job.requiredSkills.map(skill => `<span class="tag">${skill}</span>`).join('')}
@@ -226,7 +337,7 @@
             document.getElementById('modalJobDetails').innerHTML = `
               <div style="padding: 1rem; background: var(--gray-50); border-radius: var(--radius-md); border: 1px solid var(--gray-200); margin-top: 1rem;">
                 <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary-blue);">${selectedJobForModal.company}</div>
-                <div style="font-size: 0.9rem; color: var(--gray-700); margin-top: 0.25rem;">📍 ${selectedJobForModal.city} &bull; 💼 ${selectedJobForModal.type}</div>
+                <div style="font-size: 0.9rem; color: var(--gray-700); margin-top: 0.25rem;">${selectedJobForModal.city} &bull; ${selectedJobForModal.type}</div>
                 <div style="margin-top: 1rem; font-size: 0.95rem; font-weight: 600;">
                   Seu índice de compatibilidade nesta vaga é de <span style="color: var(--accent-green); font-weight: 800; font-size: 1.2rem;">${score}%</span>.
                 </div>
