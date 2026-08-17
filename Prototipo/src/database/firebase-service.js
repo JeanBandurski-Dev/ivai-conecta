@@ -3,16 +3,22 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
+import { auth } from '../../public/js/firebase-config.js';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
 import { db, isFirebaseInitialized } from '../../public/js/firebase-config.js';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  arrayUnion, 
-  query, 
-  where 
+import {
+  collection,
+  getDocs,
+  doc,
+  addDoc,
+  updateDoc,
+  arrayUnion,
+  query,
+  where
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Seed Data Fallback incorporado para compatibilidade nativa de browser ES Modules
@@ -378,4 +384,26 @@ export async function addService(servicePayload) {
   }
 
   return servicePayload;
+}
+
+// ==========================================
+// AUTENTICAÇÃO (FIREBASE AUTH)
+// ==========================================
+
+export async function loginUser(email, password) {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return { success: true, user: userCredential.user };
+  } catch (error) {
+    return { success: false, errorCode: error.code };
+  }
+}
+
+export async function registerUser(email, password, additionalData) {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return { success: true, user: userCredential.user };
+  } catch (error) {
+    return { success: false, errorCode: error.code };
+  }
 }
