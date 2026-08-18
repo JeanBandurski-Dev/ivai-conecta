@@ -146,7 +146,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   height: 72px;
-  gap: 1rem;
+  gap: 1.5rem;
   white-space: nowrap;
 }
 
@@ -161,11 +161,13 @@ textarea {
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-right: 0.5rem;
 }
 
 .logo-brand-svg {
   height: 40px;
   width: auto;
+  flex-shrink: 0;
 }
 
 .logo-brand .logo-ivai {
@@ -188,9 +190,10 @@ textarea {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.75rem;
   list-style: none;
   white-space: nowrap;
+  margin: 0 auto;
 }
 
 .nav-link {
@@ -225,6 +228,7 @@ textarea {
   gap: 0.85rem;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 #navbarAuthContainer {
@@ -330,6 +334,21 @@ textarea {
 .btn-whatsapp:hover {
   background: linear-gradient(135deg, #1EBE5D, #15803D);
   color: var(--white);
+  transform: translateY(-1px);
+}
+
+.btn-whatsapp-hover {
+  background: transparent;
+  border-color: var(--gray-300);
+  color: var(--gray-800);
+  transition: var(--transition);
+}
+
+.btn-whatsapp-hover:hover {
+  background: #25D366 !important;
+  border-color: #25D366 !important;
+  color: var(--white) !important;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3) !important;
   transform: translateY(-1px);
 }
 
@@ -710,12 +729,32 @@ textarea {
   box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.15);
 }
 
-/* Footer */
+/* Bottom Content Spacing */
+main,
+.section {
+  padding-bottom: 5rem;
+}
+
+/* Footer & Reveal Effect */
 .footer {
   background: var(--primary-dark);
   color: var(--white);
   padding: 4rem 0 2rem 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 5rem;
+  position: relative;
+  z-index: 10;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.45s ease;
+}
+
+.footer.footer-collapsed {
+  opacity: 0.7;
+  transform: translateY(35px);
+}
+
+.footer.footer-expanded {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .footer-grid {
@@ -778,5 +817,118 @@ textarea {
 
   .footer-grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* User Profile Avatar & Dropdown Menu */
+.user-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+.user-avatar-btn {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  color: var(--gray-700);
+}
+
+.user-avatar-btn:hover,
+.user-avatar-btn:focus {
+  background: var(--gray-100);
+  color: var(--primary-blue);
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 250px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+.user-dropdown-menu.show {
+  display: flex;
+}
+
+.user-dropdown-header {
+  padding: 1rem 1.25rem;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.user-dropdown-name {
+  font-weight: 700;
+  color: var(--primary-dark);
+  font-size: 0.95rem;
+  white-space: normal;
+}
+
+.user-dropdown-badge {
+  font-size: 0.775rem;
+  color: var(--primary-blue);
+  font-weight: 600;
+  margin-top: 0.2rem;
+  white-space: normal;
+}
+
+.user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  color: var(--gray-700);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-dropdown-item:hover {
+  background: var(--gray-100);
+  color: var(--primary-blue);
+}
+
+.user-dropdown-divider {
+  height: 1px;
+  background: var(--gray-200);
+  margin: 0.25rem 0;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

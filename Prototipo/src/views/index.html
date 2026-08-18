@@ -39,10 +39,6 @@
         <div id="navbarAuthContainer">
           <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
         </div>
-
-        <div data-show-role="empresa" style="display: none;">
-          <a href="vagas.html?action=new" class="btn btn-teal btn-sm">+ Publicar Vaga</a>
-        </div>
       </div>
     </div>
   </nav>
@@ -68,6 +64,14 @@
             </select>
           </div>
           <button class="btn btn-teal" id="heroSearchBtn">Buscar Agora</button>
+        </div>
+
+        <!-- Quick Action Buttons relocated from Navbar -->
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
+          <a href="servicos.html?action=new" class="btn btn-teal btn-sm" style="box-shadow: var(--shadow-sm); font-weight: 600;">+ Cadastrar Serviço</a>
+          <div data-show-role="empresa" style="display: none;">
+            <a href="vagas.html?action=new" class="btn btn-outline btn-sm" style="color: var(--white); border-color: rgba(255,255,255,0.4); font-weight: 600;">+ Publicar Vaga</a>
+          </div>
         </div>
       </div>
 
@@ -145,7 +149,12 @@
           <div class="section-subtitle">Oportunidades Regionais</div>
           <h2 class="section-title">Vagas em Destaque com Algoritmo de Matching</h2>
         </div>
-        <a href="vagas.html" class="btn btn-primary">Explorar Todas as Vagas</a>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <div data-show-role="empresa" style="display: none;">
+            <a href="vagas.html?action=new" class="btn btn-teal">+ Publicar Vaga</a>
+          </div>
+          <a href="vagas.html" class="btn btn-primary">Explorar Todas as Vagas</a>
+        </div>
       </div>
 
       <div class="grid-3" id="jobsGrid">
@@ -162,7 +171,10 @@
           <div class="section-subtitle">Marketplace Vale do Ivaí</div>
           <h2 class="section-title">Serviços Locais Recomendados</h2>
         </div>
-        <a href="servicos.html" class="btn btn-outline">Ver Todos os Serviços</a>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <a href="servicos.html?action=new" class="btn btn-teal">+ Cadastrar Meu Serviço</a>
+          <a href="servicos.html" class="btn btn-outline">Ver Todos os Serviços</a>
+        </div>
       </div>
 
       <div class="grid-3" id="servicesGrid">

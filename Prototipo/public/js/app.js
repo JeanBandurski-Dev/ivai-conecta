@@ -4,7 +4,7 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
-(function() {
+(function () {
   'use strict';
 
   // Configuração Oficial do Firebase Console (ivai-conecta-4a366)
@@ -26,6 +26,7 @@
   const STORAGE_KEY_USER_ROLE = 'ivai_conecta_current_user_role';
   const STORAGE_KEY_AUTH_USER = 'ivai_conecta_auth_user';
   const STORAGE_KEY_USERS_DB = 'ivai_conecta_users_db';
+  const STORAGE_KEY_APPLICATIONS = 'ivai_conecta_user_applications';
 
   // Configuração dos Perfis de Usuários Suportados
   const USER_ROLES = {
@@ -268,27 +269,141 @@
     }, 300);
   }
 
+  function ensureAccountSettingsModal() {
+    if (document.getElementById('accountSettingsModal')) return;
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.id = 'accountSettingsModal';
+    modal.innerHTML = `
+      <div class="modal" style="max-width: 520px;">
+        <div class="modal-header">
+          <h3>Configurações da Conta</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <form id="accountSettingsForm">
+          <div class="form-group">
+            <label>E-mail de Acesso</label>
+            <input type="email" id="settingUserEmail" class="form-control" readonly style="background: var(--gray-100);">
+          </div>
+
+          <div class="form-group">
+            <label>Alterar Senha</label>
+            <input type="password" id="settingNewPassword" class="form-control" placeholder="Nova senha (deixe em branco para manter)">
+          </div>
+
+          <div class="form-group">
+            <label>Notificações por E-mail</label>
+            <select id="settingNotifications" class="form-control">
+              <option value="all">Receber alertas de novas vagas e propostas</option>
+              <option value="important">Apenas convites para entrevistas</option>
+              <option value="none">Desativar todas as notificações</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Privacidade do Perfil no Banco de Talentos</label>
+            <select id="settingPrivacy" class="form-control">
+              <option value="public">Visível para todas as empresas do Vale do Ivaí</option>
+              <option value="verified_only">Apenas empresas com selo verificado</option>
+              <option value="private">Privado (Apenas quando me candidatar)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="button" class="btn btn-outline" data-close-modal>Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-close')?.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+    modal.querySelector('[data-close-modal]')?.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+
+    document.getElementById('accountSettingsForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      modal.classList.remove('active');
+      showToast('Configurações da conta salvas com sucesso!');
+    });
+  }
+
   function renderNavbarAuthStatus() {
     const user = getAuthUser();
     const container = document.getElementById('navbarAuthContainer');
     if (!container) return;
 
     if (user) {
-      const avatarUrl = user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <a href="perfil-aluno.html" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none;" title="Ver Perfil">
-            <img src="${avatarUrl}" alt="${user.name}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-blue); box-shadow: var(--shadow-sm);">
-            <div style="font-size: 0.85rem; text-align: left; line-height: 1.2;">
-              <div style="font-weight: 700; color: var(--primary-dark);">${user.name}</div>
-              <div style="font-size: 0.725rem; color: var(--primary-blue); font-weight: 600;">${user.badge || USER_ROLES[user.role]?.badge}</div>
+        <div class="user-menu-container">
+          <button class="user-avatar-btn" id="btnUserMenuDropdown" title="${user.name} - Opções da Conta" aria-label="Menu do Usuário">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4.5"/>
+              <path d="M20 21c0-3.6-3.6-6.5-8-6.5s-8 2.9-8 6.5"/>
+            </svg>
+          </button>
+
+          <div class="user-dropdown-menu" id="userDropdownMenu">
+            <div class="user-dropdown-header">
+              <div class="user-dropdown-name">${user.name}</div>
+              <div class="user-dropdown-badge">${user.badge || USER_ROLES[user.role]?.badge}</div>
             </div>
-          </a>
-          <button class="btn btn-outline btn-sm" id="btnNavLogout" title="Sair da Conta" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Sair</button>
+
+            <a href="perfil-aluno.html" class="user-dropdown-item">
+              <span>Meu Perfil & Qualificações</span>
+            </a>
+
+            <a href="minhas-vagas.html" class="user-dropdown-item">
+              <span>Minhas Candidaturas</span>
+            </a>
+
+            <a href="vagas.html" class="user-dropdown-item">
+              <span>Painel de Vagas</span>
+            </a>
+
+            <div class="user-dropdown-divider"></div>
+
+            <button type="button" class="user-dropdown-item" id="dropdownBtnSettings">
+              <span>Configurações da Conta</span>
+            </button>
+
+            <div class="user-dropdown-divider"></div>
+
+            <button type="button" class="user-dropdown-item" id="dropdownBtnLogout" style="color: var(--danger);">
+              <span>Sair da Conta</span>
+            </button>
+          </div>
         </div>
       `;
 
-      document.getElementById('btnNavLogout')?.addEventListener('click', () => {
+      const avatarBtn = document.getElementById('btnUserMenuDropdown');
+      const dropdownMenu = document.getElementById('userDropdownMenu');
+
+      avatarBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownMenu?.classList.toggle('show');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+          dropdownMenu?.classList.remove('show');
+        }
+      });
+
+      document.getElementById('dropdownBtnSettings')?.addEventListener('click', () => {
+        dropdownMenu?.classList.remove('show');
+        ensureAccountSettingsModal();
+        const emailInput = document.getElementById('settingUserEmail');
+        if (emailInput) emailInput.value = user.email || 'usuario@ivaiconecta.com.br';
+        openModal('accountSettingsModal');
+      });
+
+      document.getElementById('dropdownBtnLogout')?.addEventListener('click', () => {
+        dropdownMenu?.classList.remove('show');
         logout();
       });
     } else {
@@ -488,10 +603,10 @@
   function calculateMatchScore(studentSkills = [], requiredSkills = []) {
     if (!requiredSkills || requiredSkills.length === 0) return 0;
     if (!studentSkills || studentSkills.length === 0) return 0;
-    
+
     const normalizedStudent = studentSkills.map(s => String(s).toLowerCase().trim());
     let matches = 0;
-    
+
     requiredSkills.forEach(req => {
       if (normalizedStudent.includes(String(req).toLowerCase().trim())) {
         matches++;
@@ -656,6 +771,143 @@
     return payload;
   }
 
+  // Gestão de Candidaturas do Usuário com Etapas de Processo Seletivo
+  function getUserApplications() {
+    let apps = JSON.parse(localStorage.getItem(STORAGE_KEY_APPLICATIONS));
+    if (!apps || apps.length === 0) {
+      apps = [
+        {
+          id: 'app_101',
+          jobId: 101,
+          title: 'Desenvolvedor Front-end Junior / Estagiário',
+          company: 'ValeTech Soluções Digitais',
+          recruiterPhone: '5543999887766',
+          city: 'Ivaiporã',
+          type: 'Tempo Integral / Híbrido',
+          appliedAt: '16/08/2026',
+          matchScore: 92,
+          status: 'Entrevista Agendada',
+          statusBadge: 'badge-match high',
+          currentStageIndex: 2,
+          nextStepNote: 'Entrevista técnica agendada para Quinta-feira às 14:00 via Google Meet.',
+          stages: [
+            { name: 'Candidatura Enviada', date: '16/08/2026', completed: true },
+            { name: 'Triagem de Currículo', date: '17/08/2026', completed: true },
+            { name: 'Entrevista / Teste Técnico', date: '19/08/2026', completed: false, active: true },
+            { name: 'Proposta / Admissão', date: 'Pendente', completed: false }
+          ]
+        },
+        {
+          id: 'app_102',
+          jobId: 102,
+          title: 'Assistente Administrativo & Financeiro',
+          company: 'Cooperativa Agropecuária do Vale',
+          recruiterPhone: '5543999112233',
+          city: 'Ivaiporã',
+          type: 'Tempo Integral',
+          appliedAt: '12/08/2026',
+          matchScore: 85,
+          status: 'Em Análise pelo Recrutador',
+          statusBadge: 'badge-endosso',
+          currentStageIndex: 1,
+          nextStepNote: 'Sua candidatura está em avaliação pela equipe de Recursos Humanos.',
+          stages: [
+            { name: 'Candidatura Enviada', date: '12/08/2026', completed: true },
+            { name: 'Triagem de Currículo', date: '14/08/2026', completed: false, active: true },
+            { name: 'Entrevista Presencial', date: 'A definir', completed: false },
+            { name: 'Proposta / Admissão', date: 'Pendente', completed: false }
+          ]
+        },
+        {
+          id: 'app_103',
+          jobId: 103,
+          title: 'Técnico de Manutenção Elétrica Industrial',
+          company: 'Indústria Metalúrgica Ivaiporã',
+          recruiterPhone: '5543999445566',
+          city: 'São João do Ivaí',
+          type: 'Tempo Integral',
+          appliedAt: '05/08/2026',
+          matchScore: 78,
+          status: 'Candidatura Enviada',
+          statusBadge: 'badge-endosso',
+          currentStageIndex: 0,
+          nextStepNote: 'Aguardando abertura de triagem de currículos pela empresa.',
+          stages: [
+            { name: 'Candidatura Enviada', date: '05/08/2026', completed: true, active: true },
+            { name: 'Triagem de Currículo', date: 'A definir', completed: false },
+            { name: 'Teste Prático & NR-10', date: 'A definir', completed: false },
+            { name: 'Proposta / Admissão', date: 'Pendente', completed: false }
+          ]
+        },
+        {
+          id: 'app_104',
+          jobId: 104,
+          title: 'Desenvolvedor Front-end React',
+          company: 'Grupo Tecnologia Vale do Ivaí',
+          recruiterPhone: '5543999778899',
+          city: 'Ivaiporã',
+          type: 'Híbrido',
+          appliedAt: '20/07/2026',
+          matchScore: 92,
+          status: 'Finalizado',
+          statusBadge: 'badge-endosso',
+          currentStageIndex: 3,
+          nextStepNote: 'Processo seletivo concluído com sucesso.',
+          stages: [
+            { name: 'Candidatura Enviada', date: '20/07/2026', completed: true },
+            { name: 'Triagem de Currículo', date: '22/07/2026', completed: true },
+            { name: 'Entrevista & Teste', date: '28/07/2026', completed: true },
+            { name: 'Proposta / Admissão', date: '05/08/2026', completed: true }
+          ]
+        }
+      ];
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(apps));
+    }
+    return apps;
+  }
+
+  function addJobApplication(jobPayload) {
+    let apps = getUserApplications();
+    const existing = apps.find(a => a.jobId == jobPayload.id || (a.title === jobPayload.title && a.company === jobPayload.company));
+    if (existing) {
+      return { success: false, error: 'Você já se candidatou a esta vaga anteriormente.' };
+    }
+
+    const todayStr = new Date().toLocaleDateString('pt-BR');
+    const newApp = {
+      id: `app_${Date.now()}`,
+      jobId: jobPayload.id || Date.now(),
+      title: jobPayload.title || 'Vaga Regional',
+      company: jobPayload.company || 'Empresa Parceira',
+      recruiterPhone: jobPayload.phone || '5543999887766',
+      city: jobPayload.city || 'Ivaiporã',
+      type: jobPayload.type || 'Tempo Integral',
+      appliedAt: todayStr,
+      matchScore: jobPayload.matchScore || 88,
+      status: 'Candidatura Enviada',
+      statusBadge: 'badge-endosso',
+      currentStageIndex: 0,
+      nextStepNote: 'Sua candidatura foi registrada e enviada para o recrutador da empresa.',
+      stages: [
+        { name: 'Candidatura Enviada', date: todayStr, completed: true, active: true },
+        { name: 'Triagem de Currículo', date: 'A definir', completed: false },
+        { name: 'Entrevista / Avaliação', date: 'A definir', completed: false },
+        { name: 'Proposta / Admissão', date: 'Pendente', completed: false }
+      ]
+    };
+
+    apps.unshift(newApp);
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(apps));
+    return { success: true, application: newApp };
+  }
+
+  function removeJobApplication(appId) {
+    let apps = getUserApplications();
+    apps = apps.filter(a => a.id !== appId);
+    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(apps));
+    return true;
+  }
+
   // Toast Visual
   function showToast(message) {
     let toast = document.getElementById('ivai-toast');
@@ -797,6 +1049,9 @@
     addJob,
     getServices,
     addService,
+    getUserApplications,
+    addJobApplication,
+    removeJobApplication,
     calculateMatchScore,
     generateWhatsAppLink,
     validateEndorsement,
@@ -809,12 +1064,35 @@
     initRoleSelectors
   };
 
+  function initFooterRevealEffect() {
+    const footer = document.querySelector('.footer');
+    if (!footer) return;
+
+    footer.classList.add('footer-collapsed');
+
+    const checkFooterScroll = () => {
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 200;
+      if (scrollPosition >= threshold) {
+        footer.classList.add('footer-expanded');
+        footer.classList.remove('footer-collapsed');
+      } else {
+        footer.classList.add('footer-collapsed');
+        footer.classList.remove('footer-expanded');
+      }
+    };
+
+    window.addEventListener('scroll', checkFooterScroll, { passive: true });
+    checkFooterScroll();
+  }
+
   // Init DOM
   document.addEventListener('DOMContentLoaded', () => {
     initCitySelectors();
     initRoleSelectors();
     renderNavbarAuthStatus();
     setupModalListeners();
+    initFooterRevealEffect();
   });
 
 })();
