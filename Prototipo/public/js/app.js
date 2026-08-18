@@ -692,6 +692,126 @@
             isVerified: true
           }
         ]
+      },
+      {
+        id: 5,
+        name: "Rafael Gomes Costa",
+        course: "Engenharia de Software",
+        institution: "UENP",
+        city: "Ivaiporã",
+        avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250",
+        skills: ["Python", "Django", "PostgreSQL", "Docker", "REST APIs", "Git"],
+        endorsements: [
+          {
+            id: "end_06",
+            profName: "Prof. Dr. André Luciano",
+            profEmail: "andre.luciano@uenp.edu.br",
+            institution: "UENP",
+            discipline: "Engenharia de Software Avançada",
+            quote: "Rafael demonstra maturidade técnica rara para um estudante, com projetos de backend robustos e bem documentados.",
+            isVerified: true
+          }
+        ]
+      },
+      {
+        id: 6,
+        name: "Juliana Aparecida Melo",
+        course: "Análise e Desenvolvimento de Sistemas",
+        institution: "IFPR Campus Ivaiporã",
+        city: "Jardim Alegre",
+        avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250",
+        skills: ["Vue.js", "JavaScript", "HTML5/CSS3", "MySQL", "Scrum", "Figma"],
+        endorsements: [
+          {
+            id: "end_07",
+            profName: "Prof. Ma. Renata Nunes",
+            profEmail: "renata.nunes@ifpr.edu.br",
+            institution: "IFPR Campus Ivaiporã",
+            discipline: "Desenvolvimento de Sistemas Web",
+            quote: "Aluna comprometida, criativa e com excelente capacidade de entrega em projetos ágeis colaborativos.",
+            isVerified: true
+          }
+        ]
+      },
+      {
+        id: 7,
+        name: "Bruno Freitas — Dev & Infra",
+        course: "Freelancer — Tecnologia da Informação",
+        institution: "Autônomo / Vale do Ivaí",
+        city: "Ivaiporã",
+        avatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250",
+        skills: ["Linux", "AWS", "Docker", "CI/CD", "Nginx", "Node.js", "TypeScript"],
+        endorsements: [
+          {
+            id: "end_08",
+            profName: "ValeTech Soluções Digitais",
+            profEmail: "rh@valetech.com.br",
+            institution: "Empresa Parceira Verificada",
+            discipline: "Infraestrutura & DevOps",
+            quote: "Profissional autônomo de alta confiabilidade. Migrou toda nossa infra para cloud com zero downtime.",
+            isVerified: true
+          }
+        ]
+      },
+      {
+        id: 8,
+        name: "Fernanda Lima",
+        course: "Licenciatura em Pedagogia",
+        institution: "Univale Ivaiporã",
+        city: "São João do Ivaí",
+        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=250",
+        skills: ["Gestão de Pessoas", "Treinamento Corporativo", "RH", "Google Workspace", "Power BI"],
+        endorsements: [
+          {
+            id: "end_09",
+            profName: "Profª. Dra. Silvia Campos",
+            profEmail: "silvia.campos@univale.edu.br",
+            institution: "Univale Ivaiporã",
+            discipline: "Gestão de Recursos Humanos",
+            quote: "Fernanda possui habilidades excepcionais de liderança educacional e gestão de equipes multidisciplinares.",
+            isVerified: true
+          }
+        ]
+      },
+      {
+        id: 9,
+        name: "Diego Carvalho — Design & Vídeo",
+        course: "Freelancer — Criação Digital",
+        institution: "Autônomo / Manoel Ribas",
+        city: "Manoel Ribas",
+        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250",
+        skills: ["Adobe Premiere", "After Effects", "Figma", "Motion Design", "Social Media", "Copywriting"],
+        endorsements: [
+          {
+            id: "end_10",
+            profName: "Agência Conect@ Comunicação",
+            profEmail: "contato@conectacomm.com.br",
+            institution: "Empresa Parceira Verificada",
+            discipline: "Produção Audiovisual & Branding",
+            quote: "Diego transforma briefings complexos em peças criativas impactantes. Entrega antes do prazo e supera expectativas.",
+            isVerified: true
+          }
+        ]
+      },
+      {
+        id: 10,
+        name: "Isabela Rocha",
+        course: "Ciências Contábeis",
+        institution: "UENP",
+        city: "Grandes Rios",
+        avatar: "https://images.unsplash.com/photo-1546961342-ea5f60b193b7?auto=format&fit=crop&q=80&w=250",
+        skills: ["Contabilidade Fiscal", "SPED", "Excel Avançado", "Planejamento Tributário", "ERP Totvs"],
+        endorsements: [
+          {
+            id: "end_11",
+            profName: "Prof. Dr. Marcos Pereira",
+            profEmail: "marcos.pereira@uenp.edu.br",
+            institution: "UENP",
+            discipline: "Contabilidade Tributária e Fiscal",
+            quote: "Isabela tem domínio técnico e ético exemplar das normas contábeis brasileiras, sendo referência na turma.",
+            isVerified: true
+          }
+        ]
       }
     ],
     jobs: [
