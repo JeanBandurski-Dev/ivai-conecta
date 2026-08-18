@@ -18,7 +18,8 @@ import {
   updateDoc,
   arrayUnion,
   query,
-  where
+  where,
+  setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Seed Data Fallback incorporado para compatibilidade nativa de browser ES Modules
@@ -402,7 +403,19 @@ export async function loginUser(email, password) {
 export async function registerUser(email, password, additionalData) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    return { success: true, user: userCredential.user };
+    const user = userCredential.user;
+
+    if (isFirebaseInitialized) {
+      await setDoc(doc(db, 'users', user.id), {
+        name: additionalData.name,
+        email: email,
+        city: additionalData.city,
+        role: additionalData.role,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    return { success: true, user: user };
   } catch (error) {
     return { success: false, errorCode: error.code };
   }
