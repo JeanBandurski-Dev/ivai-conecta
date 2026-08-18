@@ -68,7 +68,9 @@
 
         <!-- Quick Action Buttons relocated from Navbar -->
         <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
-          <a href="servicos.html?action=new" class="btn btn-teal btn-sm" style="box-shadow: var(--shadow-sm); font-weight: 600;">+ Cadastrar Serviço</a>
+          <div data-show-role="freelancer" style="display: none;">
+            <a href="servicos.html?action=new" class="btn btn-teal btn-sm" style="box-shadow: var(--shadow-sm); font-weight: 600;">+ Cadastrar Serviço</a>
+          </div>
           <div data-show-role="empresa" style="display: none;">
             <a href="vagas.html?action=new" class="btn btn-outline btn-sm" style="color: var(--white); border-color: rgba(255,255,255,0.4); font-weight: 600;">+ Publicar Vaga</a>
           </div>
@@ -172,7 +174,9 @@
           <h2 class="section-title">Serviços Locais Recomendados</h2>
         </div>
         <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-          <a href="servicos.html?action=new" class="btn btn-teal">+ Cadastrar Meu Serviço</a>
+          <div data-show-role="freelancer" style="display: none;">
+            <a href="servicos.html?action=new" class="btn btn-teal">+ Cadastrar Meu Serviço</a>
+          </div>
           <a href="servicos.html" class="btn btn-outline">Ver Todos os Serviços</a>
         </div>
       </div>
@@ -276,29 +280,29 @@
         talentsContainer.innerHTML = `<div style="grid-column: 1/-1; padding: 2rem; text-align: center; color: var(--gray-500);">Nenhum talento ou profissional cadastrado em ${selectedCity} no momento.</div>`;
       } else {
         talentsContainer.innerHTML = talents.map(talent => `
-          <div class="card">
-            <div class="talent-card-header">
-              <img src="${talent.avatar}" alt="${talent.name}" class="avatar">
+          <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; height: 100%; border: 1px solid var(--gray-200); background: var(--white); box-shadow: none;">
+            <div class="talent-card-header" style="margin-bottom: 0.75rem;">
+              <img src="${talent.avatar}" alt="${talent.name}" class="avatar" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gray-200);">
               <div>
-                <h3 class="talent-name">${talent.name}</h3>
-                <div class="talent-course">${talent.course}</div>
-                <div class="talent-institution">${talent.institution} • ${talent.city}</div>
+                <h3 class="talent-name" style="font-size: 1.05rem; color: var(--primary-dark); font-weight: 700; margin-bottom: 0.15rem;">${talent.name}</h3>
+                <div class="talent-course" style="font-size: 0.825rem; color: var(--gray-800); font-weight: 600;">${talent.course}</div>
+                <div class="talent-institution" style="font-size: 0.775rem; color: var(--gray-500); margin-top: 0.1rem;">${talent.institution} &bull; ${talent.city}</div>
               </div>
             </div>
             
-            ${talent.endorsements && talent.endorsements.length > 0 ? `
-              <div style="margin-bottom: 0.75rem;">
-                <span class="badge-endosso">Recomendação Verificada</span>
-              </div>
-            ` : ''}
-
-            <div class="skill-tags">
-              ${talent.skills.slice(0, 4).map(skill => `<span class="tag">${skill}</span>`).join('')}
-              ${talent.skills.length > 4 ? `<span class="tag">+${talent.skills.length - 4}</span>` : ''}
+            <div style="margin-bottom: 0.75rem;">
+              <span style="font-size: 0.75rem; padding: 0.15rem 0.55rem; background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; border-radius: var(--radius-sm); font-weight: 600;">
+                ✓ ${talent.endorsements?.length || 0} Recomendações Verificadas
+              </span>
             </div>
 
-            <div style="margin-top: auto; padding-top: 1rem;">
-              <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%;">Ver Perfil Completo</a>
+            <div class="skill-tags" style="margin-bottom: 1rem;">
+              ${talent.skills.slice(0, 4).map(skill => `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">${skill}</span>`).join('')}
+              ${talent.skills.length > 4 ? `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">+${talent.skills.length - 4}</span>` : ''}
+            </div>
+
+            <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
+              <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%; justify-content: center; font-size: 0.825rem; color: var(--gray-800); border-color: var(--gray-300);">Ver Perfil Completo</a>
             </div>
           </div>
         `).join('');

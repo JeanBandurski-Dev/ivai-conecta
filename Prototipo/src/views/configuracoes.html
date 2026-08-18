@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações da Conta | Ivaí Conecta</title>
+  <meta name="description"
+    content="Gerencie suas informações de conta, segurança, notificações e preferências de perfil no Ivaí Conecta.">
+  <link rel="stylesheet" href="../../public/css/styles.css?v=4">
+  <script src="../../public/js/app.js?v=4"></script>
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="container navbar-container">
+      <a href="index.html" class="logo-brand">
+        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none"
+          xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="8" fill="#0052FF" />
+          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF" />
+          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14"
+            stroke-linecap="round" fill="none" />
+          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <circle cx="72" cy="20" r="7" fill="#22C55E" />
+          <circle cx="56" cy="36" r="6" fill="#0052FF" />
+          <circle cx="88" cy="40" r="6" fill="#0052FF" />
+        </svg>
+        <span><span class="logo-ivai">Ivaí</span> <span class="logo-conecta">Conecta</span></span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Dashboard</a></li>
+        <li><a href="vagas.html" class="nav-link">Vagas & Match</a></li>
+        <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
+        <li><a href="banco-de-talentos.html" class="nav-link">Banco de Talentos</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div id="navbarAuthContainer">
+          <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header style="background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 2.25rem 0;">
+    <div class="container"
+      style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h1 style="font-size: 1.8rem; color: var(--primary-dark); margin-bottom: 0.25rem;">Configurações da Conta</h1>
+        <p style="color: var(--gray-600); font-size: 0.925rem;">
+          Gerencie seus dados pessoais, acesso de segurança e preferências no Ivaí Conecta.
+        </p>
+      </div>
+      <div
+        style="font-size: 0.85rem; padding: 0.4rem 0.85rem; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: var(--radius-full); font-weight: 600; color: var(--gray-800);"
+        id="settingsAccountTypeBadge">
+        Perfil: Carregando...
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="container section">
+
+    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 2.5rem; align-items: flex-start;">
+
+      <!-- NAVEGAÇÃO LATERAL DE ABAS -->
+      <div
+        style="background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 0.75rem;">
+        <button class="settings-tab-btn active" data-target="tabProfile"
+          style="width: 100%; text-align: left; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: none; background: var(--primary-light); color: var(--primary-blue); font-weight: 700; font-size: 0.875rem; cursor: pointer; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>Dados do Perfil</span>
+        </button>
+
+        <button class="settings-tab-btn" data-target="tabSecurity"
+          style="width: 100%; text-align: left; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--gray-700); font-weight: 600; font-size: 0.875rem; cursor: pointer; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>Segurança & Login</span>
+        </button>
+
+        <button class="settings-tab-btn" data-target="tabNotifications"
+          style="width: 100%; text-align: left; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--gray-700); font-weight: 600; font-size: 0.875rem; cursor: pointer; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>Notificações & Alertas</span>
+        </button>
+
+        <button class="settings-tab-btn" data-target="tabPrivacy"
+          style="width: 100%; text-align: left; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--gray-700); font-weight: 600; font-size: 0.875rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+          <span>Privacidade & Dados</span>
+        </button>
+      </div>
+
+      <!-- PAINEL DE CONTEÚDO DAS ABAS -->
+      <div>
+
+        <!-- ABA 1: DADOS DO PERFIL -->
+        <div class="settings-tab-content" id="tabProfile"
+          style="background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1.75rem;">
+          <h2
+            style="font-size: 1.2rem; color: var(--primary-dark); margin-bottom: 1.25rem; font-weight: 700; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem;">
+            Informações Cadastrais
+          </h2>
+
+          <form id="formProfileSettings">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+              <div class="form-group">
+                <label for="setFullName">Nome Completo / Razão Social</label>
+                <input type="text" id="setFullName" class="form-control" required>
+              </div>
+
+              <div class="form-group">
+                <label for="setEmailDisplay">E-mail Cadastrado</label>
+                <input type="email" id="setEmailDisplay" class="form-control" readonly
+                  style="background: var(--gray-50); cursor: not-allowed;">
+              </div>
+            </div>
+
+            <!-- SEÇÃO DINÂMICA DE ACORDO COM O TIPO DE CONTA -->
+            <div id="roleSpecificFieldsContainer"
+              style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+              <!-- Preenchido via JS conforme perfil (Aluno, Empresa, Freelancer) -->
+            </div>
+
+            <!-- MODOS DE ATUAÇÃO DA CONTA (PERFIS HÍBRIDOS) -->
+            <div id="hybridModesSection"
+              style="margin-top: 1.5rem; padding: 1.25rem; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-md); scroll-margin-top: 130px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-dark); margin-bottom: 0.35rem;">
+                Modos de Atuação da Conta (Ativação de Perfil Híbrido)
+              </div>
+              <p style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 1rem; line-height: 1.4;">
+                Ative novos perfis na sua conta para expandir suas possibilidades no Vale do Ivaí (ex: Alunos que também
+                prestam serviços autônomos ou Freelancers que se candidatam a vagas CLT/Estágio).
+              </p>
+
+              <div id="hybridModesContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <!-- Preenchido via JS -->
+              </div>
+            </div>
+
+            <div
+              style="display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+              <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ABA 2: SEGURANÇA & LOGIN -->
+        <div class="settings-tab-content" id="tabSecurity"
+          style="display: none; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1.75rem;">
+          <h2
+            style="font-size: 1.2rem; color: var(--primary-dark); margin-bottom: 1.25rem; font-weight: 700; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem;">
+            Alterar Senha e Acesso
+          </h2>
+
+          <form id="formSecuritySettings">
+            <div class="form-group" style="max-width: 450px;">
+              <label for="setPassCurrent">Senha Atual</label>
+              <input type="password" id="setPassCurrent" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; max-width: 600px;">
+              <div class="form-group">
+                <label for="setPassNew">Nova Senha</label>
+                <input type="password" id="setPassNew" class="form-control" placeholder="Mínimo 6 caracteres" required>
+              </div>
+
+              <div class="form-group">
+                <label for="setPassConfirm">Confirmar Nova Senha</label>
+                <input type="password" id="setPassConfirm" class="form-control" placeholder="Repita a nova senha"
+                  required>
+              </div>
+            </div>
+
+            <div
+              style="margin-top: 1.25rem; padding: 1rem; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); max-width: 600px;">
+              <div style="font-weight: 700; font-size: 0.85rem; color: var(--gray-800); margin-bottom: 0.25rem;">
+                Autenticação em 2 Etapas (2FA)</div>
+              <div style="font-size: 0.8rem; color: var(--gray-600); margin-bottom: 0.6rem;">Adicione uma camada extra
+                de segurança ao acessar sua conta.</div>
+              <button type="button" class="btn btn-outline btn-sm" id="btnToggle2FA" style="font-size: 0.775rem;">Ativar
+                Verificação em 2 Etapas</button>
+            </div>
+
+            <div
+              style="display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+              <button type="submit" class="btn btn-primary">Atualizar Senha</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ABA 3: NOTIFICAÇÕES & ALERTAS -->
+        <div class="settings-tab-content" id="tabNotifications"
+          style="display: none; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1.75rem;">
+          <h2
+            style="font-size: 1.2rem; color: var(--primary-dark); margin-bottom: 1.25rem; font-weight: 700; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem;">
+            Preferências de Comunicação
+          </h2>
+
+          <form id="formNotificationSettings">
+            <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 650px;"
+              id="notificationsCheckboxesContainer">
+              <!-- Preenchido via JS -->
+            </div>
+
+            <div
+              style="display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+              <button type="submit" class="btn btn-primary">Salvar Preferências</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ABA 4: PRIVACIDADE & DADOS (LGPD) -->
+        <div class="settings-tab-content" id="tabPrivacy"
+          style="display: none; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1.75rem;">
+          <h2
+            style="font-size: 1.2rem; color: var(--primary-dark); margin-bottom: 1.25rem; font-weight: 700; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem;">
+            Privacidade e Gerenciamento de Dados
+          </h2>
+
+          <div style="max-width: 650px;">
+            <div style="margin-bottom: 1.5rem;">
+              <h3 style="font-size: 0.95rem; color: var(--gray-800); margin-bottom: 0.35rem;">Exportar Meus Dados (LGPD)
+              </h3>
+              <p style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.75rem;">
+                Baixe uma cópia completa dos seus dados cadastrais, currículo e candidaturas em formato JSON/PDF.
+              </p>
+              <button type="button" class="btn btn-outline btn-sm" id="btnExportData"
+                style="font-size: 0.8rem;">Exportar Dados Cadastrais</button>
+            </div>
+
+            <div style="padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
+              <h3 style="font-size: 0.95rem; color: var(--danger); margin-bottom: 0.35rem;">Exclusão de Conta</h3>
+              <p style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.75rem;">
+                A exclusão da conta é permanente e removerá todas as suas candidaturas e dados do banco regional.
+              </p>
+              <button type="button" class="btn btn-outline btn-sm" id="btnDeleteAccount"
+                style="color: var(--danger); border-color: var(--danger); font-size: 0.8rem;">Excluir Minha Conta
+                Permanentemente</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a href="index.html" class="logo-brand" style="color: var(--white); margin-bottom: 1rem;">
+            <svg class="logo-brand-svg" width="36" height="34" viewBox="0 0 100 90" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="8" fill="#38BDF8" />
+              <rect x="9" y="32" width="14" height="48" rx="7" fill="#38BDF8" />
+              <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#38BDF8" stroke-width="14"
+                stroke-linecap="round" fill="none" />
+              <line x1="56" y1="36" x2="72" y2="20" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round" />
+              <line x1="72" y1="20" x2="88" y2="40" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round" />
+              <line x1="56" y1="36" x2="88" y2="40" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round" />
+              <circle cx="72" cy="20" r="7" fill="#22C55E" />
+              <circle cx="56" cy="36" r="6" fill="#38BDF8" />
+              <circle cx="88" cy="40" r="6" fill="#38BDF8" />
+            </svg>
+            <span><span style="color: var(--white);">Ivaí</span> <span style="color: #38BDF8;">Conecta</span></span>
+          </a>
+          <p style="font-size: 0.9rem; color: var(--gray-400); margin-bottom: 1.5rem;">
+            Conectando talentos e oportunidades em Ivaiporã, Jardim Alegre, São João do Ivaí, Manoel Ribas e todo o Vale
+            do Ivaí.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Plataforma</h4>
+          <ul class="footer-links">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="vagas.html">Vagas Regionais</a></li>
+            <li><a href="servicos.html">Serviços Locais</a></li>
+            <li><a href="banco-de-talentos.html">Banco de Talentos</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Cidades Cobertas</h4>
+          <ul class="footer-links">
+            <li><a href="#">Ivaiporã</a></li>
+            <li><a href="#">Jardim Alegre</a></li>
+            <li><a href="#">São João do Ivaí</a></li>
+            <li><a href="#">Manoel Ribas</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Instituições & Parceiros</h4>
+          <ul class="footer-links">
+            <li><a href="#">IFPR Campus Ivaiporã</a></li>
+            <li><a href="#">UENP</a></li>
+            <li><a href="#">Univale</a></li>
+            <li><a href="#">Associação Comercial (ACISI)</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 Ivaí Conecta. Conectando talentos, profissionais e oportunidades em Ivaiporã e região.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = IvaiConecta.getAuthUser();
+
+      // Se não estiver logado, simula login
+      const activeUser = user || {
+        id: 1,
+        name: 'João Silva',
+        email: 'joao.silva@ifpr.edu.br',
+        role: IvaiConecta.getUserRole() || 'aluno',
+        city: 'Ivaiporã',
+        institution: 'IFPR Campus Ivaiporã',
+        course: 'Análise e Desenv. de Sistemas'
+      };
+
+      // Atualizar badge do tipo de perfil
+      const badge = document.getElementById('settingsAccountTypeBadge');
+      if (badge) {
+        const roleNames = {
+          aluno: 'Perfil Aluno / Candidato',
+          empresa: 'Perfil Empresa / Recrutador',
+          freelancer: 'Perfil Freelancer / Autônomo',
+          candidato: 'Perfil Candidato'
+        };
+        badge.textContent = roleNames[activeUser.role] || 'Perfil Cadastrado';
+      }
+
+      // Preencher campos principais
+      document.getElementById('setFullName').value = activeUser.name || '';
+      document.getElementById('setEmailDisplay').value = activeUser.email || 'usuario@ivaiconecta.com.br';
+
+      renderRoleSpecificFields(activeUser);
+      renderHybridModesBox(activeUser);
+      renderRoleNotificationCheckboxes(activeUser);
+
+      // Detectar ?highlight=hybrid para piscar a seção com bloom
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('highlight') === 'hybrid') {
+        setTimeout(() => {
+          const hybridSection = document.getElementById('hybridModesSection');
+          if (hybridSection) {
+            // Scroll suave até a seção
+            hybridSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Aguardar o scroll terminar antes de aplicar o bloom
+            setTimeout(() => {
+              hybridSection.classList.add('highlight-bloom');
+              hybridSection.addEventListener('animationend', () => {
+                hybridSection.classList.remove('highlight-bloom');
+              }, { once: true });
+            }, 600);
+          }
+        }, 350);
+      }
+
+      // Alternância de Abas
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.settings-tab-btn').forEach(b => {
+            b.style.background = 'transparent';
+            b.style.color = 'var(--gray-700)';
+            b.style.fontWeight = '600';
+          });
+
+          btn.style.background = 'var(--primary-light)';
+          btn.style.color = 'var(--primary-blue)';
+          btn.style.fontWeight = '700';
+
+          const targetId = btn.getAttribute('data-target');
+          document.querySelectorAll('.settings-tab-content').forEach(content => {
+            content.style.display = content.id === targetId ? 'block' : 'none';
+          });
+        });
+      });
+
+      // Submit do Perfil
+      document.getElementById('formProfileSettings')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newName = document.getElementById('setFullName').value.trim();
+        const newCity = document.getElementById('setCitySelect')?.value || activeUser.city;
+
+        const chkFreelancer = document.getElementById('chkEnableFreelancer');
+        const chkCandidate = document.getElementById('chkEnableCandidate');
+        const chkCompany = document.getElementById('chkEnableCompany');
+
+        if (chkFreelancer) activeUser.isFreelancerEnabled = chkFreelancer.checked;
+        if (chkCandidate) activeUser.isCandidateEnabled = chkCandidate.checked;
+        if (chkCompany) activeUser.isCompanyEnabled = chkCompany.checked;
+
+        activeUser.name = newName;
+        activeUser.city = newCity;
+
+        localStorage.setItem('ivai_conecta_auth_user', JSON.stringify(activeUser));
+        IvaiConecta.renderNavbarAuthStatus();
+        IvaiConecta.showToast('Configurações salvas! Modos de atuação atualizados.');
+      });
+
+      // Submit de Senha
+      document.getElementById('formSecuritySettings')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newPass = document.getElementById('setPassNew').value;
+        const confirmPass = document.getElementById('setPassConfirm').value;
+
+        if (newPass !== confirmPass) {
+          IvaiConecta.showToast('As senhas digitadas não coincidem.');
+          return;
+        }
+
+        IvaiConecta.showToast('Sua senha foi atualizada com sucesso!');
+        document.getElementById('formSecuritySettings').reset();
+      });
+
+      // Submit de Notificações
+      document.getElementById('formNotificationSettings')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        IvaiConecta.showToast('Preferências de notificação salvas!');
+      });
+
+      // Botão 2FA
+      document.getElementById('btnToggle2FA')?.addEventListener('click', () => {
+        IvaiConecta.showToast('Verificação em 2 Etapas ativada via WhatsApp / SMS!');
+      });
+
+      // Exportar Dados
+      document.getElementById('btnExportData')?.addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeUser, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `meus_dados_ivai_conecta_${activeUser.id}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        IvaiConecta.showToast('Download do relatório de dados iniciado (LGPD).');
+      });
+
+      // Excluir Conta
+      document.getElementById('btnDeleteAccount')?.addEventListener('click', () => {
+        if (confirm('Tem certeza de que deseja solicitar a exclusão permanente da sua conta no Ivaí Conecta?')) {
+          IvaiConecta.logout();
+          window.location.href = 'index.html';
+        }
+      });
+    });
+
+    function renderRoleSpecificFields(user) {
+      const container = document.getElementById('roleSpecificFieldsContainer');
+      if (!container) return;
+
+      const cities = IvaiConecta.getCities().filter(c => c !== 'Todas as Cidades');
+      const cityOptionsHtml = cities.map(c => `<option value="${c}" ${c === user.city ? 'selected' : ''}>${c}</option>`).join('');
+
+      if (user.role === 'empresa') {
+        container.innerHTML = `
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-dark); margin-bottom: 0.85rem;">
+            Dados da Empresa / Organização
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label for="setCNPJ">CNPJ / Registro Comercial</label>
+              <input type="text" id="setCNPJ" class="form-control" value="00.123.456/0001-99">
+            </div>
+
+            <div class="form-group">
+              <label for="setCompanyPhone">WhatsApp Corporativo / Recrutamento</label>
+              <input type="text" id="setCompanyPhone" class="form-control" value="(43) 99988-7766">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label for="setCitySelect">Cidade Sede no Vale do Ivaí</label>
+              <select id="setCitySelect" class="form-control">
+                ${cityOptionsHtml}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="setCompanyIndustry">Ramo de Atuação</label>
+              <select id="setCompanyIndustry" class="form-control">
+                <option value="Tecnologia">Tecnologia & Inovação</option>
+                <option value="Agronegócio">Agronegócio & Cooperativa</option>
+                <option value="Comércio">Comércio & Serviços</option>
+                <option value="Indústria">Indústria & Manufatura</option>
+              </select>
+            </div>
+          </div>
+        `;
+      } else if (user.role === 'freelancer') {
+        container.innerHTML = `
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-dark); margin-bottom: 0.85rem;">
+            Dados do Serviço Profissional
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label for="setServiceCategory">Categoria do Serviço</label>
+              <select id="setServiceCategory" class="form-control">
+                <option value="Construção & Manutenção">Construção & Manutenção</option>
+                <option value="Marketing & Design">Marketing & Design</option>
+                <option value="Tecnologia & Suporte">Tecnologia & Suporte</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="setServiceWhatsApp">WhatsApp para Orçamentos</label>
+              <input type="text" id="setServiceWhatsApp" class="form-control" value="(43) 99887-6655">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="setCitySelect">Cidade Principal de Atendimento</label>
+            <select id="setCitySelect" class="form-control" style="max-width: 300px;">
+              ${cityOptionsHtml}
+            </select>
+          </div>
+        `;
+      } else {
+        // Aluno / Candidato
+        container.innerHTML = `
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary-dark); margin-bottom: 0.85rem;">
+            Dados Acadêmicos e Residência
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label for="setInstitution">Instituição de Ensino</label>
+              <input type="text" id="setInstitution" class="form-control" value="${user.institution || 'IFPR Campus Ivaiporã'}">
+            </div>
+
+            <div class="form-group">
+              <label for="setCourse">Curso / Formação</label>
+              <input type="text" id="setCourse" class="form-control" value="${user.course || 'Análise e Desenv. de Sistemas'}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+            <div class="form-group">
+              <label for="setCitySelect">Cidade de Residência</label>
+              <select id="setCitySelect" class="form-control">
+                ${cityOptionsHtml}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="setProfileVisibility">Visibilidade do Currículo</label>
+              <select id="setProfileVisibility" class="form-control">
+                <option value="public">Público (Visível para Empresas do Vale do Ivaí)</option>
+                <option value="private">Privado (Apenas mediante candidatura enviada)</option>
+              </select>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function renderRoleNotificationCheckboxes(user) {
+      const container = document.getElementById('notificationsCheckboxesContainer');
+      if (!container) return;
+
+      if (user.role === 'empresa') {
+        container.innerHTML = `
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Receber e-mail imediato ao receber novas candidaturas em minhas vagas</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Resumo semanal de novos talentos cadastrados no Vale do Ivaí</span>
+          </label>
+        `;
+      } else if (user.role === 'freelancer') {
+        container.innerHTML = `
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Receber alertas de solicitação de orçamento via WhatsApp</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Notificação ao receber novas avaliações de clientes</span>
+          </label>
+        `;
+      } else {
+        container.innerHTML = `
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Notificar sobre novas vagas compatíveis com meu perfil (% Match alto)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Notificar quando o recrutador avançar o status da minha candidatura</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--gray-800); cursor: pointer;">
+            <input type="checkbox" checked style="accent-color: var(--primary-blue);">
+            <span>Aviso ao receber uma recomendação verificada de professor</span>
+          </label>
+        `;
+      }
+    }
+
+    function renderHybridModesBox(user) {
+      const container = document.getElementById('hybridModesContainer');
+      if (!container) return;
+
+      let html = '';
+
+      // Regras de compatibilidade:
+      // Aluno / Candidato → pode ativar APENAS Modo Freelancer
+      // Freelancer        → pode ativar APENAS Modo Candidato
+      // Empresa           → não pode ativar nenhum outro modo
+
+      if (user.role === 'aluno' || user.role === 'candidato') {
+        // Modo Freelancer: disponível para aluno/candidato
+        html += `
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); cursor: pointer;">
+            <input type="checkbox" id="chkEnableFreelancer" ${user.isFreelancerEnabled ? 'checked' : ''} style="margin-top: 0.2rem; accent-color: var(--primary-blue);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--gray-800);">Ativar Modo Freelancer / Prestador de Serviços</div>
+              <div style="font-size: 0.8rem; color: var(--gray-600);">Permite cadastrar seus serviços autônomos no Marketplace do Vale do Ivaí sem perder seu perfil de aluno.</div>
+            </div>
+          </label>
+        `;
+
+        // Opções bloqueadas para aluno
+        html += `
+          <div style="padding: 0.75rem 0.85rem; background: var(--gray-50); border: 1px dashed var(--gray-300); border-radius: var(--radius-sm); font-size: 0.825rem; color: var(--gray-500);">
+            <strong>Modo Empresa</strong> não está disponível para perfis de Aluno ou Candidato.
+          </div>
+        `;
+
+      } else if (user.role === 'freelancer') {
+        // Modo Candidato: disponível para freelancer
+        html += `
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); cursor: pointer;">
+            <input type="checkbox" id="chkEnableCandidate" ${user.isCandidateEnabled ? 'checked' : ''} style="margin-top: 0.2rem; accent-color: var(--primary-blue);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--gray-800);">Ativar Modo Candidato a Vagas</div>
+              <div style="font-size: 0.8rem; color: var(--gray-600);">Crie seu currículo e candidate-se a vagas CLT e estágio publicadas por empresas no Ivaí Conecta.</div>
+            </div>
+          </label>
+        `;
+
+        // Opções bloqueadas para freelancer
+        html += `
+          <div style="padding: 0.75rem 0.85rem; background: var(--gray-50); border: 1px dashed var(--gray-300); border-radius: var(--radius-sm); font-size: 0.825rem; color: var(--gray-500);">
+            <strong>Modo Empresa</strong> não está disponível para perfis de Freelancer.
+          </div>
+        `;
+
+      } else if (user.role === 'empresa') {
+        // Empresa não pode ativar outros modos
+        html += `
+          <div style="padding: 1rem; background: var(--gray-50); border: 1px dashed var(--gray-300); border-radius: var(--radius-sm); font-size: 0.875rem; color: var(--gray-600); text-align: center;">
+            Contas empresariais não possuem modos híbridos disponíveis.<br>
+            <span style="font-size: 0.8rem; color: var(--gray-500);">Para acessar recursos de candidato ou freelancer, crie uma conta pessoal separada.</span>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

@@ -324,16 +324,33 @@
         IvaiConecta.setUserRole('empresa');
         IvaiConecta.openModal('publishJobModal');
       }
+      if (urlParams.get('view') === 'my_jobs' || urlParams.get('view') === 'company_profile') {
+        IvaiConecta.setUserRole('empresa');
+        const headerTitle = document.querySelector('header h1');
+        if (headerTitle) headerTitle.textContent = 'Minhas Vagas Criadas & Gerenciamento';
+        renderJobs();
+      }
     });
 
     function renderJobs() {
       const container = document.getElementById('jobsListContainer');
       const selectedCity = IvaiConecta.getSelectedCity();
       const searchQuery = document.getElementById('jobSearchInput').value.toLowerCase().trim();
+      const userRole = IvaiConecta.getUserRole();
+      const urlParams = new URLSearchParams(window.location.search);
+      const isMyJobsView = urlParams.get('view') === 'my_jobs';
 
       const jobs = IvaiConecta.getJobs(selectedCity);
+      const authUser = IvaiConecta.getAuthUser();
+      const myCompanyName = (authUser && authUser.role === 'empresa' ? authUser.name : 'Grupo Tecnologia Vale do Ivaí').toLowerCase();
 
       const filtered = jobs.filter(job => {
+        if (isMyJobsView) {
+          // Exibe APENAS as vagas criadas/sob responsabilidade da empresa logada
+          const isOwnerCompany = job.company.toLowerCase().includes(myCompanyName.split(' ')[0]) || job.company.toLowerCase().includes('vale do ivaí') || job.company.toLowerCase().includes(myCompanyName);
+          if (!isOwnerCompany) return false;
+        }
+
         if (searchQuery) {
           const matchTitle = job.title.toLowerCase().includes(searchQuery);
           const matchCompany = job.company.toLowerCase().includes(searchQuery);
@@ -350,7 +367,10 @@
       });
 
       if (filtered.length === 0) {
-        container.innerHTML = `<div style="grid-column: 1/-1; padding: 3rem; text-align: center; color: var(--gray-500);">Nenhuma vaga encontrada com os filtros selecionados em ${selectedCity}.</div>`;
+        const emptyMessage = isMyJobsView 
+          ? `Sua empresa ainda não possui vagas ativas cadastradas em ${selectedCity}.`
+          : `Nenhuma vaga encontrada com os filtros selecionados em ${selectedCity}.`;
+        container.innerHTML = `<div style="grid-column: 1/-1; padding: 3rem; text-align: center; color: var(--gray-500);">${emptyMessage}</div>`;
         return;
       }
 
@@ -369,11 +389,17 @@
           typeBadgeStyle = 'background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;';
         }
 
+        const actionBtnHtml = userRole === 'empresa' ? `
+          <button class="btn btn-outline btn-sm btn-manage-job" data-id="${job.id}" style="width: 100%; font-size: 0.825rem; padding: 0.35rem 0.75rem; color: var(--gray-800); border-color: var(--gray-300);">Gerenciar Vaga / Candidatos</button>
+        ` : `
+          <button class="btn btn-primary btn-sm btn-apply-job" data-id="${job.id}" style="width: 100%; font-size: 0.825rem; padding: 0.35rem 0.75rem;">Candidatar-se à Vaga</button>
+        `;
+
         return `
           <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; height: 100%; border: 1px solid var(--gray-200); background: var(--white); box-shadow: none;">
             
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-              <div style="font-weight: 700; color: var(--gray-800); font-size: 0.95rem;">${job.company}</div>
+              <a href="perfil-empresa.html?id=1" style="font-weight: 700; color: var(--gray-800); font-size: 0.95rem; text-decoration: none;" title="Ver Perfil Institucional da Empresa">${job.company}</a>
               <span style="font-size: 0.75rem; padding: 0.15rem 0.55rem; border-radius: var(--radius-full); font-weight: 700; ${matchBadgeStyle}">
                 ${score}% Match
               </span>
@@ -393,7 +419,7 @@
             </div>
 
             <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
-              <button class="btn btn-primary btn-sm btn-apply-job" data-id="${job.id}" style="width: 100%; font-size: 0.825rem; padding: 0.35rem 0.75rem;">Candidatar-se à Vaga</button>
+              ${actionBtnHtml}
             </div>
           </div>
         `;
@@ -401,6 +427,40 @@
 
       document.querySelectorAll('.btn-apply-job').forEach(btn => {
         btn.addEventListener('click', () => {
+          // Verificar permissão de candidatura
+          const permission = IvaiConecta.canApplyToJobs();
+
+          if (!permission.allowed) {
+            // Mostrar modal de restrição com explicação clara
+            let restrictModal = document.getElementById('applyRestrictModal');
+            if (!restrictModal) {
+              restrictModal = document.createElement('div');
+              restrictModal.className = 'modal-backdrop';
+              restrictModal.id = 'applyRestrictModal';
+              restrictModal.innerHTML = `
+                <div class="modal" style="max-width: 460px;">
+                  <div class="modal-header" style="border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1.05rem; color: var(--primary-dark); font-weight: 700;">Candidatura Bloqueada</h3>
+                    <button class="modal-close" data-close-modal>&times;</button>
+                  </div>
+                  <div id="applyRestrictModalMsg" style="font-size: 0.9rem; color: var(--gray-700); line-height: 1.6; margin-bottom: 1.5rem;"></div>
+                  <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
+                    <button type="button" class="btn btn-outline btn-sm" data-close-modal style="font-size: 0.825rem;">Fechar</button>
+                    <a href="configuracoes.html?highlight=hybrid" class="btn btn-primary btn-sm" style="font-size: 0.825rem;">Ir para Configurações da Conta</a>
+                  </div>
+                </div>
+              `;
+              document.body.appendChild(restrictModal);
+              restrictModal.querySelectorAll('[data-close-modal]').forEach(b => {
+                b.addEventListener('click', () => restrictModal.classList.remove('active'));
+              });
+            }
+            document.getElementById('applyRestrictModalMsg').innerHTML = permission.message;
+            restrictModal.classList.add('active');
+            return;
+          }
+
+          // Tem permissão — abrir modal de candidatura normal
           const id = btn.getAttribute('data-id');
           selectedJobForModal = jobs.find(j => j.id == id);
           if (selectedJobForModal) {

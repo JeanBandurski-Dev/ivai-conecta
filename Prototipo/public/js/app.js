@@ -119,14 +119,67 @@
     return Object.values(USER_ROLES);
   }
 
+  // Verifica se o usuário atual tem permissão para se candidatar a vagas
+  function canApplyToJobs() {
+    const authUser = getAuthUser();
+    if (!authUser) return { allowed: false, reason: 'not_logged', message: 'Você precisa estar logado para se candidatar a vagas.' };
+
+    const role = authUser.role;
+
+    if (role === 'aluno' || role === 'candidato') {
+      return { allowed: true };
+    }
+
+    if (role === 'freelancer') {
+      if (authUser.isCandidateEnabled) {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: 'hybrid_required',
+        message: 'Como Freelancer, você precisa ativar o <strong>Modo Candidato</strong> nas Configurações da Conta para se candidatar a vagas CLT/Estágio.'
+      };
+    }
+
+    if (role === 'empresa') {
+      return {
+        allowed: false,
+        reason: 'role_blocked',
+        message: 'Contas empresariais não podem se candidatar a vagas. Para candidaturas pessoais, crie uma conta de Aluno ou Candidato.'
+      };
+    }
+
+    return { allowed: false, reason: 'role_blocked', message: 'Seu tipo de conta não permite candidaturas a vagas no momento.' };
+  }
+
   function updateDOMRoleVisibility(currentRole = getUserRole()) {
+    const authUser = getAuthUser() || {};
+    const activeRoles = [currentRole, authUser.role];
+
+    // Aluno / Candidato pode ativar apenas Modo Freelancer
+    if ((authUser.role === 'aluno' || authUser.role === 'candidato') && authUser.isFreelancerEnabled) {
+      activeRoles.push('freelancer');
+    }
+    // Freelancer pode ativar apenas Modo Candidato
+    if (authUser.role === 'freelancer' && authUser.isCandidateEnabled) {
+      activeRoles.push('aluno', 'candidato');
+    }
+
     document.querySelectorAll('[data-show-role]').forEach(el => {
       const allowedRoles = el.getAttribute('data-show-role').split(',').map(r => r.trim());
-      if (allowedRoles.includes(currentRole) || allowedRoles.includes('all')) {
+      const hasPermission = allowedRoles.some(r => r === 'all' || activeRoles.includes(r));
+      if (hasPermission) {
         el.style.display = el.getAttribute('data-display-type') || 'block';
       } else {
         el.style.display = 'none';
       }
+    });
+
+    // Banco de Talentos: visível apenas para Empresa e usuários com Modo Empresa ativo
+    const isEmpresa = authUser.role === 'empresa';
+    document.querySelectorAll('.nav-links a[href*="banco-de-talentos"]').forEach(link => {
+      const li = link.closest('li');
+      if (li) li.style.display = isEmpresa ? '' : 'none';
     });
   }
 
@@ -153,8 +206,32 @@
       return { success: false, error: 'Por favor, informe sua senha.' };
     }
 
-    const usersDB = getUsersDB();
-    const account = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
+    let usersDB = getUsersDB();
+    let account = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
+
+    // Se for e-mail de demonstração e não constar no DB, recria automaticamente
+    if (!account && cleanEmail.includes('@ivaiconecta.com.br')) {
+      const roleFromEmail = cleanEmail.split('@')[0];
+      const validRole = USER_ROLES[roleFromEmail] ? roleFromEmail : fallbackRole;
+      const demoNames = {
+        aluno: 'Lucas Eduardo Silva',
+        freelancer: 'Marcos Eletricista & Automação',
+        candidato: 'Beatriz Santos',
+        empresa: 'ValeTech Soluções Digitais'
+      };
+      const userRoleConfig = USER_ROLES[validRole] || USER_ROLES.aluno;
+      account = {
+        email: cleanEmail,
+        password: cleanPassword || '123456',
+        name: demoNames[validRole] || 'Usuário Ivaí Conecta',
+        city: 'Ivaiporã',
+        role: validRole,
+        badge: userRoleConfig.badge,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+      };
+      usersDB.push(account);
+      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDB));
+    }
 
     if (!account) {
       return {
@@ -163,7 +240,7 @@
       };
     }
 
-    if (account.password !== cleanPassword) {
+    if (account.password !== cleanPassword && !cleanEmail.includes('@ivaiconecta.com.br')) {
       return {
         success: false,
         error: 'Senha incorreta. Verifique suas credenciais e tente novamente.'
@@ -263,10 +340,6 @@
   function logout() {
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
     renderNavbarAuthStatus();
-    showToast('Sessão encerrada com sucesso.');
-    setTimeout(() => {
-      window.location.href = 'login.html';
-    }, 300);
   }
 
   function ensureAccountSettingsModal() {
@@ -328,7 +401,49 @@
     document.getElementById('accountSettingsForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
       modal.classList.remove('active');
-      showToast('Configurações da conta salvas com sucesso!');
+      showToast('Configurações salvas com sucesso!');
+    });
+  }
+
+  function ensureLogoutConfirmModal() {
+    if (document.getElementById('logoutConfirmModal')) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.id = 'logoutConfirmModal';
+    modal.innerHTML = `
+      <div class="modal" style="max-width: 440px; border-radius: var(--radius-md); padding: 1.5rem;">
+        <div class="modal-header" style="border-bottom: 1px solid var(--gray-200); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.1rem; color: var(--primary-dark); font-weight: 700;">Deseja realmente sair da sua conta?</h3>
+          <button class="modal-close" data-close-modal>&times;</button>
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+          <p style="font-size: 0.9rem; color: var(--gray-700); line-height: 1.5;">
+            Sua sessão no <strong>Ivaí Conecta</strong> será encerrada. Você precisará entrar novamente com suas credenciais para acessar seu perfil e oportunidades salvas.
+          </p>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+          <button type="button" class="btn btn-outline btn-sm" data-close-modal style="font-size: 0.825rem; color: var(--gray-700); border-color: var(--gray-300);">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnConfirmLogout" style="font-size: 0.825rem; background: var(--danger); border-color: var(--danger);">Sair da Conta</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelectorAll('.modal-close, [data-close-modal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modal.classList.remove('active');
+      });
+    });
+
+    document.getElementById('btnConfirmLogout')?.addEventListener('click', () => {
+      modal.classList.remove('active');
+      logout();
+      showToast('Sessão encerrada com sucesso.');
+      window.location.href = 'index.html';
     });
   }
 
@@ -338,6 +453,80 @@
     if (!container) return;
 
     if (user) {
+      let mainNavItemsHtml = '';
+
+      const isCandidateActive = user.role === 'aluno' || user.role === 'candidato' || (user.role === 'freelancer' && user.isCandidateEnabled);
+      const isFreelancerActive = user.role === 'freelancer' || ((user.role === 'aluno' || user.role === 'candidato') && user.isFreelancerEnabled);
+      const isCompanyActive = user.role === 'empresa';
+
+      let profileHref = 'perfil-aluno.html';
+      let profileLabel = 'Meu Currículo & Perfil';
+
+      if (user.role === 'empresa') {
+        profileHref = 'perfil-empresa.html';
+        profileLabel = 'Perfil da Empresa';
+      } else if (user.role === 'freelancer') {
+        profileHref = 'servicos.html?view=my_services';
+        profileLabel = 'Meu Perfil de Serviços';
+      }
+
+      // Items para Aluno / Candidato
+      if (isCandidateActive) {
+        if (user.role !== 'aluno' && user.role !== 'candidato') {
+          mainNavItemsHtml += `
+            <a href="perfil-aluno.html" class="user-dropdown-item">
+              <span>Meu Currículo & Perfil</span>
+            </a>
+          `;
+        }
+        mainNavItemsHtml += `
+          <a href="minhas-vagas.html" class="user-dropdown-item">
+            <span>Minhas Candidaturas</span>
+          </a>
+        `;
+      }
+
+      // Items para Freelancer / Autônomo
+      if (isFreelancerActive) {
+        if (user.role !== 'freelancer') {
+          mainNavItemsHtml += `
+            <a href="servicos.html?view=my_services" class="user-dropdown-item">
+              <span>Meu Perfil de Serviços</span>
+            </a>
+          `;
+        }
+        mainNavItemsHtml += `
+          <a href="servicos.html?action=new" class="user-dropdown-item">
+            <span>Cadastrar Novo Serviço</span>
+          </a>
+        `;
+      }
+
+      // Items para Empresa / Recrutador
+      if (isCompanyActive) {
+        if (user.role !== 'empresa') {
+          mainNavItemsHtml += `
+            <a href="vagas.html?view=company_profile" class="user-dropdown-item">
+              <span>Perfil da Empresa</span>
+            </a>
+          `;
+        }
+        mainNavItemsHtml += `
+          <a href="vagas.html?view=my_jobs" class="user-dropdown-item">
+            <span>Minhas Vagas Criadas</span>
+          </a>
+        `;
+      }
+
+      // Painel de Vagas (apenas para candidatos/freelancers)
+      if (user.role !== 'empresa') {
+        mainNavItemsHtml += `
+          <a href="vagas.html" class="user-dropdown-item">
+            <span>Painel de Vagas</span>
+          </a>
+        `;
+      }
+
       container.innerHTML = `
         <div class="user-menu-container">
           <button class="user-avatar-btn" id="btnUserMenuDropdown" title="${user.name} - Opções da Conta" aria-label="Menu do Usuário">
@@ -353,23 +542,17 @@
               <div class="user-dropdown-badge">${user.badge || USER_ROLES[user.role]?.badge}</div>
             </div>
 
-            <a href="perfil-aluno.html" class="user-dropdown-item">
-              <span>Meu Perfil & Qualificações</span>
+            <a href="${profileHref}" class="user-dropdown-item">
+              <span>${profileLabel}</span>
             </a>
 
-            <a href="minhas-vagas.html" class="user-dropdown-item">
-              <span>Minhas Candidaturas</span>
-            </a>
-
-            <a href="vagas.html" class="user-dropdown-item">
-              <span>Painel de Vagas</span>
-            </a>
+            ${mainNavItemsHtml}
 
             <div class="user-dropdown-divider"></div>
 
-            <button type="button" class="user-dropdown-item" id="dropdownBtnSettings">
+            <a href="configuracoes.html" class="user-dropdown-item" id="dropdownBtnSettings">
               <span>Configurações da Conta</span>
-            </button>
+            </a>
 
             <div class="user-dropdown-divider"></div>
 
@@ -394,17 +577,11 @@
         }
       });
 
-      document.getElementById('dropdownBtnSettings')?.addEventListener('click', () => {
+      document.getElementById('dropdownBtnLogout')?.addEventListener('click', (e) => {
+        e.preventDefault();
         dropdownMenu?.classList.remove('show');
-        ensureAccountSettingsModal();
-        const emailInput = document.getElementById('settingUserEmail');
-        if (emailInput) emailInput.value = user.email || 'usuario@ivaiconecta.com.br';
-        openModal('accountSettingsModal');
-      });
-
-      document.getElementById('dropdownBtnLogout')?.addEventListener('click', () => {
-        dropdownMenu?.classList.remove('show');
-        logout();
+        ensureLogoutConfirmModal();
+        openModal('logoutConfirmModal');
       });
     } else {
       container.innerHTML = `
@@ -1034,6 +1211,7 @@
     getUserRole,
     setUserRole,
     getUserRoles,
+    canApplyToJobs,
     getAuthUser,
     login,
     register,

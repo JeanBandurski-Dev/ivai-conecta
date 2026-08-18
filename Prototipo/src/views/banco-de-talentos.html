@@ -84,12 +84,14 @@
   <!-- MAIN CONTENT (Exibido APENAS para contas de Empresa) -->
   <main class="container section" id="bancoTalentosMainContent" style="display: none;">
     
-    <!-- SEARCH & FILTER BAR -->
-    <div style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+    <!-- BARRA DE FILTROS AVANÇADOS DE RECRUTAMENTO E SELEÇÃO -->
+    <div style="background: var(--white); padding: 1.25rem 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+      
+      <!-- LINHA 1: BUSCA GERAL E CIDADE -->
+      <div style="display: flex; gap: 0.85rem; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         
         <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; flex-wrap: wrap;">
-          <div class="search-input-group" style="max-width: 400px; width: 100%; border: 1px solid var(--gray-300);">
+          <div class="search-input-group" style="max-width: 440px; width: 100%; border: 1px solid var(--gray-300);">
             <input type="text" id="talentSearchInput" placeholder="Busque por nome, curso, habilidade ou instituição...">
           </div>
 
@@ -100,19 +102,56 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-          <span style="font-size: 0.875rem; font-weight: 600; color: var(--gray-600);">Filtrar por Competência:</span>
-          <div class="filter-pills" style="margin: 0; display: flex; gap: 0.4rem; flex-wrap: wrap;" id="skillPillsFilter">
-            <span class="tag active" style="cursor: pointer;" data-skill="TODAS">Todas</span>
-            <span class="tag" style="cursor: pointer;" data-skill="JavaScript">JavaScript</span>
-            <span class="tag" style="cursor: pointer;" data-skill="React">React</span>
-            <span class="tag" style="cursor: pointer;" data-skill="Excel Avançado">Excel Avançado</span>
-            <span class="tag" style="cursor: pointer;" data-skill="NR-10">NR-10</span>
-            <span class="tag" style="cursor: pointer;" data-skill="Figma">Figma</span>
-          </div>
-        </div>
+        <!-- FILTRO DE RECOMENDAÇÃO VERIFICADA -->
+        <label style="font-size: 0.825rem; font-weight: 600; color: var(--gray-700); display: flex; align-items: center; gap: 0.4rem; cursor: pointer; background: var(--gray-50); padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--gray-300);">
+          <input type="checkbox" id="chkOnlyEndorsed" style="cursor: pointer; accent-color: var(--primary-blue);"> 
+          <span>Apenas com Recomendação Verificada (✓)</span>
+        </label>
 
       </div>
+
+      <!-- LINHA 2: DROPDOWNS DE CURSO, INSTITUIÇÃO E NÍVEL -->
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.85rem; padding-top: 0.85rem; border-top: 1px solid var(--gray-200);">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px;">Filtros por Perfil:</div>
+
+        <select id="filterCourseArea" class="form-control" style="width: auto; min-width: 180px; font-size: 0.825rem; padding: 0.35rem 0.65rem; border-color: var(--gray-300);">
+          <option value="TODOS">Todos os Cursos / Áreas</option>
+          <option value="Sistemas">Análise e Desenv. de Sistemas</option>
+          <option value="Engenharia">Engenharia Elétrica / Civil</option>
+          <option value="Administração">Administração & Gestão</option>
+          <option value="Enfermagem">Enfermagem & Saúde</option>
+          <option value="Design">Design & Comunicação</option>
+        </select>
+
+        <select id="filterInstitution" class="form-control" style="width: auto; min-width: 180px; font-size: 0.825rem; padding: 0.35rem 0.65rem; border-color: var(--gray-300);">
+          <option value="TODAS">Todas as Instituições</option>
+          <option value="IFPR">IFPR Campus Ivaiporã</option>
+          <option value="UENP">UENP</option>
+          <option value="Univale">Univale</option>
+        </select>
+
+        <select id="filterLevel" class="form-control" style="width: auto; min-width: 170px; font-size: 0.825rem; padding: 0.35rem 0.65rem; border-color: var(--gray-300);">
+          <option value="TODOS">Todos os Níveis de Atuação</option>
+          <option value="Estágio">Disponível para Estágio</option>
+          <option value="Júnior">Júnior / Trainee</option>
+          <option value="Efetivo">Profissional Efetivo</option>
+        </select>
+      </div>
+
+      <!-- LINHA 3: PÍLULAS DE COMPETÊNCIAS RÁPIDAS -->
+      <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; padding-top: 0.75rem; border-top: 1px dashed var(--gray-200);">
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px;">Competências:</span>
+        <div class="filter-pills" style="margin: 0; display: flex; gap: 0.4rem; flex-wrap: wrap;" id="skillPillsFilter">
+          <span class="tag active" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="TODAS">Todas</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="JavaScript">JavaScript</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="React">React</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="HTML5/CSS3">HTML5/CSS3</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="Node.js">Node.js</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="SQL">SQL</span>
+          <span class="tag" style="cursor: pointer; font-size: 0.775rem; padding: 0.2rem 0.55rem;" data-skill="Git">Git</span>
+        </div>
+      </div>
+
     </div>
 
     <!-- LISTA DE TALENTOS -->
@@ -204,6 +243,10 @@
       });
 
       document.getElementById('talentSearchInput')?.addEventListener('input', renderTalents);
+      document.getElementById('filterCourseArea')?.addEventListener('change', renderTalents);
+      document.getElementById('filterInstitution')?.addEventListener('change', renderTalents);
+      document.getElementById('filterLevel')?.addEventListener('change', renderTalents);
+      document.getElementById('chkOnlyEndorsed')?.addEventListener('change', renderTalents);
 
       // Filter pills
       document.querySelectorAll('#skillPillsFilter .tag').forEach(pill => {
@@ -222,7 +265,8 @@
 
     function checkAccessControl() {
       const currentRole = IvaiConecta.getUserRole();
-      const isEmpresa = currentRole === 'empresa';
+      const authUser = IvaiConecta.getAuthUser() || {};
+      const isEmpresa = currentRole === 'empresa' || authUser.role === 'empresa' || authUser.isCompanyEnabled;
 
       const mainContent = document.getElementById('bancoTalentosMainContent');
       const restrictedContent = document.getElementById('bancoTalentosRestrictedContent');
@@ -242,6 +286,11 @@
       const selectedCity = IvaiConecta.getSelectedCity();
       const searchQuery = (document.getElementById('talentSearchInput')?.value || '').toLowerCase().trim();
 
+      const courseFilter = document.getElementById('filterCourseArea')?.value || 'TODOS';
+      const instFilter = document.getElementById('filterInstitution')?.value || 'TODAS';
+      const levelFilter = document.getElementById('filterLevel')?.value || 'TODOS';
+      const onlyEndorsed = document.getElementById('chkOnlyEndorsed')?.checked || false;
+
       const talents = IvaiConecta.getTalents(selectedCity);
 
       const filtered = talents.filter(t => {
@@ -258,6 +307,18 @@
           if (!hasSkill) return false;
         }
 
+        if (courseFilter !== 'TODOS') {
+          if (!t.course.toLowerCase().includes(courseFilter.toLowerCase())) return false;
+        }
+
+        if (instFilter !== 'TODAS') {
+          if (!t.institution.toLowerCase().includes(instFilter.toLowerCase())) return false;
+        }
+
+        if (onlyEndorsed) {
+          if (!t.endorsements || t.endorsements.length === 0) return false;
+        }
+
         return true;
       });
 
@@ -267,29 +328,30 @@
       }
 
       container.innerHTML = filtered.map(talent => `
-        <div class="card" style="display: flex; flex-direction: column;">
-          <div class="talent-card-header">
-            <img src="${talent.avatar}" alt="${talent.name}" class="avatar">
+        <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; height: 100%; border: 1px solid var(--gray-200); background: var(--white); box-shadow: none;">
+          
+          <div class="talent-card-header" style="margin-bottom: 0.75rem;">
+            <img src="${talent.avatar}" alt="${talent.name}" class="avatar" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gray-200);">
             <div>
-              <h3 class="talent-name" style="font-size: 1.15rem;">${talent.name}</h3>
-              <div class="talent-course" style="font-size: 0.875rem; color: var(--primary-blue); font-weight: 600;">${talent.course}</div>
-              <div class="talent-institution" style="font-size: 0.8rem; color: var(--gray-600);">${talent.institution} &bull; ${talent.city}</div>
+              <h3 class="talent-name" style="font-size: 1.05rem; color: var(--primary-dark); font-weight: 700; margin-bottom: 0.15rem;">${talent.name}</h3>
+              <div class="talent-course" style="font-size: 0.825rem; color: var(--gray-800); font-weight: 600;">${talent.course}</div>
+              <div class="talent-institution" style="font-size: 0.775rem; color: var(--gray-500); margin-top: 0.1rem;">${talent.institution} &bull; ${talent.city}</div>
             </div>
           </div>
           
-          <div style="margin: 0.75rem 0;">
-            <span class="badge-endosso" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
-              ${talent.endorsements?.length || 0} Recomendações Verificadas
+          <div style="margin-bottom: 0.75rem;">
+            <span style="font-size: 0.75rem; padding: 0.15rem 0.55rem; background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; border-radius: var(--radius-sm); font-weight: 600;">
+              ✓ ${talent.endorsements?.length || 0} Recomendações Verificadas
             </span>
           </div>
 
           <div class="skill-tags" style="margin-bottom: 1rem;">
-            ${talent.skills.slice(0, 5).map(skill => `<span class="tag">${skill}</span>`).join('')}
-            ${talent.skills.length > 5 ? `<span class="tag">+${talent.skills.length - 5}</span>` : ''}
+            ${talent.skills.slice(0, 5).map(skill => `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">${skill}</span>`).join('')}
+            ${talent.skills.length > 5 ? `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">+${talent.skills.length - 5}</span>` : ''}
           </div>
 
-          <div style="margin-top: auto; padding-top: 1rem;">
-            <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%;">Ver Perfil Completo</a>
+          <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
+            <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%; justify-content: center; font-size: 0.825rem; color: var(--gray-800); border-color: var(--gray-300);">Ver Perfil Completo</a>
           </div>
         </div>
       `).join('');
