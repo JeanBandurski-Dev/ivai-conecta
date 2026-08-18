@@ -3,13 +3,13 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
-import { auth } from '../../public/js/firebase-config.js';
+import { auth, db } from '../../public/js/firebase-config.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-import { db, isFirebaseInitialized } from '../../public/js/firebase-config.js';
+import { isFirebaseInitialized } from '../../public/js/firebase-config.js';
 import {
   collection,
   getDocs,
@@ -406,7 +406,8 @@ export async function registerUser(email, password, additionalData) {
     const user = userCredential.user;
 
     if (isFirebaseInitialized) {
-      await setDoc(doc(db, 'users', user.id), {
+      console.log("TESTE DE VARIAVEIS:", "DB:", !!db, "UID:", user.uid);
+      await setDoc(doc(db, 'users', user.uid), {
         name: additionalData.name,
         email: email,
         city: additionalData.city,
@@ -417,6 +418,7 @@ export async function registerUser(email, password, additionalData) {
 
     return { success: true, user: user };
   } catch (error) {
+    console.error("ERRO COMPLETO NO CADASTRO:", error);
     return { success: false, errorCode: error.code };
   }
 }
