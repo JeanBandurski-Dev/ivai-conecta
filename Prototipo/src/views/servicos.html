@@ -324,11 +324,20 @@
             <p style="font-size: 0.875rem; color: var(--gray-700); margin-bottom: 1rem; flex: 1; line-height: 1.5;">${service.description}</p>
             
             <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
-              <a href="${waLink}" target="_blank" class="btn btn-outline btn-sm btn-whatsapp-hover" style="width: 100%; justify-content: center; font-size: 0.825rem;">Contatar via WhatsApp</a>
+              <a href="${waLink}" target="_blank" class="btn btn-outline btn-sm btn-whatsapp-hover btn-contact-service" data-wa="${waLink}" style="width: 100%; justify-content: center; font-size: 0.825rem;">Contatar via WhatsApp</a>
             </div>
           </div>
         `;
       }).join('');
+
+      // Auth guard nos botões de contato WhatsApp
+      container.querySelectorAll('.btn-contact-service').forEach(link => {
+        link.addEventListener('click', (e) => {
+          if (!IvaiConecta.requireAuth('para contatar prestadores de serviço')) {
+            e.preventDefault();
+          }
+        });
+      });
     }
   </script>
 </body>

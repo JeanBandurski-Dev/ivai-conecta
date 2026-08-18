@@ -427,7 +427,10 @@
 
       document.querySelectorAll('.btn-apply-job').forEach(btn => {
         btn.addEventListener('click', () => {
-          // Verificar permissão de candidatura
+          // 1. Verificar autenticação
+          if (!IvaiConecta.requireAuth('para se candidatar a vagas')) return;
+
+          // 2. Verificar permissão de candidatura
           const permission = IvaiConecta.canApplyToJobs();
 
           if (!permission.allowed) {

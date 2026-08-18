@@ -846,6 +846,46 @@
         city: "Jardim Alegre",
         type: "Meio Período / Remoto",
         requiredSkills: ["Figma", "Photoshop", "Social Media", "Branding"]
+      },
+      {
+        id: 105,
+        title: "Analista de Dados & Business Intelligence",
+        company: "Cooperativa Agropecuária do Vale",
+        city: "Ivaiporã",
+        type: "Tempo Integral (CLT)",
+        requiredSkills: ["Power BI", "Excel Avançado", "SQL", "Python"]
+      },
+      {
+        id: 106,
+        title: "Auxiliar Contábil e Fiscal",
+        company: "Escritório Contábil Pereira & Associados",
+        city: "Grandes Rios",
+        type: "Tempo Integral (CLT)",
+        requiredSkills: ["Contabilidade Fiscal", "SPED", "ERP Totvs", "Excel Avançado"]
+      },
+      {
+        id: 107,
+        title: "Estágio em Desenvolvimento Backend (Python)",
+        company: "ValeTech Soluções Digitais",
+        city: "Ivaiporã",
+        type: "Estágio / Trainee",
+        requiredSkills: ["Python", "Django", "REST APIs", "PostgreSQL", "Git"]
+      },
+      {
+        id: 108,
+        title: "Coordenador de Treinamento & DHO",
+        company: "Indústria Metalúrgica Ivaiporã",
+        city: "São João do Ivaí",
+        type: "Tempo Integral (CLT)",
+        requiredSkills: ["Gestão de Pessoas", "Treinamento Corporativo", "RH", "Google Workspace"]
+      },
+      {
+        id: 109,
+        title: "Produtor de Vídeo & Motion Designer",
+        company: "Agência Conect@ Comunicação",
+        city: "Manoel Ribas",
+        type: "Prestador de Serviço (PJ)",
+        requiredSkills: ["Adobe Premiere", "After Effects", "Motion Design", "Copywriting"]
       }
     ],
     services: [
@@ -892,6 +932,50 @@
         reviewsCount: 19,
         badge: "Certificado",
         description: "Limpeza, higienização, recarga de gás e instalação de ar condicionado split em toda a microrregião."
+      },
+      {
+        id: 205,
+        providerName: "Bruno Dev — Sistemas & Sites",
+        category: "Tecnologia & Suporte",
+        city: "Ivaiporã",
+        phone: "5543999321456",
+        rating: 5.0,
+        reviewsCount: 11,
+        badge: "Verificado Ivaí Conecta",
+        description: "Desenvolvimento de sites institucionais, sistemas web, APIs REST, hospedagem e manutenção em cloud. Orçamento sem compromisso."
+      },
+      {
+        id: 206,
+        providerName: "Diego Produções — Vídeo & Foto",
+        category: "Marketing & Design",
+        city: "Manoel Ribas",
+        phone: "5543999654987",
+        rating: 4.8,
+        reviewsCount: 33,
+        badge: "Destaque da Semana",
+        description: "Produção de vídeos institucionais, reels, fotos de produto e campanhas para redes sociais. Cobertura em toda a região."
+      },
+      {
+        id: 207,
+        providerName: "ContaFácil — Assessoria Contábil",
+        category: "Finanças & Contabilidade",
+        city: "Grandes Rios",
+        phone: "5543999123789",
+        rating: 4.9,
+        reviewsCount: 27,
+        badge: "Verificado Ivaí Conecta",
+        description: "Abertura e fechamento de empresas, declaração de IR pessoa física e jurídica, planejamento tributário e consultoria MEI."
+      },
+      {
+        id: 208,
+        providerName: "FerPedagogia — Aulas & Treinamentos",
+        category: "Educação & Cursos",
+        city: "São João do Ivaí",
+        phone: "5543999852741",
+        rating: 5.0,
+        reviewsCount: 18,
+        badge: "Destaque da Semana",
+        description: "Reforço escolar, capacitações corporativas em Google Workspace e Power BI, e orientação profissional para jovens talentos."
       }
     ]
   };
@@ -1322,6 +1406,106 @@
     updateDOMRoleVisibility(currentRole);
   }
 
+  // ─── AUTH GUARD MODAL ──────────────────────────────────────────────────────
+  // Mostra modal de login/cadastro para usuários não autenticados.
+  // Uso: if (!requireAuth('para se candidatar')) return;
+  function requireAuth(actionLabel = '') {
+    if (getAuthUser()) return true; // logado → libera
+
+    const existingModal = document.getElementById('authGuardModal');
+    if (existingModal) existingModal.remove();
+
+    const label = actionLabel ? ` ${actionLabel}` : '';
+    const modal = document.createElement('div');
+    modal.id = 'authGuardModal';
+    modal.style.cssText = [
+      'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;',
+      'background:rgba(10,17,40,0.72);backdrop-filter:blur(6px);',
+      'animation:fadeIn .2s ease;'
+    ].join('');
+
+    modal.innerHTML = `
+      <div style="
+        background:#fff;border-radius:20px;padding:2.5rem 2rem 2rem;
+        max-width:420px;width:90%;box-shadow:0 24px 64px rgba(0,82,255,.18);
+        text-align:center;position:relative;
+        animation:slideUp .28s cubic-bezier(.34,1.56,.64,1);
+      ">
+        <button id="authGuardClose" style="
+          position:absolute;top:1rem;right:1rem;background:none;border:none;
+          font-size:1.4rem;color:#94a3b8;cursor:pointer;line-height:1;
+        " aria-label="Fechar">&times;</button>
+
+        <div style="
+          width:64px;height:64px;border-radius:50%;
+          background:linear-gradient(135deg,#0052FF,#22C55E);
+          display:flex;align-items:center;justify-content:center;
+          margin:0 auto 1.25rem;
+        ">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+
+        <h2 style="font-size:1.35rem;font-weight:800;color:#0A1128;margin-bottom:.5rem;">Acesso necessário</h2>
+        <p style="font-size:.95rem;color:#64748b;margin-bottom:1.75rem;line-height:1.6;">
+          Você precisa estar logado${label}.<br>
+          Crie uma conta gratuita ou entre na sua.
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:.75rem;">
+          <a href="login.html" style="
+            display:block;padding:.85rem;border-radius:12px;
+            background:linear-gradient(135deg,#0052FF,#0041cc);
+            color:#fff;font-weight:700;font-size:1rem;text-decoration:none;
+            box-shadow:0 4px 16px rgba(0,82,255,.3);
+            transition:transform .15s,box-shadow .15s;
+          " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,82,255,.4)'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,82,255,.3)'">
+            Entrar na minha conta
+          </a>
+          <a href="login.html?tab=register" style="
+            display:block;padding:.85rem;border-radius:12px;
+            background:transparent;border:2px solid #0052FF;
+            color:#0052FF;font-weight:700;font-size:1rem;text-decoration:none;
+            transition:background .15s,color .15s;
+          " onmouseover="this.style.background='#f0f4ff';" onmouseout="this.style.background='transparent'">
+            Criar conta gratuita
+          </a>
+        </div>
+
+        <p style="font-size:.78rem;color:#94a3b8;margin-top:1.25rem;">Ivaí Conecta &mdash; Gratuito e 100% local 💙</p>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Fechar ao clicar fora ou no &times;
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    document.getElementById('authGuardClose')?.addEventListener('click', () => modal.remove());
+
+    // Garantir keyframe slideUp
+    if (!document.getElementById('authGuardStyles')) {
+      const style = document.createElement('style');
+      style.id = 'authGuardStyles';
+      style.textContent = `
+        @keyframes slideUp {
+          from { opacity:0; transform:translateY(30px) scale(.96); }
+          to   { opacity:1; transform:translateY(0)   scale(1);    }
+        }
+        @keyframes fadeIn {
+          from { opacity:0; } to { opacity:1; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    return false; // bloqueia ação
+  }
+
   // Exportação Global window.IvaiConecta
   window.IvaiConecta = {
     firebaseConfig,
@@ -1355,6 +1539,7 @@
     validateEndorsement,
     createEndorsementPayload,
     showToast,
+    requireAuth,
     openModal,
     closeModal,
     setupModalListeners,
