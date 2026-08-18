@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ivaí Conecta - Conectando Talentos e Oportunidades em Ivaiporã</title>
-  <meta name="description" content="Ivaí Conecta: Conectando talentos e oportunidades em Ivaiporã. Plataforma de banco de talentos acadêmicos com endosso verificado e marketplace de serviços locais no Vale do Ivaí.">
+  <title>Ivaí Conecta - Conectando Talentos, Profissionais e Oportunidades no Vale do Ivaí</title>
+  <meta name="description" content="Ivaí Conecta: Conectando profissionais, autônomos, trabalhadores e estudantes às empresas e oportunidades em Ivaiporã e no Vale do Ivaí.">
   <link rel="stylesheet" href="../../public/css/styles.css?v=3">
   <script src="../../public/js/app.js?v=3"></script>
 </head>
@@ -32,16 +32,13 @@
         <li><a href="index.html" class="nav-link active">Dashboard</a></li>
         <li><a href="vagas.html" class="nav-link">Vagas & Match</a></li>
         <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
-        <li><a href="perfil-aluno.html" class="nav-link">Perfil do Aluno</a></li>
+        <li><a href="banco-de-talentos.html" class="nav-link">Banco de Talentos</a></li>
       </ul>
 
       <div class="nav-actions">
-        <div class="city-selector-pill" title="Selecione sua cidade no Vale do Ivaí">
-          <select class="city-select-global" id="headerCitySelect">
-            <!-- Preenchido via app.js -->
-          </select>
+        <div id="navbarAuthContainer">
+          <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
         </div>
-        <a href="perfil-aluno.html" class="btn btn-primary btn-sm">Meu Perfil</a>
       </div>
     </div>
   </nav>
@@ -51,18 +48,32 @@
     <div class="container hero-grid">
       <div>
         <div class="hero-tag">
-          <span>🎓 Parceria com IFPR, UENP e Faculdades Locais</span>
+          <span>Conectando Pessoas, Profissionais e Oportunidades no Vale do Ivaí</span>
         </div>
-        <h1>Conectando <span>Talentos e Oportunidades</span> em Ivaiporã</h1>
-        <p>A ponte inteligente entre estudantes capacitados, empresas locais e prestadores de serviços do Vale do Ivaí com selo de verificação docente.</p>
+        <h1>Conectando <span>Talentos & Profissionais</span> em Ivaiporã</h1>
+        <p>A plataforma regional que aproxima trabalhadores qualificados, autônomos, estudantes e empresas do Vale do Ivaí com recomendações e qualificações verificadas.</p>
         
         <!-- Hero Search -->
         <div class="search-card-hero">
           <div class="search-input-group">
-            <span style="font-size: 1.1rem;">🔍</span>
             <input type="text" id="heroSearchInput" placeholder="Busque por 'React', 'Eletricista', 'Administração'...">
           </div>
+          <div class="city-selector-pill" style="background: var(--white); border-color: var(--gray-300);" title="Selecione sua cidade no Vale do Ivaí">
+            <select class="city-select-global" id="heroCitySelect">
+              <!-- Preenchido via app.js -->
+            </select>
+          </div>
           <button class="btn btn-teal" id="heroSearchBtn">Buscar Agora</button>
+        </div>
+
+        <!-- Quick Action Buttons relocated from Navbar -->
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
+          <div data-show-role="freelancer" style="display: none;">
+            <a href="servicos.html?action=new" class="btn btn-teal btn-sm" style="box-shadow: var(--shadow-sm); font-weight: 600;">+ Cadastrar Serviço</a>
+          </div>
+          <div data-show-role="empresa" style="display: none;">
+            <a href="vagas.html?action=new" class="btn btn-outline btn-sm" style="color: var(--white); border-color: rgba(255,255,255,0.4); font-weight: 600;">+ Publicar Vaga</a>
+          </div>
         </div>
       </div>
 
@@ -73,7 +84,7 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
           <div style="background: rgba(255, 255, 255, 0.06); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.1);">
             <div style="font-size: 2.2rem; font-weight: 800; color: #4ADE80;">480+</div>
-            <div style="font-size: 0.85rem; color: var(--gray-300);">Alunos com Endosso</div>
+            <div style="font-size: 0.85rem; color: var(--gray-300);">Talentos e Profissionais</div>
           </div>
           <div style="background: rgba(255, 255, 255, 0.06); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.1);">
             <div style="font-size: 2.2rem; font-weight: 800; color: #38BDF8;">94%</div>
@@ -97,23 +108,18 @@
     <div class="container">
       <div class="pillars-grid">
         <div class="pillar-item">
-          <div class="pillar-icon">👥</div>
           <div class="pillar-text">Conexão entre pessoas e empresas</div>
         </div>
         <div class="pillar-item">
-          <div class="pillar-icon">📈</div>
           <div class="pillar-text">Crescimento profissional</div>
         </div>
         <div class="pillar-item">
-          <div class="pillar-icon">📍</div>
           <div class="pillar-text">Foco em Ivaiporã</div>
         </div>
         <div class="pillar-item">
-          <div class="pillar-icon">💼</div>
           <div class="pillar-text">Mais oportunidades na sua região</div>
         </div>
         <div class="pillar-item">
-          <div class="pillar-icon">🤝</div>
           <div class="pillar-text">Desenvolvimento da nossa cidade</div>
         </div>
       </div>
@@ -126,7 +132,7 @@
       <div class="section-title-wrapper">
         <div>
           <div class="section-subtitle">Banco de Talentos</div>
-          <h2 class="section-title">Alunos com Endosso Acadêmico Verificado</h2>
+          <h2 class="section-title">Talentos & Profissionais Regionais</h2>
         </div>
         <a href="perfil-aluno.html" class="btn btn-outline">Ver Perfil Demo</a>
       </div>
@@ -145,7 +151,12 @@
           <div class="section-subtitle">Oportunidades Regionais</div>
           <h2 class="section-title">Vagas em Destaque com Algoritmo de Matching</h2>
         </div>
-        <a href="vagas.html" class="btn btn-primary">Explorar Todas as Vagas</a>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <div data-show-role="empresa" style="display: none;">
+            <a href="vagas.html?action=new" class="btn btn-teal">+ Publicar Vaga</a>
+          </div>
+          <a href="vagas.html" class="btn btn-primary">Explorar Todas as Vagas</a>
+        </div>
       </div>
 
       <div class="grid-3" id="jobsGrid">
@@ -162,7 +173,12 @@
           <div class="section-subtitle">Marketplace Vale do Ivaí</div>
           <h2 class="section-title">Serviços Locais Recomendados</h2>
         </div>
-        <a href="servicos.html" class="btn btn-outline">Ver Todos os Serviços</a>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <div data-show-role="freelancer" style="display: none;">
+            <a href="servicos.html?action=new" class="btn btn-teal">+ Cadastrar Meu Serviço</a>
+          </div>
+          <a href="servicos.html" class="btn btn-outline">Ver Todos os Serviços</a>
+        </div>
       </div>
 
       <div class="grid-3" id="servicesGrid">
@@ -201,7 +217,7 @@
             <li><a href="index.html">Dashboard</a></li>
             <li><a href="vagas.html">Vagas Regionais</a></li>
             <li><a href="servicos.html">Serviços Locais</a></li>
-            <li><a href="perfil-aluno.html">Endossos Acadêmicos</a></li>
+            <li><a href="perfil-aluno.html">Banco de Talentos</a></li>
           </ul>
         </div>
 
@@ -216,7 +232,7 @@
         </div>
 
         <div>
-          <h4 class="footer-title">Instituições Parceiras</h4>
+          <h4 class="footer-title">Instituições & Parceiros</h4>
           <ul class="footer-links">
             <li><a href="#">IFPR Campus Ivaiporã</a></li>
             <li><a href="#">UENP</a></li>
@@ -227,7 +243,7 @@
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; 2026 Ivaí Conecta. Conectando talentos e oportunidades em Ivaiporã.</p>
+        <p>&copy; 2026 Ivaí Conecta. Conectando talentos, profissionais e oportunidades em Ivaiporã e região.</p>
       </div>
     </div>
   </footer>
@@ -261,32 +277,32 @@
       const talents = IvaiConecta.getTalents(selectedCity);
 
       if (talents.length === 0) {
-        talentsContainer.innerHTML = `<div style="grid-column: 1/-1; padding: 2rem; text-align: center; color: var(--gray-500);">Nenhum aluno cadastrado em ${selectedCity} no momento.</div>`;
+        talentsContainer.innerHTML = `<div style="grid-column: 1/-1; padding: 2rem; text-align: center; color: var(--gray-500);">Nenhum talento ou profissional cadastrado em ${selectedCity} no momento.</div>`;
       } else {
         talentsContainer.innerHTML = talents.map(talent => `
-          <div class="card">
-            <div class="talent-card-header">
-              <img src="${talent.avatar}" alt="${talent.name}" class="avatar">
+          <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; height: 100%; border: 1px solid var(--gray-200); background: var(--white); box-shadow: none;">
+            <div class="talent-card-header" style="margin-bottom: 0.75rem;">
+              <img src="${talent.avatar}" alt="${talent.name}" class="avatar" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gray-200);">
               <div>
-                <h3 class="talent-name">${talent.name}</h3>
-                <div class="talent-course">${talent.course}</div>
-                <div class="talent-institution">${talent.institution} • 📍 ${talent.city}</div>
+                <h3 class="talent-name" style="font-size: 1.05rem; color: var(--primary-dark); font-weight: 700; margin-bottom: 0.15rem;">${talent.name}</h3>
+                <div class="talent-course" style="font-size: 0.825rem; color: var(--gray-800); font-weight: 600;">${talent.course}</div>
+                <div class="talent-institution" style="font-size: 0.775rem; color: var(--gray-500); margin-top: 0.1rem;">${talent.institution} &bull; ${talent.city}</div>
               </div>
             </div>
             
-            ${talent.endorsements && talent.endorsements.length > 0 ? `
-              <div style="margin-bottom: 0.75rem;">
-                <span class="badge-endosso">🎓 Recomendado pelo Prof. ${talent.endorsements[0].profName.replace('Prof. ', '').replace('Profª. ', '')}</span>
-              </div>
-            ` : ''}
-
-            <div class="skill-tags">
-              ${talent.skills.slice(0, 4).map(skill => `<span class="tag">${skill}</span>`).join('')}
-              ${talent.skills.length > 4 ? `<span class="tag">+${talent.skills.length - 4}</span>` : ''}
+            <div style="margin-bottom: 0.75rem;">
+              <span style="font-size: 0.75rem; padding: 0.15rem 0.55rem; background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; border-radius: var(--radius-sm); font-weight: 600;">
+                ✓ ${talent.endorsements?.length || 0} Recomendações Verificadas
+              </span>
             </div>
 
-            <div style="margin-top: auto; padding-top: 1rem;">
-              <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%;">Ver Perfil & Endossos</a>
+            <div class="skill-tags" style="margin-bottom: 1rem;">
+              ${talent.skills.slice(0, 4).map(skill => `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">${skill}</span>`).join('')}
+              ${talent.skills.length > 4 ? `<span class="tag" style="background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 0.775rem; padding: 0.2rem 0.5rem;">+${talent.skills.length - 4}</span>` : ''}
+            </div>
+
+            <div style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--gray-200);">
+              <a href="perfil-aluno.html?id=${talent.id}" class="btn btn-outline btn-sm" style="width: 100%; justify-content: center; font-size: 0.825rem; color: var(--gray-800); border-color: var(--gray-300);">Ver Perfil Completo</a>
             </div>
           </div>
         `).join('');
@@ -310,7 +326,7 @@
               </div>
               <h3 style="font-size: 1.15rem; margin-bottom: 0.4rem;">${job.title}</h3>
               <div style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.75rem;">
-                <span>📍 ${job.city}</span> &bull; <span>💼 ${job.type}</span>
+                <span>${job.city}</span> &bull; <span>${job.type}</span>
               </div>
               <div class="skill-tags">
                 ${job.requiredSkills.map(skill => `<span class="tag">${skill}</span>`).join('')}
@@ -336,14 +352,14 @@
             <div class="card">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
                 <span class="badge-endosso" style="background: var(--primary-light); color: var(--primary-blue); border-color: rgba(0, 82, 255, 0.2);">${service.category}</span>
-                <span style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600);">📍 ${service.city}</span>
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--gray-600);">${service.city}</span>
               </div>
               <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem;">${service.providerName}</h3>
               <div style="font-size: 0.85rem; color: var(--accent-amber); margin-bottom: 0.75rem;">
-                ⭐ <strong>${service.rating}</strong> (${service.reviewsCount} avaliações)
+                <strong>${service.rating}</strong> (${service.reviewsCount} avaliações)
               </div>
               <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 1rem; flex: 1;">${service.description}</p>
-              <a href="${waLink}" target="_blank" class="btn btn-whatsapp btn-sm">💬 Contatar via WhatsApp</a>
+              <a href="${waLink}" target="_blank" class="btn btn-whatsapp btn-sm">Contatar via WhatsApp</a>
             </div>
           `;
         }).join('');

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar ou Cadastrar-se | Ivaí Conecta</title>
+  <meta name="description" content="Acesse sua conta no Ivaí Conecta ou cadastre-se como Estudante, Freelancer, Candidato ou Empresa no Vale do Ivaí.">
+  <link rel="stylesheet" href="../../public/css/styles.css?v=3">
+  <script src="../../public/js/app.js?v=3"></script>
+  <style>
+    .auth-container {
+      max-width: 920px;
+      margin: 2.5rem auto;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      background: var(--white);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-xl);
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .auth-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .auth-sidebar {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary-blue));
+      color: var(--white);
+      padding: 3rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .auth-form-wrapper {
+      padding: 2.5rem 2rem;
+    }
+
+    .role-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .role-card-option {
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: 0.85rem;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: center;
+      background: var(--gray-50);
+    }
+
+    .role-card-option:hover,
+    .role-card-option.selected {
+      border-color: var(--primary-blue);
+      background: var(--primary-light);
+    }
+
+    .role-card-option .role-icon {
+      font-size: 1.6rem;
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .role-card-option .role-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--primary-dark);
+    }
+
+    .auth-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--gray-200);
+      margin-bottom: 1.5rem;
+    }
+
+    .auth-tab-btn {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--gray-500);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .auth-tab-btn.active {
+      color: var(--primary-blue);
+      border-bottom-color: var(--primary-blue);
+    }
+
+    .demo-login-box {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      background: var(--gray-50);
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--gray-300);
+    }
+
+    .demo-btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="container navbar-container">
+      <a href="index.html" class="logo-brand">
+        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="8" fill="#0052FF"/>
+          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF"/>
+          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14" stroke-linecap="round" fill="none"/>
+          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="72" cy="20" r="7" fill="#22C55E"/>
+          <circle cx="56" cy="36" r="6" fill="#0052FF"/>
+          <circle cx="88" cy="40" r="6" fill="#0052FF"/>
+        </svg>
+        <span><span class="logo-ivai">Ivaí</span> <span class="logo-conecta">Conecta</span></span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Dashboard</a></li>
+        <li><a href="vagas.html" class="nav-link">Vagas & Match</a></li>
+        <li><a href="servicos.html" class="nav-link">Serviços Locais</a></li>
+        <li><a href="banco-de-talentos.html" class="nav-link">Banco de Talentos</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div id="navbarAuthContainer">
+          <a href="login.html" class="btn btn-primary btn-sm">Entrar / Cadastrar</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- AUTH MAIN CONTENT -->
+  <main class="container section">
+    <div class="auth-container">
+      
+      <!-- SIDEBAR INFO -->
+      <div class="auth-sidebar">
+        <div>
+          <span class="hero-tag" style="background: rgba(255,255,255,0.15); color: #FFF; border-color: rgba(255,255,255,0.2);">Plataforma Regional</span>
+          <h2 style="font-size: 2rem; color: var(--white); margin: 1rem 0 0.5rem;">Conecte-se ao Vale do Ivaí</h2>
+          <p style="font-size: 0.95rem; color: var(--gray-300); line-height: 1.6;">
+            Acesse uma rede integrada com estudantes, prestadores de serviços autônomos, profissionais e empresas contratantes de Ivaiporã e região.
+          </p>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.08); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.15); margin-top: 2rem;">
+          <div style="font-weight: 700; font-size: 0.9rem; color: var(--accent-sky); margin-bottom: 0.35rem;">Por que ter uma conta?</div>
+          <ul style="font-size: 0.825rem; color: var(--gray-200); padding-left: 1.2rem; line-height: 1.5;">
+            <li><strong>Alunos:</strong> Endossos docentes e vagas de estágio.</li>
+            <li><strong>Freelancers:</strong> Divulgação no Marketplace Local.</li>
+            <li><strong>Candidatos:</strong> Match inteligente em vagas CLT/PJ.</li>
+            <li><strong>Empresas:</strong> Publicação ilimitada de vagas.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- FORM WRAPPER -->
+      <div class="auth-form-wrapper">
+        
+        <!-- TABS -->
+        <div class="auth-tabs">
+          <button class="auth-tab-btn active" id="tabLoginBtn">Entrar na Conta</button>
+          <button class="auth-tab-btn" id="tabRegisterBtn">Criar Nova Conta</button>
+        </div>
+
+        <!-- CAIXA DE ALERTA DE MENSAGENS / ERROS -->
+        <div id="authAlertBox" style="display: none; padding: 0.85rem 1rem; border-radius: var(--radius-md); background: #FEE2E2; border: 1px solid #FCA5A5; color: #991B1B; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.25rem; line-height: 1.4;"></div>
+
+        <!-- FORMULARIO DE LOGIN -->
+        <form id="authLoginForm">
+          <div class="form-group">
+            <label for="loginEmail">E-mail de Acesso</label>
+            <input type="email" id="loginEmail" class="form-control" placeholder="Ex: seu-email@exemplo.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="loginPassword">Senha</label>
+            <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;">
+            Entrar na Plataforma
+          </button>
+        </form>
+
+        <!-- FORMULARIO DE CADASTRO (OCULTO INICIALMENTE) -->
+        <form id="authRegisterForm" style="display: none;">
+          <!-- SELEÇÃO DE TIPO DE CONTA (APENAS PARA CADASTRO) -->
+          <label style="display: block; font-weight: 700; font-size: 0.875rem; color: var(--gray-700); margin-bottom: 0.5rem;">
+            Selecione o seu Perfil de Acesso:
+          </label>
+          
+          <div class="role-cards-grid">
+            <div class="role-card-option selected" data-role="aluno">
+              <span class="role-title">Aluno / Estudante</span>
+            </div>
+            <div class="role-card-option" data-role="freelancer">
+              <span class="role-title">Freelancer / Autônomo</span>
+            </div>
+            <div class="role-card-option" data-role="candidato">
+              <span class="role-title">Candidato Geral</span>
+            </div>
+            <div class="role-card-option" data-role="empresa">
+              <span class="role-title">Empresa / Recrutador</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="regName">Nome Completo ou Razão Social</label>
+            <input type="text" id="regName" class="form-control" placeholder="Ex: Lucas Silva ou ValeTech Soluções" required>
+          </div>
+
+          <div class="form-group">
+            <label for="regEmail">E-mail Corporativo ou Pessoal</label>
+            <input type="email" id="regEmail" class="form-control" placeholder="Ex: contato@exemplo.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="regCity">Sua Cidade no Vale do Ivaí</label>
+            <select id="regCity" class="form-control" required>
+              <option value="Ivaiporã">Ivaiporã</option>
+              <option value="Jardim Alegre">Jardim Alegre</option>
+              <option value="São João do Ivaí">São João do Ivaí</option>
+              <option value="Manoel Ribas">Manoel Ribas</option>
+              <option value="Lunardelli">Lunardelli</option>
+              <option value="Borrazópolis">Borrazópolis</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="regPassword">Crie uma Senha</label>
+            <input type="password" id="regPassword" class="form-control" placeholder="Mínimo de 6 caracteres" required>
+          </div>
+
+          <button type="submit" class="btn btn-teal" style="width: 100%; padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;">
+            Criar Conta Gratuitamente
+          </button>
+        </form>
+
+        <!-- ENTRADA RÁPIDA DE DEMONSTRAÇÃO -->
+        <div class="demo-login-box">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--gray-700);">Teste Rápido (Demonstração 1-Clique):</div>
+          <div class="demo-btn-grid">
+            <button class="btn btn-outline btn-sm btn-demo-role" data-role="aluno" style="font-size: 0.75rem;">Entrar Aluno</button>
+            <button class="btn btn-outline btn-sm btn-demo-role" data-role="freelancer" style="font-size: 0.75rem;">Entrar Freelancer</button>
+            <button class="btn btn-outline btn-sm btn-demo-role" data-role="candidato" style="font-size: 0.75rem;">Entrar Candidato</button>
+            <button class="btn btn-outline btn-sm btn-demo-role" data-role="empresa" style="font-size: 0.75rem;">Entrar Empresa</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a href="index.html" class="logo-brand" style="color: var(--white); margin-bottom: 1rem;">
+            <svg class="logo-brand-svg" width="36" height="34" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="8" fill="#38BDF8"/>
+              <rect x="9" y="32" width="14" height="48" rx="7" fill="#38BDF8"/>
+              <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" fill="none"/>
+              <line x1="56" y1="36" x2="72" y2="20" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="72" y1="20" x2="88" y2="40" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="56" y1="36" x2="88" y2="40" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/>
+              <circle cx="72" cy="20" r="7" fill="#22C55E"/>
+              <circle cx="56" cy="36" r="6" fill="#38BDF8"/>
+              <circle cx="88" cy="40" r="6" fill="#38BDF8"/>
+            </svg>
+            <span><span style="color: var(--white);">Ivaí</span> <span style="color: #38BDF8;">Conecta</span></span>
+          </a>
+          <p style="font-size: 0.9rem; color: var(--gray-400); margin-bottom: 1.5rem;">
+            Conectando talentos e oportunidades em Ivaiporã, Jardim Alegre, São João do Ivaí, Manoel Ribas e todo o Vale do Ivaí.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Plataforma</h4>
+          <ul class="footer-links">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="vagas.html">Vagas Regionais</a></li>
+            <li><a href="servicos.html">Serviços Locais</a></li>
+            <li><a href="banco-de-talentos.html">Banco de Talentos</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Cidades Cobertas</h4>
+          <ul class="footer-links">
+            <li><a href="#">Ivaiporã</a></li>
+            <li><a href="#">Jardim Alegre</a></li>
+            <li><a href="#">São João do Ivaí</a></li>
+            <li><a href="#">Manoel Ribas</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Instituições & Parceiros</h4>
+          <ul class="footer-links">
+            <li><a href="#">IFPR Campus Ivaiporã</a></li>
+            <li><a href="#">UENP</a></li>
+            <li><a href="#">Univale</a></li>
+            <li><a href="#">Associação Comercial (ACISI)</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 Ivaí Conecta. Conectando talentos, profissionais e oportunidades em Ivaiporã e região.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let selectedRole = 'aluno';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const alertBox = document.getElementById('authAlertBox');
+
+      function showAlert(msg) {
+        if (!alertBox) return;
+        alertBox.textContent = msg;
+        alertBox.style.display = 'block';
+      }
+
+      function hideAlert() {
+        if (!alertBox) return;
+        alertBox.style.display = 'none';
+        alertBox.textContent = '';
+      }
+
+      // Role card click
+      document.querySelectorAll('.role-card-option').forEach(card => {
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.role-card-option').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedRole = card.getAttribute('data-role');
+        });
+      });
+
+      // Tabs switcher
+      const tabLoginBtn = document.getElementById('tabLoginBtn');
+      const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+      const authLoginForm = document.getElementById('authLoginForm');
+      const authRegisterForm = document.getElementById('authRegisterForm');
+
+      tabLoginBtn.addEventListener('click', () => {
+        hideAlert();
+        tabLoginBtn.classList.add('active');
+        tabRegisterBtn.classList.remove('active');
+        authLoginForm.style.display = 'block';
+        authRegisterForm.style.display = 'none';
+      });
+
+      tabRegisterBtn.addEventListener('click', () => {
+        hideAlert();
+        tabRegisterBtn.classList.add('active');
+        tabLoginBtn.classList.remove('active');
+        authRegisterForm.style.display = 'block';
+        authLoginForm.style.display = 'none';
+      });
+
+      // Check URL parameters (ex: login.html?role=empresa)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('role') === 'empresa') {
+        const empresaCard = document.querySelector('.role-card-option[data-role="empresa"]');
+        if (empresaCard) empresaCard.click();
+      }
+
+      // Submit Login com Validação Real
+      authLoginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        hideAlert();
+
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+
+        const res = IvaiConecta.login(email, password);
+        if (!res.success) {
+          showAlert(res.error);
+          return;
+        }
+
+        IvaiConecta.showToast(`Bem-vindo de volta, ${res.user.name}!`);
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 800);
+      });
+
+      // Submit Register com Validação de E-mail Único
+      authRegisterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        hideAlert();
+
+        const name = document.getElementById('regName').value;
+        const email = document.getElementById('regEmail').value;
+        const city = document.getElementById('regCity').value;
+        const password = document.getElementById('regPassword').value;
+
+        const res = IvaiConecta.register({
+          name,
+          email,
+          city,
+          role: selectedRole,
+          password
+        });
+
+        if (!res.success) {
+          showAlert(res.error);
+          return;
+        }
+
+        IvaiConecta.showToast(`Conta criada com sucesso! Bem-vindo, ${res.user.name}.`);
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 800);
+      });
+
+      // Quick Demo Buttons
+      document.querySelectorAll('.btn-demo-role').forEach(btn => {
+        btn.addEventListener('click', () => {
+          hideAlert();
+          const role = btn.getAttribute('data-role');
+          const res = IvaiConecta.login(`${role}@ivaiconecta.com.br`, '123456');
+          if (res.success) {
+            IvaiConecta.showToast(`Conectado no modo demonstração: ${res.user.name}`);
+            setTimeout(() => {
+              window.location.href = 'index.html';
+            }, 600);
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
