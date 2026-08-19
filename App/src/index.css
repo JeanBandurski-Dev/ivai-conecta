@@ -1,0 +1,302 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens (Tailwind v4 @theme) ─────────────────── */
+@theme {
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Colors — primary */
+  --color-primary-dark: #0A1128;
+  --color-primary-navy: #0F172A;
+  --color-primary-blue: #0052FF;
+  --color-primary-hover: #0043D0;
+  --color-primary-light: #EFF6FF;
+
+  /* Colors — accent */
+  --color-accent-green: #22C55E;
+  --color-accent-green-soft: #DCFCE7;
+  --color-accent-sky: #38BDF8;
+  --color-accent-gold: #F59E0B;
+  --color-accent-amber: #D97706;
+  --color-accent-gold-soft: #FEF3C7;
+
+  /* Colors — brand */
+  --color-brand-teal-soft: #E0F2FE;
+
+  /* Shadows */
+  --shadow-brand-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-brand-md: 0 4px 6px -1px rgba(10, 17, 40, 0.08), 0 2px 4px -1px rgba(10, 17, 40, 0.04);
+  --shadow-brand-lg: 0 10px 15px -3px rgba(10, 17, 40, 0.1), 0 4px 6px -2px rgba(10, 17, 40, 0.05);
+  --shadow-brand-xl: 0 20px 25px -5px rgba(10, 17, 40, 0.12), 0 10px 10px -5px rgba(10, 17, 40, 0.04);
+}
+
+/* ─── Base ────────────────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+  }
+  body {
+    font-family: var(--font-body);
+    background-color: #f8fafc;
+    color: #1e293b;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  a {
+    color: var(--color-primary-blue);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  a:hover {
+    color: var(--color-primary-hover);
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+}
+
+/* ─── Custom Component Classes ────────────────────────────── */
+@layer components {
+
+  /* ── Container / Layout ── */
+  .container {
+    width: 100%;
+    max-width: 1240px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  .section {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+  .btn:active {
+    transform: translateY(0);
+  }
+  .btn-sm  { padding: 0.4rem 0.875rem; font-size: 0.75rem; }
+  .btn-lg  { padding: 0.875rem 1.75rem; font-size: 1rem; }
+
+  .btn-primary {
+    background-color: var(--color-primary-blue);
+    color: #fff;
+    box-shadow: var(--shadow-brand-sm);
+  }
+  .btn-primary:hover { background-color: var(--color-primary-hover); color: #fff; box-shadow: var(--shadow-brand-md); }
+
+  .btn-teal {
+    background-color: var(--color-accent-green);
+    color: #fff;
+    box-shadow: var(--shadow-brand-sm);
+  }
+  .btn-teal:hover { background-color: #16a34a; color: #fff; box-shadow: var(--shadow-brand-md); }
+
+  .btn-outline {
+    background-color: transparent;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+  .btn-outline:hover { border-color: var(--color-primary-blue); color: var(--color-primary-blue); background-color: var(--color-primary-light); }
+
+  .btn-outline-white {
+    background-color: transparent;
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+  }
+  .btn-outline-white:hover { background-color: rgba(255,255,255,0.12); color: #fff; border-color: #fff; }
+
+  .btn-whatsapp {
+    background-color: #22c55e;
+    color: #fff;
+    box-shadow: var(--shadow-brand-sm);
+  }
+  .btn-whatsapp:hover { background-color: #16a34a; color: #fff; box-shadow: var(--shadow-brand-md); }
+
+  .btn-danger {
+    background-color: #ef4444;
+    color: #fff;
+  }
+  .btn-danger:hover { background-color: #dc2626; color: #fff; }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-brand-sm);
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  }
+  .card:hover { 
+    box-shadow: var(--shadow-brand-lg); 
+    border-color: #cbd5e1;
+  }
+
+  /* ── Tags / Skills ── */
+  .tag {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.625rem;
+    font-weight: 500;
+  }
+  .tag-blue {
+    background: var(--color-primary-light);
+    color: var(--color-primary-blue);
+    border-color: #bfdbfe;
+  }
+
+  /* ── Badges ── */
+  .badge-match {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #f1f5f9;
+    color: #475569;
+  }
+  .badge-match-high { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge-endorsement {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--color-primary-light);
+    color: var(--color-primary-blue);
+    border: 1px solid #bfdbfe;
+  }
+
+  /* ── Hero tag pill ── */
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1.125rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.25);
+    margin-bottom: 1.25rem;
+  }
+
+  /* ── Form controls ── */
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.375rem;
+  }
+  .form-control {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    background: #fff;
+    color: #1e293b;
+    transition: all 0.2s;
+    outline: none;
+  }
+  .form-control::placeholder { color: #94a3b8; }
+  .form-control:focus {
+    border-color: var(--color-primary-blue);
+    box-shadow: 0 0 0 3px rgba(0,82,255,0.15);
+  }
+  .form-control:disabled,
+  .form-control[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+
+  /* ── Section headers ── */
+  .section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+  }
+  .section-subtitle {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--color-primary-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+    margin-bottom: 0.25rem;
+  }
+  .section-title {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Grid layouts ── */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.25rem;
+  }
+  @media (min-width: 640px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  }
+}
