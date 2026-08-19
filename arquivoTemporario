@@ -1,0 +1,24 @@
+import { watchAuthState, getUserProfile, logoutUser } from '../database/auth-service.js';
+
+// Assim que a página carregar, ele verifica quem está logado
+watchAuthState(async (user) => {
+  if (user) {
+    // Está logado! Vamos buscar o nome dele no banco
+    const profileData = await getUserProfile(user.uid);
+    
+    if (profileData.success) {
+      // Aqui você altera o HTML para mostrar o nome da pessoa!
+      console.log("Bem-vindo(a), " + profileData.profile.name);
+      // document.getElementById('nome-usuario').innerText = profileData.profile.name;
+    }
+  } else {
+    // Não tem ninguém logado! Expulsa para a tela de login
+    window.location.href = 'login.html';
+  }
+});
+
+// Lógica para o botão de sair
+document.getElementById('btn-sair').addEventListener('click', async () => {
+  await logoutUser();
+  // O watchAuthState vai perceber que deslogou e vai mandar pro login automaticamente!
+});
