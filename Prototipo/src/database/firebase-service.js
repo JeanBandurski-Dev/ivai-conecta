@@ -3,13 +3,13 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
-import { auth } from '../../public/js/firebase-config.js';
+import { auth, db } from '../../public/js/firebase-config.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-import { db, isFirebaseInitialized } from '../../public/js/firebase-config.js';
+import { isFirebaseInitialized } from '../../public/js/firebase-config.js';
 import {
   collection,
   getDocs,
@@ -18,7 +18,8 @@ import {
   updateDoc,
   arrayUnion,
   query,
-  where
+  where,
+  setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Seed Data Fallback incorporado para compatibilidade nativa de browser ES Modules
@@ -402,8 +403,22 @@ export async function loginUser(email, password) {
 export async function registerUser(email, password, additionalData) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    return { success: true, user: userCredential.user };
+    const user = userCredential.user;
+
+    if (isFirebaseInitialized) {
+      console.log("TESTE DE VARIAVEIS:", "DB:", !!db, "UID:", user.uid);
+      await setDoc(doc(db, 'users', user.uid), {
+        name: additionalData.name,
+        email: email,
+        city: additionalData.city,
+        role: additionalData.role,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    return { success: true, user: user };
   } catch (error) {
+    console.error("ERRO COMPLETO NO CADASTRO:", error);
     return { success: false, errorCode: error.code };
   }
 }
