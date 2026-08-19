@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         //se chegar aqui, login ok
-        alert('Login realizado com sucesso!');
+        IvaiConecta.showToast('Login realizado com sucesso!');
         setTimeout(() => {
             window.location.href = 'index.html';
         }, 800);
