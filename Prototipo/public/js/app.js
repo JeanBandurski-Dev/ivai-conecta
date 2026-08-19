@@ -4,6 +4,8 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
+import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/auth-service.js';
+
 (function () {
   'use strict';
 
@@ -447,11 +449,15 @@
     });
   }
 
+  // ==========================================
+  // CONTROLE DE SESSÃO E PERFIL (INTEGRADO COM O FRONT)
+  // ==========================================
+
   function renderNavbarAuthStatus() {
-    const user = getAuthUser();
     const container = document.getElementById('navbarAuthContainer');
     if (!container) return;
 
+    const user = getAuthUser();
     if (user) {
       let mainNavItemsHtml = '';
 
@@ -577,9 +583,10 @@
         }
       });
 
-      document.getElementById('dropdownBtnLogout')?.addEventListener('click', (e) => {
+      document.getElementById('dropdownBtnLogout')?.addEventListener('click', async (e) => {
         e.preventDefault();
         dropdownMenu?.classList.remove('show');
+        await logoutUser();
         ensureLogoutConfirmModal();
         openModal('logoutConfirmModal');
       });
@@ -589,6 +596,47 @@
       `;
     }
   }
+
+  // Vigia alterações de sessão no Firebase
+  watchAuthState(async (user) => {
+    if (user) {
+      let profileName = user.displayName || user.email || 'Usuário';
+      let profileRole = 'Usuário';
+      let avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+
+      if (user.uid) {
+        const response = await getUserProfile(user.uid);
+        if (response && response.success && response.profile) {
+          profileName = response.profile.name || profileName;
+          profileRole = response.profile.role || profileRole;
+          avatarUrl = response.profile.avatar || avatarUrl;
+        }
+      }
+
+      const container = document.getElementById('navbarAuthContainer');
+      if (container) {
+        container.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <a href="perfil-aluno.html" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none;" title="Ver Perfil">
+              <img src="${avatarUrl}" alt="${profileName}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-blue); box-shadow: var(--shadow-sm);">
+              <div style="font-size: 0.85rem; text-align: left; line-height: 1.2;">
+                <div style="font-weight: 700; color: var(--primary-dark);">${profileName}</div>
+                <div style="font-size: 0.725rem; color: var(--primary-blue); font-weight: 600; text-transform: capitalize;">${profileRole}</div>
+              </div>
+            </a>
+            <button class="btn btn-outline btn-sm" id="btnNavLogout" title="Sair da Conta" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Sair</button>
+          </div>
+        `;
+
+        document.getElementById('btnNavLogout')?.addEventListener('click', async () => {
+          await logoutUser();
+          logout();
+        });
+      }
+    } else {
+      renderNavbarAuthStatus();
+    }
+  });
 
   // Seed Data Fallback incorporado para funcionamento offline e zero-config
   const seedData = {

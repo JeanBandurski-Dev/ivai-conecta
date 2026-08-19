@@ -3,16 +3,23 @@
  * Projeto de Extensão IFPR Campus Ivaiporã
  */
 
-import { db, isFirebaseInitialized } from '../../public/js/firebase-config.js';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  arrayUnion, 
-  query, 
-  where 
+import { auth, db } from '../../public/js/firebase-config.js';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+import { isFirebaseInitialized } from '../../public/js/firebase-config.js';
+import {
+  collection,
+  getDocs,
+  doc,
+  addDoc,
+  updateDoc,
+  arrayUnion,
+  query,
+  where,
+  setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Seed Data Fallback incorporado para compatibilidade nativa de browser ES Modules
