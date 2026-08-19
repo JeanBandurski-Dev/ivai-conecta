@@ -386,39 +386,3 @@ export async function addService(servicePayload) {
 
   return servicePayload;
 }
-
-// ==========================================
-// AUTENTICAÇÃO (FIREBASE AUTH)
-// ==========================================
-
-export async function loginUser(email, password) {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return { success: true, user: userCredential.user };
-  } catch (error) {
-    return { success: false, errorCode: error.code };
-  }
-}
-
-export async function registerUser(email, password, additionalData) {
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    if (isFirebaseInitialized) {
-      console.log("TESTE DE VARIAVEIS:", "DB:", !!db, "UID:", user.uid);
-      await setDoc(doc(db, 'users', user.uid), {
-        name: additionalData.name,
-        email: email,
-        city: additionalData.city,
-        role: additionalData.role,
-        createdAt: new Date().toISOString()
-      });
-    }
-
-    return { success: true, user: user };
-  } catch (error) {
-    console.error("ERRO COMPLETO NO CADASTRO:", error);
-    return { success: false, errorCode: error.code };
-  }
-}
