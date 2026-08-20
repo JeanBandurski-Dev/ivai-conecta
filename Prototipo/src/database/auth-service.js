@@ -15,8 +15,7 @@ import {
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
-  signInWithPopup,
-  getAdditionalUserInfo
+  signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 import {
@@ -80,22 +79,19 @@ export async function registerUser(email, password, additionalData) {
 /**
  * Autentica (ou cadastra automaticamente, na primeira vez) usando uma conta
  * Google, via popup. O Firebase Auth cuida de tudo relacionado à senha —
- * a gente só precisa saber se é a primeira vez desse usuário aqui, pra
- * decidir se ele precisa completar o perfil (nome/cidade/role) ou não.
+ * a gente só devolve o usuário autenticado aqui. Quem decide se precisa
+ * completar o perfil é quem chama essa função, checando se já existe
+ * documento em 'users' (via getUserProfile) — não dá pra confiar só na
+ * flag isNewUser do Firebase, porque ela não cobre o caso de alguém criar
+ * a conta e fechar a aba antes de preencher o formulário de perfil.
  *
- * @returns {{success: boolean, user?: object, isNewUser?: boolean, errorCode?: string}}
+ * @returns {{success: boolean, user?: object, errorCode?: string}}
  */
 export async function loginWithGoogle() {
   try {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
-    const additionalInfo = getAdditionalUserInfo(userCredential);
-
-    return {
-      success: true,
-      user: userCredential.user,
-      isNewUser: additionalInfo?.isNewUser ?? false
-    };
+    return { success: true, user: userCredential.user };
   } catch (error) {
     return { success: false, errorCode: error.code };
   }
