@@ -13,7 +13,10 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signOut
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  getAdditionalUserInfo
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 import {
@@ -74,6 +77,30 @@ export async function registerUser(email, password, additionalData) {
   }
 }
 
+/**
+ * Autentica (ou cadastra automaticamente, na primeira vez) usando uma conta
+ * Google, via popup. O Firebase Auth cuida de tudo relacionado à senha —
+ * a gente só precisa saber se é a primeira vez desse usuário aqui, pra
+ * decidir se ele precisa completar o perfil (nome/cidade/role) ou não.
+ *
+ * @returns {{success: boolean, user?: object, isNewUser?: boolean, errorCode?: string}}
+ */
+export async function loginWithGoogle() {
+  try {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    const additionalInfo = getAdditionalUserInfo(userCredential);
+
+    return {
+      success: true,
+      user: userCredential.user,
+      isNewUser: additionalInfo?.isNewUser ?? false
+    };
+  } catch (error) {
+    return { success: false, errorCode: error.code };
+  }
+}
+
 // ==========================================
 // SESSÃO
 // ==========================================
@@ -129,6 +156,35 @@ export async function getUserProfile(uid) {
     }
 
     return { success: true, profile: userDocSnap.data() };
+  } catch (error) {
+    return { success: false, errorCode: error.code };
+  }
+}
+
+/**
+ * Grava (ou sobrescreve) o perfil complementar de um usuário no Firestore.
+ * Usado tanto pelo cadastro tradicional quanto pela tela de "completar
+ * perfil" que aparece na primeira vez que alguém entra com o Google
+ * (onde não existe senha/email pra coletar, só nome/cidade/role).
+ *
+ * @param {string} uid
+ * @param {{name: string, email: string, city: string, role: string}} additionalData
+ * @returns {{success: boolean, errorCode?: string}}
+ */
+export async function completeUserProfile(uid, additionalData) {
+  if (!isFirebaseInitialized) {
+    return { success: false, errorCode: 'firebase/not-initialized' };
+  }
+
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      name: additionalData.name,
+      email: additionalData.email,
+      city: additionalData.city,
+      role: additionalData.role,
+      createdAt: new Date().toISOString()
+    });
+    return { success: true };
   } catch (error) {
     return { success: false, errorCode: error.code };
   }

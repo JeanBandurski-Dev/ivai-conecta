@@ -1,5 +1,5 @@
 //importando a camada de serviço firebase
-import { loginUser, registerUser } from '../../src/database/auth-service.js';
+import { loginUser, registerUser, loginWithGoogle } from '../../src/database/auth-service.js';
 
 let selectedRole = 'aluno';
 
@@ -74,6 +74,32 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             window.location.href = 'index.html';
         }, 800);
+    });
+
+    // -----------------------------------------------------
+    // LOGIN COM GOOGLE
+    // -----------------------------------------------------
+    const btnGoogleLogin = document.getElementById('btnGoogleLogin');
+    btnGoogleLogin?.addEventListener('click', async () => {
+      hideAlert();
+
+      const response = await loginWithGoogle();
+
+      if (!response.success) {
+        // Usuário fechou o popup não é um erro real, ignora silenciosamente
+        if (response.errorCode !== 'auth/popup-closed-by-user') {
+          showAlert('Não foi possível entrar com o Google. Tente novamente.');
+        }
+        return;
+      }
+
+      if (response.isNewUser) {
+        // Primeira vez desse usuário: falta nome/cidade/perfil
+        window.location.href = 'completar-perfil.html';
+      } else {
+        // Já tem perfil completo no Firestore, segue direto
+        window.location.href = 'index.html';
+      }
     });
 
     // -----------------------------------------------------
