@@ -32,23 +32,23 @@ export default function PerfilAluno() {
   return (
     <>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-primary-dark to-primary-blue text-white py-14">
+      <div className="bg-gradient-to-br from-primary-dark via-[#071330] to-primary-blue text-white py-8 sm:py-10">
         <div className="container">
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <img src={freshTalent.avatar} alt={freshTalent.name}
-              className="w-24 h-24 rounded-full border-4 border-white/30 object-cover shadow-brand-lg shrink-0" />
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-white/30 object-cover shadow-brand-md shrink-0" />
             <div>
-              <h1 className="text-3xl font-heading font-bold text-white mb-1">{freshTalent.name}</h1>
-              <div className="text-accent-sky font-semibold mb-1">{freshTalent.course}</div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
-                <Building2 size={14} />{freshTalent.institution}
+              <h1 className="text-xl sm:text-2xl font-heading font-bold text-white mb-0.5">{freshTalent.name}</h1>
+              <div className="text-accent-sky font-semibold text-sm mb-0.5">{freshTalent.course}</div>
+              <div className="flex items-center gap-2 text-gray-300 text-xs sm:text-sm">
+                <Building2 size={13} />{freshTalent.institution}
                 <span>·</span>
-                <MapPin size={14} />{freshTalent.city}
+                <MapPin size={13} />{freshTalent.city}
               </div>
             </div>
-            <div className="ml-auto flex gap-3 flex-wrap">
-              <button onClick={() => setEndorseModal(true)} className="btn btn-teal">
-                <CheckCircle size={16} /> Enviar Recomendação
+            <div className="ml-auto flex gap-2.5 flex-wrap">
+              <button onClick={() => setEndorseModal(true)} className="btn btn-teal btn-sm">
+                <CheckCircle size={14} /> Enviar Recomendação
               </button>
             </div>
           </div>
@@ -56,7 +56,7 @@ export default function PerfilAluno() {
       </div>
 
       <main className="container section">
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-5">
 
           {/* Left column */}
           <div className="space-y-6">

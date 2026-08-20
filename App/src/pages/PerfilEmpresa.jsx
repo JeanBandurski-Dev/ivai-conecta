@@ -24,14 +24,14 @@ export default function PerfilEmpresa() {
   return (
     <>
       {/* Header */}
-      <div className="bg-gradient-to-br from-primary-dark to-primary-blue text-white py-14">
-        <div className="container flex flex-wrap items-center gap-6">
+      <div className="bg-gradient-to-br from-primary-dark via-[#071330] to-primary-blue text-white py-8 sm:py-10">
+        <div className="container flex flex-wrap items-center gap-4 sm:gap-6">
           <img src={company.logo} alt={company.name}
-            className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow-brand-lg shrink-0" />
+            className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border-2 border-white/30 shadow-brand-md shrink-0" />
           <div>
-            <h1 className="text-3xl font-heading font-bold text-white mb-1">{company.name}</h1>
-            <div className="text-accent-sky font-semibold mb-1">{company.sector}</div>
-            <div className="flex items-center gap-3 text-gray-300 text-sm flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-heading font-bold text-white mb-0.5">{company.name}</h1>
+            <div className="text-accent-sky font-semibold text-sm mb-0.5">{company.sector}</div>
+            <div className="flex items-center gap-3 text-gray-300 text-xs sm:text-sm flex-wrap">
               <span className="flex items-center gap-1"><MapPin size={13} />{company.city}</span>
               <span className="flex items-center gap-1"><Users size={13} />{company.size}</span>
               <span className="flex items-center gap-1"><Star size={13} className="fill-amber-400 text-amber-400" />{company.rating} ({company.reviews} avaliações)</span>
@@ -41,7 +41,7 @@ export default function PerfilEmpresa() {
       </div>
 
       <main className="container section">
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-5">
           {/* Left */}
           <div className="space-y-6">
             <div className="card">

@@ -4,19 +4,19 @@ import Logo from '../ui/Logo';
 export default function Footer() {
   return (
     <footer className="bg-primary-dark text-white mt-auto">
-      <div className="container py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+      <div className="container py-8 sm:py-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
           {/* Brand */}
           <div>
-            <Link to="/" className="flex items-center gap-2.5 mb-4">
-              <Logo size={36} color="#38BDF8" accentColor="#22C55E" />
-              <span className="text-lg font-heading font-bold">
+            <Link to="/" className="flex items-center gap-2 mb-3">
+              <Logo size={28} color="#38BDF8" accentColor="#22C55E" />
+              <span className="text-base font-heading font-bold">
                 <span className="text-white">Ivaí</span>{' '}
                 <span className="text-accent-sky">Conecta</span>
               </span>
             </Link>
-            <p className="text-sm text-gray-400 leading-relaxed">
+            <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
               Conectando talentos e oportunidades em Ivaiporã, Jardim Alegre, São João do Ivaí,
               Manoel Ribas e todo o Vale do Ivaí.
             </p>
