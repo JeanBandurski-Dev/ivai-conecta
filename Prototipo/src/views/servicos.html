@@ -1,29 +1,34 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serviços Locais & Marketplace | Ivaí Conecta</title>
-  <meta name="description" content="Marketplace de prestadores de serviços locais do Vale do Ivaí com avaliações, filtro regional e contato direto por WhatsApp.">
+  <meta name="description"
+    content="Marketplace de prestadores de serviços locais do Vale do Ivaí com avaliações, filtro regional e contato direto por WhatsApp.">
   <link rel="stylesheet" href="../../public/css/styles.css?v=3">
-  <script src="../../public/js/app.js?v=3"></script>
+  <script type="module" src="../../public/js/app.js?v=3"></script>
 </head>
+
 <body>
 
   <!-- NAVBAR -->
   <nav class="navbar">
     <div class="container navbar-container">
       <a href="index.html" class="logo-brand">
-        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="8" fill="#0052FF"/>
-          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF"/>
-          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14" stroke-linecap="round" fill="none"/>
-          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
-          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round"/>
-          <circle cx="72" cy="20" r="7" fill="#22C55E"/>
-          <circle cx="56" cy="36" r="6" fill="#0052FF"/>
-          <circle cx="88" cy="40" r="6" fill="#0052FF"/>
+        <svg class="logo-brand-svg" width="46" height="42" viewBox="0 0 100 90" fill="none"
+          xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="8" fill="#0052FF" />
+          <rect x="9" y="32" width="14" height="48" rx="7" fill="#0052FF" />
+          <path d="M 72 26 C 55 12 36 24 36 50 C 36 76 56 86 78 76" stroke="#0052FF" stroke-width="14"
+            stroke-linecap="round" fill="none" />
+          <line x1="56" y1="36" x2="72" y2="20" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <line x1="72" y1="20" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <line x1="56" y1="36" x2="88" y2="40" stroke="#0052FF" stroke-width="3.5" stroke-linecap="round" />
+          <circle cx="72" cy="20" r="7" fill="#22C55E" />
+          <circle cx="56" cy="36" r="6" fill="#0052FF" />
+          <circle cx="88" cy="40" r="6" fill="#0052FF" />
         </svg>
         <span><span class="logo-ivai">Ivaí</span> <span class="logo-conecta">Conecta</span></span>
       </a>
@@ -51,24 +56,28 @@
       <span class="hero-tag" style="margin-bottom: 0.75rem;">Autônomos e Empreendedores do Vale do Ivaí</span>
       <h1 style="color: var(--white); font-size: 2.4rem; margin-bottom: 0.5rem;">Marketplace de Serviços Locais</h1>
       <p style="color: var(--gray-200); max-width: 650px;">
-        Encontre profissionais qualificados em Ivaiporã, Jardim Alegre, São João do Ivaí e região com avaliações de clientes e contato imediato por WhatsApp.
+        Encontre profissionais qualificados em Ivaiporã, Jardim Alegre, São João do Ivaí e região com avaliações de
+        clientes e contato imediato por WhatsApp.
       </p>
     </div>
   </header>
 
   <!-- MAIN CONTENT -->
   <main class="container section">
-    
+
     <!-- SEARCH AND CATEGORY FILTERS -->
-    <div style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+    <div
+      style="background: var(--white); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
       <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
-        
+
         <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; flex-wrap: wrap;">
           <div class="search-input-group" style="max-width: 380px; width: 100%; border: 1px solid var(--gray-300);">
-            <input type="text" id="serviceSearchInput" placeholder="Busque por eletricista, técnico, aulas, designer...">
+            <input type="text" id="serviceSearchInput"
+              placeholder="Busque por eletricista, técnico, aulas, designer...">
           </div>
 
-          <div class="city-selector-pill" style="border: 1px solid var(--gray-300); background: var(--gray-50);" title="Filtrar por cidade no Vale do Ivaí">
+          <div class="city-selector-pill" style="border: 1px solid var(--gray-300); background: var(--gray-50);"
+            title="Filtrar por cidade no Vale do Ivaí">
             <select class="city-select-global">
               <!-- Preenchido via app.js -->
             </select>
@@ -102,7 +111,8 @@
       <form id="newServiceForm">
         <div class="form-group">
           <label for="newProviderName">Nome do Profissional / Negócio</label>
-          <input type="text" id="newProviderName" class="form-control" placeholder="Ex: Carlos Instalações Eletrotécnicas" required>
+          <input type="text" id="newProviderName" class="form-control"
+            placeholder="Ex: Carlos Instalações Eletrotécnicas" required>
         </div>
 
         <div class="form-group">
@@ -135,7 +145,8 @@
 
         <div class="form-group">
           <label for="newDescription">Descrição dos Serviços Prestados</label>
-          <textarea id="newDescription" class="form-control" rows="3" placeholder="Descreva os serviços, tempo de experiência ou garantia..." required></textarea>
+          <textarea id="newDescription" class="form-control" rows="3"
+            placeholder="Descreva os serviços, tempo de experiência ou garantia..." required></textarea>
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
@@ -259,4 +270,5 @@
     }
   </script>
 </body>
+
 </html>
