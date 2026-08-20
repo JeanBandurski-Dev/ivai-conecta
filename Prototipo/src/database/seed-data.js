@@ -1,4 +1,14 @@
-{
+/**
+ * IVAÍ CONECTA - DADOS DE EXEMPLO (SEED / FALLBACK)
+ * Projeto de Extensão IFPR Campus Ivaiporã
+ *
+ * Fonte única dos dados de demonstração (talentos, vagas, serviços).
+ * Usado como fallback quando o Firestore está vazio/offline.
+ * Antes existia uma cópia disso em app.js e outra em firebase-service.js —
+ * agora os dois importam daqui, evitando divergência entre os dados.
+ */
+
+export const seedData = {
   "cities": [
     "Todas as Cidades",
     "Ivaiporã",
@@ -272,3 +282,4 @@
     }
   ]
 }
+;

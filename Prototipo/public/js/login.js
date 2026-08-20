@@ -1,5 +1,5 @@
 //importando a camada de serviço firebase
-import { loginUser, registerUser } from '../../src/database/auth-service.js';
+import { loginUser, registerUser, loginWithGoogle, getUserProfile } from '../../src/database/auth-service.js';
 
 let selectedRole = 'aluno';
 
@@ -74,6 +74,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             window.location.href = 'index.html';
         }, 800);
+    });
+
+    // -----------------------------------------------------
+    // LOGIN COM GOOGLE
+    // -----------------------------------------------------
+    const btnGoogleLogin = document.getElementById('btnGoogleLogin');
+    btnGoogleLogin?.addEventListener('click', async () => {
+      hideAlert();
+
+      const response = await loginWithGoogle();
+
+      if (!response.success) {
+        if (response.errorCode === 'auth/popup-closed-by-user') {
+          // Usuário fechou o popup por conta própria, não é um erro real
+          return;
+        }
+        if (response.errorCode === 'auth/account-exists-with-different-credential') {
+          showAlert('Já existe uma conta com este e-mail cadastrada por senha. Entre com e-mail e senha.');
+          return;
+        }
+        showAlert('Não foi possível entrar com o Google. Tente novamente.');
+        return;
+      }
+
+      // Checa se já existe perfil salvo no Firestore para esse usuário —
+      // não confiamos na flag "isNewUser" do Firebase, pois ela não cobre
+      // o caso de alguém criar a conta e fechar a aba antes de completar
+      // o cadastro (deixaria a conta "órfã", sem perfil).
+      const perfil = await getUserProfile(response.user.uid);
+
+      if (!perfil.success) {
+        // Sem perfil no banco: primeira vez ou cadastro incompleto anterior
+        window.location.href = 'completar-perfil.html';
+      } else {
+        // Já tem perfil completo, segue direto
+        window.location.href = 'index.html';
+      }
     });
 
     // -----------------------------------------------------

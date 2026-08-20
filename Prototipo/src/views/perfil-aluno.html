@@ -6,7 +6,7 @@
   <title>Meu Perfil & Prévia Profissional | Ivaí Conecta</title>
   <meta name="description" content="Prévia do seu perfil profissional, painel de informações úteis, acompanhamento de vagas candidatadas e gerenciamento de qualificações.">
   <link rel="stylesheet" href="../../public/css/styles.css?v=3">
-  <script src="../../public/js/app.js?v=3"></script>
+  <script type="module" src="../../public/js/app.js?v=3"></script>
 </head>
 <body>
 
@@ -481,38 +481,83 @@
     </div>
   </footer>
 
-  <script>
+  <script type="module">
+    import { watchAuthState, getUserProfile } from '../database/auth-service.js';
+
     let currentStudent = null;
-    let isOwnProfile = false;
+    let interactionsBound = false;
+
+    // Mesma chave usada pelo resto do sistema de talentos (app.js / firebase-service.js),
+    // assim o "meu perfil" fica salvo no mesmo lugar que o Banco de Talentos já lê.
+    const STORAGE_KEY_TALENTS_LOCAL = 'ivai_conecta_db_talents';
+
+    /**
+     * Garante que existe um registro de talento vinculado ao uid do usuário
+     * logado. Se ainda não existir (primeira vez que ele visita "Meu Perfil"),
+     * cria um novo, com nome/cidade vindos do cadastro real (users/{uid}).
+     */
+    function ensureOwnTalentRecord(uid, profile) {
+      let talents = JSON.parse(localStorage.getItem(STORAGE_KEY_TALENTS_LOCAL)) || [];
+      let mine = talents.find(t => t.id === uid);
+
+      if (!mine) {
+        mine = {
+          id: uid,
+          name: profile.name || 'Meu Perfil',
+          city: profile.city || 'Ivaiporã',
+          course: '',
+          institution: '',
+          bio: '',
+          avatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=250',
+          skills: [],
+          education: [],
+          experiences: [],
+          endorsements: []
+        };
+        talents.push(mine);
+        localStorage.setItem(STORAGE_KEY_TALENTS_LOCAL, JSON.stringify(talents));
+      }
+
+      return mine;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const paramId = urlParams.get('id');
-      const authUser = IvaiConecta.getAuthUser();
+      const studentIdParam = urlParams.get('id');
 
-      // Verificação rigorosa de propriedade do perfil:
-      if (!paramId) {
-        isOwnProfile = true;
-      } else if (authUser) {
-        if (authUser.id && paramId == authUser.id) {
-          isOwnProfile = true;
-        } else if ((paramId == 1 || paramId == '1') && (authUser.role === 'aluno' || authUser.role === 'candidato')) {
-          isOwnProfile = true;
-        }
+      if (studentIdParam) {
+        // Veio do Banco de Talentos vendo o perfil de outra pessoa
+        const talents = IvaiConecta.getTalents('Todas as Cidades');
+        currentStudent = talents.find(t => t.id == studentIdParam) || talents[0];
+        setupProfileHeaderActions();
+        renderStudentProfile();
+        renderUsefulStats();
+        setupProfileInteractions();
+      } else {
+        // "Meu Perfil": precisa estar logado, carrega os dados reais da conta
+        watchAuthState(async (user) => {
+          if (!user) {
+            window.location.href = 'login.html';
+            return;
+          }
+
+          const perfilResult = await getUserProfile(user.uid);
+          const profile = perfilResult.success
+            ? perfilResult.profile
+            : { name: user.displayName || user.email, city: 'Ivaiporã' };
+
+          currentStudent = ensureOwnTalentRecord(user.uid, profile);
+          setupProfileHeaderActions();
+          renderStudentProfile();
+          renderUsefulStats();
+          setupProfileInteractions();
+        });
       }
+    });
 
-      const studentId = paramId || 1;
-      currentStudent = IvaiConecta.getTalentById(studentId);
-      
-      if (authUser && isOwnProfile) {
-        currentStudent.name = authUser.name || currentStudent.name;
-        if (authUser.city) currentStudent.city = authUser.city;
-        if (authUser.avatar) currentStudent.avatar = authUser.avatar;
-      }
-
-      setupProfileHeaderActions();
-      renderStudentProfile();
-      renderUsefulStats();
+    function setupProfileInteractions() {
+      if (interactionsBound) return; // evita duplicar listeners se o callback disparar de novo
+      interactionsBound = true;
 
       // Botões de alternância de Modo (Prévia vs Edição)
       document.getElementById('btnModePreview')?.addEventListener('click', () => switchMode('preview'));
@@ -639,7 +684,7 @@
         IvaiConecta.showToast('Recomendação registrada com selo oficial de verificação!');
         document.getElementById('endorsementForm').reset();
       });
-    });
+    }
 
     function setupProfileHeaderActions() {
       const btnModeEdit = document.getElementById('btnModeEdit');

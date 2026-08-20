@@ -5,6 +5,7 @@
  */
 
 import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/auth-service.js';
+import { seedData } from '../../src/database/seed-data.js';
 
 (function () {
   'use strict';
@@ -57,53 +58,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
       desc: 'Foco em publicar vagas, encontrar talentos e contratar.'
     }
   };
-
-  // Base de Contas Cadastradas (Inicialização Seed + LocalStorage)
-  function getUsersDB() {
-    let users = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS_DB));
-    if (!users || users.length === 0) {
-      users = [
-        {
-          email: 'aluno@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Lucas Eduardo Silva',
-          city: 'Ivaiporã',
-          role: 'aluno',
-          badge: 'Estudante (IFPR Campus Ivaiporã)',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'freelancer@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Marcos Eletricista & Automação',
-          city: 'Ivaiporã',
-          role: 'freelancer',
-          badge: 'Prestador de Serviço Autônomo',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'candidato@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Beatriz Santos',
-          city: 'Jardim Alegre',
-          role: 'candidato',
-          badge: 'Candidato / Profissional',
-          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'empresa@ivaiconecta.com.br',
-          password: '123456',
-          name: 'ValeTech Soluções Digitais',
-          city: 'Ivaiporã',
-          role: 'empresa',
-          badge: 'Empresa / Recrutador',
-          avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-        }
-      ];
-      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
-    }
-    return users;
-  }
 
   function getUserRole() {
     return localStorage.getItem(STORAGE_KEY_USER_ROLE) || 'aluno';
@@ -196,152 +150,11 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
     }
   }
 
-  // Login com Verificação Real de Credenciais
-  function login(email, password, fallbackRole = 'aluno') {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPassword = (password || '').trim();
-
-    if (!cleanEmail) {
-      return { success: false, error: 'Por favor, informe seu e-mail de acesso.' };
-    }
-    if (!cleanPassword) {
-      return { success: false, error: 'Por favor, informe sua senha.' };
-    }
-
-    let usersDB = getUsersDB();
-    let account = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
-
-    // Se for e-mail de demonstração e não constar no DB, recria automaticamente
-    if (!account && cleanEmail.includes('@ivaiconecta.com.br')) {
-      const roleFromEmail = cleanEmail.split('@')[0];
-      const validRole = USER_ROLES[roleFromEmail] ? roleFromEmail : fallbackRole;
-      const demoNames = {
-        aluno: 'Lucas Eduardo Silva',
-        freelancer: 'Marcos Eletricista & Automação',
-        candidato: 'Beatriz Santos',
-        empresa: 'ValeTech Soluções Digitais'
-      };
-      const userRoleConfig = USER_ROLES[validRole] || USER_ROLES.aluno;
-      account = {
-        email: cleanEmail,
-        password: cleanPassword || '123456',
-        name: demoNames[validRole] || 'Usuário Ivaí Conecta',
-        city: 'Ivaiporã',
-        role: validRole,
-        badge: userRoleConfig.badge,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-      };
-      usersDB.push(account);
-      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDB));
-    }
-
-    if (!account) {
-      return {
-        success: false,
-        error: 'Nenhuma conta encontrada com este e-mail. Crie uma conta na aba "Criar Nova Conta".'
-      };
-    }
-
-    if (account.password !== cleanPassword && !cleanEmail.includes('@ivaiconecta.com.br')) {
-      return {
-        success: false,
-        error: 'Senha incorreta. Verifique suas credenciais e tente novamente.'
-      };
-    }
-
-    const userRoleConfig = USER_ROLES[account.role] || USER_ROLES[fallbackRole] || USER_ROLES.aluno;
-    const authUser = {
-      email: account.email,
-      name: account.name,
-      city: account.city || 'Ivaiporã',
-      role: account.role,
-      roleName: userRoleConfig.name,
-      badge: account.badge || userRoleConfig.badge,
-      avatar: account.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      loggedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
-    setUserRole(account.role);
-    if (account.city) setSelectedCity(account.city);
-    renderNavbarAuthStatus();
-
-    return { success: true, user: authUser };
-  }
-
-  // Cadastro de Novo Usuário com Verificação de E-mail Único
-  function register(userData) {
-    const { name, email, city, role, password } = userData;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPassword = (password || '').trim() || '123456';
-    const cleanName = (name || '').trim();
-    const roleId = role || 'aluno';
-
-    if (!cleanName || cleanName.length < 2) {
-      return { success: false, error: 'Informe seu nome completo ou razão social.' };
-    }
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, error: 'Informe um e-mail válido.' };
-    }
-    if (cleanPassword.length < 6) {
-      return { success: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
-    }
-
-    const usersDB = getUsersDB();
-    const existing = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
-
-    if (existing) {
-      return {
-        success: false,
-        error: 'Este e-mail já está cadastrado na plataforma. Faça login na aba "Entrar na Conta".'
-      };
-    }
-
-    const userRoleConfig = USER_ROLES[roleId] || USER_ROLES.aluno;
-    const defaultAvatars = {
-      aluno: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      freelancer: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-      candidato: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
-      empresa: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-    };
-
-    const newUser = {
-      email: cleanEmail,
-      password: cleanPassword,
-      name: cleanName,
-      city: city || 'Ivaiporã',
-      role: roleId,
-      badge: userRoleConfig.badge,
-      avatar: defaultAvatars[roleId] || defaultAvatars.aluno,
-      createdAt: new Date().toISOString()
-    };
-
-    usersDB.push(newUser);
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDB));
-
-    // Logar automaticamente o novo usuário
-    const authUser = {
-      email: newUser.email,
-      name: newUser.name,
-      city: newUser.city,
-      role: newUser.role,
-      roleName: userRoleConfig.name,
-      badge: newUser.badge,
-      avatar: newUser.avatar,
-      loggedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
-    if (city) setSelectedCity(city);
-    setUserRole(newUser.role);
-    renderNavbarAuthStatus();
-
-    return { success: true, user: authUser };
-  }
-
-  function logout() {
+  async function logout() {
+    await logoutUser();
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
     renderNavbarAuthStatus();
+    window.location.href = 'index.html';
   }
 
   function ensureAccountSettingsModal() {
@@ -737,126 +550,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
             institution: "UENP",
             discipline: "Identidade Visual & Experiência do Usuário",
             quote: "Camila possui um olhar estético apurado e cria identidades visuais memoráveis para o comércio regional.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 5,
-        name: "Rafael Gomes Costa",
-        course: "Engenharia de Software",
-        institution: "UENP",
-        city: "Ivaiporã",
-        avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250",
-        skills: ["Python", "Django", "PostgreSQL", "Docker", "REST APIs", "Git"],
-        endorsements: [
-          {
-            id: "end_06",
-            profName: "Prof. Dr. André Luciano",
-            profEmail: "andre.luciano@uenp.edu.br",
-            institution: "UENP",
-            discipline: "Engenharia de Software Avançada",
-            quote: "Rafael demonstra maturidade técnica rara para um estudante, com projetos de backend robustos e bem documentados.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 6,
-        name: "Juliana Aparecida Melo",
-        course: "Análise e Desenvolvimento de Sistemas",
-        institution: "IFPR Campus Ivaiporã",
-        city: "Jardim Alegre",
-        avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250",
-        skills: ["Vue.js", "JavaScript", "HTML5/CSS3", "MySQL", "Scrum", "Figma"],
-        endorsements: [
-          {
-            id: "end_07",
-            profName: "Prof. Ma. Renata Nunes",
-            profEmail: "renata.nunes@ifpr.edu.br",
-            institution: "IFPR Campus Ivaiporã",
-            discipline: "Desenvolvimento de Sistemas Web",
-            quote: "Aluna comprometida, criativa e com excelente capacidade de entrega em projetos ágeis colaborativos.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 7,
-        name: "Bruno Freitas — Dev & Infra",
-        course: "Freelancer — Tecnologia da Informação",
-        institution: "Autônomo / Vale do Ivaí",
-        city: "Ivaiporã",
-        avatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250",
-        skills: ["Linux", "AWS", "Docker", "CI/CD", "Nginx", "Node.js", "TypeScript"],
-        endorsements: [
-          {
-            id: "end_08",
-            profName: "ValeTech Soluções Digitais",
-            profEmail: "rh@valetech.com.br",
-            institution: "Empresa Parceira Verificada",
-            discipline: "Infraestrutura & DevOps",
-            quote: "Profissional autônomo de alta confiabilidade. Migrou toda nossa infra para cloud com zero downtime.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 8,
-        name: "Fernanda Lima",
-        course: "Licenciatura em Pedagogia",
-        institution: "Univale Ivaiporã",
-        city: "São João do Ivaí",
-        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=250",
-        skills: ["Gestão de Pessoas", "Treinamento Corporativo", "RH", "Google Workspace", "Power BI"],
-        endorsements: [
-          {
-            id: "end_09",
-            profName: "Profª. Dra. Silvia Campos",
-            profEmail: "silvia.campos@univale.edu.br",
-            institution: "Univale Ivaiporã",
-            discipline: "Gestão de Recursos Humanos",
-            quote: "Fernanda possui habilidades excepcionais de liderança educacional e gestão de equipes multidisciplinares.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 9,
-        name: "Diego Carvalho — Design & Vídeo",
-        course: "Freelancer — Criação Digital",
-        institution: "Autônomo / Manoel Ribas",
-        city: "Manoel Ribas",
-        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250",
-        skills: ["Adobe Premiere", "After Effects", "Figma", "Motion Design", "Social Media", "Copywriting"],
-        endorsements: [
-          {
-            id: "end_10",
-            profName: "Agência Conect@ Comunicação",
-            profEmail: "contato@conectacomm.com.br",
-            institution: "Empresa Parceira Verificada",
-            discipline: "Produção Audiovisual & Branding",
-            quote: "Diego transforma briefings complexos em peças criativas impactantes. Entrega antes do prazo e supera expectativas.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 10,
-        name: "Isabela Rocha",
-        course: "Ciências Contábeis",
-        institution: "UENP",
-        city: "Grandes Rios",
-        avatar: "https://images.unsplash.com/photo-1546961342-ea5f60b193b7?auto=format&fit=crop&q=80&w=250",
-        skills: ["Contabilidade Fiscal", "SPED", "Excel Avançado", "Planejamento Tributário", "ERP Totvs"],
-        endorsements: [
-          {
-            id: "end_11",
-            profName: "Prof. Dr. Marcos Pereira",
-            profEmail: "marcos.pereira@uenp.edu.br",
-            institution: "UENP",
-            discipline: "Contabilidade Tributária e Fiscal",
-            quote: "Isabela tem domínio técnico e ético exemplar das normas contábeis brasileiras, sendo referência na turma.",
             isVerified: true
           }
         ]
@@ -1381,8 +1074,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
     getUserRoles,
     canApplyToJobs,
     getAuthUser,
-    login,
-    register,
     logout,
     renderNavbarAuthStatus,
     getTalents,
