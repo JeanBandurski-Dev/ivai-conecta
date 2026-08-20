@@ -5,6 +5,7 @@
  */
 
 import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/auth-service.js';
+import { seedData } from '../../src/database/seed-data.js';
 
 (function () {
   'use strict';
@@ -27,7 +28,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
   const STORAGE_KEY_SERVICES = 'ivai_conecta_db_services';
   const STORAGE_KEY_USER_ROLE = 'ivai_conecta_current_user_role';
   const STORAGE_KEY_AUTH_USER = 'ivai_conecta_auth_user';
-  const STORAGE_KEY_USERS_DB = 'ivai_conecta_users_db';
 
   // Configuração dos Perfis de Usuários Suportados
   const USER_ROLES = {
@@ -56,53 +56,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
       desc: 'Foco em publicar vagas, encontrar talentos e contratar.'
     }
   };
-
-  // Base de Contas Cadastradas (Inicialização Seed + LocalStorage)
-  function getUsersDB() {
-    let users = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS_DB));
-    if (!users || users.length === 0) {
-      users = [
-        {
-          email: 'aluno@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Lucas Eduardo Silva',
-          city: 'Ivaiporã',
-          role: 'aluno',
-          badge: 'Estudante (IFPR Campus Ivaiporã)',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'freelancer@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Marcos Eletricista & Automação',
-          city: 'Ivaiporã',
-          role: 'freelancer',
-          badge: 'Prestador de Serviço Autônomo',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'candidato@ivaiconecta.com.br',
-          password: '123456',
-          name: 'Beatriz Santos',
-          city: 'Jardim Alegre',
-          role: 'candidato',
-          badge: 'Candidato / Profissional',
-          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150'
-        },
-        {
-          email: 'empresa@ivaiconecta.com.br',
-          password: '123456',
-          name: 'ValeTech Soluções Digitais',
-          city: 'Ivaiporã',
-          role: 'empresa',
-          badge: 'Empresa / Recrutador',
-          avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-        }
-      ];
-      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
-    }
-    return users;
-  }
 
   function getUserRole() {
     return localStorage.getItem(STORAGE_KEY_USER_ROLE) || 'aluno';
@@ -140,125 +93,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
     } catch (e) {
       return null;
     }
-  }
-
-  // Login com Verificação Real de Credenciais
-  function login(email, password, fallbackRole = 'aluno') {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPassword = (password || '').trim();
-
-    if (!cleanEmail) {
-      return { success: false, error: 'Por favor, informe seu e-mail de acesso.' };
-    }
-    if (!cleanPassword) {
-      return { success: false, error: 'Por favor, informe sua senha.' };
-    }
-
-    const usersDB = getUsersDB();
-    const account = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
-
-    if (!account) {
-      return {
-        success: false,
-        error: 'Nenhuma conta encontrada com este e-mail. Crie uma conta na aba "Criar Nova Conta".'
-      };
-    }
-
-    if (account.password !== cleanPassword) {
-      return {
-        success: false,
-        error: 'Senha incorreta. Verifique suas credenciais e tente novamente.'
-      };
-    }
-
-    const userRoleConfig = USER_ROLES[account.role] || USER_ROLES[fallbackRole] || USER_ROLES.aluno;
-    const authUser = {
-      email: account.email,
-      name: account.name,
-      city: account.city || 'Ivaiporã',
-      role: account.role,
-      roleName: userRoleConfig.name,
-      badge: account.badge || userRoleConfig.badge,
-      avatar: account.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      loggedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
-    setUserRole(account.role);
-    if (account.city) setSelectedCity(account.city);
-    renderNavbarAuthStatus();
-
-    return { success: true, user: authUser };
-  }
-
-  // Cadastro de Novo Usuário com Verificação de E-mail Único
-  function register(userData) {
-    const { name, email, city, role, password } = userData;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPassword = (password || '').trim() || '123456';
-    const cleanName = (name || '').trim();
-    const roleId = role || 'aluno';
-
-    if (!cleanName || cleanName.length < 2) {
-      return { success: false, error: 'Informe seu nome completo ou razão social.' };
-    }
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, error: 'Informe um e-mail válido.' };
-    }
-    if (cleanPassword.length < 6) {
-      return { success: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
-    }
-
-    const usersDB = getUsersDB();
-    const existing = usersDB.find(u => u.email.toLowerCase() === cleanEmail);
-
-    if (existing) {
-      return {
-        success: false,
-        error: 'Este e-mail já está cadastrado na plataforma. Faça login na aba "Entrar na Conta".'
-      };
-    }
-
-    const userRoleConfig = USER_ROLES[roleId] || USER_ROLES.aluno;
-    const defaultAvatars = {
-      aluno: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      freelancer: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-      candidato: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
-      empresa: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-    };
-
-    const newUser = {
-      email: cleanEmail,
-      password: cleanPassword,
-      name: cleanName,
-      city: city || 'Ivaiporã',
-      role: roleId,
-      badge: userRoleConfig.badge,
-      avatar: defaultAvatars[roleId] || defaultAvatars.aluno,
-      createdAt: new Date().toISOString()
-    };
-
-    usersDB.push(newUser);
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDB));
-
-    // Logar automaticamente o novo usuário
-    const authUser = {
-      email: newUser.email,
-      name: newUser.name,
-      city: newUser.city,
-      role: newUser.role,
-      roleName: userRoleConfig.name,
-      badge: newUser.badge,
-      avatar: newUser.avatar,
-      loggedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
-    if (city) setSelectedCity(city);
-    setUserRole(newUser.role);
-    renderNavbarAuthStatus();
-
-    return { success: true, user: authUser };
   }
 
   function logout() {
@@ -346,191 +180,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
     }
   });
 
-  // Seed Data Fallback incorporado para funcionamento offline e zero-config
-  const seedData = {
-    cities: [
-      "Todas as Cidades",
-      "Ivaiporã",
-      "Jardim Alegre",
-      "São João do Ivaí",
-      "Manoel Ribas",
-      "Lunardelli",
-      "Borrazópolis",
-      "Ariranha do Ivaí",
-      "Grandes Rios"
-    ],
-    talents: [
-      {
-        id: 1,
-        name: "Lucas Eduardo Silva",
-        course: "Análise e Desenvolvimento de Sistemas",
-        institution: "IFPR Campus Ivaiporã",
-        city: "Ivaiporã",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
-        skills: ["JavaScript", "HTML5/CSS3", "React", "Node.js", "Git", "SQL"],
-        endorsements: [
-          {
-            id: "end_01",
-            profName: "Prof. Dr. Ricardo Oliveira",
-            profEmail: "ricardo.oliveira@ifpr.edu.br",
-            institution: "IFPR Campus Ivaiporã",
-            discipline: "Desenvolvimento Web & Banco de Dados",
-            quote: "Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.",
-            isVerified: true
-          },
-          {
-            id: "end_02",
-            profName: "Profª. Ma. Amanda Costa",
-            profEmail: "amanda.costa@ifpr.edu.br",
-            institution: "IFPR Campus Ivaiporã",
-            discipline: "Engenharia de Software",
-            quote: "Demonstrou alto domínio em metodologias ágeis e capacidade técnica destacada na criação de APIs.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 2,
-        name: "Beatriz Santos",
-        course: "Administração",
-        institution: "Univale Ivaiporã",
-        city: "Jardim Alegre",
-        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250",
-        skills: ["Gestão Financeira", "Excel Avançado", "Marketing Digital", "ERP", "Atendimento ao Cliente"],
-        endorsements: [
-          {
-            id: "end_03",
-            profName: "Prof. Carlos Alberto Ramos",
-            profEmail: "carlos.ramos@univale.edu.br",
-            institution: "Univale Ivaiporã",
-            discipline: "Gestão Financeira e Orçamentária",
-            quote: "Extremamente dedicada, responsável e proativa na solução de casos de gestão empresarial.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 3,
-        name: "Matheus Henrique",
-        course: "Técnico em Eletrotécnica",
-        institution: "IFPR Campus Ivaiporã",
-        city: "São João do Ivaí",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250",
-        skills: ["Instalações Elétricas", "Automação Industrial", "Comandos Elétricos", "AutoCAD", "NR-10"],
-        endorsements: [
-          {
-            id: "end_04",
-            profName: "Prof. Eng. Fernando Souza",
-            profEmail: "fernando.souza@ifpr.edu.br",
-            institution: "IFPR Campus Ivaiporã",
-            discipline: "Instalações Elétricas Industriais",
-            quote: "Profissional técnico com excelente visão de segurança e precisão em diagramas unifilares.",
-            isVerified: true
-          }
-        ]
-      },
-      {
-        id: 4,
-        name: "Camila Fernandes",
-        course: "Design Gráfico & Mídias",
-        institution: "UENP / Unicesumar",
-        city: "Manoel Ribas",
-        avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250",
-        skills: ["Figma", "Photoshop", "Branding", "UI/UX Design", "Social Media"],
-        endorsements: [
-          {
-            id: "end_05",
-            profName: "Profª. Dra. Vanessa Martins",
-            profEmail: "vanessa.martins@uenp.edu.br",
-            institution: "UENP",
-            discipline: "Identidade Visual & Experiência do Usuário",
-            quote: "Camila possui um olhar estético apurado e cria identidades visuais memoráveis para o comércio regional.",
-            isVerified: true
-          }
-        ]
-      }
-    ],
-    jobs: [
-      {
-        id: 101,
-        title: "Desenvolvedor Front-end Junior / Estagiário",
-        company: "ValeTech Soluções Digitais",
-        city: "Ivaiporã",
-        type: "Tempo Integral / Híbrido",
-        requiredSkills: ["JavaScript", "HTML5/CSS3", "React", "Git"]
-      },
-      {
-        id: 102,
-        title: "Assistente Administrativo & Financeiro",
-        company: "Cooperativa Agropecuária do Vale",
-        city: "Ivaiporã",
-        type: "Tempo Integral",
-        requiredSkills: ["Excel Avançado", "Gestão Financeira", "ERP", "Atendimento ao Cliente"]
-      },
-      {
-        id: 103,
-        title: "Técnico de Manutenção Elétrica Industrial",
-        company: "Indústria Metalúrgica Ivaiporã",
-        city: "São João do Ivaí",
-        type: "Tempo Integral",
-        requiredSkills: ["Instalações Elétricas", "Comandos Elétricos", "NR-10", "Automação Industrial"]
-      },
-      {
-        id: 104,
-        title: "Designer de Mídias Sociais & Marketing",
-        company: "Agência Conect@ Comunicação",
-        city: "Jardim Alegre",
-        type: "Meio Período / Remoto",
-        requiredSkills: ["Figma", "Photoshop", "Social Media", "Branding"]
-      }
-    ],
-    services: [
-      {
-        id: 201,
-        providerName: "Marcos Eletricista & Automação",
-        category: "Construção & Manutenção",
-        city: "Ivaiporã",
-        phone: "5543999887766",
-        rating: 4.9,
-        reviewsCount: 38,
-        badge: "Verificado Ivaí Conecta",
-        description: "Serviços residenciais e comerciais, padrões Copel, quadros de distribuição e manutenção de emergência 24h."
-      },
-      {
-        id: 202,
-        providerName: "Ana Paula - Design & Redes Sociais",
-        category: "Marketing & Design",
-        city: "Jardim Alegre",
-        phone: "5543999112233",
-        rating: 5.0,
-        reviewsCount: 24,
-        badge: "Destaque da Semana",
-        description: "Criação de logotipos, gestão de Instagram/Facebook, materiais impressos e identidade visual para o comércio local."
-      },
-      {
-        id: 203,
-        providerName: "TechVale - Suporte em Informática",
-        category: "Tecnologia & Suporte",
-        city: "Ivaiporã",
-        phone: "5543999445566",
-        rating: 4.8,
-        reviewsCount: 52,
-        badge: "Verificado Ivaí Conecta",
-        description: "Formatação, remoção de vírus, montagem de computadores gamer, redes Wi-Fi empresariais e instalação de câmeras."
-      },
-      {
-        id: 204,
-        providerName: "ClimaIvaí Climatização Split",
-        category: "Manutenção Doméstica",
-        city: "Manoel Ribas",
-        phone: "5543999778899",
-        rating: 4.9,
-        reviewsCount: 19,
-        badge: "Certificado",
-        description: "Limpeza, higienização, recarga de gás e instalação de ar condicionado split em toda a microrregião."
-      }
-    ]
-  };
 
   // Motor de Matching
   function calculateMatchScore(studentSkills = [], requiredSkills = []) {
@@ -831,8 +480,6 @@ import { watchAuthState, getUserProfile, logoutUser } from '../../src/database/a
     setUserRole,
     getUserRoles,
     getAuthUser,
-    login,
-    register,
     logout,
     renderNavbarAuthStatus,
     getTalents,
