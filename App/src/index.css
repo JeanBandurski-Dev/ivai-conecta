@@ -1,0 +1,404 @@
+@import "tailwindcss";
+
+/* Ocultar a media-query de preferência do SO para que as classes dark: só funcionem se a classe .dark estiver presente no <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Design Tokens (Tailwind v4 @theme) ─────────────────── */
+@theme {
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Colors — primary */
+  --color-primary-dark: #0A1128;
+  --color-primary-navy: #0F172A;
+  --color-primary-blue: #0052FF;
+  --color-primary-hover: #0043D0;
+  --color-primary-light: #EFF6FF;
+
+  /* Colors — accent */
+  --color-accent-green: #22C55E;
+  --color-accent-green-soft: #DCFCE7;
+  --color-accent-sky: #38BDF8;
+  --color-accent-gold: #F59E0B;
+  --color-accent-amber: #D97706;
+  --color-accent-gold-soft: #FEF3C7;
+
+  /* Colors — brand */
+  --color-brand-teal-soft: #E0F2FE;
+
+  /* Shadows */
+  --shadow-brand-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-brand-md: 0 4px 8px -1px rgba(10, 17, 40, 0.08), 0 2px 4px -1px rgba(10, 17, 40, 0.04);
+  --shadow-brand-lg: 0 12px 20px -3px rgba(10, 17, 40, 0.1), 0 4px 6px -2px rgba(10, 17, 40, 0.05);
+  --shadow-brand-xl: 0 24px 32px -5px rgba(10, 17, 40, 0.14), 0 12px 16px -5px rgba(10, 17, 40, 0.04);
+}
+
+/* ─── Base ────────────────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+  }
+  body {
+    font-family: var(--font-body);
+    background-color: #f8fafc;
+    color: #1e293b;
+    line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  .dark body {
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+    line-height: 1.22;
+    letter-spacing: -0.02em;
+  }
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: #ffffff;
+  }
+  a {
+    color: var(--color-primary-blue);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  a:hover {
+    color: var(--color-primary-hover);
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+}
+
+/* ─── Custom Component Classes ────────────────────────────── */
+@layer components {
+
+  /* ── Container / Layout (Centered firmly in screen) ── */
+  .container {
+    width: 100%;
+    max-width: 1140px; /* Levemente mais concentrado no meio da tela */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  .section {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.35rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.925rem;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+  }
+  .btn:active {
+    transform: translateY(0);
+  }
+  .btn-sm  { padding: 0.45rem 1rem; font-size: 0.825rem; border-radius: 0.6rem; }
+  .btn-lg  { padding: 0.85rem 1.85rem; font-size: 1.05rem; border-radius: 0.85rem; }
+  .btn-pill { border-radius: 9999px; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #0052FF, #0036B3);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 82, 255, 0.28);
+  }
+  .btn-primary:hover { 
+    background: linear-gradient(135deg, #0043D0, #002888); 
+    color: #fff; 
+    box-shadow: 0 8px 20px rgba(0, 82, 255, 0.38); 
+  }
+
+  .btn-teal {
+    background: linear-gradient(135deg, #0052FF, #0036B3);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 82, 255, 0.28);
+  }
+  .btn-teal:hover { 
+    background: linear-gradient(135deg, #0043D0, #0030A0); 
+    color: #fff; 
+    box-shadow: 0 8px 20px rgba(0, 82, 255, 0.38); 
+  }
+
+  .btn-outline {
+    background-color: transparent;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+  .dark .btn-outline {
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .btn-outline:hover { 
+    border-color: var(--color-primary-blue); 
+    color: var(--color-primary-blue); 
+    background-color: var(--color-primary-light); 
+  }
+  .dark .btn-outline:hover {
+    border-color: var(--color-primary-blue);
+    color: #60a5fa;
+    background-color: rgba(30, 58, 138, 0.4);
+  }
+
+  .btn-outline-white {
+    background-color: transparent;
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+  }
+  .btn-outline-white:hover { 
+    background-color: rgba(255,255,255,0.15); 
+    color: #fff; 
+    border-color: #fff; 
+  }
+
+  .btn-whatsapp {
+    background: linear-gradient(135deg, #25D366, #16A34A);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.28);
+  }
+  .btn-whatsapp:hover { 
+    background: linear-gradient(135deg, #1EBE5D, #15803D); 
+    color: #fff; 
+    box-shadow: 0 8px 20px rgba(37, 211, 102, 0.38); 
+  }
+
+  .btn-danger {
+    background-color: #ef4444;
+    color: #fff;
+  }
+  .btn-danger:hover { background-color: #dc2626; color: #fff; }
+
+  /* ── Cards (Largura ligeiramente ajustada e compacta) ── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.25rem;
+    padding: 1.4rem;
+    box-shadow: var(--shadow-brand-sm);
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  }
+  .dark .card {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  }
+  .card:hover { 
+    box-shadow: var(--shadow-brand-lg); 
+    border-color: #cbd5e1;
+    transform: translateY(-3px);
+  }
+  .dark .card:hover {
+    border-color: #475569;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── Tags / Skills ── */
+  .tag {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    font-size: 0.775rem;
+    padding: 0.25rem 0.65rem;
+    font-weight: 500;
+  }
+  .dark .tag {
+    background: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+  }
+  .tag-blue {
+    background: var(--color-primary-light);
+    color: var(--color-primary-blue);
+    border-color: #bfdbfe;
+  }
+  .dark .tag-blue {
+    background: rgba(30, 58, 138, 0.4);
+    color: #93c5fd;
+    border-color: #1e40af;
+  }
+
+  /* ── Badges ── */
+  .badge-match {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.775rem;
+    font-weight: 700;
+    background: #f1f5f9;
+    color: #475569;
+  }
+  .dark .badge-match {
+    background: #334155;
+    color: #cbd5e1;
+  }
+  .badge-match-high { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .dark .badge-match-high { background: rgba(22, 101, 52, 0.35); color: #4ade80; border-color: #166534; }
+  .badge-endorsement {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.775rem;
+    font-weight: 700;
+    background: var(--color-primary-light);
+    color: var(--color-primary-blue);
+    border: 1px solid #bfdbfe;
+  }
+  .dark .badge-endorsement {
+    background: rgba(30, 58, 138, 0.4);
+    color: #93c5fd;
+    border-color: #1e40af;
+  }
+
+  /* ── Hero tag pill ── */
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1.1rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(8px);
+    color: #6EE7B7;
+    border: 1px solid rgba(255,255,255,0.22);
+    margin-bottom: 1.25rem;
+  }
+
+  /* ── Form controls ── */
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.35rem;
+  }
+  .dark .form-label {
+    color: #cbd5e1;
+  }
+  .form-control {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    font-size: 0.925rem;
+    background: #fff;
+    color: #1e293b;
+    transition: all 0.2s;
+    outline: none;
+  }
+  .dark .form-control {
+    background: #0f172a;
+    border-color: #334155;
+    color: #f8fafc;
+  }
+  .form-control::placeholder { color: #94a3b8; }
+  .dark .form-control::placeholder { color: #64748b; }
+  .form-control:focus {
+    border-color: var(--color-primary-blue);
+    box-shadow: 0 0 0 3px rgba(0,82,255,0.15);
+  }
+  .dark .form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
+  }
+  .form-control:disabled,
+  .form-control[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+  .dark .form-control:disabled,
+  .dark .form-control[readonly] {
+    background: #1e293b;
+    color: #475569;
+  }
+
+  /* ── Section headers ── */
+  .section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.25rem;
+  }
+  .section-subtitle {
+    font-size: 0.825rem;
+    font-weight: 700;
+    color: var(--color-primary-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.25rem;
+  }
+  .section-title {
+    font-size: clamp(1.6rem, 2.75vw, 2.25rem);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Grid layouts (Espaçamento e proporções refinadas) ── */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.35rem;
+  }
+  @media (min-width: 640px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* ── Scrollbar Utility ── */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
