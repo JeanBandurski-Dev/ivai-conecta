@@ -1,4 +1,6 @@
 // Talents Service for Ivaí Conecta
+import { db } from '../lib/firebase';
+import { collection, getDocs, doc, updateDoc, arrayUnion, query, where } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
@@ -21,6 +23,19 @@ export function getTalents(city = 'Todas as Cidades') {
       localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(SEED_TALENTS));
     }
   }
+
+  // Sync background com o Firestore
+  try {
+    const talentsRef = collection(db, 'students');
+    const q = (city && city !== 'Todas as Cidades') ? query(talentsRef, where('city', '==', city)) : talentsRef;
+    getDocs(q).then(snapshot => {
+      if (!snapshot.empty) {
+        const remote = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const merged = [...remote, ...talents.filter(t => !remote.some(rt => rt.id === t.id))];
+        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(merged));
+      }
+    }).catch(err => console.warn('Firestore offline para talentos:', err.message));
+  } catch {}
 
   if (!city || city === 'Todas as Cidades') return talents;
   return talents.filter(t => t.city.toLowerCase() === city.toLowerCase());
@@ -248,6 +263,13 @@ export function addEndorsementToTalent(talentId, endorsement) {
   const endorsements = talent.endorsements || [];
   const updated = [endorsement, ...endorsements];
   updateTalentProfile(talentId, { endorsements: updated });
+
+  try {
+    updateDoc(doc(db, 'students', String(talentId)), {
+      endorsements: arrayUnion(endorsement)
+    }).catch(err => console.warn('Sync Firestore endosso:', err.message));
+  } catch {}
+
   return true;
 }
 

@@ -1,4 +1,6 @@
-// Jobs Service for Ivaí Conecta
+// Jobs Service for Ivaí Conecta (Firestore + Local Storage Sync)
+import { db } from '../lib/firebase';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, SEED_JOBS, SEED_APPLICATIONS } from '../data/seedData';
 
 export function getJobs(city = 'Todas as Cidades') {
@@ -14,6 +16,19 @@ export function getJobs(city = 'Todas as Cidades') {
       localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(SEED_JOBS));
     }
   }
+
+  // Tenta sincronizar do Firestore em background para atualizar o cache local
+  try {
+    const jobsRef = collection(db, 'jobs');
+    const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
+    getDocs(q).then(snapshot => {
+      if (!snapshot.empty) {
+        const remoteJobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const merged = [...remoteJobs, ...jobs.filter(j => !remoteJobs.some(rj => rj.id === j.id))];
+        localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(merged));
+      }
+    }).catch(err => console.warn('Firestore offline para vagas:', err.message));
+  } catch {}
 
   if (!city || city === 'Todas as Cidades') return jobs;
   return jobs.filter(j => j.city.toLowerCase() === city.toLowerCase());
@@ -35,6 +50,14 @@ export function addJob(jobData) {
   };
   const updated = [newJob, ...jobs];
   localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+
+  // Sync com o Firestore em segundo plano
+  try {
+    addDoc(collection(db, 'jobs'), newJob)
+      .then(docRef => { newJob.firestoreId = docRef.id; })
+      .catch(err => console.warn('Sync Firestore cadastro vaga:', err.message));
+  } catch {}
+
   return newJob;
 }
 

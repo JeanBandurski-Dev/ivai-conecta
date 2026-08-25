@@ -4,6 +4,8 @@ import {
   login as libLogin,
   logout as libLogout,
   register as libRegister,
+  loginWithGoogle as libLoginGoogle,
+  completeUserProfile as libCompleteProfile,
   getSelectedCity,
   setSelectedCity as libSetCity,
   CITIES,
@@ -13,25 +15,45 @@ const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
   currentUser: getAuthUser(),
 
-  login: (email, password) => {
-    const result = libLogin(email, password);
+  login: async (email, password) => {
+    const result = await libLogin(email, password);
     if (result.success) {
       set({ currentUser: result.user });
     }
     return result;
   },
 
-  register: (data) => {
-    const result = libRegister(data);
+  register: async (data) => {
+    const result = await libRegister(data);
     if (result.success) {
       set({ currentUser: result.user });
     }
     return result;
   },
 
-  logout: () => {
-    libLogout();
+  loginWithGoogle: async () => {
+    const result = await libLoginGoogle();
+    if (result.success) {
+      set({ currentUser: result.user });
+    }
+    return result;
+  },
+
+  completeProfile: async (uid, data) => {
+    const result = await libCompleteProfile(uid, data);
+    if (result.success) {
+      set({ currentUser: result.user });
+    }
+    return result;
+  },
+
+  logout: async () => {
+    await libLogout();
     set({ currentUser: null });
+  },
+
+  setCurrentUser: (user) => {
+    set({ currentUser: user });
   },
 
   // ─── City State ────────────────────────────────────────

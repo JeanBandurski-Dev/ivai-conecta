@@ -1,4 +1,14 @@
-// Auth Service for Ivaí Conecta
+// Auth Service for Ivaí Conecta (Firebase + Local Storage Fallback)
+import { auth, db, googleProvider } from '../lib/firebase';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
 import {
   STORAGE_KEY_AUTH_USER,
   STORAGE_KEY_USERS_DB,
@@ -19,7 +29,6 @@ export function getUsersDB() {
       }
     } catch {}
   }
-  // Garantir que todos os usuários demo padrão existam no localStorage
   let modified = false;
   DEFAULT_USERS.forEach(defUser => {
     if (!users.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
@@ -40,56 +49,211 @@ export function getAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export function login(email, password) {
+export async function getUserProfile(uid) {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      return { success: true, profile: snap.data() };
+    }
+    return { success: false, errorCode: 'profile/not-found' };
+  } catch (error) {
+    return { success: false, errorCode: error.code || error.message };
+  }
+}
+
+export async function login(email, password) {
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Verificar primeiro se é conta demo do LocalStorage
   const users = getUsersDB();
-  const found = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
-  if (!found) {
+  const demoFound = users.find(u => u.email.toLowerCase() === cleanEmail && u.password === password);
+  if (demoFound) {
+    const sessionUser = { ...demoFound };
+    delete sessionUser.password;
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
+  }
+
+  // 2. Tentar login no Firebase Auth
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    const fbUser = userCredential.user;
+
+    // Buscar perfil adicional no Firestore
+    const profileRes = await getUserProfile(fbUser.uid);
+    const roleMeta = USER_ROLES[profileRes.profile?.role] || USER_ROLES.aluno;
+
+    const sessionUser = {
+      uid: fbUser.uid,
+      email: fbUser.email,
+      name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
+      city: profileRes.profile?.city || 'Ivaiporã',
+      role: profileRes.profile?.role || 'aluno',
+      badge: roleMeta.badge,
+      avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      isVerifiedStudent: false,
+      isVerifiedCompany: profileRes.profile?.role === 'empresa',
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
+  } catch (error) {
     return { success: false, error: 'E-mail ou senha incorretos. Verifique seus dados.' };
   }
-  const sessionUser = { ...found };
-  delete sessionUser.password;
-  localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-  return { success: true, user: sessionUser };
 }
 
-export function register(data) {
+export async function register(data) {
   const { email, name, city, role, password } = data;
-  const users = getUsersDB();
-
-  if (users.some(u => u.email.toLowerCase() === email.toLowerCase().trim())) {
-    return { success: false, error: 'Este e-mail já está cadastrado no Ivaí Conecta.' };
-  }
-
+  const cleanEmail = email.toLowerCase().trim();
   const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
-  const newUser = {
-    email: email.toLowerCase().trim(),
-    password,
-    name,
-    city,
-    role,
-    badge: roleMeta.badge,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-    skills: role === 'aluno' || role === 'candidato' ? ['JavaScript', 'Excel Avançado', 'Gestão'] : [],
-    isVerifiedStudent: false, // Students require enrollment proof verification before public profile / apply
-    isVerifiedCompany: role === 'empresa',
-    linkedin: '',
-    github: ''
-  };
 
-  users.push(newUser);
-  localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
+  try {
+    // 1. Criar conta no Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    const fbUser = userCredential.user;
 
-  const sessionUser = { ...newUser };
-  delete sessionUser.password;
-  localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    // 2. Salvar documento adicional no Firestore em users/{uid}
+    const profileData = {
+      name,
+      email: cleanEmail,
+      city,
+      role,
+      createdAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'users', fbUser.uid), profileData);
 
-  return { success: true, user: sessionUser };
+    const sessionUser = {
+      uid: fbUser.uid,
+      email: cleanEmail,
+      name,
+      city,
+      role,
+      badge: roleMeta.badge,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      skills: role === 'aluno' || role === 'candidato' ? ['JavaScript', 'Excel Avançado', 'Gestão'] : [],
+      isVerifiedStudent: false,
+      isVerifiedCompany: role === 'empresa',
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
+  } catch (error) {
+    // Fallback: se Firebase falhar ou estiver sem internet, grava no LocalStorage
+    const users = getUsersDB();
+    if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'Este e-mail já está cadastrado no Ivaí Conecta.' };
+    }
+    const newUser = {
+      email: cleanEmail,
+      password,
+      name,
+      city,
+      role,
+      badge: roleMeta.badge,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      skills: role === 'aluno' || role === 'candidato' ? ['JavaScript', 'Excel Avançado', 'Gestão'] : [],
+      isVerifiedStudent: false,
+      isVerifiedCompany: role === 'empresa',
+    };
+    users.push(newUser);
+    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
+
+    const sessionUser = { ...newUser };
+    delete sessionUser.password;
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
+  }
 }
 
-export function logout() {
+export async function loginWithGoogle() {
+  try {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    const fbUser = userCredential.user;
+
+    // Checar perfil existente no Firestore
+    const profileRes = await getUserProfile(fbUser.uid);
+    let needsProfileCompletion = !profileRes.success || !profileRes.profile?.role;
+
+    const role = profileRes.profile?.role || 'aluno';
+    const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+
+    const sessionUser = {
+      uid: fbUser.uid,
+      email: fbUser.email,
+      name: profileRes.profile?.name || fbUser.displayName || 'Usuário Google',
+      city: profileRes.profile?.city || 'Ivaiporã',
+      role,
+      badge: roleMeta.badge,
+      avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      isVerifiedStudent: false,
+      isVerifiedCompany: role === 'empresa',
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser, needsProfileCompletion };
+  } catch (error) {
+    return { success: false, error: 'Falha ao autenticar com o Google: ' + (error.message || error.code) };
+  }
+}
+
+export async function completeUserProfile(uid, additionalData) {
+  try {
+    const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
+    await setDoc(doc(db, 'users', uid), {
+      name: additionalData.name,
+      email: additionalData.email,
+      city: additionalData.city,
+      role: additionalData.role,
+      createdAt: new Date().toISOString()
+    }, { merge: true });
+
+    const updated = updateAuthUser({
+      name: additionalData.name,
+      city: additionalData.city,
+      role: additionalData.role,
+      badge: roleMeta.badge,
+      isVerifiedCompany: additionalData.role === 'empresa',
+    });
+
+    return { success: true, user: updated };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function logout() {
+  try {
+    await signOut(auth);
+  } catch {}
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
   }
+}
+
+export function watchAuthState(callback) {
+  return onAuthStateChanged(auth, async (fbUser) => {
+    if (fbUser) {
+      const profileRes = await getUserProfile(fbUser.uid);
+      const role = profileRes.profile?.role || 'aluno';
+      const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+      const sessionUser = {
+        uid: fbUser.uid,
+        email: fbUser.email,
+        name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
+        city: profileRes.profile?.city || 'Ivaiporã',
+        role,
+        badge: roleMeta.badge,
+        avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        isVerifiedStudent: false,
+        isVerifiedCompany: role === 'empresa',
+      };
+      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+      callback(sessionUser);
+    } else {
+      callback(null);
+    }
+  });
 }
 
 export function updateAuthUser(data) {
@@ -99,7 +263,7 @@ export function updateAuthUser(data) {
   localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(updated));
 
   const users = getUsersDB();
-  const updatedDB = users.map(u => (u.email.toLowerCase() === current.email.toLowerCase() ? { ...u, ...data } : u));
+  const updatedDB = users.map(u => (u.email && current.email && u.email.toLowerCase() === current.email.toLowerCase() ? { ...u, ...data } : u));
   localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(updatedDB));
 
   return updated;
@@ -133,7 +297,6 @@ export function getSelectedCity() {
 }
 
 export function setSelectedCity(city) {
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_CITY, city);
-  }
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_CITY, city);
 }

@@ -1,4 +1,6 @@
-// Services Marketplace Service for Ivaí Conecta
+// Services Marketplace Service for Ivaí Conecta (Firestore + Local Storage Sync)
+import { db } from '../lib/firebase';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { STORAGE_KEY_SERVICES, SEED_SERVICES } from '../data/seedData';
 
 export function getServices(city = 'Todas as Cidades') {
@@ -14,6 +16,19 @@ export function getServices(city = 'Todas as Cidades') {
       localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(SEED_SERVICES));
     }
   }
+
+  // Background sync com o Firestore
+  try {
+    const servicesRef = collection(db, 'services');
+    const q = (city && city !== 'Todas as Cidades') ? query(servicesRef, where('city', '==', city)) : servicesRef;
+    getDocs(q).then(snapshot => {
+      if (!snapshot.empty) {
+        const remote = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const merged = [...remote, ...services.filter(s => !remote.some(rs => rs.id === s.id))];
+        localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(merged));
+      }
+    }).catch(err => console.warn('Firestore offline para serviços:', err.message));
+  } catch {}
 
   if (!city || city === 'Todas as Cidades') return services;
   return services.filter(s => s.city.toLowerCase() === city.toLowerCase());
@@ -38,6 +53,14 @@ export function addService(serviceData) {
   };
   const updated = [newService, ...services];
   localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(updated));
+
+  // Sync no Firestore
+  try {
+    addDoc(collection(db, 'services'), newService)
+      .then(docRef => { newService.firestoreId = docRef.id; })
+      .catch(err => console.warn('Sync Firestore cadastro serviço:', err.message));
+  } catch {}
+
   return newService;
 }
 
