@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Sparkles, CheckCircle2, RotateCcw, Building2,
@@ -29,17 +29,21 @@ const INSTITUTIONS = [
 
 export default function BancoDeTalentos() {
   const navigate = useNavigate();
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, selectedCity, setCity: setGlobalCity } = useAppStore();
 
   const [activeTab,       setActiveTab]       = useState('talents'); // 'talents' | 'teachers'
   const [query,          setQuery]          = useState('');
-  const [city,           setCity]           = useState('Todas as Cidades');
+  const [city,           setCity]           = useState(selectedCity || 'Todas as Cidades');
   const [area,           setArea]           = useState('Todas');
   const [institution,    setInstitution]    = useState('Todas as Instituições');
   const [onlyEndorsed,   setOnlyEndorsed]   = useState(false);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [sortBy,         setSortBy]         = useState('endorsements');
   const [contactTalent,  setContactTalent]  = useState(null);
+
+  useEffect(() => {
+    if (selectedCity) setCity(selectedCity);
+  }, [selectedCity]);
 
   // Modal to view students endorsed by a specific teacher
   const [selectedTeacherForEndorsements, setSelectedTeacherForEndorsements] = useState(null);

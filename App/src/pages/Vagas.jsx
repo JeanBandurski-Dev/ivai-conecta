@@ -78,6 +78,12 @@ export default function Vagas() {
     }
   }, [params]);
 
+  useEffect(() => {
+    if (selectedCity) {
+      setFilterCity(selectedCity);
+    }
+  }, [selectedCity]);
+
   const handleCreateJob = (e) => {
     e.preventDefault();
     if (!newTitle.trim()) {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, ShieldCheck, Award, RotateCcw, Filter,
@@ -13,38 +13,45 @@ const CATEGORIES = [
   'Todas',
   'Construção & Manutenção',
   'Marketing & Design',
-  'Tecnologia & Suporte',
-  'Manutenção Doméstica',
-  'Finanças & Contabilidade',
-  'Educação & Cursos',
+  'Aulas & Treinamentos',
+  'Tecnologia & TI',
+  'Consultoria & Negócios',
+  'Saúde & Bem-Estar',
+  'Eventos & Fotografia',
 ];
 
 const BADGE_FILTERS = [
-  { label: 'Todos os Selos', value: 'todos' },
-  { label: 'Verificados Ivaí Conecta', value: 'verificado' },
-  { label: 'Destaques da Semana', value: 'destaque' },
+  { label: 'Todos os Prestadores', value: 'todos' },
+  { label: 'Verificados (Documento/CNPJ)', value: 'verificado' },
+  { label: 'Em Destaque Regional', value: 'destaque' },
 ];
 
 const RATING_FILTERS = [
-  { label: 'Qualquer Avaliação', value: 0 },
+  { label: 'Todas as Avaliações', value: 0 },
+  { label: '⭐ 4.0 ou mais', value: 4.0 },
+  { label: '⭐ 4.5 ou mais', value: 4.5 },
   { label: '⭐ 4.8 ou mais', value: 4.8 },
   { label: '⭐ 5.0 (Excelente)', value: 5.0 },
 ];
 
 export default function Servicos() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, selectedCity } = useAppStore();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
   const [activeTab,    setActiveTab]    = useState(params.get('view') === 'dashboard' ? 'dashboard' : 'explore'); // 'explore' | 'dashboard'
   const [query,        setQuery]        = useState('');
-  const [city,         setCity]         = useState('Todas as Cidades');
+  const [city,         setCity]         = useState(selectedCity || 'Todas as Cidades');
   const [category,     setCategory]     = useState('Todas');
   const [badgeFilter,  setBadgeFilter]  = useState('todos');
   const [minRating,    setMinRating]    = useState(0);
   const [sortBy,       setSortBy]       = useState('rating');
   const [showModal,    setModal]        = useState(params.get('action') === 'new');
   const [editModal,    setEditModal]    = useState(false);
+
+  useEffect(() => {
+    if (selectedCity) setCity(selectedCity);
+  }, [selectedCity]);
 
   const all = getServices('Todas as Cidades');
   const myServices = all.filter(s => s.providerName.toLowerCase().includes(currentUser?.name?.toLowerCase().split(' ')[0] || 'marcos') || s.id === 201);
