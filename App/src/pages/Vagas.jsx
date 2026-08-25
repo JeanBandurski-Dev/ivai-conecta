@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getJobs, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
+import { getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
 
@@ -49,7 +49,18 @@ export default function Vagas() {
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
 
-  const allJobs = getJobs('Todas as Cidades');
+  const [refreshKey,    setRefreshKey]    = useState(0);
+
+  // New Job Form State
+  const [newTitle,      setNewTitle]      = useState('');
+  const [newType,       setNewType]       = useState('Tempo Integral');
+  const [newModality,   setNewModality]   = useState('Presencial');
+  const [newCity,       setNewCity]       = useState('Ivaiporã');
+  const [newSkills,     setNewSkills]     = useState('');
+  const [newSalary,     setNewSalary]     = useState('A combinar');
+  const [newDesc,       setNewDesc]       = useState('');
+
+  const allJobs = useMemo(() => getJobs('Todas as Cidades'), [refreshKey]);
   const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
 
   // Check jobId param in URL
@@ -61,6 +72,42 @@ export default function Vagas() {
     }
   }, [params]);
 
+  useEffect(() => {
+    if (params.get('action') === 'new') {
+      setShowModal(true);
+    }
+  }, [params]);
+
+  const handleCreateJob = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim()) {
+      showToast('Por favor, informe o título da vaga.');
+      return;
+    }
+
+    const jobPayload = {
+      title: newTitle.trim(),
+      company: currentUser?.name || 'Empresa do Vale do Ivaí',
+      companyLogo: currentUser?.avatar || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150',
+      city: newCity,
+      type: newType,
+      modality: newModality,
+      salary: newSalary || 'A combinar',
+      description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
+      requiredSkills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : ['Comunicação', 'Trabalho em Equipe'],
+      recruiterPhone: currentUser?.phone || '5543999887766',
+      createdBy: currentUser?.uid || currentUser?.email || 'empresa',
+    };
+
+    addJob(jobPayload);
+    showToast('🎉 Vaga publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
+    setShowModal(false);
+    setNewTitle('');
+    setNewDesc('');
+    setNewSkills('');
+    setParams({});
+    setRefreshKey(k => k + 1);
+  };
 
   const toggleSkill = (skill) => {
     setSelectedSkills(prev =>
@@ -99,29 +146,24 @@ export default function Vagas() {
         const matchType = filterType === 'Todos' || j.type.toLowerCase().includes(filterType.toLowerCase());
         
         // Modalidade
-        const matchMod = filterModality === 'Todas' || j.type.toLowerCase().includes(filterModality.toLowerCase());
+        const matchModality = filterModality === 'Todas' || (j.modality && j.modality.toLowerCase().includes(filterModality.toLowerCase()));
         
-        // Match Mínimo (somente para alunos/candidatos)
-        const matchScorePass = !canSeeMatch || minMatch === 0 || (j.calculatedScore != null && j.calculatedScore >= minMatch);
-        
-        // Habilidades selecionadas (deve conter ao menos uma se houver seleção)
-        const matchSkills = selectedSkills.length === 0 || selectedSkills.some(sk => (j.requiredSkills || []).includes(sk));
-        
-        // Busca textual
-        const q = query.toLowerCase().trim();
-        const matchQuery = !q ||
-          j.title.toLowerCase().includes(q) ||
-          j.company.toLowerCase().includes(q) ||
-          j.city.toLowerCase().includes(q) ||
-          (j.requiredSkills || []).some(s => s.toLowerCase().includes(q));
+        // Match Mínimo
+        const matchScoreOk = !canSeeMatch || minMatch === 0 || (j.calculatedScore && j.calculatedScore >= minMatch);
 
-        return matchCity && matchType && matchMod && matchScorePass && matchSkills && matchQuery;
+        // Habilidades
+        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r.toLowerCase().includes(sk.toLowerCase())));
+
+        // Busca Textual
+        const text = (j.title + ' ' + j.company + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
+        const matchText = !query || text.includes(query.toLowerCase());
+
+        return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
         if (sortBy === 'match' && canSeeMatch) return (b.calculatedScore || 0) - (a.calculatedScore || 0);
-        if (sortBy === 'title') return a.title.localeCompare(b.title);
-        if (sortBy === 'company') return a.company.localeCompare(b.company);
-        return b.id - a.id;
+        if (sortBy === 'recent') return (b.id || 0) - (a.id || 0);
+        return 0;
       });
   }, [allJobs, filterCity, filterType, filterModality, minMatch, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser]);
 
@@ -129,33 +171,27 @@ export default function Vagas() {
     <>
       {/* ── HEADER ── */}
       <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 lg:py-16 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(34,197,94,0.15),transparent_50%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(0,82,255,0.25),transparent_50%)] pointer-events-none" />
 
         <div className="container relative z-10">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3 py-1.5 rounded-full transition-colors"
-          >
-            <ArrowLeft size={14} /> Voltar para a tela anterior
-          </button>
-
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="max-w-2xl">
-              <div className="hero-tag mb-3">
-                <span>Oportunidades Regionais com Matching Inteligente</span>
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-heading font-extrabold text-white mt-1 mb-3 tracking-tight">
-                Vagas &amp; Matching
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 border border-white/15 text-accent-sky mb-4 backdrop-blur-md">
+                <Sparkles size={14} /> Oportunidades no Vale do Ivaí
+              </span>
+              <h1 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-heading font-extrabold text-white mb-3 tracking-tight leading-tight">
+                Vagas de Emprego &amp; Estágio Regional
               </h1>
-
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-                Encontre vagas em Ivaiporã e na região com compatibilidade calculada em tempo real com seu perfil de qualificações.
+                Encontre vagas em Ivaiporã e cidades vizinhas com cálculo automático de match de habilidades e indicação direta de professores parceiros.
               </p>
             </div>
 
             {currentUser?.role === 'empresa' && (
-              <button onClick={() => setShowModal(true)} className="btn btn-teal px-6 py-3 font-bold shadow-md shrink-0">
+              <button
+                onClick={() => setShowModal(true)}
+                className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2"
+              >
                 <Plus size={18} /> Publicar Nova Vaga
               </button>
             )}
@@ -164,151 +200,137 @@ export default function Vagas() {
       </header>
 
       <main className="container section">
-        {/* ── PAINEL DE FILTROS APRIMORADO ── */}
+
+        {/* ── BARRA DE FILTROS ── */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 mb-8 shadow-brand-sm space-y-4 transition-colors duration-300">
           
-          {/* Linha Principal de Filtros */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-center">
             
-            {/* Campo de Busca (Lg: col-span-5) */}
-            <div className="lg:col-span-5 flex items-center gap-2.5 border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-gray-50/50 dark:bg-slate-800/50 focus-within:bg-white dark:focus-within:bg-slate-800 focus-within:border-primary-blue dark:focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-primary-blue/15 transition-all">
+            {/* Busca textual */}
+            <div className="lg:col-span-4 flex items-center gap-2.5 border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-gray-50/50 dark:bg-slate-800/50 focus-within:bg-white dark:focus-within:bg-slate-800 focus-within:border-primary-blue transition-all">
               <Search size={17} className="text-gray-400 shrink-0" />
               <input
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Buscar por cargo, empresa ou habilidade..."
-                className="text-sm sm:text-base text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full"
+                placeholder="Cargo, empresa ou tecnologia..."
+                className="text-sm text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full"
               />
               {query && (
-                <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 rounded-full">
                   <X size={14} className="text-gray-400" />
                 </button>
               )}
             </div>
 
-            {/* Cidade (Lg: col-span-3) */}
+            {/* Cidade */}
             <div className="lg:col-span-3">
               <select
                 value={filterCity}
                 onChange={e => setFilterCity(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 outline-none bg-white dark:bg-slate-800 cursor-pointer font-medium hover:border-gray-400 focus:border-primary-blue"
+                className="form-control text-sm py-2.5 cursor-pointer"
               >
-                {CITIES.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
+                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
-            {/* Tipo de Contratação (Lg: col-span-2) */}
-            <div className="lg:col-span-2">
+            {/* Tipo */}
+            <div className="lg:col-span-3">
               <select
                 value={filterType}
                 onChange={e => setFilterType(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 outline-none bg-white dark:bg-slate-800 cursor-pointer font-medium hover:border-gray-400 focus:border-primary-blue"
+                className="form-control text-sm py-2.5 cursor-pointer"
               >
-                {TYPES.map(t => <option key={t.value} value={t.value} className="dark:bg-slate-800 dark:text-white">{t.label}</option>)}
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
-            {/* Ordenação (Lg: col-span-2) */}
+            {/* Botão Filtros Avançados */}
             <div className="lg:col-span-2">
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 outline-none bg-white dark:bg-slate-800 cursor-pointer font-medium hover:border-gray-400 focus:border-primary-blue"
-              >
-                <option value="match" className="dark:bg-slate-800 dark:text-white">⚡ Maior Match</option>
-                <option value="recent" className="dark:bg-slate-800 dark:text-white">🕒 Mais Recentes</option>
-                <option value="title" className="dark:bg-slate-800 dark:text-white">🔤 Cargo (A-Z)</option>
-                <option value="company" className="dark:bg-slate-800 dark:text-white">🏢 Empresa (A-Z)</option>
-              </select>
-            </div>
-
-          </div>
-
-          {/* Segunda Linha: Modalidade + Match Mínimo + Toggle Filtros Avançados */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-slate-800">
-            <div className="flex flex-wrap items-center gap-2.5">
-              
-              {/* Modalidade Chips */}
-              <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-800 p-1 rounded-xl border border-gray-200 dark:border-slate-700">
-                {MODALITIES.map(m => (
-                  <button
-                    key={m.value}
-                    onClick={() => setFilterModality(m.value)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                      filterModality === m.value
-                        ? 'bg-white dark:bg-slate-700 text-primary-blue dark:text-blue-400 shadow-xs font-bold'
-                        : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Match Mínimo Selector */}
-              <select
-                value={minMatch}
-                onChange={e => setMinMatch(Number(e.target.value))}
-                className="border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 rounded-xl px-3 py-1.5 text-xs text-gray-700 dark:text-slate-200 font-semibold outline-none cursor-pointer hover:bg-white dark:hover:bg-slate-700"
-              >
-                {MATCH_RANGES.map(mr => <option key={mr.value} value={mr.value} className="dark:bg-slate-800 dark:text-white">{mr.label}</option>)}
-              </select>
-
-              {/* Botão para abrir Habilidades */}
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  showAdvanced || selectedSkills.length > 0
-                    ? 'bg-primary-light text-primary-blue border-blue-200'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                className={`btn w-full py-2.5 text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
+                  showAdvanced || hasActiveFilters
+                    ? 'border-primary-blue bg-primary-light text-primary-blue dark:bg-blue-950/60 dark:text-blue-300'
+                    : 'border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50'
                 }`}
               >
-                <Sparkles size={13} />
-                Filtrar por Habilidades {selectedSkills.length > 0 && `(${selectedSkills.length})`}
+                <SlidersHorizontal size={14} /> Filtros {hasActiveFilters && '•'}
               </button>
             </div>
 
-            {/* Direita: Total de Vagas + Botão Limpar */}
-            <div className="flex items-center gap-3">
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 transition-colors p-1"
-                >
-                  <RotateCcw size={12} /> Limpar Filtros
-                </button>
-              )}
-              <span className="text-xs sm:text-sm text-gray-500 font-medium">
-                <strong className="text-gray-900 font-bold">{filtered.length}</strong> vaga{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
-              </span>
-            </div>
           </div>
 
-          {/* Área Expansível de Habilidades / Tags */}
+          {/* Painel de Filtros Avançados */}
           {showAdvanced && (
-            <div className="pt-3 border-t border-gray-100 bg-gray-50/50 p-3.5 rounded-xl space-y-2">
-              <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                Selecione as habilidades desejadas na vaga:
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {POPULAR_SKILLS.map(skill => {
-                  const isSelected = selectedSkills.includes(skill);
-                  return (
-                    <button
-                      key={skill}
-                      onClick={() => toggleSkill(skill)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-                        isSelected
-                          ? 'bg-primary-blue text-white border-primary-blue shadow-xs'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-primary-blue hover:text-primary-blue'
-                      }`}
+            <div className="pt-4 border-t border-gray-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                
+                {/* Modalidade */}
+                <div>
+                  <label className="form-label text-xs mb-1.5 block">Modalidade de Trabalho</label>
+                  <select
+                    value={filterModality}
+                    onChange={e => setFilterModality(e.target.value)}
+                    className="form-control text-xs py-2"
+                  >
+                    {MODALITIES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Match Mínimo (Alunos / Candidatos) */}
+                {canSeeMatch && (
+                  <div>
+                    <label className="form-label text-xs mb-1.5 block">Nível de Match de Habilidades</label>
+                    <select
+                      value={minMatch}
+                      onChange={e => setMinMatch(Number(e.target.value))}
+                      className="form-control text-xs py-2"
                     >
-                      {skill} {isSelected && '✓'}
-                    </button>
-                  );
-                })}
+                      {MATCH_RANGES.map(mr => <option key={mr.value} value={mr.value}>{mr.label}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Ordenação */}
+                <div>
+                  <label className="form-label text-xs mb-1.5 block">Ordenar Vagas por</label>
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                    className="form-control text-xs py-2"
+                  >
+                    {canSeeMatch && <option value="match">Maior Match com Meu Perfil</option>}
+                    <option value="recent">Mais Recentes Primeiro</option>
+                  </select>
+                </div>
+
               </div>
+
+              {/* Habilidades Populares */}
+              <div>
+                <label className="form-label text-xs mb-2 block">Filtrar por Tecnologias &amp; Habilidades:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {POPULAR_SKILLS.map(skill => {
+                    const isSelected = selectedSkills.includes(skill);
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => toggleSkill(skill)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-primary-blue text-white border-primary-blue shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue'
+                        }`}
+                      >
+                        {skill} {isSelected && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -316,9 +338,9 @@ export default function Vagas() {
 
         {/* ── GRID DE VAGAS ── */}
         {filtered.length === 0 ? (
-          <div className="py-20 text-center text-gray-400 bg-white rounded-2xl border border-gray-200 p-8 shadow-xs">
+          <div className="py-20 text-center text-gray-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
             <div className="text-5xl mb-4">🔍</div>
-            <p className="font-bold text-lg text-gray-700 mb-1">Nenhuma vaga encontrada com os filtros selecionados.</p>
+            <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga encontrada com os filtros selecionados.</p>
             <p className="text-sm text-gray-400 mb-5">Tente remover alguns filtros ou buscar por outro termo.</p>
             <button onClick={resetFilters} className="btn btn-outline btn-sm">
               <RotateCcw size={14} /> Restaurar Todos os Filtros
@@ -354,35 +376,83 @@ export default function Vagas() {
       {showNewModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-heading text-xl font-bold text-primary-dark">Publicar Nova Vaga</h3>
-              <button onClick={() => setShowModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Publicar Nova Vaga</h3>
+              <button onClick={() => setShowModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
             </div>
-            <form onSubmit={e => { e.preventDefault(); setShowModal(false); showToast('Vaga publicada com sucesso!'); }} className="space-y-4">
+            <form onSubmit={handleCreateJob} className="space-y-4">
               <div className="form-group">
-                <label className="form-label">Título da Vaga</label>
-                <input type="text" className="form-control" placeholder="Ex: Desenvolvedor Front-end Junior" required />
+                <label className="form-label">Título da Vaga *</label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  className="form-control"
+                  placeholder="Ex: Desenvolvedor Front-end Junior"
+                  required
+                />
               </div>
-              <div className="form-group">
-                <label className="form-label">Tipo de Contratação</label>
-                <select className="form-control">
-                  {TYPES.slice(1).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Contratação</label>
+                  <select value={newType} onChange={e => setNewType(e.target.value)} className="form-control">
+                    {TYPES.slice(1).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Modalidade</label>
+                  <select value={newModality} onChange={e => setNewModality(e.target.value)} className="form-control">
+                    {MODALITIES.slice(1).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Cidade</label>
-                <select className="form-control">
-                  {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="form-label">Cidade no Vale do Ivaí</label>
+                  <select value={newCity} onChange={e => setNewCity(e.target.value)} className="form-control">
+                    {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Faixa Salarial</label>
+                  <input
+                    type="text"
+                    value={newSalary}
+                    onChange={e => setNewSalary(e.target.value)}
+                    className="form-control"
+                    placeholder="Ex: R$ 2.500 ou A combinar"
+                  />
+                </div>
               </div>
+
               <div className="form-group">
                 <label className="form-label">Habilidades Necessárias (separadas por vírgula)</label>
-                <input type="text" className="form-control" placeholder="Ex: React, JavaScript, Git" />
+                <input
+                  type="text"
+                  value={newSkills}
+                  onChange={e => setNewSkills(e.target.value)}
+                  className="form-control"
+                  placeholder="Ex: React, JavaScript, Git, Tailwind"
+                />
               </div>
+
+              <div className="form-group">
+                <label className="form-label">Descrição das Atividades &amp; Benefícios</label>
+                <textarea
+                  value={newDesc}
+                  onChange={e => setNewDesc(e.target.value)}
+                  className="form-control"
+                  rows={3}
+                  placeholder="Descreva o papel, principais responsabilidades e requisitos..."
+                />
+              </div>
+
               <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline btn-sm">Cancelar</button>
-                <button type="submit" className="btn btn-primary btn-sm">Publicar Vaga</button>
+                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
+                <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">Publicar Vaga</button>
               </div>
             </form>
           </div>
@@ -391,4 +461,3 @@ export default function Vagas() {
     </>
   );
 }
-

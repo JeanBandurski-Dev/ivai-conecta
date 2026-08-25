@@ -21,7 +21,13 @@ export default function MinhasVagas() {
   const isProfessor = currentUser?.role === 'professor';
 
   const apps = getUserApplications();
-  const companyJobs = getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(currentUser?.name?.toLowerCase().split(' ')[0] || 'valetech'));
+  const companyJobs = getJobs('Todas as Cidades').filter(j => 
+    j.createdBy === currentUser?.uid ||
+    j.createdBy === currentUser?.email ||
+    (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
+    (currentUser?.name && j.company?.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
+    j.company?.toLowerCase().includes('valetech')
+  );
   
   // Teacher endorsement requests state
   const requests = getEndorsementRequests();

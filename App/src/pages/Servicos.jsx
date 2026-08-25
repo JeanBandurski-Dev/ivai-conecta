@@ -516,35 +516,66 @@ export default function Servicos() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setModal(false)}>
-          <div className="bg-white rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-heading text-xl font-bold text-primary-dark">Cadastrar Meu Serviço</h3>
-              <button onClick={() => setModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Cadastrar Meu Serviço</h3>
+              <button onClick={() => setModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
             </div>
-            <form onSubmit={e => { e.preventDefault(); setModal(false); showToast('Serviço cadastrado com sucesso!'); }} className="space-y-4">
+            <form onSubmit={e => {
+              e.preventDefault();
+              const category = e.target.category.value;
+              const city = e.target.city.value;
+              const phone = e.target.phone.value;
+              const description = e.target.description.value;
+              const title = e.target.title.value || category;
+
+              const servicePayload = {
+                title,
+                category,
+                providerName: currentUser?.name || 'Profissional Autônomo',
+                avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+                city,
+                phone: phone || '5543999887766',
+                description,
+                createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
+                rating: 5.0,
+                reviewsCount: 1,
+                badge: 'Novo Profissional',
+                analytics: { views: 1, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
+                reviews: [],
+                forumTopics: []
+              };
+              addService(servicePayload);
+              showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
+              setModal(false);
+            }} className="space-y-4">
+              <div className="form-group">
+                <label className="form-label">Título ou Nome do Serviço</label>
+                <input name="title" type="text" className="form-control" placeholder="Ex: Manutenção Elétrica Residencial e Predial" required />
+              </div>
               <div className="form-group">
                 <label className="form-label">Categoria do Serviço</label>
-                <select className="form-control">
+                <select name="category" className="form-control">
                   {CATEGORIES.slice(1).map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Cidade onde Atua</label>
-                <select className="form-control">
+                <select name="city" className="form-control">
                   {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">WhatsApp para Contato</label>
-                <input type="tel" className="form-control" placeholder="Ex: (43) 99999-0000" required />
+                <input name="phone" type="tel" className="form-control" placeholder="Ex: (43) 99999-0000" required />
               </div>
               <div className="form-group">
                 <label className="form-label">Descrição dos Serviços</label>
-                <textarea className="form-control" rows={3} placeholder="Descreva seus serviços, especialidades e diferenciais..." required />
+                <textarea name="description" className="form-control" rows={3} placeholder="Descreva seus serviços, especialidades e diferenciais..." required />
               </div>
               <div className="flex gap-3 justify-end pt-2">
                 <button type="button" onClick={() => setModal(false)} className="btn btn-outline btn-sm">Cancelar</button>
-                <button type="submit" className="btn btn-teal btn-sm">Cadastrar Serviço</button>
+                <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">Cadastrar Serviço</button>
               </div>
             </form>
           </div>
