@@ -20,7 +20,7 @@ const DEMO_ROLES = [
 ];
 
 export default function Login() {
-  const { login, register, loginWithGoogle, completeProfile, showToast } = useAppStore();
+  const { login, register, loginWithGoogle, showToast } = useAppStore();
   const navigate = useNavigate();
 
   const [tab, setTab]               = useState('login'); // 'login' | 'register'
@@ -28,11 +28,15 @@ export default function Login() {
   const [alert, setAlert]           = useState('');
   const [loading, setLoading]       = useState(false);
 
-  // Complete profile modal state (for Google login first time)
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [pendingUser, setPendingUser]             = useState(null);
-  const [completeCity, setCompleteCity]           = useState('Ivaiporã');
-  const [completeRole, setCompleteRole]           = useState('aluno');
+  // Login form
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPass,  setLoginPass]  = useState('');
+
+  // Register form
+  const [regName,  setRegName]  = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regCity,  setRegCity]  = useState('Ivaiporã');
+  const [regPass,  setRegPass]  = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -64,28 +68,10 @@ export default function Login() {
     if (!res.success) { setAlert(res.error); return; }
 
     if (res.needsProfileCompletion) {
-      setPendingUser(res.user);
-      setShowCompleteModal(true);
+      showToast('Conta Google conectada! Complete os dados do seu perfil.');
+      navigate('/completar-perfil');
     } else {
       showToast(`Bem-vindo(a), ${res.user.name}!`);
-      setTimeout(() => navigate('/'), 600);
-    }
-  };
-
-  const handleSaveCompleteProfile = async (e) => {
-    e.preventDefault();
-    if (!pendingUser) return;
-    setLoading(true);
-    const res = await completeProfile(pendingUser.uid, {
-      name: pendingUser.name,
-      email: pendingUser.email,
-      city: completeCity,
-      role: completeRole
-    });
-    setLoading(false);
-    setShowCompleteModal(false);
-    if (res.success) {
-      showToast(`Perfil atualizado com sucesso! Bem-vindo, ${res.user.name}.`);
       setTimeout(() => navigate('/'), 600);
     }
   };
@@ -100,16 +86,6 @@ export default function Login() {
       setTimeout(() => navigate('/'), 500);
     }
   };
-
-  // Login form
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPass,  setLoginPass]  = useState('');
-
-  // Register form
-  const [regName,  setRegName]  = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regCity,  setRegCity]  = useState('Ivaiporã');
-  const [regPass,  setRegPass]  = useState('');
 
   return (
     <main className="container section">
@@ -278,59 +254,6 @@ export default function Login() {
 
         </div>
       </div>
-
-      {/* Modal Completar Perfil (Primeiro Acesso Google) */}
-      {showCompleteModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-gray-200 dark:border-slate-800 shadow-2xl space-y-4">
-            <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white">
-              Bem-vindo! Complete o seu perfil
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-slate-400">
-              Para personalizar sua experiência no Vale do Ivaí, escolha a sua cidade e tipo de conta:
-            </p>
-
-            <form onSubmit={handleSaveCompleteProfile} className="space-y-4">
-              <div>
-                <label className="form-label mb-2 block">Selecione o seu Perfil:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {ROLES.map(r => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setCompleteRole(r.id)}
-                      className={`p-2 rounded-xl border text-center transition-all text-xs font-semibold ${
-                        completeRole === r.id
-                          ? 'border-primary-blue bg-primary-light text-primary-blue dark:bg-blue-950/60 dark:text-blue-300'
-                          : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <span className="text-base block mb-0.5">{r.icon}</span>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label">Sua Cidade no Vale do Ivaí</label>
-                <select
-                  value={completeCity}
-                  onChange={e => setCompleteCity(e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  {CITIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">
-                {loading ? 'Salvando...' : 'Concluir Cadastro e Acessar'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

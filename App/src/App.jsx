@@ -13,6 +13,7 @@ import PerfilEmpresa from './pages/PerfilEmpresa';
 import PerfilProfessor from './pages/PerfilProfessor';
 import Configuracoes from './pages/Configuracoes';
 import MinhasVagas from './pages/MinhasVagas';
+import CompletarPerfil from './pages/CompletarPerfil';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Routes>
             <Route path="/"                 element={<Dashboard />} />
             <Route path="/login"            element={<Login />} />
+            <Route path="/completar-perfil" element={<CompletarPerfil />} />
             <Route path="/vagas"            element={<Vagas />} />
             <Route path="/servicos"         element={<Servicos />} />
             <Route path="/talentos"         element={<BancoDeTalentos />} />
