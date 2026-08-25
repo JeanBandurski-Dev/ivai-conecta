@@ -11,25 +11,25 @@ export default function ServiceCard({ service }) {
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <span className="badge-endorsement">{category}</span>
-        <span className="text-xs font-bold text-gray-500 shrink-0">{city}</span>
+        <span className="text-xs font-bold text-gray-600 dark:text-slate-400 shrink-0">{city}</span>
       </div>
 
-      <h3 className="text-base font-semibold text-primary-dark leading-snug">{providerName}</h3>
+      <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{providerName}</h3>
 
       {/* Rating */}
       <div className="flex items-center gap-1.5 text-sm">
         <Star size={14} className="text-amber-400 fill-amber-400 shrink-0" />
-        <span className="font-bold text-gray-700">{rating}</span>
-        <span className="text-gray-400 text-xs">({reviewsCount} avaliações)</span>
+        <span className="font-bold text-gray-800 dark:text-slate-200">{rating}</span>
+        <span className="text-gray-500 dark:text-slate-400 text-xs">({reviewsCount} avaliações)</span>
         {badge && (
-          <span className="ml-auto text-xs font-semibold text-accent-green">{badge}</span>
+          <span className="ml-auto text-xs font-semibold text-accent-green dark:text-green-400">{badge}</span>
         )}
       </div>
 
-      <p className="text-sm text-gray-600 leading-relaxed flex-1">{description}</p>
+      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed flex-1">{description}</p>
 
       {/* Action */}
-      <div className="mt-auto pt-3 border-t border-gray-100">
+      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
         <a
           href={waLink}
           target="_blank"

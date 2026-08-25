@@ -1,42 +1,118 @@
+import { MapPin, Building2, Eye, ShieldCheck, Bookmark } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { MapPin } from 'lucide-react';
+import useAppStore from '../store/useAppStore';
+import { calculateMatchScore } from '../lib/ivaiConecta';
 
-export default function JobCard({ job, matchScore }) {
-  const { id, title, company, city, type, requiredSkills = [] } = job;
-  const isHighMatch = matchScore >= 75;
+export default function JobCard({ job, matchScore, onSelect }) {
+  const { currentUser, favoriteJobs, toggleFavoriteJob, showToast } = useAppStore();
+  const { id, title, company, companyLogo, city, type, requiredSkills = [], benefits = [] } = job;
+
+  const isFavorite = favoriteJobs.includes(id);
+  const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
+
+  // Compute match score if candidate/aluno is logged in
+  const userSkills = currentUser?.skills || [];
+  const computedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, { userCity: currentUser.city, jobCity: city, isVerifiedStudent: currentUser.isVerifiedStudent }) : null);
+  const isHighMatch = computedScore >= 75;
+
+  const handleClick = (e) => {
+    if (onSelect) {
+      e.preventDefault();
+      onSelect(job);
+    }
+  };
+
+  const handleFavoriteToggle = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const added = toggleFavoriteJob(id);
+    showToast(added ? '★ Vaga salva nos seus Favoritos!' : 'Vaga removida dos Favoritos.');
+  };
 
   return (
-    <div className="card gap-3">
+    <div className="card gap-3.5 hover:border-primary-blue/40 transition-all group flex flex-col relative">
       {/* Top row */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-bold text-primary-dark text-base leading-tight">{company}</div>
-        {matchScore != null && (
-          <span className={`badge-match shrink-0 ${isHighMatch ? 'badge-match-high' : ''}`}>
-            {matchScore}% Match
-          </span>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+            alt={company}
+            className="w-10 h-10 rounded-xl object-cover border border-gray-200 shrink-0 bg-white"
+          />
+          <div className="min-w-0">
+            <div className="font-bold text-gray-900 dark:text-white text-sm leading-tight group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors truncate">
+              {company}
+            </div>
+            <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+              <ShieldCheck size={11} className="text-green-600 dark:text-green-400 shrink-0" />
+              {job.isVerifiedCompany ? 'CNPJ Validado · Vaga Verificada' : 'Vaga Ativa'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Favorite Button */}
+          <button
+            onClick={handleFavoriteToggle}
+            className={`p-1.5 rounded-full border transition-all cursor-pointer ${
+              isFavorite
+                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-500 border-amber-300 dark:border-amber-700'
+                : 'bg-white dark:bg-slate-800 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-700 hover:text-amber-500'
+            }`}
+            title={isFavorite ? 'Remover dos Favoritos' : 'Salvar Vaga nos Favoritos'}
+            aria-label="Favoritar vaga"
+          >
+            <Bookmark size={15} className={isFavorite ? 'fill-amber-500' : ''} />
+          </button>
+
+          {/* Match Score Badge — Only visible for logged-in Aluno / Candidato */}
+          {canSeeMatch && computedScore != null && (
+            <span className={`badge-match ${isHighMatch ? 'badge-match-high' : ''}`}>
+              {computedScore}% Match
+            </span>
+          )}
+        </div>
       </div>
 
-      <h3 className="text-base font-semibold text-gray-800 leading-snug">{title}</h3>
+      <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors">
+        {title}
+      </h3>
 
-      <div className="flex items-center gap-1 text-sm text-gray-500">
-        <MapPin size={13} className="shrink-0" />
-        <span>{city}</span>
-        <span className="text-gray-300">·</span>
-        <span>{type}</span>
+      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300 flex-wrap">
+        <span className="flex items-center gap-1"><MapPin size={13} className="shrink-0 text-gray-500" />{city}</span>
+        <span className="text-gray-400 dark:text-slate-600">·</span>
+        <span className="font-semibold text-gray-700 dark:text-slate-300">{type}</span>
       </div>
+
+      {/* Benefits Badges */}
+      {benefits.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {benefits.slice(0, 2).map((b, i) => (
+            <span key={i} className="text-[11px] font-semibold bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-2 py-0.5 rounded-md">
+              ✓ {b}
+            </span>
+          ))}
+          {benefits.length > 2 && (
+            <span className="text-[11px] text-gray-400 dark:text-slate-400 self-center">+{benefits.length - 2}</span>
+          )}
+        </div>
+      )}
 
       {/* Skills */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 pt-1">
         {requiredSkills.map(skill => (
-          <span key={skill} className="tag">{skill}</span>
+          <span key={skill} className="tag text-xs">{skill}</span>
         ))}
       </div>
 
       {/* Action */}
-      <div className="mt-auto pt-3 border-t border-gray-100">
-        <Link to={`/vagas?jobId=${id}`} className="btn btn-primary btn-sm w-full text-xs">
-          Ver Detalhes da Vaga
+      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
+        <Link
+          to={`/vagas?jobId=${id}`}
+          onClick={handleClick}
+          className="btn btn-primary btn-sm w-full text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
+        >
+          <Eye size={14} /> Ver Detalhes da Vaga
         </Link>
       </div>
     </div>

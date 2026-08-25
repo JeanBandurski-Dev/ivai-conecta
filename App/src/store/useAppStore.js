@@ -43,6 +43,60 @@ const useAppStore = create((set, get) => ({
     set({ selectedCity: city });
   },
 
+  // ─── Theme State ───────────────────────────────────────
+  theme: (() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('ivai_conecta_theme') : null;
+    if (saved === 'dark' || saved === 'light') {
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', saved === 'dark');
+      }
+      return saved;
+    }
+    const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initial = prefersDark ? 'dark' : 'light';
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', initial === 'dark');
+    }
+    return initial;
+  })(),
+
+  toggleTheme: () => {
+    const nextTheme = get().theme === 'dark' ? 'light' : 'dark';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ivai_conecta_theme', nextTheme);
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+    }
+    set({ theme: nextTheme });
+  },
+
+  // ─── Favorites State ───────────────────────────────────
+  favoriteJobs: typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('ivai_conecta_fav_jobs') || '[]')) : [],
+  favoriteTalents: typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('ivai_conecta_fav_talents') || '[]')) : [],
+
+  toggleFavoriteJob: (jobId) => {
+    const current = get().favoriteJobs;
+    const exists = current.includes(jobId);
+    const updated = exists ? current.filter(id => id !== jobId) : [...current, jobId];
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ivai_conecta_fav_jobs', JSON.stringify(updated));
+    }
+    set({ favoriteJobs: updated });
+    return !exists;
+  },
+
+  toggleFavoriteTalent: (talentId) => {
+    const current = get().favoriteTalents;
+    const exists = current.includes(talentId);
+    const updated = exists ? current.filter(id => id !== talentId) : [...current, talentId];
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ivai_conecta_fav_talents', JSON.stringify(updated));
+    }
+    set({ favoriteTalents: updated });
+    return !exists;
+  },
+
   // ─── Toast State ──────────────────────────────────────
   toasts: [],
 

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Ocultar a media-query de preferência do SO para que as classes dark: só funcionem se a classe .dark estiver presente no <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ─── Design Tokens (Tailwind v4 @theme) ─────────────────── */
 @theme {
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -41,6 +44,11 @@
     background-color: #f8fafc;
     color: #1e293b;
     line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  .dark body {
+    background-color: #0f172a;
+    color: #f1f5f9;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
@@ -48,6 +56,9 @@
     font-weight: 700;
     line-height: 1.22;
     letter-spacing: -0.02em;
+  }
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: #ffffff;
   }
   a {
     color: var(--color-primary-blue);
@@ -135,10 +146,19 @@
     border-color: #cbd5e1;
     color: #334155;
   }
+  .dark .btn-outline {
+    border-color: #475569;
+    color: #cbd5e1;
+  }
   .btn-outline:hover { 
     border-color: var(--color-primary-blue); 
     color: var(--color-primary-blue); 
     background-color: var(--color-primary-light); 
+  }
+  .dark .btn-outline:hover {
+    border-color: var(--color-primary-blue);
+    color: #60a5fa;
+    background-color: rgba(30, 58, 138, 0.4);
   }
 
   .btn-outline-white {
@@ -178,12 +198,21 @@
     box-shadow: var(--shadow-brand-sm);
     display: flex;
     flex-direction: column;
-    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+    transition: background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  }
+  .dark .card {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   }
   .card:hover { 
     box-shadow: var(--shadow-brand-lg); 
     border-color: #cbd5e1;
     transform: translateY(-3px);
+  }
+  .dark .card:hover {
+    border-color: #475569;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
   }
 
   /* ── Tags / Skills ── */
@@ -197,10 +226,20 @@
     padding: 0.25rem 0.65rem;
     font-weight: 500;
   }
+  .dark .tag {
+    background: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+  }
   .tag-blue {
     background: var(--color-primary-light);
     color: var(--color-primary-blue);
     border-color: #bfdbfe;
+  }
+  .dark .tag-blue {
+    background: rgba(30, 58, 138, 0.4);
+    color: #93c5fd;
+    border-color: #1e40af;
   }
 
   /* ── Badges ── */
@@ -214,7 +253,12 @@
     background: #f1f5f9;
     color: #475569;
   }
+  .dark .badge-match {
+    background: #334155;
+    color: #cbd5e1;
+  }
   .badge-match-high { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .dark .badge-match-high { background: rgba(22, 101, 52, 0.35); color: #4ade80; border-color: #166534; }
   .badge-endorsement {
     display: inline-flex;
     align-items: center;
@@ -225,6 +269,11 @@
     background: var(--color-primary-light);
     color: var(--color-primary-blue);
     border: 1px solid #bfdbfe;
+  }
+  .dark .badge-endorsement {
+    background: rgba(30, 58, 138, 0.4);
+    color: #93c5fd;
+    border-color: #1e40af;
   }
 
   /* ── Hero tag pill ── */
@@ -252,6 +301,9 @@
     color: #334155;
     margin-bottom: 0.35rem;
   }
+  .dark .form-label {
+    color: #cbd5e1;
+  }
   .form-control {
     width: 100%;
     padding: 0.65rem 1rem;
@@ -263,16 +315,31 @@
     transition: all 0.2s;
     outline: none;
   }
+  .dark .form-control {
+    background: #0f172a;
+    border-color: #334155;
+    color: #f8fafc;
+  }
   .form-control::placeholder { color: #94a3b8; }
+  .dark .form-control::placeholder { color: #64748b; }
   .form-control:focus {
     border-color: var(--color-primary-blue);
     box-shadow: 0 0 0 3px rgba(0,82,255,0.15);
+  }
+  .dark .form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
   }
   .form-control:disabled,
   .form-control[readonly] {
     background: #f8fafc;
     color: #64748b;
     cursor: not-allowed;
+  }
+  .dark .form-control:disabled,
+  .dark .form-control[readonly] {
+    background: #1e293b;
+    color: #475569;
   }
 
   /* ── Section headers ── */

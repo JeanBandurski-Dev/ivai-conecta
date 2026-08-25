@@ -5,6 +5,7 @@ import { CITIES } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: '🎓' },
+  { id: 'professor',  label: 'Professor / Docente',     icon: '👨‍🏫' },
   { id: 'freelancer', label: 'Freelancer / Autônomo',    icon: '🔧' },
   { id: 'candidato',  label: 'Candidato Geral',          icon: '💼' },
   { id: 'empresa',    label: 'Empresa / Recrutador',     icon: '🏢' },
@@ -12,6 +13,7 @@ const ROLES = [
 
 const DEMO_ROLES = [
   { role: 'aluno',      label: 'Entrar como Aluno' },
+  { role: 'professor',  label: 'Entrar como Professor' },
   { role: 'freelancer', label: 'Entrar como Freelancer' },
   { role: 'candidato',  label: 'Entrar como Candidato' },
   { role: 'empresa',    label: 'Entrar como Empresa' },
@@ -64,7 +66,7 @@ export default function Login() {
 
   return (
     <main className="container section">
-      <div className="max-w-[920px] mx-auto grid md:grid-cols-[1fr_1.2fr] bg-white rounded-2xl border border-gray-200 shadow-brand-xl overflow-hidden">
+      <div className="max-w-[920px] mx-auto grid md:grid-cols-[1fr_1.2fr] bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-brand-xl overflow-hidden transition-colors duration-300">
 
         {/* ── SIDEBAR ── */}
         <div className="bg-gradient-to-br from-primary-dark to-primary-blue text-white p-10 flex flex-col justify-between">
@@ -76,8 +78,7 @@ export default function Login() {
               Conecte-se ao Vale do Ivaí
             </h2>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Acesse uma rede integrada com estudantes, prestadores de serviços autônomos,
-              profissionais e empresas contratantes de Ivaiporã e região.
+              Acesse uma rede integrada com estudantes, professores parceiros, prestadores autônomos e empresas contratantes de Ivaiporã e região.
             </p>
           </div>
 
@@ -85,9 +86,9 @@ export default function Login() {
             <div className="font-bold text-sm text-accent-sky mb-3">Por que ter uma conta?</div>
             <ul className="text-xs text-gray-200 space-y-2 leading-relaxed list-disc list-inside">
               <li><strong>Alunos:</strong> Endossos docentes e vagas de estágio.</li>
+              <li><strong>Professores:</strong> Validação de pareceres educacionais.</li>
               <li><strong>Freelancers:</strong> Divulgação no Marketplace Local.</li>
-              <li><strong>Candidatos:</strong> Match inteligente em vagas CLT/PJ.</li>
-              <li><strong>Empresas:</strong> Publicação ilimitada de vagas.</li>
+              <li><strong>Empresas:</strong> CNPJ verificado e vagas ilimitadas.</li>
             </ul>
           </div>
         </div>
@@ -96,15 +97,15 @@ export default function Login() {
         <div className="p-10">
 
           {/* Tabs */}
-          <div className="flex border-b-2 border-gray-200 mb-6">
+          <div className="flex border-b-2 border-gray-200 dark:border-slate-800 mb-6">
             {[{ id: 'login', label: 'Entrar na Conta' }, { id: 'register', label: 'Criar Nova Conta' }].map(t => (
               <button
                 key={t.id}
                 onClick={() => { setTab(t.id); setAlert(''); }}
-                className={`flex-1 py-3 text-center font-bold text-sm transition-colors duration-200 border-b-2 -mb-[2px] ${
+                className={`py-3 px-4 font-heading font-bold text-sm transition-all border-b-2 -mb-[2px] cursor-pointer ${
                   tab === t.id
-                    ? 'text-primary-blue border-primary-blue'
-                    : 'text-gray-400 border-transparent hover:text-gray-600'
+                    ? 'border-primary-blue dark:border-blue-400 text-primary-blue dark:text-blue-400'
+                    : 'border-transparent text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200'
                 }`}
               >
                 {t.label}
@@ -124,7 +125,7 @@ export default function Login() {
               <div className="form-group">
                 <label className="form-label">E-mail de Acesso</label>
                 <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
-                  className="form-control" placeholder="Ex: seu-email@exemplo.com" required />
+                  className="form-control" placeholder="Ex: professor@ivaiconecta.com.br ou aluno@..." required />
               </div>
               <div className="form-group">
                 <label className="form-label">Senha</label>
@@ -142,19 +143,19 @@ export default function Login() {
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
                 <label className="form-label mb-2 block">Selecione o seu Perfil de Acesso:</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {ROLES.map(r => (
                     <button
                       key={r.id}
                       type="button"
                       onClick={() => setRole(r.id)}
-                      className={`p-3 rounded-xl border-2 text-center transition-all duration-200 text-sm font-semibold ${
+                      className={`p-2.5 rounded-xl border-2 text-center transition-all duration-200 text-xs font-semibold ${
                         selectedRole === r.id
-                          ? 'border-primary-blue bg-primary-light text-primary-blue'
-                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-primary-blue/50'
+                          ? 'border-primary-blue bg-primary-light text-primary-blue dark:bg-blue-950/60 dark:text-blue-300'
+                          : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:border-primary-blue/50'
                       }`}
                     >
-                      <span className="text-xl block mb-1">{r.icon}</span>
+                      <span className="text-lg block mb-0.5">{r.icon}</span>
                       {r.label}
                     </button>
                   ))}
@@ -164,12 +165,12 @@ export default function Login() {
               <div className="form-group">
                 <label className="form-label">Nome Completo ou Razão Social</label>
                 <input type="text" value={regName} onChange={e => setRegName(e.target.value)}
-                  className="form-control" placeholder="Ex: Lucas Silva ou ValeTech Soluções" required />
+                  className="form-control" placeholder="Ex: Prof. Dr. Ronan Silva ou Lucas Silva" required />
               </div>
               <div className="form-group">
-                <label className="form-label">E-mail</label>
+                <label className="form-label">E-mail {selectedRole === 'professor' ? 'Educacional (@ifpr, @uenp, @univale)' : ''}</label>
                 <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)}
-                  className="form-control" placeholder="Ex: contato@exemplo.com" required />
+                  className="form-control" placeholder={selectedRole === 'professor' ? 'professor@ifpr.edu.br' : 'contato@exemplo.com'} required />
               </div>
               <div className="form-group">
                 <label className="form-label">Sua Cidade no Vale do Ivaí</label>
@@ -189,14 +190,14 @@ export default function Login() {
           )}
 
           {/* ── DEMO ── */}
-          <div className="mt-6 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl">
-            <div className="text-xs font-bold text-gray-600 mb-3">Teste Rápido (Demonstração 1-Clique):</div>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-800 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
+            <div className="text-xs font-bold text-gray-600 dark:text-slate-300 mb-3">Teste Rápido (Demonstração 1-Clique):</div>
+            <div className="flex flex-wrap gap-1.5">
               {DEMO_ROLES.map(d => (
                 <button
                   key={d.role}
                   onClick={() => handleDemo(d.role)}
-                  className="btn btn-outline btn-sm text-xs"
+                  className="btn btn-outline btn-sm text-[11px] font-bold py-1 px-2.5"
                 >
                   {d.label}
                 </button>

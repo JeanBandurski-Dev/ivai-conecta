@@ -10,6 +10,7 @@ import Servicos from './pages/Servicos';
 import BancoDeTalentos from './pages/BancoDeTalentos';
 import PerfilAluno from './pages/PerfilAluno';
 import PerfilEmpresa from './pages/PerfilEmpresa';
+import PerfilProfessor from './pages/PerfilProfessor';
 import Configuracoes from './pages/Configuracoes';
 import MinhasVagas from './pages/MinhasVagas';
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/talentos"         element={<BancoDeTalentos />} />
             <Route path="/perfil/:id"       element={<PerfilAluno />} />
             <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+            <Route path="/professor/:id"    element={<PerfilProfessor />} />
             <Route path="/configuracoes"    element={<Configuracoes />} />
             <Route path="/minhas-vagas"     element={<MinhasVagas />} />
 
@@ -47,10 +49,10 @@ function NotFound() {
   return (
     <div className="container section text-center py-24">
       <div className="text-7xl mb-6">🗺️</div>
-      <h1 className="text-4xl font-heading font-bold text-primary-dark mb-3">
+      <h1 className="text-4xl font-heading font-bold text-primary-dark dark:text-white mb-3">
         Página não encontrada
       </h1>
-      <p className="text-gray-500 mb-8 max-w-md mx-auto">
+      <p className="text-gray-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
         A rota que você tentou acessar não existe nesta plataforma.
       </p>
       <a href="/" className="btn btn-primary">

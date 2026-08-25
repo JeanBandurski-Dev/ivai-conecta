@@ -67,8 +67,8 @@ export default function Dashboard() {
               </p>
 
               {/* Hero Search Box */}
-              <div className="bg-white/95 backdrop-blur-md p-3 rounded-2xl shadow-2xl flex flex-wrap sm:flex-nowrap items-center gap-3 max-w-xl">
-                <div className="flex-1 min-w-[200px] flex items-center gap-2.5 px-4 py-3 bg-gray-50/90 rounded-xl">
+              <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl shadow-2xl flex flex-wrap sm:flex-nowrap items-center gap-3 max-w-xl border border-white/20 dark:border-slate-700">
+                <div className="flex-1 min-w-[200px] flex items-center gap-2.5 px-4 py-3 bg-gray-50/90 dark:bg-slate-800/90 rounded-xl">
                   <Search size={17} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
@@ -76,17 +76,17 @@ export default function Dashboard() {
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
                     placeholder="Busque por 'React', 'Eletricista', 'Admin..."
-                    className="bg-transparent text-sm sm:text-base text-gray-800 placeholder-gray-400 outline-none w-full"
+                    className="bg-transparent text-sm sm:text-base text-gray-800 dark:text-white placeholder-gray-400 outline-none w-full"
                   />
                 </div>
 
-                <div className="border border-gray-200 rounded-xl px-3 py-2 bg-white shrink-0">
+                <div className="border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 shrink-0">
                   <select
                     value={selectedCity}
                     onChange={e => setCity(e.target.value)}
-                    className="bg-transparent text-primary-blue font-bold text-xs sm:text-sm outline-none cursor-pointer"
+                    className="bg-transparent text-primary-blue dark:text-blue-400 font-bold text-xs sm:text-sm outline-none cursor-pointer"
                   >
-                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                    {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
                   </select>
                 </div>
 
@@ -124,13 +124,13 @@ export default function Dashboard() {
       </header>
 
       {/* ── BRAND PILLARS BAR ── */}
-      <section className="bg-white border-b border-gray-200 py-6">
+      <section className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 py-6 transition-colors duration-300">
         <div className="container">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
             {PILLARS.map((p, i) => (
               <div
                 key={i}
-                className="flex items-center justify-center p-3.5 rounded-2xl border border-gray-200 bg-gray-50/60 hover:bg-white hover:border-primary-blue hover:shadow-md transition-all text-center text-xs sm:text-sm font-semibold text-gray-700"
+                className="flex items-center justify-center p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 hover:border-primary-blue dark:hover:border-blue-400 hover:shadow-md transition-all text-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-200"
               >
                 {p}
               </div>
@@ -140,7 +140,7 @@ export default function Dashboard() {
       </section>
 
       {/* ── TALENTS CAROUSEL ── */}
-      <section className="section bg-gray-50/50 overflow-hidden">
+      <section className="section bg-gray-50/50 dark:bg-slate-950/40 overflow-hidden transition-colors duration-300">
         <div className="container">
           <div className="section-header">
             <div>
@@ -161,7 +161,7 @@ export default function Dashboard() {
       </section>
 
       {/* ── JOBS ── */}
-      <section className="section bg-white border-t border-gray-100">
+      <section className="section bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300">
         <div className="container">
           <div className="section-header">
             <div>
@@ -181,7 +181,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid-3">
               {jobs.slice(0, 3).map(j => (
-                <JobCard key={j.id} job={j} matchScore={calculateMatchScore(demoSkills, j.requiredSkills)} />
+                <JobCard key={j.id} job={j} />
               ))}
             </div>
           )}
@@ -189,7 +189,7 @@ export default function Dashboard() {
       </section>
 
       {/* ── SERVICES ── */}
-      <section className="section bg-gray-50/50 border-t border-gray-100">
+      <section className="section bg-gray-50/50 dark:bg-slate-950/40 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300">
         <div className="container">
           <div className="section-header">
             <div>
@@ -219,6 +219,6 @@ export default function Dashboard() {
 
 function EmptyState({ message }) {
   return (
-    <div className="py-16 text-center text-gray-400 text-base">{message}</div>
+    <div className="py-16 text-center text-gray-400 dark:text-slate-500 text-base">{message}</div>
   );
 }
