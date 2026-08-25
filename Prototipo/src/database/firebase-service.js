@@ -196,3 +196,30 @@ export async function addService(servicePayload) {
 
   return servicePayload;
 }
+
+/**
+ * Cadastra uma nova vaga de emprego.
+ */
+export async function addJob(jobPayLoad) {
+  //1.Busca as vagas atuais salvas no Local Storage
+  let localJobs = JSON.parse(localStorage.getItem(STORAGE_KEY_JOBS));
+  if (!localJobs || localJobs.length === 0) {
+    localJobs = seedData.jobs;
+}
+
+//2.Insere a nova vaga no inicio da lista
+localJobs.unshift(jobPayLoad);
+localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(localJobs));
+
+//3.Tenta sincronizar com o banco do Firestore em segundo plano.
+if (isFirebaseInitialized) {
+  addDoc(collection(db, 'jobs'), jobPayLoad)
+    .then(docRef => {
+      jobPayLoad.id = docRef.id;
+    })
+    .catch(err => console.warn('Sync Firestore cadastro vaga:',
+      err.message));
+}
+
+return jobPayLoad;
+}
