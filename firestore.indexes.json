@@ -1,0 +1,31 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "services",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "talents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "course", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
