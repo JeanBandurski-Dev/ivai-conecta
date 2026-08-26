@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Sparkles, CheckCircle2, RotateCcw, Building2,
@@ -6,6 +6,7 @@ import {
   UserCheck, Award, Lock, BookOpen, Check, Eye
 } from 'lucide-react';
 import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES } from '../lib/ivaiConecta';
+import { subscribeToTalents } from '../services/talentsService.js';
 import TalentCard from '../components/TalentCard';
 import useAppStore from '../store/useAppStore';
 
@@ -44,7 +45,16 @@ export default function BancoDeTalentos() {
   // Modal to view students endorsed by a specific teacher
   const [selectedTeacherForEndorsements, setSelectedTeacherForEndorsements] = useState(null);
 
-  const all = getTalents('Todas as Cidades');
+  const [liveTalents, setLiveTalents] = useState(() => getTalents('Todas as Cidades'));
+
+  useEffect(() => {
+    const unsub = subscribeToTalents('Todas as Cidades', (data) => {
+      setLiveTalents(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const all = liveTalents;
   const teachers = getVerifiedTeachers();
 
   const highlightedTalents = useMemo(() => {

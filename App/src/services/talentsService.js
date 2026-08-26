@@ -1,6 +1,6 @@
 // Talents Service for Ivaí Conecta
 import { db } from '../lib/firebase.js';
-import { collection, getDocs, doc, updateDoc, arrayUnion, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
@@ -9,6 +9,34 @@ import {
   SEED_TEACHERS,
   SEED_ENDORSEMENT_REQUESTS
 } from '../data/seedData.js';
+
+/**
+ * Escuta banco de talentos em tempo real via Firestore onSnapshot
+ */
+export function subscribeToTalents(city = 'Todas as Cidades', callback) {
+  try {
+    const talentsRef = collection(db, 'talents');
+    const q = (city && city !== 'Todas as Cidades') ? query(talentsRef, where('city', '==', city)) : talentsRef;
+
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const remote = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+        const local = getTalents(city);
+        const merged = [...remote, ...local.filter(t => !remote.some(rt => String(rt.id) === String(t.id)))];
+        callback(merged);
+      } else {
+        callback(getTalents(city));
+      }
+    }, (error) => {
+      console.warn('[Firestore Talents Listener] Offline fallback:', error.message);
+      callback(getTalents(city));
+    });
+  } catch (error) {
+    console.warn('[Firestore Talents Listener] Falha ao assinar talentos:', error.message);
+    callback(getTalents(city));
+    return () => {};
+  }
+}
 
 export function getTalents(city = 'Todas as Cidades') {
   let talents = SEED_TALENTS;

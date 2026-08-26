@@ -4,6 +4,62 @@ import { collection, getDocs, addDoc, query, where, doc, updateDoc, onSnapshot }
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, SEED_JOBS, SEED_APPLICATIONS } from '../data/seedData.js';
 
 /**
+ * Escuta vagas em tempo real via Firestore onSnapshot
+ */
+export function subscribeToJobs(city = 'Todas as Cidades', callback) {
+  try {
+    const jobsRef = collection(db, 'jobs');
+    const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
+    
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const remoteJobs = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+        const localJobs = getJobs(city);
+        const merged = [...remoteJobs, ...localJobs.filter(j => !remoteJobs.some(rj => String(rj.id) === String(j.id)))];
+        callback(merged);
+      } else {
+        callback(getJobs(city));
+      }
+    }, (error) => {
+      console.warn('[Firestore Jobs Listener] Offline fallback:', error.message);
+      callback(getJobs(city));
+    });
+  } catch (error) {
+    console.warn('[Firestore Jobs Listener] Falha ao assinar vagas:', error.message);
+    callback(getJobs(city));
+    return () => {};
+  }
+}
+
+/**
+ * Escuta candidaturas em tempo real via Firestore onSnapshot
+ */
+export function subscribeToApplications(candidateUid, callback) {
+  try {
+    const appsRef = collection(db, 'applications');
+    const q = candidateUid ? query(appsRef, where('candidateUid', '==', candidateUid)) : appsRef;
+    
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const remoteApps = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+        const localApps = getUserApplications();
+        const merged = [...remoteApps, ...localApps.filter(a => !remoteApps.some(ra => String(ra.id) === String(a.id)))];
+        callback(merged);
+      } else {
+        callback(getUserApplications());
+      }
+    }, (error) => {
+      console.warn('[Firestore Apps Listener] Fallback:', error.message);
+      callback(getUserApplications());
+    });
+  } catch (error) {
+    console.warn('[Firestore Apps Listener] Falha ao assinar candidaturas:', error.message);
+    callback(getUserApplications());
+    return () => {};
+  }
+}
+
+/**
  * Busca vagas (sincronamente usando cache/seedData e atualizando Firestore em background)
  */
 export function getJobs(city = 'Todas as Cidades') {
