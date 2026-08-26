@@ -1,6 +1,6 @@
 // Chat & Direct Messaging Service for Ivaí Conecta (Firestore + Local Storage Sync)
 import { db } from '../lib/firebase.js';
-import { collection, addDoc, doc, setDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 
@@ -105,9 +105,9 @@ export function sendMessageToThread(threadId, senderUser, text) {
 export function subscribeToFirestoreChat(chatId, callback) {
   try {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'asc'));
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(messagesRef, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       callback(msgs);
     }, (err) => {
       console.warn('[Firestore Chat] Erro no listener:', err.message);
