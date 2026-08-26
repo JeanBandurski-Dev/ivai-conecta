@@ -1,7 +1,7 @@
 // Services Marketplace Service for Ivaí Conecta (Firestore + Local Storage Sync)
-import { db } from '../lib/firebase';
+import { db } from '../lib/firebase.js';
 import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
-import { STORAGE_KEY_SERVICES, SEED_SERVICES } from '../data/seedData';
+import { STORAGE_KEY_SERVICES, SEED_SERVICES } from '../data/seedData.js';
 
 export function getServices(city = 'Todas as Cidades') {
   let services = SEED_SERVICES;

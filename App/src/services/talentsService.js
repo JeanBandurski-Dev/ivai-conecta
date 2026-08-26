@@ -1,5 +1,5 @@
 // Talents Service for Ivaí Conecta
-import { db } from '../lib/firebase';
+import { db } from '../lib/firebase.js';
 import { collection, getDocs, doc, updateDoc, arrayUnion, query, where } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
@@ -8,7 +8,7 @@ import {
   SEED_TALENTS,
   SEED_TEACHERS,
   SEED_ENDORSEMENT_REQUESTS
-} from '../data/seedData';
+} from '../data/seedData.js';
 
 export function getTalents(city = 'Todas as Cidades') {
   let talents = SEED_TALENTS;

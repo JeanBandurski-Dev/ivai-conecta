@@ -1,5 +1,5 @@
 // Auth Service for Ivaí Conecta (Firebase + Local Storage Fallback)
-import { auth, db, googleProvider } from '../lib/firebase';
+import { auth, db, googleProvider } from '../lib/firebase.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -8,6 +8,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { seedFirestoreIfEmpty } from './seedFirestore.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -122,6 +123,7 @@ export async function register(data) {
       createdAt: new Date().toISOString()
     };
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
+    seedFirestoreIfEmpty();
 
     const sessionUser = {
       uid: fbUser.uid,
@@ -139,7 +141,25 @@ export async function register(data) {
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser };
   } catch (error) {
-    // Fallback: se Firebase falhar ou estiver sem internet, grava no LocalStorage
+    console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
+
+    // Mensagens explicativas para erros comuns do Firebase Auth
+    let userFriendlyError = null;
+    if (error.code === 'auth/operation-not-allowed') {
+      userFriendlyError = '⚠️ O método E-mail/Senha não está ativado no Firebase Console (Vá em Authentication > Sign-in method e ative E-mail/senha).';
+    } else if (error.code === 'auth/email-already-in-use') {
+      userFriendlyError = 'Este e-mail já está cadastrado no Firebase.';
+    } else if (error.code === 'auth/weak-password') {
+      userFriendlyError = 'A senha deve conter no mínimo 6 caracteres.';
+    } else if (error.code === 'auth/invalid-email') {
+      userFriendlyError = 'Formato de e-mail inválido.';
+    }
+
+    if (userFriendlyError) {
+      return { success: false, error: userFriendlyError, errorCode: error.code };
+    }
+
+    // Fallback: se houver erro genérico/offline, grava no LocalStorage
     const users = getUsersDB();
     if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
       return { success: false, error: 'Este e-mail já está cadastrado no Ivaí Conecta.' };
@@ -234,6 +254,7 @@ export async function logout() {
 export function watchAuthState(callback) {
   return onAuthStateChanged(auth, async (fbUser) => {
     if (fbUser) {
+      seedFirestoreIfEmpty();
       const profileRes = await getUserProfile(fbUser.uid);
       const role = profileRes.profile?.role || 'aluno';
       const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
