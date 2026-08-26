@@ -200,11 +200,14 @@ export async function loginWithGoogle() {
 export async function completeUserProfile(uid, additionalData) {
   try {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
+    const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+
     await setDoc(doc(db, 'users', uid), {
       name: additionalData.name,
       email: additionalData.email,
       city: additionalData.city,
       role: additionalData.role,
+      avatar: avatar,
       createdAt: new Date().toISOString()
     }, { merge: true });
 
@@ -212,6 +215,7 @@ export async function completeUserProfile(uid, additionalData) {
       name: additionalData.name,
       city: additionalData.city,
       role: additionalData.role,
+      avatar: avatar,
       badge: roleMeta.badge,
       isVerifiedCompany: additionalData.role === 'empresa',
     });

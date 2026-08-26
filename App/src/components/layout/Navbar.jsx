@@ -128,11 +128,15 @@ export default function Navbar() {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen(o => !o)}
-                    className="flex items-center gap-2.5 px-3.5 py-2 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary-blue dark:hover:border-blue-400 transition-colors duration-200 bg-white dark:bg-slate-800 shadow-xs"
+                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary-blue dark:hover:border-blue-400 transition-colors duration-200 bg-white dark:bg-slate-800 shadow-xs cursor-pointer"
                     aria-label="Menu do usuário"
                   >
-                    <div className="w-8 h-8 rounded-full bg-primary-light dark:bg-blue-900/50 flex items-center justify-center">
-                      <User size={15} className="text-primary-blue dark:text-blue-400" />
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
+                      {currentUser.avatar ? (
+                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={15} className="text-primary-blue dark:text-blue-400" />
+                      )}
                     </div>
                     <span className="text-sm font-semibold text-gray-700 dark:text-slate-200 max-w-[120px] truncate">
                       {currentUser.name.split(' ')[0]}
@@ -141,10 +145,21 @@ export default function Navbar() {
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50">
-                      <div className="px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                        <div className="font-semibold text-sm text-gray-800 dark:text-white truncate">{currentUser.name}</div>
-                        <div className="text-xs text-primary-blue dark:text-blue-400 font-medium mt-0.5">{currentUser.badge}</div>
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
+                          {currentUser.avatar ? (
+                            <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
+                              {currentUser.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="overflow-hidden">
+                          <div className="font-semibold text-sm text-gray-800 dark:text-white truncate">{currentUser.name}</div>
+                          <div className="text-xs text-primary-blue dark:text-blue-400 font-medium mt-0.5 truncate">{currentUser.badge}</div>
+                        </div>
                       </div>
 
                       <div className="py-2">
@@ -253,9 +268,20 @@ export default function Navbar() {
               {currentUser && (
                 <>
                   <div className="border-t border-gray-100 dark:border-slate-800 my-2.5" />
-                  <div className="px-4 py-2.5 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
-                    <div className="font-semibold text-base text-gray-800 dark:text-white">{currentUser.name}</div>
-                    <div className="text-xs text-primary-blue dark:text-blue-400 font-medium">{currentUser.badge}</div>
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
+                      {currentUser.avatar ? (
+                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
+                          {currentUser.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="overflow-hidden">
+                      <div className="font-semibold text-base text-gray-800 dark:text-white truncate">{currentUser.name}</div>
+                      <div className="text-xs text-primary-blue dark:text-blue-400 font-medium truncate">{currentUser.badge}</div>
+                    </div>
                   </div>
 
                   <NavLink to={getProfileLink()} className={mobileNavLinkClass} onClick={closeMobile}>
