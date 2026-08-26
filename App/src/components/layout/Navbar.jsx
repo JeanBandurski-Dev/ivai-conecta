@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, MapPin
+  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
@@ -84,21 +84,9 @@ export default function Navbar() {
               <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
             </ul>
 
-            {/* Right actions: City Selector, Theme Switcher & User / Auth */}
+            {/* Right actions: Theme Switcher & User / Auth */}
             <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-auto md:ml-0">
               
-              {/* Desktop City Selector */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800 text-xs font-semibold shadow-xs">
-                <MapPin size={13} className="text-primary-blue dark:text-blue-400 shrink-0" />
-                <select
-                  value={selectedCity}
-                  onChange={e => setCity(e.target.value)}
-                  className="bg-transparent text-gray-700 dark:text-slate-200 text-xs font-bold outline-none cursor-pointer"
-                >
-                  {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
-                </select>
-              </div>
-
               {/* Chat Button */}
               {currentUser && (
                 <button
@@ -249,17 +237,6 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
             <div className="container py-4 space-y-1">
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-3">
-                <span className="text-gray-400 text-sm">📍</span>
-                <select
-                  value={selectedCity}
-                  onChange={e => setCity(e.target.value)}
-                  className="bg-transparent text-gray-700 dark:text-slate-200 text-sm font-medium outline-none cursor-pointer flex-1"
-                >
-                  {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
-                </select>
-              </div>
-
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Dashboard</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>
