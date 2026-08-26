@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -13,8 +14,15 @@ import PerfilEmpresa from './pages/PerfilEmpresa';
 import PerfilProfessor from './pages/PerfilProfessor';
 import Configuracoes from './pages/Configuracoes';
 import MinhasVagas from './pages/MinhasVagas';
+import { forceSeedAllCollections } from './services/seedFirestore';
 
 export default function App() {
+  useEffect(() => {
+    forceSeedAllCollections().then(results => {
+      console.log('[Firestore Auto-Seed Resultados]:', results);
+    });
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="flex flex-col min-h-screen">
