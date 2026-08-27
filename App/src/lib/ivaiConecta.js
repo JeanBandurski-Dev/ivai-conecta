@@ -8,3 +8,4 @@ export * from '../services/servicesService';
 export * from '../services/matchService';
 export * from '../services/favoritesService';
 export * from '../services/chatService';
+export * from '../services/storageService';

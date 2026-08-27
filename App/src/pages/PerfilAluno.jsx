@@ -5,7 +5,7 @@ import {
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
   Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent } from '../lib/ivaiConecta';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -142,15 +142,17 @@ export default function PerfilAluno() {
     }
   };
 
-  const handleAvatarFileChange = (e) => {
+  const handleAvatarFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditData(d => ({ ...d, avatar: reader.result }));
-        showToast('📸 Nova foto de perfil selecionada com sucesso!');
-      };
-      reader.readAsDataURL(file);
+      showToast('⏳ Enviando foto para o Firebase Storage...');
+      const res = await uploadUserProfilePicture(file, currentUser?.uid || talent?.id);
+      if (res.success) {
+        setEditData(d => ({ ...d, avatar: res.url }));
+        showToast('📸 Foto de perfil salva na nuvem com sucesso!');
+      } else {
+        showToast(`⚠️ ${res.error || 'Erro ao enviar foto.'}`);
+      }
     }
   };
 
