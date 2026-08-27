@@ -13,11 +13,17 @@ export default function PerfilProfessor() {
   const navigate = useNavigate();
   const { currentUser, showToast } = useAppStore();
 
-  const teacherId = id || 'prof_1';
+  const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id || 'prof_1') : 'prof_1');
   const teacher = getTeacherById(teacherId);
   const endorsedStudents = getTeacherEndorsedStudents(teacher.email);
 
-  const isOwner = currentUser && (currentUser.role === 'professor' || currentUser.email === teacher.email);
+  const isOwner = Boolean(
+    currentUser && (
+      (currentUser.email && teacher.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(teacher.id) || String(currentUser.uid) === String(teacher.firestoreId))) ||
+      (currentUser.id != null && String(currentUser.id) === String(teacher.id))
+    )
+  );
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);

@@ -25,9 +25,9 @@ export default function PerfilAluno() {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, showToast } = useAppStore();
 
-  const talentId = id || currentUser?.id || '1';
+  const talentId = id || currentUser?.uid || currentUser?.id || '1';
   const talent = getTalentById(talentId) || {
-    id: currentUser?.id || 1,
+    id: currentUser?.uid || currentUser?.id || 1,
     name: currentUser?.name || 'Lucas Eduardo Silva',
     course: currentUser?.course || 'Análise e Desenvolvimento de Sistemas',
     institution: currentUser?.institution || 'IFPR Campus Ivaiporã',
@@ -55,10 +55,11 @@ export default function PerfilAluno() {
     ]
   };
 
-  // Permissão estrita do proprietário: id, e-mail ou nome correspondente entre o usuário logado e o perfil
+  // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
     currentUser && talent && (
       (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
       (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
       (currentUser.name && talent.name && currentUser.name.trim().toLowerCase() === talent.name.trim().toLowerCase())
     )

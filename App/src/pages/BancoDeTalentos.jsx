@@ -6,7 +6,7 @@ import {
   UserCheck, Award, Lock, BookOpen, Check, Eye
 } from 'lucide-react';
 import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES } from '../lib/ivaiConecta';
-import { subscribeToTalents } from '../services/talentsService.js';
+import { subscribeToTalents, subscribeToTeachers } from '../services/talentsService.js';
 import TalentCard from '../components/TalentCard';
 import useAppStore from '../store/useAppStore';
 
@@ -46,16 +46,23 @@ export default function BancoDeTalentos() {
   const [selectedTeacherForEndorsements, setSelectedTeacherForEndorsements] = useState(null);
 
   const [liveTalents, setLiveTalents] = useState(() => getTalents('Todas as Cidades'));
+  const [liveTeachers, setLiveTeachers] = useState(() => getVerifiedTeachers());
 
   useEffect(() => {
-    const unsub = subscribeToTalents('Todas as Cidades', (data) => {
+    const unsubTalents = subscribeToTalents('Todas as Cidades', (data) => {
       setLiveTalents(data);
     });
-    return () => unsub();
+    const unsubTeachers = subscribeToTeachers((data) => {
+      setLiveTeachers(data);
+    });
+    return () => {
+      unsubTalents();
+      unsubTeachers();
+    };
   }, []);
 
   const all = liveTalents;
-  const teachers = getVerifiedTeachers();
+  const teachers = liveTeachers;
 
   const highlightedTalents = useMemo(() => {
     return all.filter(t => t.isVerifiedStudent && t.endorsements && t.endorsements.length >= 1).slice(0, 4);

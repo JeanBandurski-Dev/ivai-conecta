@@ -14,13 +14,11 @@ import PerfilEmpresa from './pages/PerfilEmpresa';
 import PerfilProfessor from './pages/PerfilProfessor';
 import Configuracoes from './pages/Configuracoes';
 import MinhasVagas from './pages/MinhasVagas';
-import { forceSeedAllCollections } from './services/seedFirestore';
+import { seedFirestoreIfEmpty } from './services/seedFirestore';
 
 export default function App() {
   useEffect(() => {
-    forceSeedAllCollections().then(results => {
-      console.log('[Firestore Auto-Seed Resultados]:', results);
-    });
+    seedFirestoreIfEmpty();
   }, []);
 
   return (

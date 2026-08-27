@@ -16,10 +16,9 @@ export async function forceSeedAllCollections() {
   console.log('[Firestore Seed] Usuário autenticado:', currentUser ? currentUser.uid : 'Nenhum usuário logado');
 
   const collectionsToSeed = [
+    { name: 'users', data: DEFAULT_USERS, idKey: 'id' },
     { name: 'jobs', data: SEED_JOBS, idKey: 'id' },
     { name: 'services', data: SEED_SERVICES, idKey: 'id' },
-    { name: 'talents', data: SEED_TALENTS, idKey: 'id' },
-    { name: 'teachers', data: SEED_TEACHERS, idKey: 'id' },
     { name: 'applications', data: SEED_APPLICATIONS, idKey: 'id' },
     { name: 'chats', data: SEED_CHAT_THREADS, idKey: 'id' },
   ];
@@ -56,9 +55,9 @@ export async function forceSeedAllCollections() {
 export async function seedFirestoreIfEmpty() {
   try {
     const collectionsToSeed = [
+      { name: 'users', data: DEFAULT_USERS, idKey: 'id' },
+      { name: 'jobs', data: SEED_JOBS, idKey: 'id' },
       { name: 'services', data: SEED_SERVICES, idKey: 'id' },
-      { name: 'talents', data: SEED_TALENTS, idKey: 'id' },
-      { name: 'teachers', data: SEED_TEACHERS, idKey: 'id' },
       { name: 'applications', data: SEED_APPLICATIONS, idKey: 'id' },
       { name: 'chats', data: SEED_CHAT_THREADS, idKey: 'id' },
     ];
