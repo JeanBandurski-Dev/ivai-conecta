@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import Toast from './components/ui/Toast';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import GuestRoute from './components/auth/GuestRoute';
+import useAppStore from './store/useAppStore';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -17,9 +20,17 @@ import MinhasVagas from './pages/MinhasVagas';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 
 export default function App() {
+  const initAuthListener = useAppStore(state => state.initAuthListener);
+
   useEffect(() => {
     seedFirestoreIfEmpty();
-  }, []);
+    const unsubscribe = initAuthListener();
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [initAuthListener]);
 
   return (
     <BrowserRouter>
@@ -29,15 +40,29 @@ export default function App() {
         <main className="flex-1">
           <Routes>
             <Route path="/"                 element={<Dashboard />} />
-            <Route path="/login"            element={<Login />} />
+            <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/vagas"            element={<Vagas />} />
             <Route path="/servicos"         element={<Servicos />} />
             <Route path="/talentos"         element={<BancoDeTalentos />} />
             <Route path="/perfil/:id"       element={<PerfilAluno />} />
             <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
             <Route path="/professor/:id"    element={<PerfilProfessor />} />
-            <Route path="/configuracoes"    element={<Configuracoes />} />
-            <Route path="/minhas-vagas"     element={<MinhasVagas />} />
+            <Route
+              path="/configuracoes"
+              element={
+                <ProtectedRoute>
+                  <Configuracoes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/minhas-vagas"
+              element={
+                <ProtectedRoute>
+                  <MinhasVagas />
+                </ProtectedRoute>
+              }
+            />
 
             {/* 404 fallback */}
             <Route path="*" element={<NotFound />} />

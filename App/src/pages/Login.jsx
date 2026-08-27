@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { CITIES } from '../lib/ivaiConecta';
 
@@ -22,6 +22,8 @@ const DEMO_ROLES = [
 export default function Login() {
   const { login, register, loginWithGoogle, completeProfile, showToast } = useAppStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTarget = location.state?.from?.pathname || '/';
 
   const [tab, setTab]               = useState('login'); // 'login' | 'register'
   const [selectedRole, setRole]     = useState('aluno');
@@ -42,7 +44,7 @@ export default function Login() {
     setLoading(false);
     if (!res.success) { setAlert(res.error); return; }
     showToast(`Bem-vindo de volta, ${res.user.name}!`);
-    setTimeout(() => navigate('/'), 600);
+    setTimeout(() => navigate(redirectTarget, { replace: true }), 600);
   };
 
   const handleRegister = async (e) => {
@@ -53,7 +55,7 @@ export default function Login() {
     setLoading(false);
     if (!res.success) { setAlert(res.error); return; }
     showToast(`Conta criada com sucesso! Bem-vindo, ${res.user.name}.`);
-    setTimeout(() => navigate('/'), 600);
+    setTimeout(() => navigate(redirectTarget, { replace: true }), 600);
   };
 
   const handleGoogleLogin = async () => {
@@ -68,7 +70,7 @@ export default function Login() {
       setShowCompleteModal(true);
     } else {
       showToast(`Bem-vindo(a), ${res.user.name}!`);
-      setTimeout(() => navigate('/'), 600);
+      setTimeout(() => navigate(redirectTarget, { replace: true }), 600);
     }
   };
 
@@ -86,7 +88,7 @@ export default function Login() {
     setShowCompleteModal(false);
     if (res.success) {
       showToast(`Perfil atualizado com sucesso! Bem-vindo, ${res.user.name}.`);
-      setTimeout(() => navigate('/'), 600);
+      setTimeout(() => navigate(redirectTarget, { replace: true }), 600);
     }
   };
 
@@ -97,7 +99,7 @@ export default function Login() {
     setLoading(false);
     if (res.success) {
       showToast(`Conectado no modo demonstração: ${res.user.name}`);
-      setTimeout(() => navigate('/'), 500);
+      setTimeout(() => navigate(redirectTarget, { replace: true }), 500);
     }
   };
 
@@ -183,6 +185,14 @@ export default function Login() {
               </button>
             ))}
           </div>
+
+          {/* Notice if redirected from protected route */}
+          {location.state?.from && !alert && (
+            <div className="mb-5 px-4 py-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs md:text-sm font-medium rounded-xl flex items-center gap-2">
+              <span>🔒</span>
+              <span>Faça login para continuar para a página solicitada.</span>
+            </div>
+          )}
 
           {/* Alert */}
           {alert && (

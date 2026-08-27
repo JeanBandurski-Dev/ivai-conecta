@@ -148,6 +148,13 @@ export default function Navbar() {
                           </Link>
                         )}
 
+                        {currentUser.role === 'professor' && (
+                          <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
+                            <Star size={15} /> Pareceres e Recomendações
+                          </Link>
+                        )}
+
                         {currentUser.role === 'empresa' && (
                           <>
                             <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
@@ -253,6 +260,18 @@ export default function Navbar() {
                   {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
                     <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><Briefcase size={16} /> Minhas Candidaturas</span>
+                    </NavLink>
+                  )}
+
+                  {currentUser.role === 'professor' && (
+                    <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Star size={16} /> Pareceres e Recomendações</span>
+                    </NavLink>
+                  )}
+
+                  {currentUser.role === 'empresa' && (
+                    <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Building2 size={16} /> Minhas Vagas Criadas</span>
                     </NavLink>
                   )}
 

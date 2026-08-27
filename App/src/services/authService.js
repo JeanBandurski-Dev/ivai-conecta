@@ -330,14 +330,20 @@ export function watchAuthState(callback) {
         role,
         badge: roleMeta.badge,
         avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-        isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
-        isVerifiedCompany: role === 'empresa',
+        isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
+        isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
         ...(profileRes.profile || {})
       };
       localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
       callback(sessionUser);
     } else {
-      callback(null);
+      const localUser = getAuthUser();
+      if (localUser && (localUser.id?.startsWith?.('usr_') || localUser.id?.startsWith?.('prof_') || localUser.email?.includes?.('@ivaiconecta.com.br'))) {
+        callback(localUser);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+        callback(null);
+      }
     }
   });
 }
