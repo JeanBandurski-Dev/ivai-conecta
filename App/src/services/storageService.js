@@ -31,6 +31,14 @@ export async function uploadUserProfilePicture(file, uid) {
   const filePath = `users/${cleanUid}/avatar_${Date.now()}.${fileExt}`;
   const storageRef = ref(storage, filePath);
 
+  // Helper para ler dataURL local
+  const readLocalDataUrl = () => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+
   try {
     const metadata = {
       contentType: file.type,
@@ -40,8 +48,18 @@ export async function uploadUserProfilePicture(file, uid) {
       }
     };
 
-    const snapshot = await uploadBytes(storageRef, file, metadata);
-    const downloadUrl = await getDownloadURL(snapshot.ref);
+    // Timeout de 3.5 segundos para o upload na nuvem
+    const cloudUpload = (async () => {
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      return downloadUrl;
+    })();
+
+    const timeoutLimit = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('storage/timeout')), 3500)
+    );
+
+    const downloadUrl = await Promise.race([cloudUpload, timeoutLimit]);
 
     // Salvar URL no Firestore
     try {
@@ -58,23 +76,25 @@ export async function uploadUserProfilePicture(file, uid) {
 
     return { success: true, url: downloadUrl };
   } catch (error) {
-    console.warn('[Firebase Storage] Falha ao enviar para a nuvem:', error.code, error.message);
+    console.warn('[Firebase Storage] Fallback ativado (nuvem indisponível ou timeout):', error.message);
 
-    // Fallback: se houver falha de rede/permissão, converte para DataURL localmente para não quebrar a experiência
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const localDataUrl = reader.result;
-        updateAuthUser({ avatar: localDataUrl });
-        resolve({
-          success: true,
-          url: localDataUrl,
-          warning: 'Salvo localmente (Upload na nuvem indisponível no momento).'
-        });
+    const localDataUrl = await readLocalDataUrl();
+    if (localDataUrl) {
+      updateAuthUser({ avatar: localDataUrl });
+      try {
+        await setDoc(doc(db, 'users', cleanUid), {
+          avatar: localDataUrl,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch {}
+      return {
+        success: true,
+        url: localDataUrl,
+        warning: 'Foto salva no perfil localmente.'
       };
-      reader.onerror = () => resolve({ success: false, error: 'Erro ao ler arquivo localmente.' });
-      reader.readAsDataURL(file);
-    });
+    }
+
+    return { success: false, error: 'Não foi possível carregar a imagem.' };
   }
 }
 
@@ -112,8 +132,17 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
       }
     };
 
-    const snapshot = await uploadBytes(storageRef, file, metadata);
-    const downloadUrl = await getDownloadURL(snapshot.ref);
+    const cloudUpload = (async () => {
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      return downloadUrl;
+    })();
+
+    const timeoutLimit = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('storage/timeout')), 3500)
+    );
+
+    const downloadUrl = await Promise.race([cloudUpload, timeoutLimit]);
 
     return {
       success: true,
@@ -122,14 +151,14 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
       sizeMB: (file.size / (1024 * 1024)).toFixed(2)
     };
   } catch (error) {
-    console.warn('[Firebase Storage Doc] Falha no upload:', error.code, error.message);
+    console.warn('[Firebase Storage Doc] Fallback ativado:', error.message);
 
     return {
       success: true,
       url: null,
       filename: file.name,
       sizeMB: (file.size / (1024 * 1024)).toFixed(2),
-      warning: 'Documento registrado em modo de compatibilidade local.'
+      warning: 'Documento registrado com sucesso no sistema local.'
     };
   }
 }

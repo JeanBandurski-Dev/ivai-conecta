@@ -65,19 +65,25 @@ export default function Configuracoes() {
     );
   }
 
+  const [submittingStudent, setSubmittingStudent] = useState(false);
+  const [submittingCompany, setSubmittingCompany] = useState(false);
+
   const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
-    showToast('⏳ Enviando foto para o Firebase Storage...');
-    const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
-    setUploadingAvatar(false);
-    if (res.success) {
-      setAvatar(res.url);
-      setCurrentUser({ ...currentUser, avatar: res.url });
-      showToast('📸 Foto de perfil salva no Storage com sucesso!');
-    } else {
-      showToast(`⚠️ ${res.error || 'Erro ao enviar imagem.'}`);
+    showToast('⏳ Processando foto de perfil...');
+    try {
+      const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
+      if (res.success) {
+        setAvatar(res.url);
+        setCurrentUser({ ...currentUser, avatar: res.url });
+        showToast('📸 Foto de perfil salva com sucesso!');
+      } else {
+        showToast(`⚠️ ${res.error || 'Erro ao enviar imagem.'}`);
+      }
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -136,25 +142,34 @@ export default function Configuracoes() {
       return;
     }
 
-    let uploadedDocUrl = null;
-    if (selectedFile) {
-      showToast('⏳ Enviando comprovante estudantil para o Storage...');
-      const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
-      if (uploadRes.success) {
-        uploadedDocUrl = uploadRes.url;
-      }
-    }
+    setSubmittingStudent(true);
+    showToast('⏳ Processando e autenticando declaração...');
 
-    const res = submitStudentVerification(raNumber, selectedFile);
-    if (res.success) {
-      setVerificationSubmitted(true);
-      updateAuthUser({
-        isVerifiedStudent: true,
-        raNumber,
-        studentProofUrl: uploadedDocUrl,
-        studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
-      });
-      showToast('🎉 Declaração enviada e salva na nuvem! Sua conta de aluno foi autenticada.');
+    try {
+      let uploadedDocUrl = null;
+      if (selectedFile) {
+        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
+        if (uploadRes.success) {
+          uploadedDocUrl = uploadRes.url;
+        }
+      }
+
+      const res = submitStudentVerification(raNumber, selectedFile);
+      if (res.success) {
+        setVerificationSubmitted(true);
+        const updated = updateAuthUser({
+          isVerifiedStudent: true,
+          raNumber,
+          studentProofUrl: uploadedDocUrl,
+          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
+        });
+        if (updated) {
+          setCurrentUser(updated);
+        }
+        showToast('🎉 Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
+      }
+    } finally {
+      setSubmittingStudent(false);
     }
   };
 
@@ -166,24 +181,36 @@ export default function Configuracoes() {
       return;
     }
 
-    let uploadedCnpjUrl = null;
-    if (companyFile) {
-      showToast('⏳ Enviando Cartão CNPJ para o Storage...');
-      const uploadRes = await uploadUserDocument(companyFile, currentUser.uid || currentUser.id, 'cnpj_proof');
-      if (uploadRes.success) {
-        uploadedCnpjUrl = uploadRes.url;
-      }
-    }
+    setSubmittingCompany(true);
+    showToast('⏳ Validando e processando CNPJ...');
 
-    const res = submitCompanyVerification(cnpj, companyFile);
-    if (res.success) {
-      setCompanyVerified(true);
-      if (uploadedCnpjUrl) {
-        updateAuthUser({ cnpjProofUrl: uploadedCnpjUrl });
+    try {
+      let uploadedCnpjUrl = null;
+      if (companyFile) {
+        const uploadRes = await uploadUserDocument(companyFile, currentUser.uid || currentUser.id, 'cnpj_proof');
+        if (uploadRes.success) {
+          uploadedCnpjUrl = uploadRes.url;
+        }
       }
-      showToast('🎉 CNPJ autenticado e documento armazenado no Storage!');
-    } else {
-      showToast(res.error);
+
+      const res = submitCompanyVerification(cnpj, companyFile);
+      if (res.success) {
+        setCompanyVerified(true);
+        const updated = updateAuthUser({
+          cnpj,
+          isVerifiedCompany: true,
+          cnpjProofUrl: uploadedCnpjUrl,
+          companyProofFile: companyFile?.name || 'Cartao_CNPJ.pdf'
+        });
+        if (updated) {
+          setCurrentUser(updated);
+        }
+        showToast('🎉 CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
+      } else {
+        showToast(res.error);
+      }
+    } finally {
+      setSubmittingCompany(false);
     }
   };
 
@@ -488,8 +515,8 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">
-                      <ShieldCheck size={16} /> Enviar Comprovante &amp; Ativar Perfil
+                    <button type="submit" disabled={submittingStudent} className="btn btn-teal btn-sm font-bold shadow-md">
+                      <ShieldCheck size={16} /> {submittingStudent ? 'Autenticando...' : 'Enviar Comprovante & Ativar Perfil'}
                     </button>
                   </div>
                 </form>
@@ -557,8 +584,8 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">
-                      <ShieldCheck size={16} /> Validar CNPJ Empresarial
+                    <button type="submit" disabled={submittingCompany} className="btn btn-primary btn-sm font-bold shadow-md">
+                      <ShieldCheck size={16} /> {submittingCompany ? 'Validando...' : 'Validar CNPJ Empresarial'}
                     </button>
                   </div>
                 </form>
