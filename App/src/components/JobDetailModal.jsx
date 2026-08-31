@@ -4,7 +4,7 @@ import {
   Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, generateWhatsAppLink, calculateMatchScore } from '../lib/ivaiConecta';
+import { applyToJob, generateWhatsAppLink, calculateMatchScore, isSkillMatch } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast } = useAppStore();
@@ -14,7 +14,12 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
   const userSkills = currentUser?.skills || [];
-  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, job.requiredSkills || [], { userCity: currentUser?.city, jobCity: job.city, isVerifiedStudent: currentUser?.isVerifiedStudent }) : null);
+  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+    userCity: currentUser?.city,
+    jobCity: job.city,
+    isVerifiedStudent: currentUser?.isVerifiedStudent,
+    endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
+  }) : null);
 
   const handleApply = () => {
     if (!currentUser) {
@@ -170,7 +175,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5">Habilidades Exigidas</h3>
             <div className="flex flex-wrap gap-2">
               {(job.requiredSkills || []).map(skill => {
-                const isMatched = userSkills.includes(skill);
+                const isMatched = userSkills.some(us => isSkillMatch(us, skill));
                 return (
                   <span key={skill} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
                     isMatched

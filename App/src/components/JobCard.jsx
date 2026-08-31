@@ -12,7 +12,12 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
   // Compute match score if candidate/aluno is logged in
   const userSkills = currentUser?.skills || [];
-  const computedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, { userCity: currentUser.city, jobCity: city, isVerifiedStudent: currentUser.isVerifiedStudent }) : null);
+  const computedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, {
+    userCity: currentUser.city,
+    jobCity: city,
+    isVerifiedStudent: currentUser.isVerifiedStudent,
+    endorsementsCount: (currentUser.endorsements?.length || currentUser.endorsementCount || 0)
+  }) : null);
   const isHighMatch = computedScore >= 75;
 
   const handleClick = (e) => {

@@ -150,7 +150,12 @@ export default function Vagas() {
     return allJobs
       .map(job => {
         const score = canSeeMatch
-          ? calculateMatchScore(userSkills, job.requiredSkills || [], { userCity: currentUser?.city, jobCity: job.city, isVerifiedStudent: currentUser?.isVerifiedStudent })
+          ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+              userCity: currentUser?.city,
+              jobCity: job.city,
+              isVerifiedStudent: currentUser?.isVerifiedStudent,
+              endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
+            })
           : null;
         return { ...job, calculatedScore: score };
       })
