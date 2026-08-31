@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Jobs Collection
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Applications Collection
+    match /applications/{applicationId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // Services Collection
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Talents Collection
+    match /talents/{talentId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Teachers Collection
+    match /teachers/{teacherId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Chats Collection & Subcollections (messages)
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+      
+      match /{allChildren=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Favorites Collection
+    match /favorites/{favoriteId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

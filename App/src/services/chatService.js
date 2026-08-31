@@ -1,4 +1,6 @@
-// Chat & Direct Messaging Service for Ivaí Conecta
+// Chat & Direct Messaging Service for Ivaí Conecta (Firestore + Local Storage Sync)
+import { db } from '../lib/firebase.js';
+import { collection, addDoc, doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 
@@ -59,6 +61,7 @@ export function sendMessageToThread(threadId, senderUser, text) {
     id: `m_${Date.now()}`,
     sender: senderUser?.name || 'Lucas Eduardo Silva',
     senderEmail: senderUser?.email || 'aluno@ivaiconecta.com.br',
+    senderUid: senderUser?.uid || 'guest',
     text,
     timestamp
   };
@@ -74,6 +77,43 @@ export function sendMessageToThread(threadId, senderUser, text) {
   const updatedThreads = [...threads];
   updatedThreads[threadIndex] = updatedThread;
 
-  localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(updatedThreads));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(updatedThreads));
+  }
+
+  // Sincronizar conversa e mensagem no Firestore em tempo real
+  try {
+    const chatDocRef = doc(db, 'chats', threadId);
+    setDoc(chatDocRef, {
+      lastMessage: text,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: new Date().toISOString()
+    }, { merge: true }).catch(() => {});
+
+    addDoc(collection(db, 'chats', threadId, 'messages'), {
+      ...newMsg,
+      createdAt: serverTimestamp()
+    }).catch(() => {});
+  } catch {}
+
   return updatedThread;
+}
+
+/**
+ * Listener em tempo real do Firestore para ler mensagens do chat
+ */
+export function subscribeToFirestoreChat(chatId, callback) {
+  try {
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    return onSnapshot(messagesRef, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      callback(msgs);
+    }, (err) => {
+      console.warn('[Firestore Chat] Erro no listener:', err.message);
+    });
+  } catch (error) {
+    console.warn('[Firestore Chat] Falha ao assinar chat:', error.message);
+    return () => {};
+  }
 }

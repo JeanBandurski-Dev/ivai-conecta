@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   getAuthUser,
+  watchAuthState,
   login as libLogin,
   logout as libLogout,
   register as libRegister,
@@ -14,11 +15,23 @@ import {
 const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
   currentUser: getAuthUser(),
+  authLoading: true,
+  isAuthReady: false,
+
+  initAuthListener: () => {
+    return watchAuthState((user) => {
+      set({
+        currentUser: user,
+        authLoading: false,
+        isAuthReady: true,
+      });
+    });
+  },
 
   login: async (email, password) => {
     const result = await libLogin(email, password);
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -26,7 +39,7 @@ const useAppStore = create((set, get) => ({
   register: async (data) => {
     const result = await libRegister(data);
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -34,7 +47,7 @@ const useAppStore = create((set, get) => ({
   loginWithGoogle: async () => {
     const result = await libLoginGoogle();
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -49,11 +62,11 @@ const useAppStore = create((set, get) => ({
 
   logout: async () => {
     await libLogout();
-    set({ currentUser: null });
+    set({ currentUser: null, authLoading: false });
   },
 
   setCurrentUser: (user) => {
-    set({ currentUser: user });
+    set({ currentUser: user, authLoading: false });
   },
 
   // ─── City State ────────────────────────────────────────

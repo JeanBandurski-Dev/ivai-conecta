@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getServices, addService, updateService, CITIES } from '../lib/ivaiConecta';
+import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
 
 const CATEGORIES = [
@@ -53,7 +54,16 @@ export default function Servicos() {
     if (selectedCity) setCity(selectedCity);
   }, [selectedCity]);
 
-  const all = getServices('Todas as Cidades');
+  const [liveServices, setLiveServices] = useState(() => getServices('Todas as Cidades'));
+
+  useEffect(() => {
+    const unsub = subscribeToServices('Todas as Cidades', (data) => {
+      setLiveServices(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const all = liveServices;
   const myServices = all.filter(s => s.providerName.toLowerCase().includes(currentUser?.name?.toLowerCase().split(' ')[0] || 'marcos') || s.id === 201);
   const currentService = myServices[0] || all[0];
 

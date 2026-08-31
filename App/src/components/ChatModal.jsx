@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageSquare, X, Send, User, Check, Clock, ShieldCheck, Building2 } from 'lucide-react';
 import { getChatThreads, sendMessageToThread } from '../lib/ivaiConecta';
+import { subscribeToFirestoreChat } from '../services/chatService.js';
 import useAppStore from '../store/useAppStore';
 
 export default function ChatModal({ onClose }) {
@@ -10,6 +11,22 @@ export default function ChatModal({ onClose }) {
   const [messageInput, setMessageInput] = useState('');
 
   const activeThread = threads.find(t => t.id === activeThreadId) || threads[0];
+
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const unsub = subscribeToFirestoreChat(activeThreadId, (remoteMsgs) => {
+      if (remoteMsgs && remoteMsgs.length > 0) {
+        setThreads(prev => prev.map(t => {
+          if (t.id === activeThreadId) {
+            const mergedMsgs = [...t.messages, ...remoteMsgs.filter(rm => !t.messages.some(m => m.id === rm.id))];
+            return { ...t, messages: mergedMsgs };
+          }
+          return t;
+        }));
+      }
+    });
+    return () => unsub();
+  }, [activeThreadId]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();

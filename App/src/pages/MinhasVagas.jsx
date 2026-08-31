@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
@@ -10,6 +10,7 @@ import {
   updateJobStatus, getTalents, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest
 } from '../lib/ivaiConecta';
+import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
 
 export default function MinhasVagas() {
@@ -20,8 +21,20 @@ export default function MinhasVagas() {
   const isCompany   = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
 
-  const apps = getUserApplications();
-  const companyJobs = getJobs('Todas as Cidades').filter(j => 
+  const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
+  const [liveApps, setLiveApps] = useState(() => getUserApplications());
+
+  useEffect(() => {
+    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
+    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => setLiveApps(data));
+    return () => {
+      unsubJobs();
+      unsubApps();
+    };
+  }, [currentUser]);
+
+  const apps = liveApps;
+  const companyJobs = liveJobs.filter(j => 
     j.createdBy === currentUser?.uid ||
     j.createdBy === currentUser?.email ||
     (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
