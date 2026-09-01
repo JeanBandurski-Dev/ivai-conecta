@@ -37,6 +37,13 @@ export function getUsersDB() {
       modified = true;
     }
   });
+
+  const authUser = getAuthUser();
+  if (authUser && !users.some(u => u.email.toLowerCase() === authUser.email.toLowerCase())) {
+    users.push(authUser);
+    modified = true;
+  }
+
   if (modified || !raw) {
     localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
   }

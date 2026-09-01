@@ -1,325 +1,289 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  MessageSquare, X, Send, User, Check, Clock, ShieldCheck,
-  Building2, ArrowLeft, Search, Sparkles, MessageCircle, Plus
-} from 'lucide-react';
-import {
-  getChatThreads,
-  sendMessageToThread,
-  subscribeToFirestoreChat,
-  createOrGetDirectThread,
-  markThreadAsRead
-} from '../services/chatService';
+import { MessageSquare, X, Send, Sparkles, Plus, Trash2, Users, ArrowLeft } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
+import {
+  subscribeToUserThreads,
+  subscribeToMessages,
+  sendChatMessage,
+  getChatThreads,
+  deleteChatThread,
+  matchesUserEmail
+} from '../services/chatService';
+import { getUsersDB } from '../lib/ivaiConecta';
 
-const SUGGESTED_CONTACTS = [
-  {
-    name: 'ValeTech Soluções Digitais',
-    role: 'empresa',
-    avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150',
-    subject: 'Desenvolvedor Front-end Junior'
-  },
-  {
-    name: 'Prof. Dr. Ronan Silva',
-    role: 'professor',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-    subject: 'Parecer Pedagógico - Programação'
-  },
-  {
-    name: 'Prof. Dr. Ricardo Oliveira',
-    role: 'professor',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-    subject: 'Desenvolvimento Web & Banco de Dados'
-  },
-  {
-    name: 'Cooperativa Agropecuária do Vale',
-    role: 'empresa',
-    avatar: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=150',
-    subject: 'Assistente Administrativo & Financeiro'
-  }
-];
+function getOtherParticipant(thread, currentUser) {
+  const myEmail = currentUser?.email?.toLowerCase().trim();
+  const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) || thread.lastSenderEmail || '';
+  
+  const name = thread.participantNames?.[otherEmail] || thread.participantName || 'Contato';
+  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+  const role = thread.participantRoles?.[otherEmail] || thread.participantRole || 'Usuário Conectado';
+
+  return { email: otherEmail, name, avatar, role };
+}
 
 export default function ChatModal({ onClose }) {
-  const { currentUser, showToast } = useAppStore();
-  const [threads, setThreads] = useState(() => getChatThreads());
-  const [activeThreadId, setActiveThreadId] = useState(() => threads[0]?.id || null);
+  const { currentUser, activeChatThreadId, startChatWith } = useAppStore();
+
+  const [threads, setThreads] = useState([]);
+  const [activeThreadId, setActiveThreadId] = useState(activeChatThreadId || null);
+  const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showMobileChat, setShowMobileChat] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [mobileShowChat, setMobileShowChat] = useState(Boolean(activeChatThreadId));
+
   const messagesEndRef = useRef(null);
 
-  // Garantir que activeThread exista
-  const activeThread = threads.find(t => t.id === activeThreadId) || threads[0] || null;
-
-  // Auto-scroll para o final das mensagens
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeThread?.messages?.length, activeThreadId]);
+    if (activeChatThreadId) {
+      setActiveThreadId(activeChatThreadId);
+      setMobileShowChat(true);
+    }
+  }, [activeChatThreadId]);
 
-  // Listener do Firestore para a conversa ativa
   useEffect(() => {
-    if (!activeThread?.id) return;
-    const unsub = subscribeToFirestoreChat(activeThread.id, (remoteMsgs) => {
-      if (remoteMsgs && remoteMsgs.length > 0) {
-        setThreads(prev => prev.map(t => {
-          if (t.id === activeThread.id) {
-            const currentMsgs = t.messages || [];
-            const mergedMsgs = [...currentMsgs, ...remoteMsgs.filter(rm => !currentMsgs.some(m => m.id === rm.id))];
-            return { ...t, messages: mergedMsgs };
+    if (!currentUser?.email) return;
+
+    const unsubscribe = subscribeToUserThreads(currentUser.email, (liveChats) => {
+      setThreads(liveChats || []);
+      setLoading(false);
+
+      if (liveChats && liveChats.length > 0) {
+        setActiveThreadId(current => {
+          if (current && liveChats.some(t => t.id === current)) {
+            return current;
           }
-          return t;
-        }));
+          return liveChats[0].id;
+        });
       }
     });
-    return () => unsub();
-  }, [activeThread?.id]);
 
-  const handleSendMessage = (e) => {
-    if (e) e.preventDefault();
-    if (!messageInput.trim() || !activeThread?.id) return;
+    return () => unsubscribe();
+  }, [currentUser?.email]);
 
-    const textToSend = messageInput.trim();
+  useEffect(() => {
+    if (!activeThreadId) {
+      setMessages([]);
+      return;
+    }
+
+    const unsubscribe = subscribeToMessages(activeThreadId, (liveMessages) => {
+      setMessages(liveMessages || []);
+    });
+
+    return () => unsubscribe();
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !activeThreadId) return;
+
+    const text = messageInput.trim();
     setMessageInput('');
+    await sendChatMessage(activeThreadId, currentUser, text);
+  };
 
-    const updated = sendMessageToThread(activeThread.id, currentUser, textToSend);
-    if (updated) {
-      setThreads(getChatThreads());
+  const handleDeleteThread = async (threadId, e) => {
+    e.stopPropagation();
+    await deleteChatThread(threadId);
+    const myEmail = currentUser?.email?.toLowerCase().trim();
+    const all = getChatThreads();
+    const remaining = all.filter(t => t.participants?.some(p => matchesUserEmail(p, myEmail)));
+    setThreads(remaining);
+    if (activeThreadId === threadId) {
+      setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
+      if (remaining.length === 0) setMobileShowChat(false);
     }
   };
 
-  const handleSelectThread = (threadId) => {
-    setActiveThreadId(threadId);
-    markThreadAsRead(threadId);
-    setThreads(getChatThreads());
-    setShowMobileChat(true);
-  };
+  const activeThread = threads.find(t => t.id === activeThreadId);
+  const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
-  const handleStartNewChat = (contact) => {
-    const thread = createOrGetDirectThread(contact, contact.subject);
-    setThreads(getChatThreads());
-    setActiveThreadId(thread.id);
-    setShowMobileChat(true);
-    showToast(`Conversa aberta com ${contact.name}!`);
-  };
-
-  const filteredThreads = threads.filter(t => {
-    if (!searchTerm.trim()) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      (t.participantName && t.participantName.toLowerCase().includes(q)) ||
-      (t.jobTitle && t.jobTitle.toLowerCase().includes(q)) ||
-      (t.lastMessage && t.lastMessage.toLowerCase().includes(q))
-    );
-  });
+  const allUsers = getUsersDB();
+  const myEmail = currentUser?.email?.toLowerCase().trim();
+  const availableContacts = allUsers.filter(u => !matchesUserEmail(u.email, myEmail));
 
   return (
-    <div
-      className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-200"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
-        className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-4xl h-[88vh] sm:h-[82vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-4xl h-[85vh] sm:h-[82vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header Principal */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-primary-dark via-blue-900 to-primary-blue text-white flex items-center justify-between shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center font-bold text-white shadow-inner shrink-0">
-              <MessageSquare size={20} />
+        {/* Header */}
+        <div className="p-4 sm:p-5 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            {mobileShowChat && (
+              <button
+                onClick={() => setMobileShowChat(false)}
+                className="md:hidden p-1.5 -ml-1 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg"
+                title="Voltar às conversas"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div className="w-9 h-9 rounded-xl bg-primary-blue text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <MessageSquare size={18} />
             </div>
-            <div>
-              <h3 className="font-heading font-bold text-base sm:text-lg text-white leading-tight flex items-center gap-2">
+            <div className="min-w-0">
+              <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white leading-tight truncate">
                 Mensagens Diretas &amp; Chat
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Ao Vivo
-                </span>
               </h3>
-              <p className="text-xs text-blue-200 hidden sm:block">
-                Canal seguro e integrado para candidatos, empresas e professores do Vale do Ivaí.
+              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                Logado como: <strong className="text-primary-blue dark:text-blue-400">{currentUser?.name}</strong>
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="Fechar Chat"
-            aria-label="Fechar modal"
-          >
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full text-gray-400 dark:text-slate-400 cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        {/* Corpo do Chat Dividido em 2 Painéis */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-[300px_1fr] overflow-hidden">
-          
-          {/* ── PAINEL ESQUERDO: LISTA DE CONVERSAS ── */}
-          <div className={`flex flex-col border-r border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/60 overflow-hidden ${
-            showMobileChat ? 'hidden md:flex' : 'flex'
-          }`}>
-            
-            {/* Barra de Busca de Contatos */}
-            <div className="p-3 border-b border-gray-100 dark:border-slate-800">
-              <div className="relative flex items-center">
-                <Search size={15} className="absolute left-3 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Buscar conversa ou empresa..."
-                  className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-800 dark:text-white placeholder-gray-400 outline-none focus:border-primary-blue dark:focus:border-blue-400 transition-colors"
-                />
-              </div>
+        {/* Chat Body Responsivo */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-[290px_1fr] overflow-hidden">
+          {/* Painel Esquerdo: Lista de Conversas (Esconde no mobile quando um chat está aberto) */}
+          <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} border-r border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 overflow-y-auto p-3 space-y-2 flex-col h-full`}>
+            <div className="flex items-center justify-between px-1 mb-1">
+              <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase">Conversas Ativas</span>
+              <span className="text-[10px] bg-primary-blue/10 text-primary-blue px-2 py-0.5 rounded-full font-bold">{threads.length}</span>
             </div>
 
-            {/* Lista de Threads */}
-            <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
-              <div className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase px-2 py-1 flex items-center justify-between">
-                <span>Conversas Recentes</span>
-                <span className="text-[10px] font-semibold">{filteredThreads.length}</span>
-              </div>
+            {/* Botão para Nova Conversa */}
+            <button
+              onClick={() => setShowNewChat(!showNewChat)}
+              className="w-full btn btn-sm bg-primary-blue text-white hover:bg-blue-700 font-bold flex items-center justify-center gap-1.5 rounded-xl transition-all shadow-xs cursor-pointer text-xs py-2"
+            >
+              <Plus size={14} /> {showNewChat ? 'Fechar Contatos' : '➕ Nova Conversa'}
+            </button>
 
-              {filteredThreads.length === 0 ? (
-                <div className="text-center py-8 px-4">
-                  <div className="text-3xl mb-2">💬</div>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">Nenhuma conversa encontrada.</p>
+            {/* Modal/Menu para selecionar usuário */}
+            {showNewChat && (
+              <div className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-primary-blue/30 shadow-md space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-[11px] font-bold text-gray-700 dark:text-slate-200 px-1 flex items-center gap-1">
+                  <Users size={12} className="text-primary-blue" /> Iniciar conversa com:
                 </div>
-              ) : (
-                filteredThreads.map(t => {
-                  const isSelected = activeThread?.id === t.id;
-                  return (
-                    <div
-                      key={t.id}
-                      onClick={() => handleSelectThread(t.id)}
-                      className={`p-3 rounded-2xl cursor-pointer transition-all flex items-start gap-3 relative ${
-                        isSelected
-                          ? 'bg-white dark:bg-slate-800 border border-primary-blue/30 shadow-xs ring-1 ring-primary-blue/20'
-                          : 'hover:bg-white/80 dark:hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <img
-                        src={t.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
-                        alt={t.participantName}
-                        className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="font-bold text-xs text-gray-800 dark:text-white truncate">
-                            {t.participantName}
-                          </span>
-                          {t.lastMessageAt && (
-                            <span className="text-[10px] text-gray-400 dark:text-slate-500 shrink-0">
-                              {t.lastMessageAt.split(' - ')[1] || t.lastMessageAt}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] font-semibold text-primary-blue dark:text-blue-400 truncate">
-                          {t.jobTitle}
-                        </div>
-                        <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">
-                          {t.lastMessage}
-                        </div>
-                      </div>
-
-                      {t.unreadCount > 0 && (
-                        <span className="w-2 h-2 rounded-full bg-primary-blue absolute top-3 right-3 animate-pulse" />
-                      )}
-                    </div>
-                  );
-                })
-              )}
-
-              {/* Sugestões Rápidas para Iniciar Conversa */}
-              <div className="pt-3 mt-3 border-t border-gray-100 dark:border-slate-800">
-                <div className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase px-2 mb-2 flex items-center gap-1">
-                  <Sparkles size={12} className="text-amber-500" /> Iniciar Nova Conversa
-                </div>
-                <div className="space-y-1">
-                  {SUGGESTED_CONTACTS.map((c, i) => (
+                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                  {availableContacts.map(c => (
                     <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleStartNewChat(c)}
-                      className="w-full p-2 rounded-xl text-left hover:bg-white dark:hover:bg-slate-800 transition-colors flex items-center gap-2 text-xs text-gray-700 dark:text-slate-300 cursor-pointer"
+                      key={c.email}
+                      onClick={() => {
+                        startChatWith(c, 'Contato Direto');
+                        setShowNewChat(false);
+                        setMobileShowChat(true);
+                      }}
+                      className="w-full text-left p-2 rounded-xl hover:bg-primary-blue/10 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer border border-transparent hover:border-primary-blue/20"
                     >
-                      <img src={c.avatar} alt={c.name} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                      <span className="truncate font-medium flex-1">{c.name}</span>
-                      <Plus size={13} className="text-primary-blue dark:text-blue-400 shrink-0" />
+                      <img src={c.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={c.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{c.name}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{c.email}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
+            )}
 
-            </div>
+            {loading ? (
+              <div className="p-6 text-center text-xs text-gray-400">Carregando conversas...</div>
+            ) : threads.length === 0 ? (
+              <div className="p-5 text-center space-y-2 bg-white dark:bg-slate-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 my-auto">
+                <p className="text-xs font-medium text-gray-500 dark:text-slate-400">Nenhuma conversa ativa.</p>
+                <p className="text-[11px] text-gray-400 dark:text-slate-500">Clique em "+ Nova Conversa" acima!</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 flex-1 overflow-y-auto">
+                {threads.map(t => {
+                  const other = getOtherParticipant(t, currentUser);
+                  const isSelected = t.id === activeThreadId;
+
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        setActiveThreadId(t.id);
+                        setMobileShowChat(true);
+                      }}
+                      className={`group p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 relative ${
+                        isSelected
+                          ? 'bg-white dark:bg-slate-800 border border-primary-blue/40 shadow-xs'
+                          : 'hover:bg-gray-100 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                      <div className="min-w-0 flex-1 pr-5">
+                        <div className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</div>
+                        <div className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate">{t.contextTitle || 'Chat Direto'}</div>
+                        <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">{t.lastMessage || 'Conversa iniciada'}</div>
+                      </div>
+
+                      <button
+                        onClick={(e) => handleDeleteThread(t.id, e)}
+                        title="Remover conversa"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-all absolute top-2.5 right-2"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* ── PAINEL DIREITO: VISUALIZAÇÃO DA CONVERSA E ENVIO ── */}
-          <div className={`flex flex-col h-full bg-white dark:bg-slate-900 overflow-hidden ${
-            showMobileChat ? 'flex' : 'hidden md:flex'
-          }`}>
-            
-            {activeThread ? (
-              <>
-                {/* Header da Conversa Ativa */}
-                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Botão de Voltar no Mobile */}
-                    <button
-                      type="button"
-                      onClick={() => setShowMobileChat(false)}
-                      className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 md:hidden cursor-pointer shrink-0"
-                      aria-label="Voltar para a lista"
-                    >
-                      <ArrowLeft size={18} />
-                    </button>
-
-                    <img
-                      src={activeThread.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
-                      alt={activeThread.participantName}
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white"
-                    />
-
-                    <div className="min-w-0">
-                      <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
-                        <span className="truncate">{activeThread.participantName}</span>
-                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.2 rounded-full shrink-0">
+          {/* Painel Direito: Mensagens (Exibe no mobile quando chat estiver ativo) */}
+          <div className={`${!mobileShowChat ? 'hidden md:flex' : 'flex'} flex-col h-full bg-white dark:bg-slate-900 overflow-hidden`}>
+            {activeThread && otherPerson ? (
+              <div className="flex flex-col h-full">
+                {/* Header do Chat Ativo */}
+                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/30 dark:bg-slate-800/30 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <img src={otherPerson.avatar} alt={otherPerson.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                    <div>
+                      <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                        {otherPerson.name}
+                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">
                           Online
                         </span>
                       </div>
-                      <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate">
-                        {activeThread.participantRole} · {activeThread.jobTitle}
+                      <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
+                        <span>{otherPerson.role}</span>
+                        <span>·</span>
+                        <span>{activeThread.contextTitle || 'Chat Regional'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Área de Mensagens (Scroll) */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[#F8FAFC] dark:bg-slate-950/50">
-                  {(activeThread.messages || []).length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="text-4xl mb-2">👋</div>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">
-                        Envie a primeira mensagem para iniciar a conversa!
-                      </p>
+                {/* Lista de Mensagens */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/20 dark:bg-slate-900/40">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400">
+                      <Sparkles className="text-primary-blue mb-2" size={24} />
+                      <p className="text-xs font-semibold text-gray-600 dark:text-slate-300">Início da conversa com {otherPerson.name}</p>
+                      <p className="text-[11px]">Envie uma mensagem abaixo para começar a conversar!</p>
                     </div>
                   ) : (
-                    (activeThread.messages || []).map((m, idx) => {
-                      const isMe =
-                        (m.senderEmail && currentUser?.email && m.senderEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
-                        (m.sender && currentUser?.name && m.sender.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
-                        m.senderUid === currentUser?.uid;
+                    messages.map((m, idx) => {
+                      const isMe = matchesUserEmail(m.senderEmail, currentUser?.email);
 
                       return (
                         <div key={m.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                          <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-1 px-1 flex items-center gap-1.5">
-                            <span>{m.sender || 'Usuário'}</span>
-                            {m.timestamp && <span>· {m.timestamp}</span>}
+                          <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-1 px-1">
+                            {m.senderName || m.sender} · {m.timestamp}
                           </div>
-                          <div className={`max-w-[82%] sm:max-w-[70%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
-                            isMe
-                              ? 'bg-primary-blue text-white rounded-br-xs shadow-sm font-medium'
-                              : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-bl-xs border border-gray-200 dark:border-slate-700 shadow-xs'
-                          }`}>
+                          <div
+                            className={`max-w-[85%] sm:max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                              isMe
+                                ? 'bg-primary-blue text-white rounded-br-xs shadow-xs font-medium'
+                                : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
+                            }`}
+                          >
                             {m.text}
                           </div>
                         </div>
@@ -329,47 +293,60 @@ export default function ChatModal({ onClose }) {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Formulário de Envio de Mensagem */}
-                <form
-                  onSubmit={handleSendMessage}
-                  className="p-3 sm:p-4 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900 shrink-0"
-                >
+                {/* Formulário de Envio */}
+                <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2 shrink-0">
                   <input
                     type="text"
                     value={messageInput}
                     onChange={e => setMessageInput(e.target.value)}
-                    placeholder={`Mensagem para ${activeThread.participantName}...`}
-                    className="form-control text-xs sm:text-sm flex-1 py-2.5"
-                    autoFocus
+                    placeholder={`Mensagem para ${otherPerson.name}...`}
+                    className="flex-1 input input-bordered text-sm py-2 px-3 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue"
                   />
                   <button
                     type="submit"
                     disabled={!messageInput.trim()}
-                    className="btn btn-primary btn-sm font-bold shrink-0 flex items-center gap-1.5 px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    className="btn btn-primary btn-sm px-4 rounded-xl flex items-center gap-1.5 font-bold cursor-pointer disabled:opacity-50"
                   >
-                    <Send size={15} />
-                    <span className="hidden sm:inline">Enviar</span>
+                    <Send size={15} /> <span className="hidden sm:inline">Enviar</span>
                   </button>
                 </form>
-              </>
+              </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-primary-blue dark:text-blue-400 mb-4 text-2xl">
-                  💬
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-white dark:bg-slate-900">
+                <div className="w-14 h-14 rounded-2xl bg-primary-blue/10 text-primary-blue flex items-center justify-center mb-1">
+                  <MessageSquare size={28} />
                 </div>
-                <h4 className="font-heading font-bold text-base text-gray-800 dark:text-white mb-1">
-                  Nenhuma conversa selecionada
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-slate-400 max-w-xs mb-4">
-                  Escolha uma conversa na barra lateral ou inicie um novo contato direto com empresas e professores.
-                </p>
+                <div>
+                  <h4 className="font-heading font-bold text-base text-gray-900 dark:text-white">Nenhuma conversa selecionada</h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-sm">
+                    Escolha um contato à esquerda ou selecione um abaixo para começar:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-md pt-2">
+                  {availableContacts.slice(0, 4).map(contact => (
+                    <button
+                      key={contact.email}
+                      onClick={() => {
+                        startChatWith(contact, 'Contato Geral');
+                        setMobileShowChat(true);
+                      }}
+                      className="p-3 bg-gray-50 dark:bg-slate-800/80 hover:bg-primary-blue/5 dark:hover:bg-primary-blue/10 border border-gray-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group"
+                    >
+                      <img src={contact.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={contact.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-xs text-gray-900 dark:text-white truncate group-hover:text-primary-blue transition-colors">
+                          {contact.name}
+                        </div>
+                        <div className="text-[10px] text-gray-400 dark:text-slate-400 truncate">{contact.email}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-
           </div>
-
         </div>
-
       </div>
     </div>
   );

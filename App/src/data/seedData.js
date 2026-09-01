@@ -627,5 +627,7 @@ export const DEFAULT_USERS = [
       { degree: 'Bacharelado em Design Gráfico', institution: 'UEL', year: '2014', period: '2010 à 2014' }
     ],
     classes: ['Design de Interfaces UX/UI', 'Tipografia e Identidade de Marca']
-  }
+  },
+  { id: 'usr_simas', email: 'turbosimas@gmail.com', password: '123', name: 'SimasTurbo', city: 'Ivaiporã', role: 'empresa', badge: 'Empresa / Recrutador', avatar: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150', isVerifiedCompany: true },
+  { id: 'usr_aluno_teste', email: 'emailaluno@gmail.com', password: '123', name: 'AlunoTeste', city: 'Ivaiporã', role: 'aluno', badge: 'Estudante', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150' }
 ];

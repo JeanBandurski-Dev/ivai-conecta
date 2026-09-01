@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, CheckCircle, ShieldCheck,
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
-  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload
+  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
 } from 'lucide-react';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
@@ -23,7 +23,7 @@ export default function PerfilAluno() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const talentId = id || currentUser?.uid || currentUser?.id || '1';
   const talent = getTalentById(talentId) || {
@@ -392,6 +392,23 @@ export default function PerfilAluno() {
 
             {/* Coluna de Botões Perfeitamente Alinhados à Direita */}
             <div className="flex flex-col sm:items-end gap-2.5 shrink-0 w-full sm:w-auto">
+              {/* Botão de Chat Direto (visível para quem está visitando o perfil) */}
+              {!isOwner && (
+                <button
+                  onClick={() => {
+                    startChatWith({
+                      name: talent.name,
+                      email: talent.email || 'aluno@ivaiconecta.com.br',
+                      role: 'aluno',
+                      avatar: talent.avatar || ''
+                    }, `Contato Direto: Perfil de ${talent.name}`);
+                  }}
+                  className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com {talent.name.split(' ')[0]}
+                </button>
+              )}
+
               {/* 1. Baixar Currículo em PDF */}
               <button
                 onClick={() => setPdfModalOpen(true)}
