@@ -3,7 +3,13 @@ import {
   MessageSquare, X, Send, User, Check, Clock, ShieldCheck,
   Building2, ArrowLeft, Search, Sparkles, MessageCircle, Plus
 } from 'lucide-react';
-import { getChatThreads, sendMessageToThread, subscribeToFirestoreChat, createOrGetDirectThread } from '../services/chatService';
+import {
+  getChatThreads,
+  sendMessageToThread,
+  subscribeToFirestoreChat,
+  createOrGetDirectThread,
+  markThreadAsRead
+} from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 
 const SUGGESTED_CONTACTS = [
@@ -83,6 +89,8 @@ export default function ChatModal({ onClose }) {
 
   const handleSelectThread = (threadId) => {
     setActiveThreadId(threadId);
+    markThreadAsRead(threadId);
+    setThreads(getChatThreads());
     setShowMobileChat(true);
   };
 

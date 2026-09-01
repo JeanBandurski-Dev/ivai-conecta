@@ -168,6 +168,29 @@ export function sendMessageToThread(threadId, senderUser, text) {
   return updatedThread;
 }
 
+export function getUnreadChatCount() {
+  const threads = getChatThreads();
+  return threads.reduce((acc, t) => acc + (Number(t.unreadCount) || 0), 0);
+}
+
+export function markThreadAsRead(threadId) {
+  const threads = getChatThreads();
+  const updated = threads.map(t => (t.id === threadId ? { ...t, unreadCount: 0 } : t));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+export function markAllThreadsAsRead() {
+  const threads = getChatThreads();
+  const updated = threads.map(t => ({ ...t, unreadCount: 0 }));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(updated));
+  }
+  return updated;
+}
+
 /**
  * Listener em tempo real do Firestore para ler mensagens do chat
  */

@@ -7,15 +7,27 @@ import {
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
 import ChatModal from '../ChatModal';
+import { getUnreadChatCount, markAllThreadsAsRead } from '../../services/chatService';
 
 export default function Navbar() {
   const { currentUser, selectedCity, cities, setCity, logout, showToast, theme, toggleTheme } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(() => getUnreadChatCount());
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setUnreadCount(getUnreadChatCount());
+  }, [showChatModal]);
+
+  const handleOpenChat = () => {
+    setShowChatModal(true);
+    markAllThreadsAsRead();
+    setUnreadCount(0);
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -90,15 +102,17 @@ export default function Navbar() {
               {/* Chat Button */}
               {currentUser && (
                 <button
-                  onClick={() => setShowChatModal(true)}
+                  onClick={handleOpenChat}
                   className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative"
                   title="Mensagens & Chat"
                   aria-label="Abrir chat"
                 >
                   <MessageSquare size={18} />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-blue text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    1
-                  </span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-blue text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
                 </button>
               )}
 
