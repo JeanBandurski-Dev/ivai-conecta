@@ -401,4 +401,95 @@
     scrollbar-width: none;
   }
 }
+/* =========================================================
+   RESPONSIVIDADE - IVAÍ CONECTA
+   ========================================================= */
 
+/* Tablets e telas menores */
+@media (max-width: 768px) {
+
+  /* Container */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Seções */
+  .section {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+
+  /* Títulos */
+  .section-title {
+    font-size: 1.7rem;
+  }
+
+  /* Cabeçalho das seções */
+  .section-header {
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Botões */
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-lg {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  /* Cards */
+  .card {
+    padding: 1.1rem;
+    border-radius: 1rem;
+  }
+
+  /* Grid */
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Celulares */
+@media (max-width: 480px) {
+
+  html {
+    font-size: 15px;
+  }
+
+  .container {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+
+  .section {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+  }
+
+  .section-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .btn-sm {
+    width: auto;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+}
