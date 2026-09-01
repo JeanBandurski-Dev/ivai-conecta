@@ -105,6 +105,48 @@ export function updateService(id, serviceData) {
   return updated;
 }
 
+export const WHATSAPP_MESSAGE_TEMPLATES = [
+  {
+    id: 'orcamento',
+    title: 'Solicitar Orçamento',
+    icon: '💰',
+    description: 'Pedir valores e condições para execução de serviço',
+    generate: (providerName, category, city, custom) =>
+      `Olá ${providerName}! Vi seu serviço de "${category}" (${city}) no portal Ivaí Conecta e gostaria de solicitar um orçamento sem compromisso.${custom ? `\n\n📌 Detalhes do serviço: ${custom}` : ''}`
+  },
+  {
+    id: 'disponibilidade',
+    title: 'Consultar Horário / Disponibilidade',
+    icon: '📅',
+    description: 'Saber dias e horários livres para atendimento na região',
+    generate: (providerName, category, city, custom) =>
+      `Olá ${providerName}! Encontrei seu contato no Ivaí Conecta. Gostaria de saber qual sua disponibilidade para atendimento em ${city}.${custom ? `\n\n🗓️ Preferência de data/horário: ${custom}` : ''}`
+  },
+  {
+    id: 'urgente',
+    title: 'Atendimento de Emergência / Urgente',
+    icon: '⚡',
+    description: 'Serviço prioritário para o mesmo dia ou manutenção 24h',
+    generate: (providerName, category, city, custom) =>
+      `Olá ${providerName}! Preciso de um atendimento urgente em ${city} para "${category}". Você teria disponibilidade imediata ou para hoje?${custom ? `\n\n⚠️ Situação: ${custom}` : ''}`
+  },
+  {
+    id: 'duvida',
+    title: 'Tirar Dúvida Rápida',
+    icon: '❓',
+    description: 'Perguntar sobre materiais, cobertura e suporte técnico',
+    generate: (providerName, category, city, custom) =>
+      `Olá ${providerName}! Vi seu perfil no Ivaí Conecta e tenho uma dúvida rápida sobre o serviço de ${category} em ${city}.${custom ? `\n\n💬 Minha dúvida: ${custom}` : ''}`
+  }
+];
+
+export function generateWhatsAppServiceLink(phone, providerName, category, city, templateId = 'orcamento', customText = '') {
+  const cleanPhone = phone ? phone.replace(/\D/g, '') : '5543999887766';
+  const tmpl = WHATSAPP_MESSAGE_TEMPLATES.find(t => t.id === templateId) || WHATSAPP_MESSAGE_TEMPLATES[0];
+  const msg = tmpl.generate(providerName, category, city, customText);
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+}
+
 export function generateWhatsAppLink(phone, title, company, city) {
   const cleanPhone = phone ? phone.replace(/\D/g, '') : '5543999887766';
   const text = encodeURIComponent(
