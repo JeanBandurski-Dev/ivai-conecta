@@ -2,17 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, MapPin
+  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
-import ChatModal from '../ChatModal';
 
 export default function Navbar() {
-  const { currentUser, selectedCity, cities, setCity, logout, showToast, theme, toggleTheme } = useAppStore();
+  const { currentUser, theme, toggleTheme, logout, showToast, openChat } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -35,21 +33,19 @@ export default function Navbar() {
     setShowLogoutModal(false);
     closeMobile();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/');
+    navigate('/login');
   };
 
   const navLinkClass = ({ isActive }) =>
-    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${
-      isActive
-        ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
-        : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
+    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${isActive
+      ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
+      : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
     }`;
 
   const mobileNavLinkClass = ({ isActive }) =>
-    `block px-4 py-3 rounded-xl text-base font-semibold transition-colors duration-200 ${
-      isActive
-        ? 'bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-400'
-        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
+    `block px-4 py-3 rounded-xl text-base font-semibold transition-colors duration-200 ${isActive
+      ? 'bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-400'
+      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
     }`;
 
   const getProfileLink = () => {
@@ -84,33 +80,19 @@ export default function Navbar() {
               <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
             </ul>
 
-            {/* Right actions: City Selector, Theme Switcher & User / Auth */}
+            {/* Right actions: Theme Switcher & User / Auth */}
             <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-auto md:ml-0">
-              
-              {/* Desktop City Selector */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800 text-xs font-semibold shadow-xs">
-                <MapPin size={13} className="text-primary-blue dark:text-blue-400 shrink-0" />
-                <select
-                  value={selectedCity}
-                  onChange={e => setCity(e.target.value)}
-                  className="bg-transparent text-gray-700 dark:text-slate-200 text-xs font-bold outline-none cursor-pointer"
-                >
-                  {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
-                </select>
-              </div>
 
-              {/* Chat Button */}
+              {/* Chat Button com indicador */}
               {currentUser && (
                 <button
-                  onClick={() => setShowChatModal(true)}
+                  onClick={() => openChat()}
                   className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative"
                   title="Mensagens & Chat"
                   aria-label="Abrir chat"
                 >
                   <MessageSquare size={18} />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-blue text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    1
-                  </span>
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-blue rounded-full ring-2 ring-white dark:ring-slate-800"></span>
                 </button>
               )}
 
@@ -172,6 +154,13 @@ export default function Navbar() {
                           <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
                             <Briefcase size={15} /> Minhas Candidaturas
+                          </Link>
+                        )}
+
+                        {currentUser.role === 'professor' && (
+                          <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
+                            <Star size={15} /> Pareceres e Recomendações
                           </Link>
                         )}
 
@@ -249,17 +238,6 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
             <div className="container py-4 space-y-1">
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-3">
-                <span className="text-gray-400 text-sm">📍</span>
-                <select
-                  value={selectedCity}
-                  onChange={e => setCity(e.target.value)}
-                  className="bg-transparent text-gray-700 dark:text-slate-200 text-sm font-medium outline-none cursor-pointer flex-1"
-                >
-                  {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
-                </select>
-              </div>
-
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Dashboard</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>
@@ -288,9 +266,30 @@ export default function Navbar() {
                     <span className="flex items-center gap-2.5"><User size={16} /> Meu Perfil</span>
                   </NavLink>
 
+                  <button
+                    onClick={() => { closeMobile(); openChat(); }}
+                    className={mobileNavLinkClass}
+                    >
+                      <span className='flex items-center gap-2.5'>
+                        <MessageSquare size={16} /> Mensagens &amp; Chat
+                      </span>
+                    </button>
+
                   {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
                     <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><Briefcase size={16} /> Minhas Candidaturas</span>
+                    </NavLink>
+                  )}
+
+                  {currentUser.role === 'professor' && (
+                    <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Star size={16} /> Pareceres e Recomendações</span>
+                    </NavLink>
+                  )}
+
+                  {currentUser.role === 'empresa' && (
+                    <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Building2 size={16} /> Minhas Vagas Criadas</span>
                     </NavLink>
                   )}
 
@@ -327,10 +326,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
-      {/* Chat Modal */}
-      {showChatModal && (
-        <ChatModal onClose={() => setShowChatModal(false)} />
-      )}
+    
     </>
   );
 }

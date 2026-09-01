@@ -1,10 +1,25 @@
-import { Star, MessageCircle } from 'lucide-react';
-import { generateWhatsAppLink } from '../lib/ivaiConecta';
+import { Star, MessageSquare } from 'lucide-react';
+import useAppStore from '../store/useAppStore';
 
 export default function ServiceCard({ service }) {
-  const { providerName, category, city, phone, rating, reviewsCount, badge, description } = service;
+  const { providerName, category, city, rating, reviewsCount, badge, description, providerEmail, avatar } = service;
+  const { currentUser, showToast, startChatWith } = useAppStore();
 
-  const waLink = generateWhatsAppLink(phone, category, providerName, city);
+  const handleContact = async () => {
+    if (!currentUser) {
+      showToast('Faça login para conversar com o prestador de serviço!');
+      return;
+    }
+
+    const targetEmail = providerEmail || `${providerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+
+    await startChatWith({
+      name: providerName,
+      email: targetEmail,
+      role: 'freelancer',
+      avatar: avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
+    }, `Serviço: ${category}`);
+  };
 
   return (
     <div className="card gap-3">
@@ -30,15 +45,14 @@ export default function ServiceCard({ service }) {
 
       {/* Action */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
-        <a
-          href={waLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-whatsapp btn-sm w-full text-xs gap-1.5"
+        <button
+          type="button"
+          onClick={handleContact}
+          className="btn btn-primary btn-sm w-full text-xs gap-1.5 cursor-pointer font-bold"
         >
-          <MessageCircle size={13} />
-          Contatar via WhatsApp
-        </a>
+          <MessageSquare size={14} />
+          Conversar no Chat
+        </button>
       </div>
     </div>
   );

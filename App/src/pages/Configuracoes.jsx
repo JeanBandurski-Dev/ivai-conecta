@@ -3,13 +3,28 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, Globe, FileText, Check, AlertTriangle, Trash2
+  Building2, Globe, FileText, Check, AlertTriangle, Trash2, Camera
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { updateAuthUser, submitStudentVerification, submitCompanyVerification } from '../lib/ivaiConecta';
+import {
+  updateAuthUser,
+  submitStudentVerification,
+  submitCompanyVerification,
+  uploadUserProfilePicture,
+  uploadUserDocument
+} from '../lib/ivaiConecta';
+
+const AVATAR_PRESETS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
+];
 
 export default function Configuracoes() {
-  const { currentUser, logout, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, logout, showToast } = useAppStore();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('account'); // 'account', 'verification', 'company', 'security', 'privacy'
@@ -19,6 +34,8 @@ export default function Configuracoes() {
   const [email, setEmail] = useState(currentUser?.email || '');
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
   const [github, setGithub] = useState(currentUser?.github || '');
+  const [avatar, setAvatar] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Verification form (Student)
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
@@ -48,10 +65,33 @@ export default function Configuracoes() {
     );
   }
 
+  const [submittingStudent, setSubmittingStudent] = useState(false);
+  const [submittingCompany, setSubmittingCompany] = useState(false);
+
+  const handleAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    showToast('⏳ Processando foto de perfil...');
+    try {
+      const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
+      if (res.success) {
+        setAvatar(res.url);
+        setCurrentUser({ ...currentUser, avatar: res.url });
+        showToast('📸 Foto de perfil salva com sucesso!');
+      } else {
+        showToast(`⚠️ ${res.error || 'Erro ao enviar imagem.'}`);
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSaveAccount = (e) => {
     e.preventDefault();
-    updateAuthUser({ name, email, linkedin, github });
-    showToast('Dados da conta e redes sociais atualizados!');
+    updateAuthUser({ name, email, linkedin, github, avatar });
+    setCurrentUser({ ...currentUser, name, email, linkedin, github, avatar });
+    showToast('Dados da conta e foto atualizados com sucesso!');
   };
 
   // Student file drop / select
@@ -91,7 +131,7 @@ export default function Configuracoes() {
     }
   };
 
-  const handleVerificationSubmit = (e) => {
+  const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     if (!raNumber.trim()) {
       showToast('Por favor, informe seu RA / Número de Matrícula.');
@@ -101,27 +141,76 @@ export default function Configuracoes() {
       showToast('Por favor, selecione o arquivo PDF ou imagem da sua declaração de matrícula.');
       return;
     }
-    const res = submitStudentVerification(raNumber, selectedFile);
-    if (res.success) {
-      setVerificationSubmitted(true);
-      updateAuthUser({ isVerifiedStudent: true, raNumber });
-      showToast('🎉 Declaração enviada! Sua conta de aluno foi autenticada e seu perfil está VISÍVEL.');
+
+    setSubmittingStudent(true);
+    showToast('⏳ Processando e autenticando declaração...');
+
+    try {
+      let uploadedDocUrl = null;
+      if (selectedFile) {
+        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
+        if (uploadRes.success) {
+          uploadedDocUrl = uploadRes.url;
+        }
+      }
+
+      const res = submitStudentVerification(raNumber, selectedFile);
+      if (res.success) {
+        setVerificationSubmitted(true);
+        const updated = updateAuthUser({
+          isVerifiedStudent: true,
+          raNumber,
+          studentProofUrl: uploadedDocUrl,
+          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
+        });
+        if (updated) {
+          setCurrentUser(updated);
+        }
+        showToast('🎉 Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
+      }
+    } finally {
+      setSubmittingStudent(false);
     }
   };
 
   // Company CNPJ Submission
-  const handleCompanyVerificationSubmit = (e) => {
+  const handleCompanyVerificationSubmit = async (e) => {
     e.preventDefault();
     if (!cnpj.trim()) {
       showToast('Por favor, informe o CNPJ da empresa.');
       return;
     }
-    const res = submitCompanyVerification(cnpj, companyFile);
-    if (res.success) {
-      setCompanyVerified(true);
-      showToast('🎉 CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
-    } else {
-      showToast(res.error);
+
+    setSubmittingCompany(true);
+    showToast('⏳ Validando e processando CNPJ...');
+
+    try {
+      let uploadedCnpjUrl = null;
+      if (companyFile) {
+        const uploadRes = await uploadUserDocument(companyFile, currentUser.uid || currentUser.id, 'cnpj_proof');
+        if (uploadRes.success) {
+          uploadedCnpjUrl = uploadRes.url;
+        }
+      }
+
+      const res = submitCompanyVerification(cnpj, companyFile);
+      if (res.success) {
+        setCompanyVerified(true);
+        const updated = updateAuthUser({
+          cnpj,
+          isVerifiedCompany: true,
+          cnpjProofUrl: uploadedCnpjUrl,
+          companyProofFile: companyFile?.name || 'Cartao_CNPJ.pdf'
+        });
+        if (updated) {
+          setCurrentUser(updated);
+        }
+        showToast('🎉 CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
+      } else {
+        showToast(res.error);
+      }
+    } finally {
+      setSubmittingCompany(false);
     }
   };
 
@@ -143,7 +232,7 @@ export default function Configuracoes() {
   const handleLogout = () => {
     logout();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/');
+    navigate('/login');
   };
 
   return (
@@ -242,6 +331,35 @@ export default function Configuracoes() {
               </div>
 
               <form onSubmit={handleSaveAccount} className="space-y-4">
+                {/* Foto de Perfil / Avatar com Firebase Storage */}
+                <div className="bg-gray-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700/80 flex flex-wrap items-center gap-5">
+                  <div className="relative shrink-0">
+                    <img
+                      src={avatar}
+                      alt={name}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white"
+                    />
+                    {uploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
+                        Enviando...
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 flex-1 min-w-[200px]">
+                    <div className="font-bold text-sm text-gray-900 dark:text-white">Foto do Perfil</div>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                      Envie uma imagem JPG, PNG ou WEBP (máx. 5MB) para salvar no Firebase Storage.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5">
+                        <Camera size={13} /> {uploadingAvatar ? 'Enviando foto...' : 'Escolher Arquivo do PC'}
+                        <input type="file" accept="image/*" onChange={handleAvatarFile} disabled={uploadingAvatar} className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Nome Completo / Razão Social</label>
                   <input
@@ -397,8 +515,8 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">
-                      <ShieldCheck size={16} /> Enviar Comprovante &amp; Ativar Perfil
+                    <button type="submit" disabled={submittingStudent} className="btn btn-teal btn-sm font-bold shadow-md">
+                      <ShieldCheck size={16} /> {submittingStudent ? 'Autenticando...' : 'Enviar Comprovante & Ativar Perfil'}
                     </button>
                   </div>
                 </form>
@@ -466,8 +584,8 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">
-                      <ShieldCheck size={16} /> Validar CNPJ Empresarial
+                    <button type="submit" disabled={submittingCompany} className="btn btn-primary btn-sm font-bold shadow-md">
+                      <ShieldCheck size={16} /> {submittingCompany ? 'Validando...' : 'Validar CNPJ Empresarial'}
                     </button>
                   </div>
                 </form>

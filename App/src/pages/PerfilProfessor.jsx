@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Award, Building2, MapPin, CheckCircle2, ShieldCheck,
-  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2
+  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare
 } from 'lucide-react';
 import { getTeacherById, getTeacherEndorsedStudents, updateTeacherProfile } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
@@ -11,27 +11,33 @@ import useAppStore from '../store/useAppStore';
 export default function PerfilProfessor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
 
-  const teacherId = id || 'prof_1';
-  const teacher = getTeacherById(teacherId);
-  const endorsedStudents = getTeacherEndorsedStudents(teacher.email);
+  const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id || 'prof_1') : 'prof_1');
+  const teacher = getTeacherById(teacherId) || {};
+  const endorsedStudents = getTeacherEndorsedStudents(teacher?.email);
 
-  const isOwner = currentUser && (currentUser.role === 'professor' || currentUser.email === teacher.email);
+  const isOwner = Boolean(
+    currentUser && (
+      (currentUser.email && teacher?.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(teacher?.id) || String(currentUser.uid) === String(teacher?.firestoreId))) ||
+      (currentUser.id != null && String(currentUser.id) === String(teacher?.id))
+    )
+  );
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);
 
   // Edit form state
   const [editData, setEditData] = useState({
-    name: teacher.name,
-    avatar: teacher.avatar,
-    degree: teacher.degree || 'Doutor em Ciência da Computação (UFPR)',
-    institution: teacher.institution,
-    discipline: teacher.discipline,
-    bio: teacher.bio || '',
-    classes: [...(teacher.classes || [])],
-    education: [...(teacher.education || [
+    name: teacher?.name || 'Prof. Dr. Ronan Silva',
+    avatar: teacher?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    degree: teacher?.degree || 'Doutor em Ciência da Computação (UFPR)',
+    institution: teacher?.institution || 'IFPR Campus Ivaiporã',
+    discipline: teacher?.discipline || 'Programação de Computadores & Redes',
+    bio: teacher?.bio || '',
+    classes: [...(teacher?.classes || [])],
+    education: [...(teacher?.education || [
       { degree: 'Doutorado em Ciência da Computação', institution: 'Universidade Federal do Paraná (UFPR)', period: '2026 à 2030' },
       { degree: 'Mestrado em Engenharia Elétrica & Computação', institution: 'Universidade Estadual de Londrina (UEL)', period: '2022 à 2025' },
       { degree: 'Bacharelado em Ciência da Computação', institution: 'Universidade Estadual de Maringá (UEM)', period: '2017 à 2021' }
@@ -130,10 +136,26 @@ export default function PerfilProfessor() {
               </div>
             </div>
 
-            {isOwner && (
+            {isOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil Acadêmico
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    startChatWith({
+                      name: teacher.name,
+                      email: teacher.email,
+                      role: 'professor',
+                      avatar: teacher.avatar || ''
+                    }, `Orientação Acadêmica: ${teacher.discipline}`);
+                  }}
+                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Falar com o Docente
                 </button>
               </div>
             )}

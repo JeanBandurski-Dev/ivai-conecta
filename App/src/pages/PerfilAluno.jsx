@@ -3,9 +3,9 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, CheckCircle, ShieldCheck,
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
-  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload
+  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent } from '../lib/ivaiConecta';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -23,11 +23,11 @@ export default function PerfilAluno() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
-  const talentId = id || currentUser?.id || '1';
+  const talentId = id || currentUser?.uid || currentUser?.id || '1';
   const talent = getTalentById(talentId) || {
-    id: currentUser?.id || 1,
+    id: currentUser?.uid || currentUser?.id || 1,
     name: currentUser?.name || 'Lucas Eduardo Silva',
     course: currentUser?.course || 'Análise e Desenvolvimento de Sistemas',
     institution: currentUser?.institution || 'IFPR Campus Ivaiporã',
@@ -55,10 +55,11 @@ export default function PerfilAluno() {
     ]
   };
 
-  // Permissão estrita do proprietário: id, e-mail ou nome correspondente entre o usuário logado e o perfil
+  // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
     currentUser && talent && (
       (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
       (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
       (currentUser.name && talent.name && currentUser.name.trim().toLowerCase() === talent.name.trim().toLowerCase())
     )
@@ -141,15 +142,17 @@ export default function PerfilAluno() {
     }
   };
 
-  const handleAvatarFileChange = (e) => {
+  const handleAvatarFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditData(d => ({ ...d, avatar: reader.result }));
-        showToast('📸 Nova foto de perfil selecionada com sucesso!');
-      };
-      reader.readAsDataURL(file);
+      showToast('⏳ Enviando foto para o Firebase Storage...');
+      const res = await uploadUserProfilePicture(file, currentUser?.uid || talent?.id);
+      if (res.success) {
+        setEditData(d => ({ ...d, avatar: res.url }));
+        showToast('📸 Foto de perfil salva na nuvem com sucesso!');
+      } else {
+        showToast(`⚠️ ${res.error || 'Erro ao enviar foto.'}`);
+      }
     }
   };
 
@@ -389,6 +392,23 @@ export default function PerfilAluno() {
 
             {/* Coluna de Botões Perfeitamente Alinhados à Direita */}
             <div className="flex flex-col sm:items-end gap-2.5 shrink-0 w-full sm:w-auto">
+              {/* Botão de Chat Direto (visível para quem está visitando o perfil) */}
+              {!isOwner && (
+                <button
+                  onClick={() => {
+                    startChatWith({
+                      name: talent.name,
+                      email: talent.email || 'aluno@ivaiconecta.com.br',
+                      role: 'aluno',
+                      avatar: talent.avatar || ''
+                    }, `Contato Direto: Perfil de ${talent.name}`);
+                  }}
+                  className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com {talent.name.split(' ')[0]}
+                </button>
+              )}
+
               {/* 1. Baixar Currículo em PDF */}
               <button
                 onClick={() => setPdfModalOpen(true)}

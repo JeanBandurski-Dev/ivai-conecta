@@ -3,30 +3,31 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, TrendingUp, Eye, Target, Award, Sparkles
+  BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera, MessageSquare
 } from 'lucide-react';
-import { getJobs } from '../lib/ivaiConecta';
+import { getJobs, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilEmpresa() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [company, setCompany] = useState({
     name:     currentUser?.name || 'ValeTech Soluções Digitais',
     city:     currentUser?.city || 'Ivaiporã',
-    sector:   'Tecnologia da Informação & Inovação',
-    size:     '11-50 funcionários',
-    cnpj:     '12.345.678/0001-90',
+    sector:   currentUser?.sector || 'Tecnologia da Informação & Inovação',
+    size:     currentUser?.size || '11-50 funcionários',
+    cnpj:     currentUser?.cnpj || '12.345.678/0001-90',
     rating:   4.9,
     reviews:  28,
     logo:     currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
-    about:    'Empresa de tecnologia e consultoria digital com sede em Ivaiporã. Desenvolvemos softwares sob medida, portais web e impulsionamos a transformação digital de indústrias, cooperativas e comércios em todo o Vale do Ivaí.',
-    history:  'Fundada em 2018 por egressos de cursos de tecnologia da região, a ValeTech nasceu com o propósito de reter talentos locais e gerar oportunidades de trabalho para estudantes universitários.',
-    perks:    ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido', 'Participação nos Lucros (PPR)', 'Auxílio Educação & Cursos', 'Ambiente de Inovação'],
+    about:    currentUser?.about || 'Empresa de tecnologia e consultoria digital com sede em Ivaiporã. Desenvolvemos softwares sob medida, portais web e impulsionamos a transformação digital de indústrias, cooperativas e comércios em todo o Vale do Ivaí.',
+    history:  currentUser?.history || 'Fundada em 2018 por egressos de cursos de tecnologia da região, a ValeTech nasceu com o propósito de reter talentos locais e gerar oportunidades de trabalho para estudantes universitários.',
+    perks:    currentUser?.perks || ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido', 'Participação nos Lucros (PPR)', 'Auxílio Educação & Cursos', 'Ambiente de Inovação'],
   });
 
   const jobs = getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]));
@@ -46,9 +47,42 @@ export default function PerfilEmpresa() {
 
   const maxViews = Math.max(...viewsPerDay.map(v => v.views));
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    showToast('⏳ Enviando logotipo para o Firebase Storage...');
+    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id || 'empresa_1');
+    setUploadingLogo(false);
+    if (res.success) {
+      setCompany(c => ({ ...c, logo: res.url }));
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, avatar: res.url });
+      }
+      showToast('📸 Logotipo atualizado e salvo no Storage com sucesso!');
+    } else {
+      showToast(`⚠️ ${res.error || 'Erro ao enviar logotipo.'}`);
+    }
+  };
+
   const handleSaveCompany = (e) => {
     e.preventDefault();
     setEditModal(false);
+    updateAuthUser({
+      name: company.name,
+      sector: company.sector,
+      about: company.about,
+      avatar: company.logo
+    });
+    if (currentUser) {
+      setCurrentUser({
+        ...currentUser,
+        name: company.name,
+        sector: company.sector,
+        about: company.about,
+        avatar: company.logo
+      });
+    }
     showToast('Dados da empresa atualizados com sucesso!');
   };
 
@@ -93,7 +127,7 @@ export default function PerfilEmpresa() {
               </div>
             </div>
 
-            {isCompanyOwner && (
+            {isCompanyOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil da Empresa
@@ -101,6 +135,25 @@ export default function PerfilEmpresa() {
                 <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
                   <Building2 size={15} /> Gerenciar Minhas Vagas
                 </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    const companyEmail = company.email || 
+                      (company.name.toLowerCase().includes('simas') ? 'turbosimas@gmail.com' : 'empresa@ivaiconecta.com.br');
+                    
+                    startChatWith({
+                      name: company.name,
+                      email: companyEmail,
+                      role: 'empresa',
+                      avatar: company.logo
+                    }, `Contato com Empresa: ${company.name}`);
+                  }}
+                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                </button>
               </div>
             )}
           </div>
@@ -302,6 +355,30 @@ export default function PerfilEmpresa() {
             </div>
 
             <form onSubmit={handleSaveCompany} className="space-y-4">
+              {/* Logotipo da Empresa */}
+              <div className="bg-gray-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700/80 flex items-center gap-4">
+                <div className="relative shrink-0">
+                  <img
+                    src={company.logo}
+                    alt={company.name}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white"
+                  />
+                  {uploadingLogo && (
+                    <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
+                      ...
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="font-bold text-xs text-gray-900 dark:text-white">Logotipo da Empresa</div>
+                  <p className="text-[11px] text-gray-500 dark:text-slate-400">Envie a imagem oficial da empresa (JPG/PNG).</p>
+                  <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 mt-1">
+                    <Camera size={13} /> {uploadingLogo ? 'Enviando...' : 'Alterar Logotipo'}
+                    <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">Razão Social / Nome Fantasia</label>
                 <input

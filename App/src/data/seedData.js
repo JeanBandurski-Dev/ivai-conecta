@@ -347,9 +347,287 @@ export const SEED_APPLICATIONS = [
 ];
 
 export const DEFAULT_USERS = [
-  { id: 1, email: 'aluno@ivaiconecta.com.br', password: '123456', name: 'Lucas Eduardo Silva', city: 'Ivaiporã', role: 'aluno', badge: 'Estudante (IFPR Campus Ivaiporã)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150', skills: ['JavaScript', 'HTML5/CSS3', 'React', 'Node.js', 'Git', 'SQL'], isVerifiedStudent: true, raNumber: 'IFPR-2024-8891', linkedin: 'https://linkedin.com/in/lucas-eduardo-dev', github: 'https://github.com/lucas-dev' },
-  { id: 201, email: 'freelancer@ivaiconecta.com.br', password: '123456', name: 'Marcos Eletricista & Automação', city: 'Ivaiporã', role: 'freelancer', badge: 'Prestador de Serviço Autônomo', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150', skills: ['Instalações Elétricas', 'Automação Industrial', 'Comandos Elétricos'] },
-  { id: 2, email: 'candidato@ivaiconecta.com.br', password: '123456', name: 'Beatriz Santos', city: 'Jardim Alegre', role: 'candidato', badge: 'Candidato / Profissional', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250', skills: ['Gestão Financeira', 'Excel Avançado', 'Marketing Digital', 'ERP', 'Atendimento ao Cliente'], linkedin: 'https://linkedin.com/in/beatriz-santos-adm', github: 'https://github.com/beatriz-santos-adm' },
-  { id: 101, email: 'empresa@ivaiconecta.com.br', password: '123456', name: 'ValeTech Soluções Digitais', city: 'Ivaiporã', role: 'empresa', badge: 'Empresa / Recrutador', avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150', skills: [], isVerifiedCompany: true, cnpj: '12.345.678/0001-90' },
-  { id: 'prof_1', email: 'professor@ivaiconecta.com.br', password: '123456', name: 'Prof. Dr. Ronan Silva', city: 'Ivaiporã', role: 'professor', badge: 'Docente (IFPR Campus Ivaiporã)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150', institution: 'IFPR Campus Ivaiporã', discipline: 'Programação de Computadores & Redes', degree: 'Doutor em Ciência da Computação (UFPR)' },
+  {
+    id: 1,
+    email: 'aluno@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Lucas Eduardo Silva',
+    city: 'Ivaiporã',
+    role: 'aluno',
+    badge: 'Estudante (IFPR Campus Ivaiporã)',
+    course: 'Análise e Desenvolvimento de Sistemas',
+    institution: 'IFPR Campus Ivaiporã',
+    period: '5º Semestre (Vespertino)',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    skills: ['JavaScript', 'HTML5/CSS3', 'React', 'Node.js', 'Git', 'SQL'],
+    isVerifiedStudent: true,
+    raNumber: 'IFPR-2024-8891',
+    linkedin: 'https://linkedin.com/in/lucas-eduardo-dev',
+    github: 'https://github.com/lucas-dev',
+    bio: 'Estudante de ADS apaixonado por desenvolvimento web e mobile. Busco oportunidade de estágio ou vaga junior na região de Ivaiporã.',
+    experiences: [
+      { id: 'exp1', role: 'Estagiário de TI', company: 'Prefeitura de Ivaiporã', period: 'Jan/2025 - Atual', description: 'Desenvolvimento de telas responsivas e suporte a banco de dados MySQL para o portal público.' },
+      { id: 'exp2', role: 'Monitor de Programação', company: 'IFPR Campus Ivaiporã', period: 'Mar/2024 - Dez/2024', description: 'Auxílio aos alunos ingressantes nas disciplinas de Lógica e Estrutura de Dados.' }
+    ],
+    projects: [
+      { id: 'proj1', title: 'Ivaí Conecta - Plataforma Regional', tech: 'React, Node, Tailwind', link: 'https://github.com/lucas-dev/ivai-conecta', description: 'Sistema de ponte de empregabilidade regional para o Vale do Ivaí.' }
+    ],
+    education: [
+      { degree: 'Análise e Desenvolvimento de Sistemas', institution: 'IFPR Campus Ivaiporã', period: '2024 - 2026' }
+    ],
+    endorsements: [
+      { id: 'end_01', profName: 'Prof. Dr. Ricardo Oliveira', profEmail: 'ricardo.oliveira@ifpr.edu.br', institution: 'IFPR Campus Ivaiporã', discipline: 'Desenvolvimento Web & Banco de Dados', quote: 'Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.', isVerified: true },
+      { id: 'end_02', profName: 'Prof. Dr. Ronan Silva', profEmail: 'ronan.silva@ifpr.edu.br', institution: 'IFPR Campus Ivaiporã', discipline: 'Programação de Computadores & Redes', quote: 'Excelente aluno, destaque na resolução de algoritmos e desenvolvimento prático.', isVerified: true }
+    ]
+  },
+  {
+    id: 2,
+    email: 'candidato@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Beatriz Santos',
+    city: 'Jardim Alegre',
+    role: 'candidato',
+    badge: 'Candidato / Profissional',
+    course: 'Administração',
+    institution: 'Univale Ivaiporã',
+    period: '7º Semestre',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
+    skills: ['Gestão Financeira', 'Excel Avançado', 'Marketing Digital', 'ERP', 'Atendimento ao Cliente'],
+    isVerifiedStudent: true,
+    raNumber: 'UNIVALE-2023-4122',
+    linkedin: 'https://linkedin.com/in/beatriz-santos-adm',
+    github: 'https://github.com/beatriz-santos-adm',
+    bio: 'Estudante de Administração com foco em controle orçamentário e rotinas financeiras empresariais.',
+    experiences: [],
+    projects: [],
+    education: [
+      { degree: 'Graduação em Administração', institution: 'Univale Ivaiporã', period: '2023 - 2026' }
+    ],
+    endorsements: [
+      { id: 'end_03', profName: 'Prof. Carlos Alberto Ramos', profEmail: 'carlos.ramos@univale.edu.br', institution: 'Univale Ivaiporã', discipline: 'Gestão Financeira e Orçamentária', quote: 'Extremamente dedicada, responsável e proativa na solução de casos de gestão empresarial.', isVerified: true }
+    ]
+  },
+  {
+    id: 3,
+    email: 'matheus@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Matheus Henrique',
+    city: 'São João do Ivaí',
+    role: 'aluno',
+    badge: 'Estudante (IFPR Campus Ivaiporã)',
+    course: 'Técnico em Eletrotécnica',
+    institution: 'IFPR Campus Ivaiporã',
+    period: '4º Módulo',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+    skills: ['Instalações Elétricas', 'Automação Industrial', 'Comandos Elétricos', 'AutoCAD', 'NR-10'],
+    isVerifiedStudent: true,
+    raNumber: 'IFPR-2024-9912',
+    linkedin: 'https://linkedin.com/in/matheus-henrique-eletro',
+    github: 'https://github.com/matheus-henrique-dev',
+    bio: 'Estudante técnico focado em comandos e automação industrial.',
+    experiences: [],
+    projects: [],
+    education: [
+      { degree: 'Técnico em Eletrotécnica', institution: 'IFPR Campus Ivaiporã', period: '2024 - 2025' }
+    ],
+    endorsements: [
+      { id: 'end_04', profName: 'Prof. Eng. Fernando Souza', profEmail: 'fernando.souza@ifpr.edu.br', institution: 'IFPR Campus Ivaiporã', discipline: 'Instalações Elétricas Industriais', quote: 'Profissional técnico com excelente visão de segurança e precisão em diagramas unifilares.', isVerified: true }
+    ]
+  },
+  {
+    id: 4,
+    email: 'camila@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Camila Fernandes',
+    city: 'Manoel Ribas',
+    role: 'aluno',
+    badge: 'Estudante (UENP)',
+    course: 'Design Gráfico & Mídias',
+    institution: 'UENP / Unicesumar',
+    period: '6º Semestre',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
+    skills: ['Figma', 'Photoshop', 'Branding', 'UI/UX Design', 'Social Media'],
+    isVerifiedStudent: true,
+    raNumber: 'UENP-2023-5510',
+    linkedin: 'https://linkedin.com/in/camila-design',
+    github: 'https://github.com/camila-fernandes-design',
+    bio: 'Designer digital focada em experiência do usuário e marcas autênticas.',
+    experiences: [],
+    projects: [],
+    education: [
+      { degree: 'Design Gráfico', institution: 'UENP', period: '2023 - 2026' }
+    ],
+    endorsements: [
+      { id: 'end_05', profName: 'Profª. Dra. Vanessa Martins', profEmail: 'vanessa.martins@uenp.edu.br', institution: 'UENP', discipline: 'Identidade Visual & Experiência do Usuário', quote: 'Camila possui um olhar estético apurado e cria identidades visuais memoráveis para o comércio regional.', isVerified: true }
+    ]
+  },
+  {
+    id: 5,
+    email: 'rafael@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Rafael Gomes Costa',
+    city: 'Ivaiporã',
+    role: 'aluno',
+    badge: 'Estudante (UENP)',
+    course: 'Engenharia de Software',
+    institution: 'UENP',
+    period: '8º Semestre',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+    skills: ['Python', 'Django', 'PostgreSQL', 'Docker', 'REST APIs', 'Git'],
+    isVerifiedStudent: true,
+    raNumber: 'UENP-2024-1189',
+    linkedin: 'https://linkedin.com/in/rafael-costa-eng',
+    github: 'https://github.com/rafael-costa',
+    bio: 'Futuro engenheiro de software focado em microsserviços e bancos relacionais.',
+    experiences: [],
+    projects: [],
+    education: [
+      { degree: 'Engenharia de Software', institution: 'UENP', period: '2022 - 2026' }
+    ],
+    endorsements: [
+      { id: 'end_06', profName: 'Prof. Dr. André Luciano', profEmail: 'andre.luciano@uenp.edu.br', institution: 'UENP', discipline: 'Engenharia de Software Avançada', quote: 'Rafael demonstra maturidade técnica rara para um estudante, com projetos de backend robustos e bem documentados.', isVerified: true }
+    ]
+  },
+  {
+    id: 101,
+    email: 'empresa@ivaiconecta.com.br',
+    password: '123456',
+    name: 'ValeTech Soluções Digitais',
+    city: 'Ivaiporã',
+    role: 'empresa',
+    badge: 'Empresa / Recrutador',
+    avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
+    skills: [],
+    isVerifiedCompany: true,
+    cnpj: '12.345.678/0001-90',
+    sector: 'Tecnologia da Informação & Inovação',
+    size: '11-50 funcionários',
+    about: 'Empresa de tecnologia e consultoria digital com sede em Ivaiporã.',
+    history: 'Fundada em 2018 para impulsionar talentos regionais.',
+    perks: ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido']
+  },
+  {
+    id: 201,
+    email: 'freelancer@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Marcos Eletricista & Automação',
+    city: 'Ivaiporã',
+    role: 'freelancer',
+    badge: 'Prestador de Serviço Autônomo',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+    skills: ['Instalações Elétricas', 'Automação Industrial', 'Comandos Elétricos'],
+    category: 'Construção & Manutenção',
+    phone: '5543999887766',
+    rating: 4.9,
+    reviewsCount: 38,
+    bio: 'Serviços residenciais e comerciais, padrões Copel e manutenção emergencial.'
+  },
+  {
+    id: 'prof_1',
+    email: 'professor@ivaiconecta.com.br',
+    password: '123456',
+    name: 'Prof. Dr. Ronan Silva',
+    city: 'Ivaiporã',
+    role: 'professor',
+    badge: 'Docente (IFPR Campus Ivaiporã)',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    institution: 'IFPR Campus Ivaiporã',
+    discipline: 'Programação de Computadores & Redes',
+    degree: 'Doutor em Ciência da Computação (UFPR)',
+    endorsementCount: 18,
+    verified: true,
+    bio: 'Professor de Engenharia e Análise de Sistemas no IFPR Campus Ivaiporã. Atua no desenvolvimento de projetos práticos e orientação de alunos para o mercado de trabalho regional.',
+    education: [
+      { degree: 'Doutorado em Ciência da Computação', institution: 'Universidade Federal do Paraná (UFPR)', year: '2020', period: '2016 à 2020' },
+      { degree: 'Mestrado em Engenharia Elétrica & Computação', institution: 'Universidade Estadual de Londrina (UEL)', year: '2016', period: '2014 à 2016' },
+      { degree: 'Bacharelado em Ciência da Computação', institution: 'Universidade Estadual de Maringá (UEM)', year: '2013', period: '2009 à 2013' }
+    ],
+    classes: ['Lógica de Programação I', 'Redes de Computadores', 'Estrutura de Dados em C/Python']
+  },
+  {
+    id: 'prof_2',
+    email: 'ricardo.oliveira@ifpr.edu.br',
+    password: '123456',
+    name: 'Prof. Dr. Ricardo Oliveira',
+    city: 'Ivaiporã',
+    role: 'professor',
+    badge: 'Docente (IFPR Campus Ivaiporã)',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+    institution: 'IFPR Campus Ivaiporã',
+    discipline: 'Desenvolvimento Web & Banco de Dados',
+    degree: 'Doutor em Engenharia de Software (UNICAMP)',
+    endorsementCount: 24,
+    verified: true,
+    bio: 'Docente e pesquisador com mais de 12 anos de experiência em banco de dados relacionais e aplicações web modernas.',
+    education: [
+      { degree: 'Doutorado em Engenharia de Software', institution: 'UNICAMP', year: '2018', period: '2014 à 2018' },
+      { degree: 'Bacharelado em Sistemas de Informação', institution: 'UTFPR', year: '2012', period: '2008 à 2012' }
+    ],
+    classes: ['Desenvolvimento Web I & II', 'Banco de Dados Relacional MySQL/PostgreSQL']
+  },
+  {
+    id: 'prof_3',
+    email: 'amanda.costa@ifpr.edu.br',
+    password: '123456',
+    name: 'Profª. Ma. Amanda Costa',
+    city: 'Ivaiporã',
+    role: 'professor',
+    badge: 'Docente (IFPR Campus Ivaiporã)',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
+    institution: 'IFPR Campus Ivaiporã',
+    discipline: 'Engenharia de Software & Metodologias Ágeis',
+    degree: 'Mestre em Engenharia de Software (UTFPR)',
+    endorsementCount: 15,
+    verified: true,
+    bio: 'Especialista em metodologias ágeis Scrum/Kanban e qualidade de software. Mentora de grupos de inovação acadêmica.',
+    education: [
+      { degree: 'Mestrado em Engenharia de Software', institution: 'UTFPR', year: '2019', period: '2017 à 2019' },
+      { degree: 'Bacharelado em Ciência da Computação', institution: 'UENP', year: '2015', period: '2011 à 2015' }
+    ],
+    classes: ['Metodologias Ágeis & Scrum', 'Arquitetura de Software', 'Gestão de Projetos de TI']
+  },
+  {
+    id: 'prof_4',
+    email: 'carlos.ramos@univale.edu.br',
+    password: '123456',
+    name: 'Prof. Carlos Alberto Ramos',
+    city: 'Ivaiporã',
+    role: 'professor',
+    badge: 'Docente (Univale Ivaiporã)',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+    institution: 'Univale Ivaiporã',
+    discipline: 'Gestão Financeira e Orçamentária',
+    degree: 'Especialista em Gestão Financeira & Controladoria (FEA/USP)',
+    endorsementCount: 12,
+    verified: true,
+    bio: 'Consultor empresarial e professor do curso de Administração na Univale. Orientador de empresas juniores.',
+    education: [
+      { degree: 'Especialização em Controladoria', institution: 'FEA/USP', year: '2017', period: '2015 à 2017' },
+      { degree: 'Graduação em Administração de Empresas', institution: 'Univale', year: '2011', period: '2007 à 2011' }
+    ],
+    classes: ['Análise de Balanço & DRE', 'Planejamento Orçamentário Empresarial']
+  },
+  {
+    id: 'prof_5',
+    email: 'vanessa.martins@uenp.edu.br',
+    password: '123456',
+    name: 'Profª. Dra. Vanessa Martins',
+    city: 'Ivaiporã',
+    role: 'professor',
+    badge: 'Docente (UENP)',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250',
+    institution: 'UENP Campus Jacarezinho / Ivaiporã',
+    discipline: 'Identidade Visual & UX/UI',
+    degree: 'Doutora em Design & Comunicação Visual (UFSC)',
+    endorsementCount: 9,
+    verified: true,
+    bio: 'Pesquisadora em experiência do usuário e design de interfaces para aplicativos móveis e web.',
+    education: [
+      { degree: 'Doutorado em Design', institution: 'UFSC', year: '2021', period: '2017 à 2021' },
+      { degree: 'Bacharelado em Design Gráfico', institution: 'UEL', year: '2014', period: '2010 à 2014' }
+    ],
+    classes: ['Design de Interfaces UX/UI', 'Tipografia e Identidade de Marca']
+  },
+  { id: 'usr_simas', email: 'turbosimas@gmail.com', password: '123', name: 'SimasTurbo', city: 'Ivaiporã', role: 'empresa', badge: 'Empresa / Recrutador', avatar: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150', isVerifiedCompany: true },
+  { id: 'usr_aluno_teste', email: 'emailaluno@gmail.com', password: '123', name: 'AlunoTeste', city: 'Ivaiporã', role: 'aluno', badge: 'Estudante', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150' }
 ];

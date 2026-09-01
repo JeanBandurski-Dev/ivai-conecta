@@ -1,6 +1,8 @@
+import { getOrCreateChat } from '../services/chatService';
 import { create } from 'zustand';
 import {
   getAuthUser,
+  watchAuthState,
   login as libLogin,
   logout as libLogout,
   register as libRegister,
@@ -14,11 +16,23 @@ import {
 const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
   currentUser: getAuthUser(),
+  authLoading: true,
+  isAuthReady: false,
+
+  initAuthListener: () => {
+    return watchAuthState((user) => {
+      set({
+        currentUser: user,
+        authLoading: false,
+        isAuthReady: true,
+      });
+    });
+  },
 
   login: async (email, password) => {
     const result = await libLogin(email, password);
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -26,7 +40,7 @@ const useAppStore = create((set, get) => ({
   register: async (data) => {
     const result = await libRegister(data);
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -34,7 +48,7 @@ const useAppStore = create((set, get) => ({
   loginWithGoogle: async () => {
     const result = await libLoginGoogle();
     if (result.success) {
-      set({ currentUser: result.user });
+      set({ currentUser: result.user, authLoading: false });
     }
     return result;
   },
@@ -49,11 +63,11 @@ const useAppStore = create((set, get) => ({
 
   logout: async () => {
     await libLogout();
-    set({ currentUser: null });
+    set({ currentUser: null, authLoading: false });
   },
 
   setCurrentUser: (user) => {
-    set({ currentUser: user });
+    set({ currentUser: user, authLoading: false });
   },
 
   // ─── City State ────────────────────────────────────────
@@ -121,6 +135,48 @@ const useAppStore = create((set, get) => ({
 
   // ─── Toast State ──────────────────────────────────────
   toasts: [],
+
+  // ─── Chat Global State ────────────────────────────────
+  isChatOpen: false,
+  activeChatThreadId: null,
+
+  // Abre o modal do chat. Se passar um threadId, já seleciona aquela conversa
+  openChat: (threadId = null) => {
+    set({
+      isChatOpen: true,
+      ...(threadId ? { activeChatThreadId: threadId } : {})
+    });
+  },
+
+  // Fecha o modal do chat
+  closeChat: () => {
+    set({ isChatOpen: false });
+  },
+
+  // Inicia ou recupera uma conversa com outro usuário e já abre a janela
+  startChatWith: async (targetUser, contextTitle = 'Contato Direto') => {
+    const currentUser = get().currentUser;
+    if (!currentUser) {
+      get().showToast('Faça login para iniciar uma conversa!');
+      return null;
+    }
+
+    try {
+      // Chama a função que já temos no chatService para criar o ID único da conversa no Firestore
+      const chatId = await getOrCreateChat(currentUser, targetUser, contextTitle);
+
+      // Abre o modal apontando exatamente para esse chat criado
+      set({
+        isChatOpen: true,
+        activeChatThreadId: chatId
+      });
+      return chatId;
+    } catch (error) {
+      console.error('Erro ao iniciar chat: ', error);
+      get().showToast('Não foi possível abrir o chat no momento.');
+      return null;
+    }
+  },
 
   showToast: (message, duration = 3500) => {
     const id = Date.now();

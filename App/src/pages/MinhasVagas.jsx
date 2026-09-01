@@ -1,27 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText
+  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, ShieldCheck, CheckCircle2,
+  Award, Send, UserCheck, Check, X, FileText, MessageSquare
 } from 'lucide-react';
 import {
-  getUserApplications, generateWhatsAppLink, getJobs,
+  getUserApplications, getJobs,
   updateJobStatus, getTalents, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest
 } from '../lib/ivaiConecta';
+import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
 
 export default function MinhasVagas() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
   const [, forceUpdate] = useState(0);
 
   const isCompany   = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
 
-  const apps = getUserApplications();
-  const companyJobs = getJobs('Todas as Cidades').filter(j => 
+  const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
+  const [liveApps, setLiveApps] = useState(() => getUserApplications());
+
+  useEffect(() => {
+    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
+    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => setLiveApps(data));
+    return () => {
+      unsubJobs();
+      unsubApps();
+    };
+  }, [currentUser]);
+
+  const apps = liveApps;
+  const companyJobs = liveJobs.filter(j => 
     j.createdBy === currentUser?.uid ||
     j.createdBy === currentUser?.email ||
     (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
@@ -31,7 +44,7 @@ export default function MinhasVagas() {
   
   // Teacher endorsement requests state
   const requests = getEndorsementRequests();
-  const teacherRequests = requests.filter(r => r.profEmail.toLowerCase() === currentUser?.email?.toLowerCase() || currentUser?.role === 'professor');
+  const teacherRequests = requests.filter(r => (r.profEmail && currentUser?.email && r.profEmail.toLowerCase() === currentUser.email.toLowerCase()) || currentUser?.role === 'professor');
   const [customQuote, setCustomQuote] = useState({});
 
   // Selected job to view applicants (for company view)
@@ -73,9 +86,9 @@ export default function MinhasVagas() {
 
   // Demo candidates list for company view
   const demoApplicants = [
-    { id: 1, name: 'Lucas Eduardo Silva', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
-    { id: 2, name: 'Juliana Aparecida Melo', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
-    { id: 3, name: 'Rafael Gomes Costa', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
+    { id: 1, name: 'Lucas Eduardo Silva', email: 'aluno@ivaiconecta.com.br', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
+    { id: 2, name: 'Juliana Aparecida Melo', email: 'juliana.melo@ifpr.edu.br', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
+    { id: 3, name: 'Rafael Gomes Costa', email: 'rafael.costa@uenp.br', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
   ];
 
   return (
@@ -314,7 +327,6 @@ export default function MinhasVagas() {
             ) : (
               <div className="space-y-6 max-w-4xl mx-auto">
                 {apps.map(app => {
-                  const waLink = generateWhatsAppLink(app.recruiterPhone, app.title, app.company, app.city);
                   return (
                     <div key={app.id} className="card gap-4 p-5 sm:p-6">
                       {/* Top */}
@@ -376,11 +388,27 @@ export default function MinhasVagas() {
                       )}
 
                       {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
                         <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
-                        <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp btn-sm text-xs font-bold">
-                          <Phone size={13} /> Contatar Recrutador no WhatsApp
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const targetEmail = app.company?.toLowerCase().includes('simas')
+                                ? 'turbosimas@gmail.com'
+                                : 'empresa@ivaiconecta.com.br';
+
+                              startChatWith({
+                                name: app.company,
+                                email: targetEmail,
+                                role: 'empresa',
+                                avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                              }, `Candidatura: ${app.title}`);
+                            }}
+                            className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <MessageSquare size={13} /> Conversar no Chat
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -420,21 +448,27 @@ export default function MinhasVagas() {
                     <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">{cand.course} · Inscrito em {cand.appliedAt}</div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        startChatWith({
+                          name: cand.name,
+                          email: cand.email || 'aluno@ivaiconecta.com.br',
+                          role: 'aluno',
+                          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                        }, `Processo Seletivo: ${selectedJobApplicants.title}`);
+                        setSelectedJobApplicants(null);
+                      }}
+                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageSquare size={13} /> Chat com o Candidato
+                    </button>
                     <button
                       onClick={() => navigate(`/perfil/${cand.id}`)}
                       className="btn btn-outline btn-sm text-xs font-bold"
                     >
                       <Eye size={13} /> Ver Currículo
                     </button>
-                    <a
-                      href={`https://wa.me/${cand.phone}?text=${encodeURIComponent(`Olá ${cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-whatsapp btn-sm text-xs font-bold"
-                    >
-                      <Phone size={13} /> WhatsApp
-                    </a>
                   </div>
                 </div>
               ))}

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
+import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
 
@@ -60,7 +61,16 @@ export default function Vagas() {
   const [newSalary,     setNewSalary]     = useState('A combinar');
   const [newDesc,       setNewDesc]       = useState('');
 
-  const allJobs = useMemo(() => getJobs('Todas as Cidades'), [refreshKey]);
+  const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
+
+  useEffect(() => {
+    const unsub = subscribeToJobs('Todas as Cidades', (data) => {
+      setLiveJobs(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const allJobs = liveJobs;
   const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
 
   // Check jobId param in URL
@@ -102,6 +112,7 @@ export default function Vagas() {
       description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
       requiredSkills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : ['Comunicação', 'Trabalho em Equipe'],
       recruiterPhone: currentUser?.phone || '5543999887766',
+      recruiterEmail: currentUser?.email || 'empresa@ivaiconecta.com.br',
       createdBy: currentUser?.uid || currentUser?.email || 'empresa',
     };
 
@@ -140,7 +151,12 @@ export default function Vagas() {
     return allJobs
       .map(job => {
         const score = canSeeMatch
-          ? calculateMatchScore(userSkills, job.requiredSkills || [], { userCity: currentUser?.city, jobCity: job.city, isVerifiedStudent: currentUser?.isVerifiedStudent })
+          ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+              userCity: currentUser?.city,
+              jobCity: job.city,
+              isVerifiedStudent: currentUser?.isVerifiedStudent,
+              endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
+            })
           : null;
         return { ...job, calculatedScore: score };
       })

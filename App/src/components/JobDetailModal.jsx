@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, generateWhatsAppLink, calculateMatchScore } from '../lib/ivaiConecta';
+import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const [applied, setApplied] = useState(false);
 
   if (!job) return null;
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
   const userSkills = currentUser?.skills || [];
-  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, job.requiredSkills || [], { userCity: currentUser?.city, jobCity: job.city, isVerifiedStudent: currentUser?.isVerifiedStudent }) : null);
+  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+    userCity: currentUser?.city,
+    jobCity: job.city,
+    isVerifiedStudent: currentUser?.isVerifiedStudent,
+    endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
+  }) : null);
 
   const handleApply = () => {
     if (!currentUser) {
@@ -30,7 +35,34 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     }
   };
 
-  const waLink = generateWhatsAppLink(job.recruiterPhone || '5543999887766', job.title, job.company, job.city);
+  const handleOpenChat = async () => {
+    if (!currentUser) {
+      showToast('Faça login como Aluno ou Candidato para conversar com a empresa!');
+      return;
+    }
+
+    // Busca o email real da empresa no banco de usuários
+    const allUsers = getUsersDB();
+    const companyUser = allUsers.find(u => 
+      u.name?.toLowerCase().trim() === job.company?.toLowerCase().trim() ||
+      (job.createdBy && u.email?.toLowerCase().trim() === job.createdBy?.toLowerCase().trim())
+    );
+
+    const targetEmail = companyUser?.email || 
+      (job.recruiterEmail && job.recruiterEmail.includes('@') ? job.recruiterEmail : null) || 
+      (job.createdBy && job.createdBy.includes('@') ? job.createdBy : null) || 
+      (job.company ? `${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+
+    const companyTarget = {
+      name: job.company,
+      email: targetEmail,
+      role: 'empresa',
+      avatar: job.companyLogo || companyUser?.avatar || ''
+    };
+
+    onClose();
+    await startChatWith(companyTarget, `Vaga: ${job.title}`);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -170,7 +202,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5">Habilidades Exigidas</h3>
             <div className="flex flex-wrap gap-2">
               {(job.requiredSkills || []).map(skill => {
-                const isMatched = userSkills.includes(skill);
+                const isMatched = userSkills.some(us => isSkillMatch(us, skill));
                 return (
                   <span key={skill} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
                     isMatched
@@ -194,14 +226,13 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-whatsapp btn-sm text-xs font-bold"
+            <button
+              type="button"
+              onClick={handleOpenChat}
+              className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <PhoneCall size={14} /> Contatar no WhatsApp
-            </a>
+              <MessageSquare size={14} /> Conversar no Chat
+            </button>
 
             {applied ? (
               <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5">
