@@ -102,6 +102,7 @@ export default function Vagas() {
       description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
       requiredSkills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : ['Comunicação', 'Trabalho em Equipe'],
       recruiterPhone: currentUser?.phone || '5543999887766',
+      recruiterEmail: currentUser?.email || 'empresa@ivaiconecta.com.br',
       createdBy: currentUser?.uid || currentUser?.email || 'empresa',
     };
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Award, Building2, MapPin, CheckCircle2, ShieldCheck,
-  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2
+  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare
 } from 'lucide-react';
 import { getTeacherById, getTeacherEndorsedStudents, updateTeacherProfile } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
@@ -11,7 +11,7 @@ import useAppStore from '../store/useAppStore';
 export default function PerfilProfessor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
 
   const teacherId = id || 'prof_1';
   const teacher = getTeacherById(teacherId);
@@ -130,10 +130,26 @@ export default function PerfilProfessor() {
               </div>
             </div>
 
-            {isOwner && (
+            {isOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil Acadêmico
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    startChatWith({
+                      name: teacher.name,
+                      email: teacher.email,
+                      role: 'professor',
+                      avatar: teacher.avatar || ''
+                    }, `Orientação Acadêmica: ${teacher.discipline}`);
+                  }}
+                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Falar com o Docente
                 </button>
               </div>
             )}

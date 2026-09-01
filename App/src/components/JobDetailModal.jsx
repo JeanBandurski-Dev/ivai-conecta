@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck
+  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck, MessageSquare
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, generateWhatsAppLink, calculateMatchScore } from '../lib/ivaiConecta';
+import { applyToJob, generateWhatsAppLink, calculateMatchScore, getUsersDB } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const [applied, setApplied] = useState(false);
 
   if (!job) return null;
@@ -28,6 +28,35 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     } else {
       showToast(res.message);
     }
+  };
+
+  const handleOpenChat = async () => {
+    if (!currentUser) {
+      showToast('Faça login como Aluno ou Candidato para conversar com a empresa!');
+      return;
+    }
+
+    // Busca o email real da empresa no banco de usuários
+    const allUsers = getUsersDB();
+    const companyUser = allUsers.find(u => 
+      u.name?.toLowerCase().trim() === job.company?.toLowerCase().trim() ||
+      (job.createdBy && u.email?.toLowerCase().trim() === job.createdBy?.toLowerCase().trim())
+    );
+
+    const targetEmail = companyUser?.email || 
+      (job.recruiterEmail && job.recruiterEmail.includes('@') ? job.recruiterEmail : null) || 
+      (job.createdBy && job.createdBy.includes('@') ? job.createdBy : null) || 
+      (job.company ? `${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+
+    const companyTarget = {
+      name: job.company,
+      email: targetEmail,
+      role: 'empresa',
+      avatar: job.companyLogo || companyUser?.avatar || ''
+    };
+
+    onClose();
+    await startChatWith(companyTarget, `Vaga: ${job.title}`);
   };
 
   const waLink = generateWhatsAppLink(job.recruiterPhone || '5543999887766', job.title, job.company, job.city);
@@ -194,6 +223,14 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={handleOpenChat}
+              className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <MessageSquare size={14} /> Chat com a Empresa
+            </button>
+
             <a
               href={waLink}
               target="_blank"

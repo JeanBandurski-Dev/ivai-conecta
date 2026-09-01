@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText
+  Award, Send, UserCheck, Check, X, FileText, MessageSquare
 } from 'lucide-react';
 import {
   getUserApplications, generateWhatsAppLink, getJobs,
@@ -13,7 +13,7 @@ import {
 import useAppStore from '../store/useAppStore';
 
 export default function MinhasVagas() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
   const [, forceUpdate] = useState(0);
 
@@ -73,9 +73,9 @@ export default function MinhasVagas() {
 
   // Demo candidates list for company view
   const demoApplicants = [
-    { id: 1, name: 'Lucas Eduardo Silva', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
-    { id: 2, name: 'Juliana Aparecida Melo', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
-    { id: 3, name: 'Rafael Gomes Costa', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
+    { id: 1, name: 'Lucas Eduardo Silva', email: 'aluno@ivaiconecta.com.br', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
+    { id: 2, name: 'Juliana Aparecida Melo', email: 'juliana.melo@ifpr.edu.br', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
+    { id: 3, name: 'Rafael Gomes Costa', email: 'rafael.costa@uenp.br', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
   ];
 
   return (
@@ -376,11 +376,30 @@ export default function MinhasVagas() {
                       )}
 
                       {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
                         <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
-                        <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp btn-sm text-xs font-bold">
-                          <Phone size={13} /> Contatar Recrutador no WhatsApp
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const targetEmail = app.company?.toLowerCase().includes('simas')
+                                ? 'turbosimas@gmail.com'
+                                : 'empresa@ivaiconecta.com.br';
+
+                              startChatWith({
+                                name: app.company,
+                                email: targetEmail,
+                                role: 'empresa',
+                                avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                              }, `Candidatura: ${app.title}`);
+                            }}
+                            className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <MessageSquare size={13} /> Chat com a Empresa
+                          </button>
+                          <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp btn-sm text-xs font-bold">
+                            <Phone size={13} /> WhatsApp
+                          </a>
+                        </div>
                       </div>
                     </div>
                   );
@@ -420,7 +439,21 @@ export default function MinhasVagas() {
                     <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">{cand.course} · Inscrito em {cand.appliedAt}</div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        startChatWith({
+                          name: cand.name,
+                          email: cand.email || 'aluno@ivaiconecta.com.br',
+                          role: 'aluno',
+                          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                        }, `Processo Seletivo: ${selectedJobApplicants.title}`);
+                        setSelectedJobApplicants(null);
+                      }}
+                      className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageSquare size={13} /> Chat Direto
+                    </button>
                     <button
                       onClick={() => navigate(`/perfil/${cand.id}`)}
                       className="btn btn-outline btn-sm text-xs font-bold"

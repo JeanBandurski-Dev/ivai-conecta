@@ -9,10 +9,9 @@ import useAppStore from '../../store/useAppStore';
 import ChatModal from '../ChatModal';
 
 export default function Navbar() {
-  const { currentUser, selectedCity, cities, setCity, logout, showToast, theme, toggleTheme } = useAppStore();
+  const { currentUser, theme, toggleTheme,logout, showToast, openChat } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -39,17 +38,15 @@ export default function Navbar() {
   };
 
   const navLinkClass = ({ isActive }) =>
-    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${
-      isActive
-        ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
-        : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
+    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${isActive
+      ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
+      : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
     }`;
 
   const mobileNavLinkClass = ({ isActive }) =>
-    `block px-4 py-3 rounded-xl text-base font-semibold transition-colors duration-200 ${
-      isActive
-        ? 'bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-400'
-        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
+    `block px-4 py-3 rounded-xl text-base font-semibold transition-colors duration-200 ${isActive
+      ? 'bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-400'
+      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
     }`;
 
   const getProfileLink = () => {
@@ -86,19 +83,17 @@ export default function Navbar() {
 
             {/* Right actions: Theme Switcher & User / Auth */}
             <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-auto md:ml-0">
-              
-              {/* Chat Button */}
+
+              {/* Chat Button com indicador */}
               {currentUser && (
                 <button
-                  onClick={() => setShowChatModal(true)}
+                  onClick={() => openChat()}
                   className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative"
                   title="Mensagens & Chat"
                   aria-label="Abrir chat"
                 >
                   <MessageSquare size={18} />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-blue text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    1
-                  </span>
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-blue rounded-full ring-2 ring-white dark:ring-slate-800"></span>
                 </button>
               )}
 
@@ -265,6 +260,15 @@ export default function Navbar() {
                     <span className="flex items-center gap-2.5"><User size={16} /> Meu Perfil</span>
                   </NavLink>
 
+                  <button
+                    onClick={() => { closeMobile(); openChat(); }}
+                    className={mobileNavLinkClass}
+                    >
+                      <span className='flex items-center gap-2.5'>
+                        <MessageSquare size={16} /> Mensagens &amp; Chat
+                      </span>
+                    </button>
+
                   {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
                     <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><Briefcase size={16} /> Minhas Candidaturas</span>
@@ -304,10 +308,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
-      {/* Chat Modal */}
-      {showChatModal && (
-        <ChatModal onClose={() => setShowChatModal(false)} />
-      )}
+    
     </>
   );
 }

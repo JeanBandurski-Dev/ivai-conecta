@@ -3,14 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, TrendingUp, Eye, Target, Award, Sparkles
+  BarChart3, TrendingUp, Eye, Target, Award, Sparkles, MessageSquare
 } from 'lucide-react';
 import { getJobs } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilEmpresa() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
@@ -93,7 +93,7 @@ export default function PerfilEmpresa() {
               </div>
             </div>
 
-            {isCompanyOwner && (
+            {isCompanyOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil da Empresa
@@ -101,6 +101,25 @@ export default function PerfilEmpresa() {
                 <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
                   <Building2 size={15} /> Gerenciar Minhas Vagas
                 </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    const companyEmail = company.email || 
+                      (company.name.toLowerCase().includes('simas') ? 'turbosimas@gmail.com' : 'empresa@ivaiconecta.com.br');
+                    
+                    startChatWith({
+                      name: company.name,
+                      email: companyEmail,
+                      role: 'empresa',
+                      avatar: company.logo
+                    }, `Contato com Empresa: ${company.name}`);
+                  }}
+                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                </button>
               </div>
             )}
           </div>

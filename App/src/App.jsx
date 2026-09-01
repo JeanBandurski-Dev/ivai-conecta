@@ -1,3 +1,5 @@
+import useAppStore from './store/useAppStore';
+import ChatModal from './components/ChatModal';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -16,6 +18,7 @@ import MinhasVagas from './pages/MinhasVagas';
 import CompletarPerfil from './pages/CompletarPerfil';
 
 export default function App() {
+  const { isChatOpen, closeChat } = useAppStore();
   return (
     <BrowserRouter>
       <div className="flex flex-col min-h-screen">
@@ -23,17 +26,17 @@ export default function App() {
 
         <main className="flex-1">
           <Routes>
-            <Route path="/"                 element={<Dashboard />} />
-            <Route path="/login"            element={<Login />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/completar-perfil" element={<CompletarPerfil />} />
-            <Route path="/vagas"            element={<Vagas />} />
-            <Route path="/servicos"         element={<Servicos />} />
-            <Route path="/talentos"         element={<BancoDeTalentos />} />
-            <Route path="/perfil/:id"       element={<PerfilAluno />} />
-            <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-            <Route path="/professor/:id"    element={<PerfilProfessor />} />
-            <Route path="/configuracoes"    element={<Configuracoes />} />
-            <Route path="/minhas-vagas"     element={<MinhasVagas />} />
+            <Route path="/vagas" element={<Vagas />} />
+            <Route path="/servicos" element={<Servicos />} />
+            <Route path="/talentos" element={<BancoDeTalentos />} />
+            <Route path="/perfil/:id" element={<PerfilAluno />} />
+            <Route path="/empresa/:id" element={<PerfilEmpresa />} />
+            <Route path="/professor/:id" element={<PerfilProfessor />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/minhas-vagas" element={<MinhasVagas />} />
 
             {/* 404 fallback */}
             <Route path="*" element={<NotFound />} />
@@ -42,6 +45,8 @@ export default function App() {
 
         <Footer />
         <Toast />
+
+        {isChatOpen && <ChatModal onClose={closeChat} />}
       </div>
     </BrowserRouter>
   );

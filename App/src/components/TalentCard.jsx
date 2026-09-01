@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle, Bookmark } from 'lucide-react';
+import { CheckCircle, Bookmark, MessageSquare } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 
 export default function TalentCard({ talent }) {
-  const { favoriteTalents, toggleFavoriteTalent, showToast } = useAppStore();
+  const { favoriteTalents, toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
   const { id, name, course, institution, city, avatar, skills = [], endorsements = [] } = talent;
 
   const isFavorite = favoriteTalents.includes(id);
@@ -110,6 +110,27 @@ export default function TalentCard({ talent }) {
         >
           Ver Perfil Completo
         </Link>
+
+        {/* Botão de Chat Direto com o Talento */}
+        {currentUser?.email?.toLowerCase().trim() !== talent.email?.toLowerCase().trim() && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              startChatWith({
+                name,
+                email: talent.email || 'aluno@ivaiconecta.com.br',
+                role: 'aluno',
+                avatar
+              }, `Contato com Talento: ${name}`);
+            }}
+            className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"
+            title={`Iniciar Chat com ${name}`}
+            aria-label="Abrir chat com talento"
+          >
+            <MessageSquare size={16} />
+          </button>
+        )}
 
         {talent.linkedin && (
           <a
