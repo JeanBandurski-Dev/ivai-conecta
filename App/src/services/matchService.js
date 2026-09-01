@@ -23,20 +23,20 @@ export function isSkillMatch(candidateSkill, requiredSkill) {
 /**
  * Calculates weighted match score for candidate/student vs job requirements.
  * Factors:
- * - Skills Match (60%)
- * - Location Proximity in Vale do Ivaí (20%)
- * - Verified Student / Teacher Endorsement Bonus (20%)
+ * - Skills Match (80%): Directly proportional to matching required technical skills
+ * - Location Proximity in Vale do Ivaí (20%): 20% same city, 10% neighboring regional city
+ * - Verified Student / Teacher Endorsement Bonus: Extra boost (+5% to +10%) that helps regional candidates or partial skill matches
  */
 export function calculateMatchScore(candidateSkills = [], requiredSkills = [], options = {}) {
   if (!requiredSkills || requiredSkills.length === 0) return 100;
   if (!candidateSkills || candidateSkills.length === 0) return 0;
 
-  // 1. Skill Match (Weight 60%)
+  // 1. Skill Match (Weight 80%)
   const matchedSkills = requiredSkills.filter(req =>
     candidateSkills.some(sk => isSkillMatch(sk, req))
   );
   const skillRatio = matchedSkills.length / requiredSkills.length;
-  const skillScore = skillRatio * 60;
+  const skillScore = skillRatio * 80;
 
   // 2. City Proximity (Weight 20%)
   let locationScore = 10; // Default regional proximity (Vale do Ivaí)
@@ -44,11 +44,11 @@ export function calculateMatchScore(candidateSkills = [], requiredSkills = [], o
     locationScore = 20; // Direct city match
   }
 
-  // 3. Verification & Endorsements Bonus (Weight 20%)
-  let verificationScore = 0;
-  if (options.isVerifiedStudent) verificationScore += 10;
-  if (options.endorsementsCount > 0) verificationScore += 10;
+  // 3. Verification & Endorsements Bonus (Up to +10% boost)
+  let bonusScore = 0;
+  if (options.isVerifiedStudent) bonusScore += 5;
+  if (options.endorsementsCount > 0) bonusScore += 5;
 
-  const totalScore = Math.min(100, Math.round(skillScore + locationScore + verificationScore));
+  const totalScore = Math.min(100, Math.round(skillScore + locationScore + bonusScore));
   return totalScore;
 }
