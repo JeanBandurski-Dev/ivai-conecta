@@ -15,7 +15,7 @@ export const SEED_CHAT_THREADS = [
     lastMessageAt: '19/08/2026 - 14:30',
     unreadCount: 1,
     messages: [
-      { id: 'm1', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá Lucas! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15' },
+      { id: 'm1', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15' },
       { id: 'm2', sender: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá! Muito obrigado pela oportunidade. Tenho total interesse na vaga híbrida em Ivaiporã.', timestamp: '19/08/2026 - 14:22' },
       { id: 'm3', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.', timestamp: '19/08/2026 - 14:30' }
     ]
@@ -26,15 +26,36 @@ export const SEED_CHAT_THREADS = [
     participantRole: 'Docente (IFPR Campus Ivaiporã)',
     participantAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
     jobTitle: 'Parecer Pedagógico - Programação',
-    lastMessage: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado.',
+    lastMessage: 'Olá! Recebi sua solicitação e já emiti seu parecer pedagógico verificado.',
     lastMessageAt: '20/08/2026 - 09:10',
     unreadCount: 0,
     messages: [
       { id: 'm10', sender: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá Professor Ronan! Gostaria de solicitar um parecer sobre meu desempenho acadêmico.', timestamp: '20/08/2026 - 08:45' },
-      { id: 'm11', sender: 'Prof. Dr. Ronan Silva', senderEmail: 'professor@ivaiconecta.com.br', text: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10' }
+      { id: 'm11', sender: 'Prof. Dr. Ronan Silva', senderEmail: 'professor@ivaiconecta.com.br', text: 'Olá! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10' }
     ]
   }
 ];
+
+function sanitizeThreads(threadsList) {
+  if (!Array.isArray(threadsList)) return SEED_CHAT_THREADS;
+  return threadsList.map(t => ({
+    id: t?.id || `thread_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    participantName: t?.participantName || 'Usuário Ivaí Conecta',
+    participantRole: t?.participantRole || 'Contato Regional',
+    participantAvatar: t?.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    jobTitle: t?.jobTitle || 'Conversa Direta',
+    lastMessage: t?.lastMessage || 'Nenhuma mensagem recente.',
+    lastMessageAt: t?.lastMessageAt || '',
+    unreadCount: t?.unreadCount || 0,
+    messages: Array.isArray(t?.messages) ? t.messages.map(m => ({
+      id: m?.id || `m_${Date.now()}`,
+      sender: m?.sender || 'Usuário',
+      senderEmail: m?.senderEmail || '',
+      text: m?.text || '',
+      timestamp: m?.timestamp || ''
+    })) : []
+  }));
+}
 
 export function getChatThreads() {
   if (typeof localStorage === 'undefined') return SEED_CHAT_THREADS;
@@ -42,11 +63,57 @@ export function getChatThreads() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.length > 0) return parsed;
+      if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+        return sanitizeThreads(parsed);
+      }
     } catch {}
   }
   localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(SEED_CHAT_THREADS));
   return SEED_CHAT_THREADS;
+}
+
+export function createOrGetDirectThread(targetUser, jobOrSubject = 'Conversa Direta') {
+  const threads = getChatThreads();
+  const targetId = targetUser?.id || targetUser?.uid || targetUser?.email;
+  
+  const existing = threads.find(t =>
+    (t.participantId && String(t.participantId) === String(targetId)) ||
+    (t.participantEmail && targetUser?.email && t.participantEmail.toLowerCase() === targetUser.email.toLowerCase()) ||
+    (t.participantName && targetUser?.name && t.participantName.toLowerCase() === targetUser.name.toLowerCase())
+  );
+
+  if (existing) {
+    return existing;
+  }
+
+  const now = new Date();
+  const timestamp = `${now.toLocaleDateString('pt-BR')} - ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+  const newThread = {
+    id: `thread_${Date.now()}`,
+    participantId: targetId,
+    participantName: targetUser?.name || 'Novo Contato',
+    participantEmail: targetUser?.email || '',
+    participantRole: targetUser?.role ? (targetUser.role === 'empresa' ? 'Empresa / Recrutador' : targetUser.role === 'professor' ? 'Docente' : 'Candidato / Estudante') : 'Contato Regional',
+    participantAvatar: targetUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    jobTitle: jobOrSubject,
+    lastMessage: 'Conversa iniciada.',
+    lastMessageAt: timestamp,
+    unreadCount: 0,
+    messages: [
+      {
+        id: `m_${Date.now()}`,
+        sender: targetUser?.name || 'Contato',
+        senderEmail: targetUser?.email || '',
+        text: `Olá! Conversa iniciada referente a "${jobOrSubject}".`,
+        timestamp
+      }
+    ]
+  };
+
+  const updated = [newThread, ...threads];
+  localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(updated));
+  return newThread;
 }
 
 export function sendMessageToThread(threadId, senderUser, text) {
@@ -58,20 +125,22 @@ export function sendMessageToThread(threadId, senderUser, text) {
   const timestamp = `${now.toLocaleDateString('pt-BR')} - ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
   const newMsg = {
-    id: `m_${Date.now()}`,
+    id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     sender: senderUser?.name || 'Lucas Eduardo Silva',
     senderEmail: senderUser?.email || 'aluno@ivaiconecta.com.br',
     senderUid: senderUser?.uid || 'guest',
-    text,
+    text: String(text || '').trim(),
     timestamp
   };
 
+  const currentMessages = Array.isArray(threads[threadIndex].messages) ? threads[threadIndex].messages : [];
+
   const updatedThread = {
     ...threads[threadIndex],
-    lastMessage: text,
+    lastMessage: newMsg.text,
     lastMessageAt: timestamp,
     unreadCount: 0,
-    messages: [...threads[threadIndex].messages, newMsg]
+    messages: [...currentMessages, newMsg]
   };
 
   const updatedThreads = [...threads];
@@ -85,7 +154,7 @@ export function sendMessageToThread(threadId, senderUser, text) {
   try {
     const chatDocRef = doc(db, 'chats', threadId);
     setDoc(chatDocRef, {
-      lastMessage: text,
+      lastMessage: newMsg.text,
       lastMessageAt: serverTimestamp(),
       updatedAt: new Date().toISOString()
     }, { merge: true }).catch(() => {});
@@ -106,7 +175,7 @@ export function subscribeToFirestoreChat(chatId, callback) {
   try {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     return onSnapshot(messagesRef, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       callback(msgs);
     }, (err) => {
