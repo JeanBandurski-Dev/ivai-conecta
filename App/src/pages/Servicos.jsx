@@ -149,7 +149,7 @@ export default function Servicos() {
               </h1>
 
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-                Encontre profissionais qualificados com avaliações de clientes e contato direto por WhatsApp.
+                Encontre profissionais qualificados com avaliações de clientes e contato direto pelo chat integrado.
               </p>
             </div>
 
@@ -241,14 +241,14 @@ export default function Servicos() {
                   <div className="text-xs text-green-600 font-semibold">+18% esta semana</div>
                 </div>
 
-                {/* Contatos WhatsApp */}
+                {/* Contatos via Chat */}
                 <div className="card p-5 bg-white border border-gray-200 space-y-1">
                   <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
                     <span>Leads / Contatos</span>
-                    <Phone size={18} className="text-green-600" />
+                    <MessageSquare size={18} className="text-primary-blue" />
                   </div>
                   <div className="text-3xl font-extrabold text-primary-dark">{currentService.analytics?.contacts || 58}</div>
-                  <div className="text-xs text-gray-500 font-medium">Pessoas que iniciaram conversa</div>
+                  <div className="text-xs text-gray-500 font-medium">Pessoas que iniciaram conversa no chat</div>
                 </div>
 
                 {/* Vendas Fechadas */}
@@ -499,7 +499,7 @@ export default function Servicos() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">WhatsApp para Atendimento aos Clientes</label>
+                <label className="form-label">Telefone de Contato</label>
                 <input
                   type="tel"
                   value={serviceData.phone}
@@ -583,7 +583,7 @@ export default function Servicos() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">WhatsApp para Contato</label>
+                <label className="form-label">Telefone de Contato</label>
                 <input name="phone" type="tel" className="form-control" placeholder="Ex: (43) 99999-0000" required />
               </div>
               <div className="form-group">

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck, MessageSquare
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, generateWhatsAppLink, calculateMatchScore, isSkillMatch, getUsersDB } from '../lib/ivaiConecta';
+import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -63,8 +63,6 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     onClose();
     await startChatWith(companyTarget, `Vaga: ${job.title}`);
   };
-
-  const waLink = generateWhatsAppLink(job.recruiterPhone || '5543999887766', job.title, job.company, job.city);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -233,17 +231,8 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               onClick={handleOpenChat}
               className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <MessageSquare size={14} /> Chat com a Empresa
+              <MessageSquare size={14} /> Conversar no Chat
             </button>
-
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-whatsapp btn-sm text-xs font-bold"
-            >
-              <PhoneCall size={14} /> Contatar no WhatsApp
-            </a>
 
             {applied ? (
               <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5">

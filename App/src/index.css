@@ -172,16 +172,7 @@
     border-color: #fff; 
   }
 
-  .btn-whatsapp {
-    background: linear-gradient(135deg, #25D366, #16A34A);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.28);
-  }
-  .btn-whatsapp:hover { 
-    background: linear-gradient(135deg, #1EBE5D, #15803D); 
-    color: #fff; 
-    box-shadow: 0 8px 20px rgba(37, 211, 102, 0.38); 
-  }
+
 
   .btn-danger {
     background-color: #ef4444;

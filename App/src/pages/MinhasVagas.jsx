@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
+  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, ShieldCheck, CheckCircle2,
   Award, Send, UserCheck, Check, X, FileText, MessageSquare
 } from 'lucide-react';
 import {
-  getUserApplications, generateWhatsAppLink, getJobs,
+  getUserApplications, getJobs,
   updateJobStatus, getTalents, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest
 } from '../lib/ivaiConecta';
@@ -327,7 +327,6 @@ export default function MinhasVagas() {
             ) : (
               <div className="space-y-6 max-w-4xl mx-auto">
                 {apps.map(app => {
-                  const waLink = generateWhatsAppLink(app.recruiterPhone, app.title, app.company, app.city);
                   return (
                     <div key={app.id} className="card gap-4 p-5 sm:p-6">
                       {/* Top */}
@@ -405,13 +404,10 @@ export default function MinhasVagas() {
                                 avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
                               }, `Candidatura: ${app.title}`);
                             }}
-                            className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                            className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <MessageSquare size={13} /> Chat com a Empresa
+                            <MessageSquare size={13} /> Conversar no Chat
                           </button>
-                          <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp btn-sm text-xs font-bold">
-                            <Phone size={13} /> WhatsApp
-                          </a>
                         </div>
                       </div>
                     </div>
@@ -463,9 +459,9 @@ export default function MinhasVagas() {
                         }, `Processo Seletivo: ${selectedJobApplicants.title}`);
                         setSelectedJobApplicants(null);
                       }}
-                      className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white flex items-center gap-1.5 cursor-pointer"
+                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                     >
-                      <MessageSquare size={13} /> Chat Direto
+                      <MessageSquare size={13} /> Chat com o Candidato
                     </button>
                     <button
                       onClick={() => navigate(`/perfil/${cand.id}`)}
@@ -473,14 +469,6 @@ export default function MinhasVagas() {
                     >
                       <Eye size={13} /> Ver Currículo
                     </button>
-                    <a
-                      href={`https://wa.me/${cand.phone}?text=${encodeURIComponent(`Olá ${cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-whatsapp btn-sm text-xs font-bold"
-                    >
-                      <Phone size={13} /> WhatsApp
-                    </a>
                   </div>
                 </div>
               ))}
