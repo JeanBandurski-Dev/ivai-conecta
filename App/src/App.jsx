@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
@@ -21,6 +21,25 @@ const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
 const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
+
+function HomeRoute() {
+  const { currentUser, authLoading } = useAppStore();
+
+  if (authLoading && !currentUser) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+        <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+        <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Dashboard />;
+}
 
 export default function App() {
   const initAuthListener = useAppStore(state => state.initAuthListener);
@@ -49,7 +68,7 @@ export default function App() {
             </div>
           }>
             <Routes>
-              <Route path="/"                 element={<Dashboard />} />
+              <Route path="/"                 element={<HomeRoute />} />
               <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
               <Route path="/completar-perfil" element={<CompletarPerfil />} />
               <Route path="/vagas"            element={<Vagas />} />

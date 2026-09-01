@@ -232,7 +232,7 @@ export default function Configuracoes() {
   const handleLogout = () => {
     logout();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/');
+    navigate('/login');
   };
 
   return (

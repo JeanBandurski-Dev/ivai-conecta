@@ -47,7 +47,7 @@ export default function Navbar() {
     setShowLogoutModal(false);
     closeMobile();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/');
+    navigate('/login');
   };
 
   const navLinkClass = ({ isActive }) =>
