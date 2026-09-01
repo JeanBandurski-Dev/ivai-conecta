@@ -52,11 +52,13 @@ export default function PerfilEmpresa() {
     if (!file) return;
     setUploadingLogo(true);
     showToast('⏳ Enviando logotipo para o Firebase Storage...');
-    const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
+    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id || 'empresa_1');
     setUploadingLogo(false);
     if (res.success) {
       setCompany(c => ({ ...c, logo: res.url }));
-      setCurrentUser({ ...currentUser, avatar: res.url });
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, avatar: res.url });
+      }
       showToast('📸 Logotipo atualizado e salvo no Storage com sucesso!');
     } else {
       showToast(`⚠️ ${res.error || 'Erro ao enviar logotipo.'}`);
@@ -72,13 +74,15 @@ export default function PerfilEmpresa() {
       about: company.about,
       avatar: company.logo
     });
-    setCurrentUser({
-      ...currentUser,
-      name: company.name,
-      sector: company.sector,
-      about: company.about,
-      avatar: company.logo
-    });
+    if (currentUser) {
+      setCurrentUser({
+        ...currentUser,
+        name: company.name,
+        sector: company.sector,
+        about: company.about,
+        avatar: company.logo
+      });
+    }
     showToast('Dados da empresa atualizados com sucesso!');
   };
 

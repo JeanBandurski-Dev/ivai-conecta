@@ -56,7 +56,8 @@ export default function CompletarPerfil() {
       name: name.trim(),
       email: email,
       city: city,
-      role: selectedRole
+      role: selectedRole,
+      avatar: auth.currentUser?.photoURL || currentUser?.avatar
     });
 
     setLoading(false);

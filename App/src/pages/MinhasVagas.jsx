@@ -44,7 +44,7 @@ export default function MinhasVagas() {
   
   // Teacher endorsement requests state
   const requests = getEndorsementRequests();
-  const teacherRequests = requests.filter(r => r.profEmail.toLowerCase() === currentUser?.email?.toLowerCase() || currentUser?.role === 'professor');
+  const teacherRequests = requests.filter(r => (r.profEmail && currentUser?.email && r.profEmail.toLowerCase() === currentUser.email.toLowerCase()) || currentUser?.role === 'professor');
   const [customQuote, setCustomQuote] = useState({});
 
   // Selected job to view applicants (for company view)

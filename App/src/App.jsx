@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -7,19 +7,20 @@ import Toast from './components/ui/Toast';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import GuestRoute from './components/auth/GuestRoute';
 import useAppStore from './store/useAppStore';
-
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import Vagas from './pages/Vagas';
-import Servicos from './pages/Servicos';
-import BancoDeTalentos from './pages/BancoDeTalentos';
-import PerfilAluno from './pages/PerfilAluno';
-import PerfilEmpresa from './pages/PerfilEmpresa';
-import PerfilProfessor from './pages/PerfilProfessor';
-import Configuracoes from './pages/Configuracoes';
-import MinhasVagas from './pages/MinhasVagas';
-import CompletarPerfil from './pages/CompletarPerfil';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
+
+// Lazy-loaded pages for fast initial page load & code-splitting
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Login = lazy(() => import('./pages/Login'));
+const Vagas = lazy(() => import('./pages/Vagas'));
+const Servicos = lazy(() => import('./pages/Servicos'));
+const BancoDeTalentos = lazy(() => import('./pages/BancoDeTalentos'));
+const PerfilAluno = lazy(() => import('./pages/PerfilAluno'));
+const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
+const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
+const Configuracoes = lazy(() => import('./pages/Configuracoes'));
+const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
+const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
 export default function App() {
   const initAuthListener = useAppStore(state => state.initAuthListener);
@@ -41,36 +42,43 @@ export default function App() {
         <Navbar />
 
         <main className="flex-1">
-          <Routes>
-            <Route path="/"                 element={<Dashboard />} />
-            <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
-            <Route path="/completar-perfil" element={<CompletarPerfil />} />
-            <Route path="/vagas"            element={<Vagas />} />
-            <Route path="/servicos"         element={<Servicos />} />
-            <Route path="/talentos"         element={<BancoDeTalentos />} />
-            <Route path="/perfil/:id"       element={<PerfilAluno />} />
-            <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-            <Route path="/professor/:id"    element={<PerfilProfessor />} />
-            <Route
-              path="/configuracoes"
-              element={
-                <ProtectedRoute>
-                  <Configuracoes />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/minhas-vagas"
-              element={
-                <ProtectedRoute>
-                  <MinhasVagas />
-                </ProtectedRoute>
-              }
-            />
+          <Suspense fallback={
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+              <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+              <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
+            </div>
+          }>
+            <Routes>
+              <Route path="/"                 element={<Dashboard />} />
+              <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
+              <Route path="/completar-perfil" element={<CompletarPerfil />} />
+              <Route path="/vagas"            element={<Vagas />} />
+              <Route path="/servicos"         element={<Servicos />} />
+              <Route path="/talentos"         element={<BancoDeTalentos />} />
+              <Route path="/perfil/:id"       element={<PerfilAluno />} />
+              <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+              <Route path="/professor/:id"    element={<PerfilProfessor />} />
+              <Route
+                path="/configuracoes"
+                element={
+                  <ProtectedRoute>
+                    <Configuracoes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/minhas-vagas"
+                element={
+                  <ProtectedRoute>
+                    <MinhasVagas />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* 404 fallback */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* 404 fallback */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </main>
 
         <Footer />

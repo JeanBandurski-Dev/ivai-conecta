@@ -14,14 +14,14 @@ export default function PerfilProfessor() {
   const { currentUser, showToast } = useAppStore();
 
   const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id || 'prof_1') : 'prof_1');
-  const teacher = getTeacherById(teacherId);
-  const endorsedStudents = getTeacherEndorsedStudents(teacher.email);
+  const teacher = getTeacherById(teacherId) || {};
+  const endorsedStudents = getTeacherEndorsedStudents(teacher?.email);
 
   const isOwner = Boolean(
     currentUser && (
-      (currentUser.email && teacher.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
-      (currentUser.uid != null && (String(currentUser.uid) === String(teacher.id) || String(currentUser.uid) === String(teacher.firestoreId))) ||
-      (currentUser.id != null && String(currentUser.id) === String(teacher.id))
+      (currentUser.email && teacher?.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(teacher?.id) || String(currentUser.uid) === String(teacher?.firestoreId))) ||
+      (currentUser.id != null && String(currentUser.id) === String(teacher?.id))
     )
   );
 
@@ -30,14 +30,14 @@ export default function PerfilProfessor() {
 
   // Edit form state
   const [editData, setEditData] = useState({
-    name: teacher.name,
-    avatar: teacher.avatar,
-    degree: teacher.degree || 'Doutor em Ciência da Computação (UFPR)',
-    institution: teacher.institution,
-    discipline: teacher.discipline,
-    bio: teacher.bio || '',
-    classes: [...(teacher.classes || [])],
-    education: [...(teacher.education || [
+    name: teacher?.name || 'Prof. Dr. Ronan Silva',
+    avatar: teacher?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    degree: teacher?.degree || 'Doutor em Ciência da Computação (UFPR)',
+    institution: teacher?.institution || 'IFPR Campus Ivaiporã',
+    discipline: teacher?.discipline || 'Programação de Computadores & Redes',
+    bio: teacher?.bio || '',
+    classes: [...(teacher?.classes || [])],
+    education: [...(teacher?.education || [
       { degree: 'Doutorado em Ciência da Computação', institution: 'Universidade Federal do Paraná (UFPR)', period: '2026 à 2030' },
       { degree: 'Mestrado em Engenharia Elétrica & Computação', institution: 'Universidade Estadual de Londrina (UEL)', period: '2022 à 2025' },
       { degree: 'Bacharelado em Ciência da Computação', institution: 'Universidade Estadual de Maringá (UEM)', period: '2017 à 2021' }
