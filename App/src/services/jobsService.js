@@ -273,7 +273,7 @@ export const SELECTION_STAGES = [
   { id: 'analise', name: 'Em Análise', color: 'amber', description: 'Currículo em avaliação detalhada' },
   { id: 'entrevista', name: 'Entrevista Agendada', color: 'purple', description: 'Entrevista marcada ou em andamento' },
   { id: 'desafio', name: 'Desafio Técnico', color: 'indigo', description: 'Teste prático ou case de negócios' },
-  { id: 'aprovado', name: 'Aprovado / Proposta', color: 'emerald', description: 'Candidato selecionado / proposta enviada' },
+  { id: 'aprovado', name: 'Aprovados', color: 'emerald', description: 'Candidatos que passaram na entrevista' },
   { id: 'reprovado', name: 'Banco de Talentos', color: 'slate', description: 'Não aprovado nesta vaga / mantido no banco' },
 ];
 
@@ -451,6 +451,112 @@ export const INITIAL_JOB_CANDIDATES = {
         { date: '14/08/2026 19:00', text: 'Candidatura recebida' },
         { date: '16/08/2026 10:00', text: 'Feedback construtivo registrado e perfil guardado no banco' }
       ]
+    },
+    {
+      id: 7,
+      name: 'Mariana Azevedo',
+      course: 'Sistemas de Informação',
+      institution: 'Univale Ivaiporã',
+      period: '6º Semestre',
+      city: 'Ivaiporã',
+      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
+      matchScore: 92,
+      stage: 'triagem',
+      appliedAt: '25/08/2026',
+      phone: '5543999998888',
+      email: 'mariana.azevedo@univale.edu.br',
+      isVerifiedStudent: true,
+      raNumber: 'UNIVALE-2024-1122',
+      rating: 4,
+      notes: 'Boa bagagem em desenvolvimento front-end com Vue e React. Participativa.',
+      interview: null,
+      skills: ['Vue.js', 'React', 'Git', 'CSS3'],
+      endorsements: [],
+      activity: [
+        { date: '25/08/2026 09:30', text: 'Candidatura submetida via Ivaí Conecta' }
+      ]
+    },
+    {
+      id: 8,
+      name: 'Fernando Rocha',
+      course: 'Técnico em Informática',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '4º Semestre',
+      city: 'Arapuã',
+      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=250',
+      matchScore: 78,
+      stage: 'analise',
+      appliedAt: '24/08/2026',
+      phone: '5543999776655',
+      email: 'fernando.rocha@aluno.ifpr.edu.br',
+      isVerifiedStudent: true,
+      raNumber: 'IFPR-2025-0044',
+      rating: 3,
+      notes: 'Interesse por DevOps e infraestrutura, mas quer focar em React no momento.',
+      interview: null,
+      skills: ['Linux', 'Redes', 'JavaScript', 'HTML5'],
+      endorsements: [],
+      activity: [
+        { date: '24/08/2026 14:00', text: 'Candidatura submetida via Ivaí Conecta' },
+        { date: '26/08/2026 10:15', text: 'Triagem realizada pelo RH' }
+      ]
+    },
+    {
+      id: 9,
+      name: 'Patrícia Souza',
+      course: 'Análise e Desenvolvimento de Sistemas',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '2º Semestre',
+      city: 'Ivaiporã',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250',
+      matchScore: 85,
+      stage: 'triagem',
+      appliedAt: '27/08/2026',
+      phone: '5543999223344',
+      email: 'patricia.souza@aluno.ifpr.edu.br',
+      isVerifiedStudent: true,
+      raNumber: 'IFPR-2026-0123',
+      rating: 4,
+      notes: 'Iniciante muito focada, projetos no GitHub mostram boa evolução.',
+      interview: null,
+      skills: ['JavaScript', 'HTML', 'CSS', 'Figma'],
+      endorsements: [],
+      activity: [
+        { date: '27/08/2026 11:20', text: 'Candidatura submetida via Ivaí Conecta' }
+      ]
+    },
+    {
+      id: 10,
+      name: 'Thiago Mendes',
+      course: 'Engenharia de Software',
+      institution: 'UENP',
+      period: '8º Semestre',
+      city: 'Ivaiporã',
+      avatar: 'https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=250',
+      matchScore: 94,
+      stage: 'entrevista',
+      appliedAt: '21/08/2026',
+      phone: '5543999881122',
+      email: 'thiago.mendes@uenp.edu.br',
+      isVerifiedStudent: true,
+      raNumber: 'UENP-2022-0998',
+      rating: 5,
+      notes: 'Excelente currículo. Tem experiência prévia como freelancer.',
+      interview: {
+        date: '2026-08-30',
+        time: '15:00',
+        format: 'Google Meet',
+        link: 'https://meet.google.com/xyz-abcd-efg',
+        notes: 'Entrevista com o CTO'
+      },
+      skills: ['React', 'Node.js', 'PostgreSQL', 'Docker', 'AWS'],
+      endorsements: [
+        { profName: 'Prof. Dr. Ricardo Silva', institution: 'UENP', discipline: 'Projeto Integrador', quote: 'Líder técnico nato. Excelente comunicação e resolução de problemas complexos.' }
+      ],
+      activity: [
+        { date: '21/08/2026 09:00', text: 'Candidatura submetida via Ivaí Conecta' },
+        { date: '23/08/2026 14:00', text: 'Entrevista técnica agendada' }
+      ]
     }
   ],
   102: [
@@ -552,12 +658,34 @@ export const INITIAL_JOB_CANDIDATES = {
 export function getAllJobCandidatesMap() {
   if (typeof localStorage === 'undefined') return INITIAL_JOB_CANDIDATES;
   const raw = localStorage.getItem(STORAGE_KEY_JOB_CANDIDATES);
+  let parsed = null;
   if (raw) {
     try {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') return parsed;
+      parsed = JSON.parse(raw);
     } catch {}
   }
+  
+  if (parsed && typeof parsed === 'object') {
+    let updated = false;
+    Object.keys(INITIAL_JOB_CANDIDATES).forEach(jobId => {
+      if (!parsed[jobId]) {
+        parsed[jobId] = INITIAL_JOB_CANDIDATES[jobId];
+        updated = true;
+      } else {
+        INITIAL_JOB_CANDIDATES[jobId].forEach(initialCand => {
+          if (!parsed[jobId].find(c => c.id === initialCand.id)) {
+            parsed[jobId].push(initialCand);
+            updated = true;
+          }
+        });
+      }
+    });
+    if (updated) {
+      localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(parsed));
+    }
+    return parsed;
+  }
+
   localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(INITIAL_JOB_CANDIDATES));
   return INITIAL_JOB_CANDIDATES;
 }
@@ -580,7 +708,7 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
     analise: 'Em Análise',
     entrevista: 'Entrevista Agendada',
     desafio: 'Desafio Técnico',
-    aprovado: 'Aprovado / Proposta',
+    aprovado: 'Aprovados',
     reprovado: 'Banco de Talentos'
   };
 
@@ -600,6 +728,34 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
   return updatedList;
+}
+
+export function reorderCandidateStage(jobId, candidateId, targetCandidateId, newStage) {
+  const map = { ...getAllJobCandidatesMap() };
+  const currentList = [...(map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [])];
+  
+  const draggedIndex = currentList.findIndex(c => String(c.id) === String(candidateId));
+  if (draggedIndex === -1) return currentList;
+
+  const [draggedItem] = currentList.splice(draggedIndex, 1);
+  draggedItem.stage = newStage;
+
+  if (targetCandidateId) {
+    const targetIndex = currentList.findIndex(c => String(c.id) === String(targetCandidateId));
+    if (targetIndex !== -1) {
+      currentList.splice(targetIndex, 0, draggedItem);
+    } else {
+      currentList.push(draggedItem);
+    }
+  } else {
+    currentList.push(draggedItem);
+  }
+
+  map[jobId] = currentList;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
+  }
+  return currentList;
 }
 
 export function updateCandidateData(jobId, candidateId, patchData) {
@@ -714,17 +870,29 @@ export function getAllJobCustomStagesMap() {
 export function getJobCustomStages(jobId) {
   if (!jobId) return getCompanyCustomStages();
   
+  let stagesToReturn = null;
+
   // 1. Check in job object directly
   const job = getJobById(jobId);
   if (job?.customStages && Array.isArray(job.customStages) && job.customStages.length > 0) {
-    return job.customStages;
+    stagesToReturn = job.customStages;
+  } else {
+    // 2. Check in specific storage map
+    const map = getAllJobCustomStagesMap();
+    const stages = map[jobId] || map[Number(jobId)] || map[String(jobId)];
+    if (stages && Array.isArray(stages) && stages.length > 0) {
+      stagesToReturn = stages;
+    }
   }
 
-  // 2. Check in specific storage map
-  const map = getAllJobCustomStagesMap();
-  const stages = map[jobId] || map[Number(jobId)] || map[String(jobId)];
-  if (stages && Array.isArray(stages) && stages.length > 0) {
-    return stages;
+  if (stagesToReturn) {
+    stagesToReturn.forEach(s => {
+      if (s.id === 'aprovado' && (s.name === 'Aprovado / Proposta' || s.name === 'Aprovados / Finalizados')) {
+        s.name = 'Aprovados';
+        s.description = 'Candidatos que passaram na entrevista';
+      }
+    });
+    return stagesToReturn;
   }
 
   // 3. Fallback to default company stages
@@ -756,7 +924,15 @@ export function getCompanyCustomStages() {
     const raw = localStorage.getItem(STORAGE_KEY_COMPANY_CUSTOM_STAGES);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.forEach(s => {
+          if (s.id === 'aprovado' && (s.name === 'Aprovado / Proposta' || s.name === 'Aprovados / Finalizados')) {
+            s.name = 'Aprovados';
+            s.description = 'Candidatos que passaram na entrevista';
+          }
+        });
+        return parsed;
+      }
     }
   } catch {}
   return SELECTION_STAGES;
