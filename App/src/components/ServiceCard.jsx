@@ -34,8 +34,10 @@ export default function ServiceCard({ service }) {
       {/* Rating */}
       <div className="flex items-center gap-1.5 text-sm">
         <Star size={14} className="text-amber-400 fill-amber-400 shrink-0" />
-        <span className="font-bold text-gray-800 dark:text-slate-200">{rating}</span>
-        <span className="text-gray-500 dark:text-slate-400 text-xs">({reviewsCount} avaliações)</span>
+        <span className="font-bold text-gray-800 dark:text-slate-200">{typeof rating === 'number' ? rating.toFixed(1) : (rating || '5.0')}</span>
+        <span className="text-gray-500 dark:text-slate-400 text-xs">
+          ({reviewsCount || 0} {(reviewsCount || 0) === 1 ? 'avaliação' : 'avaliações'})
+        </span>
         {badge && (
           <span className="ml-auto text-xs font-semibold text-accent-green dark:text-green-400">{badge}</span>
         )}

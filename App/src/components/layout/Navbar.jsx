@@ -49,12 +49,12 @@ export default function Navbar() {
     }`;
 
   const getProfileLink = () => {
-    if (!currentUser) return '/perfil/1';
-    if (currentUser.role === 'empresa') return '/empresa/1';
-    if (currentUser.role === 'professor') return `/professor/${currentUser.id || 'prof_1'}`;
+    if (!currentUser) return '/login';
+    const userIdentifier = currentUser.uid || currentUser.id;
+    if (currentUser.role === 'empresa') return '/empresa';
+    if (currentUser.role === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/talentos';
     if (currentUser.role === 'freelancer') return '/servicos?view=dashboard';
-    if (currentUser.role === 'candidato') return `/perfil/${currentUser.id || '2'}`;
-    return `/perfil/${currentUser.id || '1'}`;
+    return userIdentifier ? `/perfil/${userIdentifier}` : '/talentos';
   };
 
   return (

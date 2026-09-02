@@ -270,7 +270,9 @@ export default function MinhasVagas() {
                           }`}>
                             Status: {job.status || 'Ativa'}
                           </span>
-                          <span className="text-xs text-gray-400 dark:text-slate-400">Criada em: {job.createdAt || '15/08/2026'}</span>
+                          <span className="text-xs text-gray-400 dark:text-slate-400">
+                            Criada em: {job.createdAt ? (typeof job.createdAt === 'string' && job.createdAt.includes('/') ? job.createdAt : new Date(job.createdAt).toLocaleDateString('pt-BR')) : 'Recentemente'}
+                          </span>
                         </div>
                         <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">{job.title}</h3>
                         <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
@@ -278,7 +280,10 @@ export default function MinhasVagas() {
                           <span>·</span>
                           <span>{job.type}</span>
                           <span>·</span>
-                          <span className="font-semibold text-primary-blue dark:text-blue-400"><Users size={14} className="inline mr-1" />{job.applicantsCount || 3} Candidatos Inscritos</span>
+                          <span className="font-semibold text-primary-blue dark:text-blue-400">
+                            <Users size={14} className="inline mr-1" />
+                            {job.applicantsCount || 0} {(job.applicantsCount || 0) === 1 ? 'Candidato Inscrito' : 'Candidatos Inscritos'}
+                          </span>
                         </div>
                       </div>
 
@@ -288,7 +293,7 @@ export default function MinhasVagas() {
                           onClick={() => setSelectedJobApplicants(job)}
                           className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5"
                         >
-                          <Users size={14} /> Ver Candidatos ({job.applicantsCount || 3})
+                          <Users size={14} /> Ver Candidatos ({job.applicantsCount || 0})
                         </button>
 
                         {job.status === 'Ativa' ? (
