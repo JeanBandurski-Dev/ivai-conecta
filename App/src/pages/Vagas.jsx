@@ -164,7 +164,7 @@ export default function Vagas() {
         const matchCity = !filterCity || filterCity === 'Todas as Cidades' || j.city === filterCity;
         
         // Tipo
-        const matchType = filterType === 'Todos' || j.type.toLowerCase().includes(filterType.toLowerCase());
+        const matchType = filterType === 'Todos' || (j.type && j.type.toLowerCase().includes(filterType.toLowerCase()));
         
         // Modalidade
         const matchModality = filterModality === 'Todas' || (j.modality && j.modality.toLowerCase().includes(filterModality.toLowerCase()));
@@ -173,17 +173,21 @@ export default function Vagas() {
         const matchScoreOk = !canSeeMatch || minMatch === 0 || (j.calculatedScore && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r.toLowerCase().includes(sk.toLowerCase())));
+        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r && r.toLowerCase().includes(sk.toLowerCase())));
 
         // Busca Textual
-        const text = (j.title + ' ' + j.company + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
+        const text = ((j.title || '') + ' ' + (j.company || '') + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
         return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
         if (sortBy === 'match' && canSeeMatch) return (b.calculatedScore || 0) - (a.calculatedScore || 0);
-        if (sortBy === 'recent') return (b.id || 0) - (a.id || 0);
+        if (sortBy === 'recent') {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        }
         return 0;
       });
   }, [allJobs, filterCity, filterType, filterModality, minMatch, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser]);

@@ -120,17 +120,17 @@ export default function Servicos() {
 
         const q = query.toLowerCase().trim();
         const mQ = !q ||
-          s.providerName.toLowerCase().includes(q) ||
-          s.category.toLowerCase().includes(q) ||
-          s.city.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q);
+          (s.providerName || '').toLowerCase().includes(q) ||
+          (s.category || '').toLowerCase().includes(q) ||
+          (s.city || '').toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q);
 
         return mCity && mCat && mBadge && mRating && mQ;
       })
       .sort((a, b) => {
-        if (sortBy === 'rating') return b.rating - a.rating || b.reviewsCount - a.reviewsCount;
-        if (sortBy === 'reviews') return b.reviewsCount - a.reviewsCount;
-        if (sortBy === 'name') return a.providerName.localeCompare(b.providerName);
+        if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0) || (b.reviewsCount || 0) - (a.reviewsCount || 0);
+        if (sortBy === 'reviews') return (b.reviewsCount || 0) - (a.reviewsCount || 0);
+        if (sortBy === 'name') return (a.providerName || '').localeCompare(b.providerName || '');
         return 0;
       });
   }, [all, city, category, badgeFilter, minRating, query, sortBy]);

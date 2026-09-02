@@ -87,11 +87,11 @@ export default function BancoDeTalentos() {
   const filtered = useMemo(() => {
     return all
       .filter(t => {
-        const mCity = city === 'Todas as Cidades' || t.city === city;
+        const mCity = city === 'Todas as Cidades' || (t.city && t.city.toLowerCase() === city.toLowerCase());
         const mArea = area === 'Todas' || (t.course && t.course.toLowerCase().includes(area.toLowerCase()));
         const mInst = institution === 'Todas as Instituições' || (t.institution && t.institution.toLowerCase().includes(institution.toLowerCase())) || (institution.includes('Autônomo') && t.institution && t.institution.includes('Autônomo'));
         const mEndorsed = !onlyEndorsed || (t.endorsements && t.endorsements.length > 0);
-        const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.includes(sk));
+        const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.some(s => s && s.toLowerCase().includes(sk.toLowerCase())));
 
         const q = query.toLowerCase().trim();
         const mQ = !q ||
@@ -99,7 +99,7 @@ export default function BancoDeTalentos() {
           (t.course && t.course.toLowerCase().includes(q)) ||
           (t.city && t.city.toLowerCase().includes(q)) ||
           (t.institution && t.institution.toLowerCase().includes(q)) ||
-          t.skills?.some(s => s.toLowerCase().includes(q));
+          t.skills?.some(s => s && s.toLowerCase().includes(q));
 
         return mCity && mArea && mInst && mEndorsed && mSkills && mQ;
       })
