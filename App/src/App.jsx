@@ -6,6 +6,7 @@ import ScrollToTop from './components/layout/ScrollToTop';
 import Toast from './components/ui/Toast';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import GuestRoute from './components/auth/GuestRoute';
+import ChatModal from './components/ChatModal';
 import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 
@@ -24,16 +25,19 @@ const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
 
 export default function App() {
+  const { isChatOpen, closeChat } = useAppStore();
   const initAuthListener = useAppStore(state => state.initAuthListener);
 
   useEffect(() => {
     seedFirestoreIfEmpty();
-    const unsubscribe = initAuthListener();
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
+    if (typeof initAuthListener === 'function') {
+      const unsubscribe = initAuthListener();
+      return () => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      };
+    }
   }, [initAuthListener]);
 
   return (
@@ -84,6 +88,8 @@ export default function App() {
 
         <Footer />
         <Toast />
+
+        {isChatOpen && <ChatModal onClose={closeChat} />}
       </div>
     </BrowserRouter>
   );

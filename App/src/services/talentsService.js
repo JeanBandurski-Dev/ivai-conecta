@@ -1,13 +1,10 @@
-// Talents & Teachers Service for Ivaí Conecta (Unified with Firestore 'users' collection)
+// Talents & Teachers Service for Ivaí Conecta (Firestore 'users' and 'endorsement_requests' collections)
 import { db } from '../lib/firebase.js';
-import { collection, getDocs, doc, setDoc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, addDoc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
   STORAGE_KEY_ENDORSEMENT_REQUESTS,
-  SEED_TALENTS,
-  SEED_TEACHERS,
-  SEED_ENDORSEMENT_REQUESTS
 } from '../data/seedData.js';
 
 /**
@@ -22,16 +19,16 @@ function normalizeUserDoc(docData, docId) {
     name: data.name || 'Usuário',
     role: data.role || 'aluno',
     city: data.city || 'Ivaiporã',
-    avatar: data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    avatar: data.avatar || '',
     skills: data.skills || [],
     endorsements: data.endorsements || [],
     experiences: data.experiences || [],
     projects: data.projects || [],
     education: data.education || [],
-    isVerifiedStudent: data.isVerifiedStudent ?? (data.role === 'aluno' ? false : true),
-    course: data.course || (data.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
-    institution: data.institution || 'IFPR Campus Ivaiporã',
-    period: data.period || 'Em andamento',
+    isVerifiedStudent: data.isVerifiedStudent ?? false,
+    course: data.course || '',
+    institution: data.institution || '',
+    period: data.period || '',
   };
 }
 
@@ -45,14 +42,14 @@ function normalizeTeacherDoc(docData, docId) {
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Docente',
-    role: 'professor',
-    email: data.email || 'professor@ivaiconecta.com.br',
-    degree: data.degree || 'Doutor / Mestre',
-    institution: data.institution || 'IFPR Campus Ivaiporã',
-    discipline: data.discipline || 'Ensino Superior & Técnico',
+    role: data.role || 'professor',
+    email: data.email || '',
+    degree: data.degree || '',
+    institution: data.institution || '',
+    discipline: data.discipline || '',
     endorsementCount: data.endorsementCount || 0,
-    verified: data.verified ?? true,
-    avatar: data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    verified: data.verified ?? false,
+    avatar: data.avatar || '',
     bio: data.bio || '',
     education: data.education || [],
     classes: data.classes || [],
@@ -67,24 +64,18 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
     const usersRef = collection(db, 'users');
 
     return onSnapshot(usersRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const allUsers = snapshot.docs.map(d => normalizeUserDoc(d.data(), d.id));
-        let remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
+      const allUsers = snapshot.docs.map(d => normalizeUserDoc(d.data(), d.id));
+      let remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
 
-        if (city && city !== 'Todas as Cidades') {
-          remoteTalents = remoteTalents.filter(t => t.city && t.city.toLowerCase() === city.toLowerCase());
-        }
-
-        const local = getTalents(city);
-        const merged = [
-          ...remoteTalents,
-          ...local.filter(t => !remoteTalents.some(rt => String(rt.id) === String(t.id) || (rt.email && t.email && rt.email.toLowerCase() === t.email.toLowerCase())))
-        ];
-
-        callback(merged);
-      } else {
-        callback(getTalents(city));
+      if (city && city !== 'Todas as Cidades') {
+        remoteTalents = remoteTalents.filter(t => t.city && t.city.toLowerCase() === city.toLowerCase());
       }
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remoteTalents));
+      }
+
+      callback(remoteTalents);
     }, (error) => {
       console.warn('[Firestore Talents Listener] Offline fallback:', error.message);
       callback(getTalents(city));
@@ -102,22 +93,18 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
 export function subscribeToTeachers(callback) {
   try {
     const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('role', '==', 'professor'));
 
-    return onSnapshot(usersRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const allUsers = snapshot.docs.map(d => normalizeTeacherDoc(d.data(), d.id));
-        const remoteTeachers = allUsers.filter(u => u.role === 'professor');
+    return onSnapshot(q, (snapshot) => {
+      const remoteTeachers = snapshot.docs
+        .map(d => normalizeTeacherDoc(d.data(), d.id))
+        .filter(u => u.role === 'professor');
 
-        const local = getVerifiedTeachers();
-        const merged = [
-          ...remoteTeachers,
-          ...local.filter(t => !remoteTeachers.some(rt => String(rt.id) === String(t.id) || (rt.email && t.email && rt.email.toLowerCase() === t.email.toLowerCase())))
-        ];
-
-        callback(merged);
-      } else {
-        callback(getVerifiedTeachers());
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remoteTeachers));
       }
+
+      callback(remoteTeachers);
     }, (error) => {
       console.warn('[Firestore Teachers Listener] Offline fallback:', error.message);
       callback(getVerifiedTeachers());
@@ -130,16 +117,14 @@ export function subscribeToTeachers(callback) {
 }
 
 export function getTalents(city = 'Todas as Cidades') {
-  let talents = SEED_TALENTS;
+  let talents = [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_TALENTS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.length > 0) talents = parsed;
+        if (Array.isArray(parsed)) talents = parsed;
       } catch {}
-    } else {
-      localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(SEED_TALENTS));
     }
   }
 
@@ -147,15 +132,14 @@ export function getTalents(city = 'Todas as Cidades') {
   try {
     const usersRef = collection(db, 'users');
     getDocs(usersRef).then(snapshot => {
-      if (!snapshot.empty) {
-        const remote = snapshot.docs
-          .map(d => normalizeUserDoc(d.data(), d.id))
-          .filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
+      const remote = snapshot.docs
+        .map(d => normalizeUserDoc(d.data(), d.id))
+        .filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
 
-        const merged = [...remote, ...talents.filter(t => !remote.some(rt => String(rt.id) === String(t.id) || (rt.email && t.email && rt.email.toLowerCase() === t.email.toLowerCase())))];
-        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(merged));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remote));
       }
-    }).catch(err => console.warn('Firestore offline para talentos:', err.message));
+    }).catch(err => console.warn('[Firestore] getTalents offline:', err.message));
   } catch {}
 
   if (!city || city === 'Todas as Cidades') return talents;
@@ -163,6 +147,7 @@ export function getTalents(city = 'Todas as Cidades') {
 }
 
 export function getTalentById(id) {
+  if (!id) return null;
   const talents = getTalents('Todas as Cidades');
   const found = talents.find(t => t.id === Number(id) || t.id === id || String(t.id) === String(id) || t.firestoreId === id);
   if (found) return found;
@@ -173,31 +158,13 @@ export function getTalentById(id) {
       try {
         const auth = JSON.parse(rawAuth);
         if (auth && (String(auth.id) === String(id) || String(auth.uid) === String(id) || auth.email === id || id === 'me')) {
-          return {
-            id: auth.uid || auth.id || 1,
-            name: auth.name,
-            course: auth.course || 'Análise e Desenvolvimento de Sistemas',
-            institution: auth.institution || 'IFPR Campus Ivaiporã',
-            period: auth.period || 'Graduação',
-            city: auth.city || 'Ivaiporã',
-            avatar: auth.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-            skills: auth.skills || ['JavaScript', 'Excel Avançado', 'Gestão'],
-            isVerifiedStudent: auth.isVerifiedStudent ?? true,
-            raNumber: auth.raNumber || 'REG-2026-VAL',
-            linkedin: auth.linkedin || '',
-            github: auth.github || '',
-            bio: auth.bio || 'Profissional / Estudante cadastrado no Ivaí Conecta.',
-            experiences: auth.experiences || [],
-            projects: auth.projects || [],
-            education: auth.education || [],
-            endorsements: auth.endorsements || []
-          };
+          return normalizeUserDoc(auth, auth.uid || auth.id);
         }
       } catch {}
     }
   }
 
-  return talents[0];
+  return null;
 }
 
 export function submitStudentVerification(raNumber, fileData) {
@@ -220,116 +187,131 @@ export function submitStudentVerification(raNumber, fileData) {
 }
 
 export function getVerifiedTeachers() {
-  let teachers = SEED_TEACHERS;
+  let teachers = [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_TEACHERS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.length > 0) teachers = parsed;
+        if (Array.isArray(parsed)) {
+          teachers = parsed.filter(t => t.role === 'professor');
+        }
       } catch {}
-    } else {
-      localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(SEED_TEACHERS));
     }
   }
 
-  // Background sync com o Firestore (coleção 'users')
+  // Background sync com o Firestore (coleção 'users' role 'professor')
   try {
     const usersRef = collection(db, 'users');
-    getDocs(usersRef).then(snapshot => {
-      if (!snapshot.empty) {
-        const remote = snapshot.docs
-          .map(d => normalizeTeacherDoc(d.data(), d.id))
-          .filter(u => u.role === 'professor');
+    const q = query(usersRef, where('role', '==', 'professor'));
+    getDocs(q).then(snapshot => {
+      const remote = snapshot.docs
+        .map(d => normalizeTeacherDoc(d.data(), d.id))
+        .filter(u => u.role === 'professor');
 
-        if (remote.length > 0) {
-          const merged = [...remote, ...teachers.filter(t => !remote.some(rt => String(rt.id) === String(t.id) || (rt.email && t.email && rt.email.toLowerCase() === t.email.toLowerCase())))];
-          localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(merged));
-        }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remote));
       }
-    }).catch(err => console.warn('Firestore offline para professores:', err.message));
+    }).catch(err => console.warn('[Firestore] getVerifiedTeachers offline:', err.message));
   } catch {}
 
   return teachers;
 }
 
 export function getTeacherById(id) {
+  if (!id) return null;
   const teachers = getVerifiedTeachers();
-  return teachers.find(t => t.id === id || String(t.id) === String(id) || t.firestoreId === id) || teachers[0];
+  const found = teachers.find(t => t.id === id || String(t.id) === String(id) || t.firestoreId === id || t.email === id);
+  if (found) return found;
+
+  if (typeof localStorage !== 'undefined') {
+    const rawAuth = localStorage.getItem('ivai_conecta_auth_user');
+    if (rawAuth) {
+      try {
+        const auth = JSON.parse(rawAuth);
+        if (auth && auth.role === 'professor' && (String(auth.id) === String(id) || String(auth.uid) === String(id) || auth.email === id || id === 'me')) {
+          return normalizeTeacherDoc(auth, auth.uid || auth.id);
+        }
+      } catch {}
+    }
+  }
+
+  return null;
 }
 
-export function updateTeacherProfile(teacherId, data) {
+export async function updateTeacherProfile(teacherId, data) {
   const teachers = getVerifiedTeachers();
-  const updated = teachers.map(t => (t.id === teacherId || String(t.id) === String(teacherId) ? { ...t, ...data } : t));
-  localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
+  const updated = teachers.map(t => (t.id === teacherId || String(t.id) === String(teacherId) || t.firestoreId === teacherId ? { ...t, ...data } : t));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
+  }
 
   // Sync imediato com a coleção 'users' do Firestore
   try {
     const docRef = doc(db, 'users', String(teacherId));
-    setDoc(docRef, {
+    await setDoc(docRef, {
       ...data,
       role: 'professor',
       updatedAt: new Date().toISOString()
-    }, { merge: true }).catch(err => console.warn('[Firestore] Sync updateTeacherProfile:', err.message));
-  } catch {}
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore] Sync updateTeacherProfile:', err.message);
+  }
 
   return updated;
 }
 
 export function getTeacherEndorsedStudents(profEmail) {
   const talents = getTalents('Todas as Cidades');
-  if (!profEmail) return talents.slice(0, 2);
+  if (!profEmail) return [];
   const cleanEmail = profEmail.toLowerCase().trim();
-  return talents.filter(t => t.endorsements?.some(e => e.profEmail?.toLowerCase().trim() === cleanEmail || e.profName?.toLowerCase().includes(cleanEmail.split('@')[0])));
+  return talents.filter(t => t.endorsements?.some(e => e.profEmail?.toLowerCase().trim() === cleanEmail));
 }
 
-export function proactiveEndorseStudent(studentId, profUser, quote, discipline) {
-  const talent = getTalentById(studentId);
-  if (!talent) return { success: false, error: 'Estudante não encontrado.' };
-
+export async function proactiveEndorseStudent(studentId, profUser, quote, discipline) {
   const newEndorsement = {
     id: `end_${Date.now()}`,
-    profName: profUser?.name || 'Prof. Dr. Ronan Silva',
-    profEmail: profUser?.email || 'ronan.silva@ifpr.edu.br',
+    profName: profUser?.name || 'Professor Avaliador',
+    profEmail: profUser?.email || '',
     institution: profUser?.institution || 'IFPR Campus Ivaiporã',
-    discipline: discipline || profUser?.discipline || 'Programação de Computadores',
-    quote: quote || 'Estudante de destaque, com ótimo raciocínio prático e dedicação exemplar.',
+    discipline: discipline || profUser?.discipline || 'Avaliação Pedagógica',
+    quote: quote || 'Estudante com excelente desempenho acadêmico e ótimo trabalho em equipe.',
     isVerified: true,
     date: new Date().toLocaleDateString('pt-BR')
   };
 
-  addEndorsementToTalent(studentId, newEndorsement);
+  await addEndorsementToTalent(studentId, newEndorsement);
 
   // Incrementar contador do professor
   const teachers = getVerifiedTeachers();
   const updatedTeachers = teachers.map(t =>
     t.email?.toLowerCase() === (profUser?.email || '').toLowerCase() ? { ...t, endorsementCount: (t.endorsementCount || 0) + 1 } : t
   );
-  localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedTeachers));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedTeachers));
+  }
 
   return { success: true, endorsement: newEndorsement };
 }
 
 export function getEndorsementRequests() {
-  if (typeof localStorage === 'undefined') return SEED_ENDORSEMENT_REQUESTS;
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_ENDORSEMENT_REQUESTS);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     } catch {}
   }
-  localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(SEED_ENDORSEMENT_REQUESTS));
-  return SEED_ENDORSEMENT_REQUESTS;
+  return [];
 }
 
-export function requestTeacherEndorsement(profEmail, profName, discipline, studentUser) {
+export async function requestTeacherEndorsement(profEmail, profName, discipline, studentUser) {
   const requests = getEndorsementRequests();
   const newReq = {
-    id: `req_${Date.now()}`,
-    studentId: studentUser?.uid || studentUser?.id || 1,
-    studentName: studentUser?.name || 'Lucas Eduardo Silva',
-    studentCourse: studentUser?.badge || 'Análise e Desenvolvimento de Sistemas (IFPR)',
+    studentId: studentUser?.uid || studentUser?.id || '',
+    studentName: studentUser?.name || 'Estudante',
+    studentCourse: studentUser?.course || studentUser?.badge || 'Ensino Superior / Técnico',
     profEmail: profEmail.toLowerCase().trim(),
     profName: profName.trim(),
     discipline: discipline.trim(),
@@ -338,8 +320,19 @@ export function requestTeacherEndorsement(profEmail, profName, discipline, stude
     status: 'Pendente'
   };
 
+  try {
+    const docRef = await addDoc(collection(db, 'endorsement_requests'), newReq);
+    newReq.id = docRef.id;
+    newReq.firestoreId = docRef.id;
+  } catch (err) {
+    console.warn('[Firestore] Erro ao enviar pedido de parecer:', err.message);
+    newReq.id = `req_${Date.now()}`;
+  }
+
   requests.push(newReq);
-  localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(requests));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(requests));
+  }
 
   return {
     success: true,
@@ -347,9 +340,9 @@ export function requestTeacherEndorsement(profEmail, profName, discipline, stude
   };
 }
 
-export function approveEndorsementRequest(requestId, quote) {
+export async function approveEndorsementRequest(requestId, quote) {
   const requests = getEndorsementRequests();
-  const req = requests.find(r => r.id === requestId || String(r.id) === String(requestId));
+  const req = requests.find(r => r.id === requestId || String(r.id) === String(requestId) || r.firestoreId === requestId);
   if (!req) return { success: false, error: 'Solicitação não encontrada.' };
 
   const newEndorsement = {
@@ -363,18 +356,35 @@ export function approveEndorsementRequest(requestId, quote) {
     date: new Date().toLocaleDateString('pt-BR')
   };
 
-  addEndorsementToTalent(req.studentId, newEndorsement);
+  await addEndorsementToTalent(req.studentId, newEndorsement);
 
-  const updatedReqs = requests.map(r => r.id === req.id ? { ...r, status: 'Aprovado' } : r);
-  localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+  const targetDocId = req.firestoreId || req.id;
+  if (targetDocId) {
+    try {
+      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Aprovado' });
+    } catch {}
+  }
+
+  const updatedReqs = requests.map(r => (r.id === req.id || r.firestoreId === req.id) ? { ...r, status: 'Aprovado' } : r);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+  }
 
   return { success: true, endorsement: newEndorsement };
 }
 
-export function rejectEndorsementRequest(requestId) {
+export async function rejectEndorsementRequest(requestId) {
   const requests = getEndorsementRequests();
-  const updatedReqs = requests.map(r => String(r.id) === String(requestId) ? { ...r, status: 'Recusado' } : r);
-  localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+  const targetDocId = requestId;
+  if (targetDocId) {
+    try {
+      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Recusado' });
+    } catch {}
+  }
+  const updatedReqs = requests.map(r => (String(r.id) === String(requestId) || r.firestoreId === requestId) ? { ...r, status: 'Recusado' } : r);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+  }
   return { success: true };
 }
 

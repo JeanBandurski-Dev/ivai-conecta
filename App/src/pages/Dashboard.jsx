@@ -1,18 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getTalents, getJobs, getServices, calculateMatchScore } from '../lib/ivaiConecta';
+import { getTalents, getJobs, getServices, subscribeToTalents, subscribeToJobs, subscribeToServices } from '../lib/ivaiConecta';
 import TalentsCarousel from '../components/TalentsCarousel';
 import JobCard from '../components/JobCard';
 import ServiceCard from '../components/ServiceCard';
 
-const METRICS = [
-  { value: '480+', label: 'Talentos e Profissionais', color: 'text-[#4ADE80]' },
-  { value: '94%',  label: 'Taxa de Matching',          color: 'text-[#38BDF8]' },
-  { value: '120+', label: 'Empresas Cadastradas',       color: 'text-[#FBBF24]' },
-  { value: '350+', label: 'Serviços Locais',            color: 'text-[#6EE7B7]' },
-];
+
 
 const PILLARS = [
   'Conexão entre pessoas e empresas',
@@ -27,15 +22,32 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
 
-  const talents  = getTalents(selectedCity);
-  const jobs     = getJobs(selectedCity);
-  const services = getServices(selectedCity);
+  const [talents, setTalents]   = useState(() => getTalents(selectedCity));
+  const [jobs, setJobs]         = useState(() => getJobs(selectedCity));
+  const [services, setServices] = useState(() => getServices(selectedCity));
 
-  const demoSkills = talents[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
+  useEffect(() => {
+    const unsubTalents = subscribeToTalents(selectedCity, setTalents);
+    const unsubJobs = subscribeToJobs(selectedCity, setJobs);
+    const unsubServices = subscribeToServices(selectedCity, setServices);
+
+    return () => {
+      unsubTalents();
+      unsubJobs();
+      unsubServices();
+    };
+  }, [selectedCity]);
 
   const handleSearch = () => {
     if (query.trim()) navigate(`/vagas?q=${encodeURIComponent(query.trim())}`);
   };
+
+  const metrics = [
+    { value: talents.length > 0 ? `${talents.length}` : '0', label: 'Talentos Registrados', color: 'text-[#4ADE80]' },
+    { value: jobs.length > 0 ? `${jobs.length}` : '0', label: 'Vagas Ativas', color: 'text-[#38BDF8]' },
+    { value: services.length > 0 ? `${services.length}` : '0', label: 'Serviços no Marketplace', color: 'text-[#FBBF24]' },
+    { value: '100%', label: 'Validação Regional', color: 'text-[#6EE7B7]' },
+  ];
 
   return (
     <>
@@ -110,7 +122,7 @@ export default function Dashboard() {
             <div className="bg-white/[0.08] backdrop-blur-xl border border-white/15 rounded-3xl p-7 lg:p-8 shadow-2xl">
               <h3 className="text-white font-heading text-xl font-bold mb-6">Impacto no Vale do Ivaí</h3>
               <div className="grid grid-cols-2 gap-4">
-                {METRICS.map(m => (
+                {metrics.map(m => (
                   <div key={m.label} className="bg-white/[0.06] border border-white/10 rounded-2xl p-5 transition-all hover:bg-white/[0.09]">
                     <div className={`text-3xl sm:text-4xl font-heading font-extrabold ${m.color}`}>{m.value}</div>
                     <div className="text-xs sm:text-sm text-gray-300 mt-1.5 leading-snug">{m.label}</div>

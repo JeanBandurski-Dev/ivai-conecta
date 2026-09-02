@@ -3,18 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText, Trash2
+  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare
 } from 'lucide-react';
 import {
   getUserApplications, generateWhatsAppLink, getJobs,
   updateJobStatus, deleteJob, getTalents, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone
 } from '../lib/ivaiConecta';
-import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
+import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
 
 export default function MinhasVagas() {
-  const { currentUser, showToast } = useAppStore();
+  const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
   const [, forceUpdate] = useState(0);
 
@@ -22,7 +22,7 @@ export default function MinhasVagas() {
   const isProfessor = currentUser?.role === 'professor';
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
-  const [liveApps, setLiveApps] = useState(() => getUserApplications());
+  const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
 
   useEffect(() => {
     const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
@@ -38,10 +38,10 @@ export default function MinhasVagas() {
     (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
     (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
     (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+    (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
     (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
     (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-    (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
-    (!currentUser?.uid && j.company?.toLowerCase().includes('valetech'))
+    (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
   
   // Teacher endorsement requests state
@@ -51,6 +51,19 @@ export default function MinhasVagas() {
 
   // Selected job to view applicants (for company view)
   const [selectedJobApplicants, setSelectedJobApplicants] = useState(null);
+  const [jobApplicants, setJobApplicants] = useState([]);
+
+  useEffect(() => {
+    if (!selectedJobApplicants) {
+      setJobApplicants([]);
+      return;
+    }
+    const targetId = selectedJobApplicants.firestoreId || selectedJobApplicants.id;
+    const unsub = subscribeToJobApplicants(targetId, (data) => {
+      setJobApplicants(data);
+    });
+    return () => unsub();
+  }, [selectedJobApplicants]);
 
   if (!currentUser) {
     return (
@@ -95,13 +108,6 @@ export default function MinhasVagas() {
     showToast('Solicitação recusada.');
     forceUpdate(n => n + 1);
   };
-
-  // Demo candidates list for company view
-  const demoApplicants = [
-    { id: 1, name: 'Lucas Eduardo Silva', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
-    { id: 2, name: 'Juliana Aparecida Melo', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
-    { id: 3, name: 'Rafael Gomes Costa', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
-  ];
 
   return (
     <>
@@ -277,7 +283,9 @@ export default function MinhasVagas() {
                             <span className={`w-2 h-2 rounded-full ${job.status === 'Encerrada' ? 'bg-red-500' : 'bg-green-500'}`} />
                             {job.status === 'Encerrada' ? 'Vaga Encerrada' : 'Vaga Ativa'}
                           </span>
-                          <span className="text-xs text-gray-400 dark:text-slate-400">Criada em: {job.createdAt || '15/08/2026'}</span>
+                          <span className="text-xs text-gray-400 dark:text-slate-400">
+                            Criada em: {job.createdAt ? (typeof job.createdAt === 'string' && job.createdAt.includes('/') ? job.createdAt : new Date(job.createdAt).toLocaleDateString('pt-BR')) : 'Recentemente'}
+                          </span>
                         </div>
                         <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">{job.title}</h3>
                         <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
@@ -285,7 +293,10 @@ export default function MinhasVagas() {
                           <span>·</span>
                           <span>{job.type}</span>
                           <span>·</span>
-                          <span className="font-semibold text-primary-blue dark:text-blue-400"><Users size={14} className="inline mr-1" />{job.applicantsCount || 3} Candidatos Inscritos</span>
+                          <span className="font-semibold text-primary-blue dark:text-blue-400">
+                            <Users size={14} className="inline mr-1" />
+                            {job.applicantsCount || 0} {(job.applicantsCount || 0) === 1 ? 'Candidato Inscrito' : 'Candidatos Inscritos'}
+                          </span>
                         </div>
                       </div>
 
@@ -295,7 +306,7 @@ export default function MinhasVagas() {
                           onClick={() => setSelectedJobApplicants(job)}
                           className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5"
                         >
-                          <Users size={14} /> Ver Candidatos ({job.applicantsCount || 3})
+                          <Users size={14} /> Ver Candidatos ({job.applicantsCount || 0})
                         </button>
 
                         {job.status === 'Encerrada' ? (
@@ -349,7 +360,6 @@ export default function MinhasVagas() {
             ) : (
               <div className="space-y-6 max-w-4xl mx-auto">
                 {apps.map(app => {
-                  const waLink = generateWhatsAppLink(app.recruiterPhone, app.title, app.company, app.city);
                   return (
                     <div key={app.id} className="card gap-4 p-5 sm:p-6">
                       {/* Top */}
@@ -411,11 +421,25 @@ export default function MinhasVagas() {
                       )}
 
                       {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
                         <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
-                        <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp btn-sm text-xs font-bold">
-                          <Phone size={13} /> Contatar Recrutador no WhatsApp
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+
+                              startChatWith({
+                                name: app.company,
+                                email: targetEmail,
+                                role: 'empresa',
+                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                              }, `Candidatura: ${app.title}`);
+                            }}
+                            className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <MessageSquare size={13} /> Conversar no Chat
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -437,43 +461,69 @@ export default function MinhasVagas() {
                 <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">
                   Candidatos Inscritos: {selectedJobApplicants.title}
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Alunos e profissionais ordenados por compatibilidade de qualificações.</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Candidatos reais que se inscreveram nesta vaga no Vale do Ivaí.</p>
               </div>
               <button onClick={() => setSelectedJobApplicants(null)}><XCircle size={22} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
 
-            <div className="space-y-3">
-              {demoApplicants.map(cand => (
-                <div key={cand.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
-                      {cand.name}
-                      <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
-                        {cand.matchScore}% Match
-                      </span>
+            {jobApplicants.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 border border-gray-100 dark:border-slate-800">
+                <Users size={36} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                <p className="font-bold text-gray-700 dark:text-white text-sm">Nenhum candidato se inscreveu nesta vaga ainda.</p>
+                <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Assim que um estudante ou profissional clicar em "Candidatar-se", ele aparecerá aqui instantaneamente.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {jobApplicants.map(cand => (
+                  <div key={cand.id || cand.firestoreId} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
+                        {cand.candidateName || cand.name || 'Candidato'}
+                        <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
+                          {cand.matchScore || 90}% Match
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">
+                        {cand.candidateCourse || 'Estudante / Profissional'} · Inscrito em {cand.appliedAt || 'Hoje'}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">{cand.course} · Inscrito em {cand.appliedAt}</div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => navigate(`/perfil/${cand.id}`)}
-                      className="btn btn-outline btn-sm text-xs font-bold"
-                    >
-                      <Eye size={13} /> Ver Currículo
-                    </button>
-                    <a
-                      href={`https://wa.me/${sanitizeWhatsAppPhone(cand.phone)}?text=${encodeURIComponent(`Olá ${cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-whatsapp btn-sm text-xs font-bold"
-                    >
-                      <Phone size={13} /> WhatsApp
-                    </a>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          startChatWith({
+                            name: cand.candidateName || cand.name || 'Candidato',
+                            email: cand.candidateEmail || cand.email,
+                            role: 'aluno',
+                            avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                          }, `Processo Seletivo: ${selectedJobApplicants.title}`);
+                          setSelectedJobApplicants(null);
+                        }}
+                        className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <MessageSquare size={13} /> Chat com o Candidato
+                      </button>
+                      <button
+                        onClick={() => navigate(`/perfil/${cand.candidateUid || cand.candidateId || cand.id}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold"
+                      >
+                        <Eye size={13} /> Ver Currículo
+                      </button>
+                      {(cand.candidatePhone || cand.phone) && (
+                        <a
+                          href={`https://wa.me/${sanitizeWhatsAppPhone(cand.candidatePhone || cand.phone)}?text=${encodeURIComponent(`Olá ${cand.candidateName || cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-whatsapp btn-sm text-xs font-bold"
+                        >
+                          <Phone size={13} /> WhatsApp
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

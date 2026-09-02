@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, CheckCircle, ShieldCheck,
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
-  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload
+  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
 } from 'lucide-react';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
@@ -23,37 +23,29 @@ export default function PerfilAluno() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
-  const talentId = id || currentUser?.uid || currentUser?.id || '1';
-  const talent = getTalentById(talentId) || {
-    id: currentUser?.uid || currentUser?.id || 1,
-    name: currentUser?.name || 'Lucas Eduardo Silva',
-    course: currentUser?.course || 'Análise e Desenvolvimento de Sistemas',
-    institution: currentUser?.institution || 'IFPR Campus Ivaiporã',
-    period: currentUser?.period || '5º Semestre (Vespertino)',
-    city: currentUser?.city || 'Ivaiporã',
-    avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-    skills: currentUser?.skills || ['JavaScript', 'HTML5/CSS3', 'React', 'Node.js', 'Git', 'SQL'],
-    isVerifiedStudent: currentUser?.isVerifiedStudent ?? true,
-    raNumber: currentUser?.raNumber || 'IFPR-2024-8891',
-    linkedin: currentUser?.linkedin || 'https://linkedin.com/in/lucas-eduardo-dev',
-    github: currentUser?.github || 'https://github.com/lucas-dev',
-    bio: currentUser?.bio || 'Estudante de ADS apaixonado por desenvolvimento web e mobile. Busco oportunidade de estágio ou vaga junior na região de Ivaiporã.',
-    experiences: currentUser?.experiences || [
-      { id: 'exp1', role: 'Estagiário de TI', company: 'Prefeitura de Ivaiporã', period: 'Jan/2025 - Atual', description: 'Desenvolvimento de telas responsivas e suporte a banco de dados MySQL para o portal público.' },
-      { id: 'exp2', role: 'Monitor de Programação', company: 'IFPR Campus Ivaiporã', period: 'Mar/2024 - Dez/2024', description: 'Auxílio aos alunos ingressantes nas disciplinas de Lógica e Estrutura de Dados.' }
-    ],
-    projects: currentUser?.projects || [
-      { id: 'proj1', title: 'Ivaí Conecta - Plataforma Regional', tech: 'React, Node, Tailwind', link: 'https://github.com/lucas-dev/ivai-conecta', description: 'Sistema de ponte de empregabilidade regional para o Vale do Ivaí.' }
-    ],
-    education: currentUser?.education || [
-      { id: 'edu1', degree: 'Análise e Desenvolvimento de Sistemas', institution: 'IFPR Campus Ivaiporã', period: '2024 - 2026' }
-    ],
-    endorsements: [
-      { id: 'end_01', profName: 'Prof. Dr. Ricardo Oliveira', profEmail: 'ricardo.oliveira@ifpr.edu.br', institution: 'IFPR Campus Ivaiporã', discipline: 'Desenvolvimento Web & Banco de Dados', quote: 'Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.', isVerified: true }
-    ]
-  };
+  const talentId = id || currentUser?.uid || currentUser?.id;
+  const talent = getTalentById(talentId) || (currentUser ? {
+    id: currentUser.uid || currentUser.id,
+    firestoreId: currentUser.uid || currentUser.id,
+    name: currentUser.name || 'Estudante / Profissional',
+    course: currentUser.course || (currentUser.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
+    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+    period: currentUser.period || 'Em andamento',
+    city: currentUser.city || 'Ivaiporã',
+    avatar: currentUser.avatar || '',
+    skills: currentUser.skills || [],
+    isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
+    raNumber: currentUser.raNumber || '',
+    linkedin: currentUser.linkedin || '',
+    github: currentUser.github || '',
+    bio: currentUser.bio || '',
+    experiences: currentUser.experiences || [],
+    projects: currentUser.projects || [],
+    education: currentUser.education || [],
+    endorsements: currentUser.endorsements || []
+  } : null);
 
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
@@ -96,19 +88,19 @@ export default function PerfilAluno() {
 
   // Comprehensive edit form state
   const [editData, setEditData] = useState({
-    name: talent.name,
-    avatar: talent.avatar,
-    city: talent.city,
-    institution: talent.institution,
-    course: talent.course,
-    period: talent.period || '',
-    bio: talent.bio || '',
-    linkedin: talent.linkedin || '',
-    github: talent.github || '',
-    skills: [...(talent.skills || [])],
-    experiences: [...(talent.experiences || [])],
-    projects: [...(talent.projects || [])],
-    education: [...(talent.education || [])],
+    name: talent?.name || '',
+    avatar: talent?.avatar || '',
+    city: talent?.city || 'Ivaiporã',
+    institution: talent?.institution || '',
+    course: talent?.course || '',
+    period: talent?.period || '',
+    bio: talent?.bio || '',
+    linkedin: talent?.linkedin || '',
+    github: talent?.github || '',
+    skills: [...(talent?.skills || [])],
+    experiences: [...(talent?.experiences || [])],
+    projects: [...(talent?.projects || [])],
+    education: [...(talent?.education || [])],
     newSkill: ''
   });
 
@@ -330,15 +322,23 @@ export default function PerfilAluno() {
                 </div>
 
                 <div className="text-accent-sky font-bold text-base sm:text-lg mb-1 flex items-center gap-2">
-                  <GraduationCap size={18} /> {talent.course}
+                  <GraduationCap size={18} /> {talent.course || (isOwner ? 'Adicione seu curso ou formação' : 'Curso não informado')}
                 </div>
 
                 <div className="flex items-center gap-3 text-gray-300 text-xs sm:text-sm flex-wrap">
-                  <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
+                  {talent.institution ? (
+                    <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
+                  ) : (
+                    isOwner && <span className="text-gray-400 italic">Instituição não informada</span>
+                  )}
+                  {talent.period && (
+                    <>
+                      <span>·</span>
+                      <span>{talent.period}</span>
+                    </>
+                  )}
                   <span>·</span>
-                  <span>{talent.period || 'Graduação'}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1.5"><MapPin size={14} />{talent.city}, PR</span>
+                  <span className="flex items-center gap-1.5"><MapPin size={14} />{talent.city || 'Vale do Ivaí'}, PR</span>
                 </div>
 
                 {/* Badges Destacadas de Redes Sociais (LinkedIn e GitHub) */}
@@ -392,6 +392,23 @@ export default function PerfilAluno() {
 
             {/* Coluna de Botões Perfeitamente Alinhados à Direita */}
             <div className="flex flex-col sm:items-end gap-2.5 shrink-0 w-full sm:w-auto">
+              {/* Botão de Chat Direto (visível para quem está visitando o perfil) */}
+              {!isOwner && (
+                <button
+                  onClick={() => {
+                    startChatWith({
+                      name: talent.name,
+                      email: talent.email || 'aluno@ivaiconecta.com.br',
+                      role: 'aluno',
+                      avatar: talent.avatar || ''
+                    }, `Contato Direto: Perfil de ${talent.name}`);
+                  }}
+                  className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com {talent.name.split(' ')[0]}
+                </button>
+              )}
+
               {/* 1. Baixar Currículo em PDF */}
               <button
                 onClick={() => setPdfModalOpen(true)}
@@ -474,7 +491,7 @@ export default function PerfilAluno() {
                   <Sparkles size={17} className="text-primary-blue dark:text-blue-400" /> Sobre o Estudante
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
-                  {talent.bio || 'Estudante dedicado buscando desenvolvimento profissional e oportunidades de carreira no Vale do Ivaí.'}
+                  {talent.bio || (isOwner ? 'Nenhum resumo adicionado. Clique no botão "Editar Perfil" acima para escrever sua biografia e objetivos.' : 'Nenhum resumo profissional adicionado.')}
                 </p>
               </div>
 
@@ -482,11 +499,17 @@ export default function PerfilAluno() {
                 <h3 className="font-heading font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
                   <BookOpen size={17} className="text-primary-blue dark:text-blue-400" /> Habilidades Técnicas
                 </h3>
-                <div className="flex flex-wrap gap-2">
-                  {(talent.skills || []).map(s => (
-                    <span key={s} className="tag tag-blue">{s}</span>
-                  ))}
-                </div>
+                {!talent.skills || talent.skills.length === 0 ? (
+                  <p className="text-xs text-gray-400 dark:text-slate-500 italic">
+                    {isOwner ? 'Nenhuma competência cadastrada. Clique em "Editar Perfil" para adicionar suas habilidades.' : 'Nenhuma habilidade cadastrada ainda.'}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {talent.skills.map(s => (
+                      <span key={s} className="tag tag-blue">{s}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

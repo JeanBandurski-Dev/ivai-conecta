@@ -87,32 +87,29 @@ export default function BancoDeTalentos() {
   const filtered = useMemo(() => {
     return all
       .filter(t => {
-        const isVerifiedOrSelf = t.isVerifiedStudent || (currentUser && String(currentUser.id) === String(t.id));
-        if (!isVerifiedOrSelf) return false;
-
-        const mCity = city === 'Todas as Cidades' || t.city === city;
-        const mArea = area === 'Todas' || t.course.toLowerCase().includes(area.toLowerCase());
-        const mInst = institution === 'Todas as Instituições' || t.institution.toLowerCase().includes(institution.toLowerCase()) || (institution.includes('Autônomo') && t.institution.includes('Autônomo'));
+        const mCity = city === 'Todas as Cidades' || (t.city && t.city.toLowerCase() === city.toLowerCase());
+        const mArea = area === 'Todas' || (t.course && t.course.toLowerCase().includes(area.toLowerCase()));
+        const mInst = institution === 'Todas as Instituições' || (t.institution && t.institution.toLowerCase().includes(institution.toLowerCase())) || (institution.includes('Autônomo') && t.institution && t.institution.includes('Autônomo'));
         const mEndorsed = !onlyEndorsed || (t.endorsements && t.endorsements.length > 0);
-        const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.includes(sk));
+        const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.some(s => s && s.toLowerCase().includes(sk.toLowerCase())));
 
         const q = query.toLowerCase().trim();
         const mQ = !q ||
-          t.name.toLowerCase().includes(q) ||
-          t.course.toLowerCase().includes(q) ||
-          t.city.toLowerCase().includes(q) ||
-          t.institution.toLowerCase().includes(q) ||
-          t.skills?.some(s => s.toLowerCase().includes(q));
+          (t.name && t.name.toLowerCase().includes(q)) ||
+          (t.course && t.course.toLowerCase().includes(q)) ||
+          (t.city && t.city.toLowerCase().includes(q)) ||
+          (t.institution && t.institution.toLowerCase().includes(q)) ||
+          t.skills?.some(s => s && s.toLowerCase().includes(q));
 
         return mCity && mArea && mInst && mEndorsed && mSkills && mQ;
       })
       .sort((a, b) => {
         if (sortBy === 'endorsements') return (b.endorsements?.length || 0) - (a.endorsements?.length || 0);
-        if (sortBy === 'name') return a.name.localeCompare(b.name);
-        if (sortBy === 'city') return a.city.localeCompare(b.city);
+        if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+        if (sortBy === 'city') return (a.city || '').localeCompare(b.city || '');
         return 0;
       });
-  }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy, currentUser]);
+  }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy]);
 
   return (
     <>
@@ -192,47 +189,63 @@ export default function BancoDeTalentos() {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teachers.map(t => (
-                <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-4">
-                      <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white" />
-                      <div>
-                        <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
-                        <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Doutor / Mestre em Ciência da Computação'}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">{t.institution}</div>
+            {teachers.length === 0 ? (
+              <div className="card p-12 text-center space-y-4 max-w-md mx-auto my-8 border border-gray-100 dark:border-slate-800">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+                  <Award size={32} />
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white">
+                    Nenhum professor cadastrado ainda
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                    Os docentes de universidades parceiras (IFPR, Univale, UENP) cadastrados no sistema com o perfil Professor aparecerão aqui.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {teachers.map(t => (
+                  <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-4">
+                        <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white" />
+                        <div>
+                          <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
+                          <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Docente / Orientador'}</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">{t.institution}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-600 dark:text-slate-300 font-medium">
+                        <strong>Disciplina Principal:</strong> {t.discipline}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full w-fit font-bold">
+                        <ShieldCheck size={13} /> {t.endorsementCount || 0} Alunos Recomendados
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-600 dark:text-slate-300 font-medium">
-                      <strong>Disciplina Principal:</strong> {t.discipline}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full w-fit font-bold">
-                      <ShieldCheck size={13} /> {t.endorsementCount || 18} Alunos Recomendados
+                    {/* 2 Botões de Ação */}
+                    <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(`/professor/${t.id}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                      >
+                        <Eye size={13} /> Ver Perfil
+                      </button>
+                      
+                      <button
+                        onClick={() => setSelectedTeacherForEndorsements(t)}
+                        className="btn btn-primary btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                      >
+                        <Award size={13} /> Ver Indicações
+                      </button>
                     </div>
                   </div>
-
-                  {/* 2 Botões de Ação */}
-                  <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
-                    <button
-                      onClick={() => navigate(`/professor/${t.id}`)}
-                      className="btn btn-outline btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
-                    >
-                      <Eye size={13} /> Ver Perfil
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTeacherForEndorsements(t)}
-                      className="btn btn-primary btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
-                    >
-                      <Award size={13} /> Ver Indicações
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -377,24 +390,30 @@ export default function BancoDeTalentos() {
             </div>
 
             <div className="space-y-3">
-              {getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
-                <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <img src={student.avatar} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
-                    <div>
-                      <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
-                      <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => { setSelectedTeacherForEndorsements(null); navigate(`/perfil/${student.id}`); }}
-                    className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5"
-                  >
-                    <Eye size={13} /> Ver Currículo Completo
-                  </button>
+              {getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).length === 0 ? (
+                <div className="p-8 text-center bg-gray-50 dark:bg-slate-800 rounded-2xl text-gray-400 dark:text-slate-500 text-sm">
+                  Este docente ainda não emitiu recomendações registradas no sistema.
                 </div>
-              ))}
+              ) : (
+                getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
+                  <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <img src={student.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                      <div>
+                        <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
+                        <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => { setSelectedTeacherForEndorsements(null); navigate(`/perfil/${student.id}`); }}
+                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <Eye size={13} /> Ver Currículo Completo
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

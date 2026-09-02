@@ -79,7 +79,6 @@ export default function Vagas() {
   }, []);
 
   const allJobs = liveJobs;
-  const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
 
   // Check jobId param in URL
   useEffect(() => {
@@ -140,7 +139,7 @@ export default function Vagas() {
     setFormError('');
   };
 
-  const handleCreateJob = (e) => {
+  const handleCreateJob = async (e) => {
     e.preventDefault();
     setFormError('');
 
@@ -177,17 +176,18 @@ export default function Vagas() {
       city: newCity,
       type: newType,
       modality: newModality,
-      salary: newSalary,
+      salary: newSalary || 'A combinar',
       schedule: newSchedule,
-      description: newDesc.trim(),
-      requiredSkills: newSkillsList,
+      description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
+      requiredSkills: newSkillsList && newSkillsList.length > 0 ? newSkillsList : ['Comunicação Assertiva', 'Trabalho em Equipe'],
       benefits: newBenefits.length > 0 ? newBenefits : ['Vale Transporte (VT)'],
-      recruiterPhone: currentUser?.phone || '5543999887766',
+      recruiterPhone: currentUser?.phone || '',
+      recruiterEmail: currentUser?.email || '',
       createdBy: currentUser?.uid || currentUser?.id || currentUser?.email || 'empresa',
     };
 
-    addJob(jobPayload);
-    showToast('🎉 Vaga homologada e publicada com sucesso!');
+    await addJob(jobPayload);
+    showToast('🎉 Vaga homologada e publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
     setShowModal(false);
     setNewTitle('');
     setNewDesc('');
@@ -237,7 +237,7 @@ export default function Vagas() {
         const matchCity = !filterCity || filterCity === 'Todas as Cidades' || j.city === filterCity;
         
         // Tipo
-        const matchType = filterType === 'Todos' || j.type.toLowerCase().includes(filterType.toLowerCase());
+        const matchType = filterType === 'Todos' || (j.type && j.type.toLowerCase().includes(filterType.toLowerCase()));
         
         // Modalidade
         const matchModality = filterModality === 'Todas' || (j.modality && j.modality.toLowerCase().includes(filterModality.toLowerCase()));
@@ -246,17 +246,21 @@ export default function Vagas() {
         const matchScoreOk = !canSeeMatch || minMatch === 0 || (j.calculatedScore && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r.toLowerCase().includes(sk.toLowerCase())));
+        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r && r.toLowerCase().includes(sk.toLowerCase())));
 
         // Busca Textual
-        const text = (j.title + ' ' + j.company + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
+        const text = ((j.title || '') + ' ' + (j.company || '') + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
         return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
         if (sortBy === 'match' && canSeeMatch) return (b.calculatedScore || 0) - (a.calculatedScore || 0);
-        if (sortBy === 'recent') return (b.id || 0) - (a.id || 0);
+        if (sortBy === 'recent') {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        }
         return 0;
       });
   }, [allJobs, filterCity, filterType, filterModality, minMatch, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser]);

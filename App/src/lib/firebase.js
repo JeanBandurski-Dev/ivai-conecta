@@ -4,13 +4,13 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey:            'AIzaSyD0vBDSVrmerUmsqWee1aWvFB2NdGdyaSo',
-  authDomain:        'ivai-conecta-4a366.firebaseapp.com',
-  projectId:         'ivai-conecta-4a366',
-  storageBucket:     'ivai-conecta-4a366.firebasestorage.app',
-  messagingSenderId: '380692802322',
-  appId:             '1:380692802322:web:d0c01dc577883086cda1cb',
-  measurementId:     'G-HGGXZ0FYTR',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyD0vBDSVrmerUmsqWee1aWvFB2NdGdyaSo',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'ivai-conecta-4a366.firebaseapp.com',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID || 'ivai-conecta-4a366',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'ivai-conecta-4a366.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '380692802322',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID || '1:380692802322:web:d0c01dc577883086cda1cb',
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-HGGXZ0FYTR',
 };
 
 const app = initializeApp(firebaseConfig);

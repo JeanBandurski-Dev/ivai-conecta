@@ -3,49 +3,44 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera
+  BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera, MessageSquare
 } from 'lucide-react';
 import { getJobs, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilEmpresa() {
-  const { currentUser, setCurrentUser, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [company, setCompany] = useState({
-    name:     currentUser?.name || 'ValeTech Soluções Digitais',
+    name:     currentUser?.name || 'Empresa Cadastrada',
     city:     currentUser?.city || 'Ivaiporã',
-    sector:   currentUser?.sector || 'Tecnologia da Informação & Inovação',
-    size:     currentUser?.size || '11-50 funcionários',
-    cnpj:     currentUser?.cnpj || '12.345.678/0001-90',
-    rating:   4.9,
-    reviews:  28,
-    logo:     currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
-    about:    currentUser?.about || 'Empresa de tecnologia e consultoria digital com sede em Ivaiporã. Desenvolvemos softwares sob medida, portais web e impulsionamos a transformação digital de indústrias, cooperativas e comércios em todo o Vale do Ivaí.',
-    history:  currentUser?.history || 'Fundada em 2018 por egressos de cursos de tecnologia da região, a ValeTech nasceu com o propósito de reter talentos locais e gerar oportunidades de trabalho para estudantes universitários.',
-    perks:    currentUser?.perks || ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido', 'Participação nos Lucros (PPR)', 'Auxílio Educação & Cursos', 'Ambiente de Inovação'],
+    sector:   currentUser?.sector || 'Comércio & Serviços',
+    size:     currentUser?.size || '1-10 funcionários',
+    cnpj:     currentUser?.cnpj || '',
+    rating:   currentUser?.rating || 5.0,
+    reviews:  currentUser?.reviewsCount || 0,
+    logo:     currentUser?.avatar || '',
+    about:    currentUser?.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
+    history:  currentUser?.history || '',
+    perks:    currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
   });
 
-  const jobs = getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]));
+  const jobs = getJobs('Todas as Cidades').filter(j => 
+    (currentUser?.uid && j.createdBy === currentUser.uid) ||
+    (currentUser?.email && j.recruiterEmail === currentUser.email) ||
+    (j.company && company.name && j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]))
+  );
 
   const isCompanyOwner = currentUser?.role === 'empresa';
 
-  // Analytics mock data
-  const viewsPerDay = [
-    { day: 'Seg', views: 42 },
-    { day: 'Ter', views: 65 },
-    { day: 'Qua', views: 88 },
-    { day: 'Qui', views: 120 },
-    { day: 'Sex', views: 95 },
-    { day: 'Sáb', views: 40 },
-    { day: 'Dom', views: 35 },
-  ];
-
-  const maxViews = Math.max(...viewsPerDay.map(v => v.views));
+  const totalApplicants = jobs.reduce((acc, j) => acc + (j.applicantsCount || 0), 0);
+  const activeJobsCount = jobs.filter(j => (j.status || 'Ativa') === 'Ativa').length;
+  const closedJobsCount = jobs.filter(j => j.status === 'Encerrada').length;
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -102,7 +97,7 @@ export default function PerfilEmpresa() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6">
               <img
-                src={company.logo}
+                src={company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250'}
                 alt={company.name}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-white/30 shadow-brand-lg shrink-0 bg-white"
               />
@@ -122,12 +117,12 @@ export default function PerfilEmpresa() {
                   <span>·</span>
                   <span className="flex items-center gap-1.5"><Users size={14} />{company.size}</span>
                   <span>·</span>
-                  <span className="flex items-center gap-1.5"><Star size={14} className="fill-amber-400 text-amber-400" />{company.rating} ({company.reviews} avaliações)</span>
+                  <span className="flex items-center gap-1.5"><Briefcase size={14} />{jobs.length} {jobs.length === 1 ? 'vaga publicada' : 'vagas publicadas'}</span>
                 </div>
               </div>
             </div>
 
-            {isCompanyOwner && (
+            {isCompanyOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil da Empresa
@@ -135,6 +130,24 @@ export default function PerfilEmpresa() {
                 <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
                   <Building2 size={15} /> Gerenciar Minhas Vagas
                 </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    const companyEmail = company.email || currentUser?.email || 'empresa@ivaiconecta.com.br';
+                    
+                    startChatWith({
+                      name: company.name,
+                      email: companyEmail,
+                      role: 'empresa',
+                      avatar: company.logo
+                    }, `Contato com Empresa: ${company.name}`);
+                  }}
+                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                </button>
               </div>
             )}
           </div>
@@ -144,7 +157,7 @@ export default function PerfilEmpresa() {
 
       <main className="container section space-y-8">
 
-        {/* ── PAINEL DE ANALYTICS GRAFICO PARA EMPRESAS ── */}
+        {/* ── PAINEL DE ANALYTICS DINÂMICO PARA EMPRESAS ── */}
         {isCompanyOwner && (
           <div className="card space-y-6 border-blue-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between flex-wrap gap-3 border-b border-gray-100 dark:border-slate-800 pb-4">
@@ -152,112 +165,42 @@ export default function PerfilEmpresa() {
                 <h2 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                   <BarChart3 size={22} className="text-primary-blue dark:text-blue-400" /> Painel de Analytics Empresarial
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Métricas visuais de alcance das vagas, interesse de candidatos e taxa de conversão.</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Métricas consolidadas de alcance e inscrições de talentos para as vagas da sua empresa.</p>
               </div>
-              <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-                <TrendingUp size={13} /> +24% este mês
+              <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full flex items-center gap-1">
+                <Briefcase size={13} /> {activeJobsCount} vagas ativas
               </span>
             </div>
 
-            {/* Grid dos Gráficos */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              
-              {/* Gráfico 1: Visualizações nos últimos 7 dias */}
-              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-800 dark:text-white flex items-center gap-1.5"><Eye size={15} className="text-primary-blue" /> Visualizações por Dia</span>
-                  <span className="text-gray-500 dark:text-slate-400 font-semibold">Total: 485</span>
-                </div>
-
-                {/* Bars */}
-                <div className="flex items-end justify-between gap-2 h-36 pt-4 border-b border-gray-200 dark:border-slate-700 pb-2">
-                  {viewsPerDay.map(v => {
-                    const heightPercent = Math.round((v.views / maxViews) * 100);
-                    return (
-                      <div key={v.day} className="flex-1 flex flex-col items-center gap-1 group">
-                        <span className="text-[10px] font-bold text-primary-blue dark:text-blue-400">
-                          {v.views}
-                        </span>
-                        <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-t-lg h-24 flex items-end overflow-hidden p-0.5">
-                          <div
-                            className="bg-[linear-gradient(180deg,#0052FF_0%,#22C55E_100%)] w-full rounded-t-md transition-all duration-300 shadow-xs"
-                            style={{ height: `${Math.max(15, heightPercent)}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">{v.day}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+            {/* Grid dos Cards Métricos Reais */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
+                <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Total de Vagas</div>
+                <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{jobs.length}</div>
+                <div className="text-xs text-primary-blue font-semibold">{activeJobsCount} ativas · {closedJobsCount} encerradas</div>
               </div>
 
-              {/* Gráfico 2: Distribuição de Match Score */}
-              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-800 dark:text-white flex items-center gap-1.5"><Target size={15} className="text-teal-600" /> Compatibilidade dos Candidatos</span>
-                  <span className="text-gray-500 dark:text-slate-400 font-semibold">10 Inscritos</span>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-semibold text-gray-700 dark:text-slate-300">Match 90%+ (Excelente)</span>
-                      <span className="font-bold text-green-600 dark:text-green-400">4 (40%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-green-500 h-full rounded-full" style={{ width: '40%' }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-semibold text-gray-700 dark:text-slate-300">Match 80%-89% (Alto)</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">4 (40%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-primary-blue h-full rounded-full" style={{ width: '40%' }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-semibold text-gray-700 dark:text-slate-300">Match 70%-79% (Médio)</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">2 (20%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: '20%' }} />
-                    </div>
-                  </div>
-                </div>
+              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
+                <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Candidaturas Recebidas</div>
+                <div className="text-3xl font-extrabold text-primary-blue dark:text-blue-400">{totalApplicants}</div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Inscrições registradas</div>
               </div>
 
-              {/* Gráfico 3: Funil de Seleção */}
-              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-800 dark:text-white flex items-center gap-1.5"><Award size={15} className="text-amber-500" /> Funil do Processo Seletivo</span>
-                  <span className="text-gray-500 dark:text-slate-400 font-semibold">Taxa: 10%</span>
+              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
+                <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Média de Candidatos / Vaga</div>
+                <div className="text-3xl font-extrabold text-teal-600">
+                  {jobs.length > 0 ? (totalApplicants / jobs.length).toFixed(1) : '0'}
                 </div>
-
-                <div className="space-y-2 pt-1">
-                  <div className="bg-primary-blue text-white p-2.5 rounded-xl text-xs flex justify-between font-semibold shadow-xs">
-                    <span>1. Candidaturas Enviadas</span>
-                    <span>10 candidatos</span>
-                  </div>
-                  <div className="bg-blue-600 text-white p-2.5 rounded-xl text-xs flex justify-between font-semibold shadow-xs w-[85%] mx-auto">
-                    <span>2. Triados pela Empresa</span>
-                    <span>7 candidatos</span>
-                  </div>
-                  <div className="bg-blue-700 text-white p-2.5 rounded-xl text-xs flex justify-between font-semibold shadow-xs w-[70%] mx-auto">
-                    <span>3. Entrevistas Agendadas</span>
-                    <span>4 candidatos</span>
-                  </div>
-                  <div className="bg-green-600 text-white p-2.5 rounded-xl text-xs flex justify-between font-semibold shadow-xs w-[55%] mx-auto">
-                    <span>4. Propostas Concluídas</span>
-                    <span>1 contratado</span>
-                  </div>
-                </div>
+                <div className="text-xs text-teal-700 font-semibold">Engajamento regional</div>
               </div>
 
+              <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
+                <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Selo de Verificação</div>
+                <div className="text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5 pt-1">
+                  <ShieldCheck size={20} /> CNPJ Validado
+                </div>
+                <div className="text-xs text-green-700 font-medium">Empresa certificada</div>
+              </div>
             </div>
           </div>
         )}

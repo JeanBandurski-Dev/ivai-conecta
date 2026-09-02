@@ -15,31 +15,18 @@ import {
   STORAGE_KEY_AUTH_USER,
   STORAGE_KEY_USERS_DB,
   STORAGE_KEY_CITY,
-  DEFAULT_USERS,
   USER_ROLES,
 } from '../data/seedData';
 
 export function getUsersDB() {
-  if (typeof localStorage === 'undefined') return DEFAULT_USERS;
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_USERS_DB);
-  let users = DEFAULT_USERS;
+  let users = [];
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-        users = parsed;
-      }
+      if (Array.isArray(parsed)) users = parsed;
     } catch {}
-  }
-  let modified = false;
-  DEFAULT_USERS.forEach(defUser => {
-    if (!users.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
-      users.push(defUser);
-      modified = true;
-    }
-  });
-  if (modified || !raw) {
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
   }
   return users;
 }
@@ -67,17 +54,6 @@ export async function getUserProfile(uid) {
 export async function login(email, password) {
   const cleanEmail = email.toLowerCase().trim();
 
-  // 1. Verificar primeiro se é conta demo do LocalStorage
-  const users = getUsersDB();
-  const demoFound = users.find(u => u.email.toLowerCase() === cleanEmail && u.password === password);
-  if (demoFound) {
-    const sessionUser = { ...demoFound };
-    delete sessionUser.password;
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-    return { success: true, user: sessionUser };
-  }
-
-  // 2. Tentar login no Firebase Auth
   try {
     const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
@@ -95,7 +71,7 @@ export async function login(email, password) {
       city: profileRes.profile?.city || 'Ivaiporã',
       role,
       badge: roleMeta.badge,
-      avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: profileRes.profile?.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
       ...(profileRes.profile || {})
@@ -104,7 +80,13 @@ export async function login(email, password) {
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser };
   } catch (error) {
-    return { success: false, error: 'E-mail ou senha incorretos. Verifique seus dados.' };
+    let errorMsg = 'E-mail ou senha incorretos. Verifique seus dados.';
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      errorMsg = 'E-mail ou senha inválidos. Verifique suas credenciais.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMsg = 'Muitas tentativas sem sucesso. Tente novamente mais tarde.';
+    }
+    return { success: false, error: errorMsg };
   }
 }
 
@@ -116,55 +98,55 @@ export async function register(data) {
 
   const defaultRoleData = {
     aluno: {
-      course: data.course || 'Análise e Desenvolvimento de Sistemas',
-      institution: data.institution || 'IFPR Campus Ivaiporã',
-      period: 'Graduação / 1º Semestre',
-      skills: data.skills || ['JavaScript', 'Excel Avançado', 'Gestão'],
+      course: data.course || '',
+      institution: data.institution || '',
+      period: data.period || '',
+      skills: data.skills || [],
       isVerifiedStudent: false,
       raNumber: '',
-      bio: `Estudante no Vale do Ivaí (${city || 'Ivaiporã'}).`,
+      bio: data.bio || '',
       experiences: [],
       projects: [],
-      education: [{ degree: 'Ensino Superior / Técnico', institution: data.institution || 'IFPR Campus Ivaiporã', period: '2024 - 2026' }],
+      education: [],
       endorsements: []
     },
     candidato: {
-      course: data.course || 'Profissional / Graduado',
-      institution: data.institution || 'Instituição Regional',
-      period: 'Formado',
-      skills: data.skills || ['Gestão Financeira', 'Excel Avançado', 'Atendimento ao Cliente'],
-      isVerifiedStudent: true,
-      bio: `Profissional cadastrado no Ivaí Conecta - ${city || 'Ivaiporã'}.`,
+      course: data.course || '',
+      institution: data.institution || '',
+      period: data.period || '',
+      skills: data.skills || [],
+      isVerifiedStudent: false,
+      bio: data.bio || '',
       experiences: [],
       projects: [],
       education: [],
       endorsements: []
     },
     professor: {
-      degree: data.degree || 'Docente / Especialista',
-      institution: data.institution || 'IFPR Campus Ivaiporã',
-      discipline: data.discipline || 'Ensino Superior & Técnico',
+      degree: data.degree || '',
+      institution: data.institution || '',
+      discipline: data.discipline || '',
       endorsementCount: 0,
-      verified: true,
-      bio: `Docente na instituição ${data.institution || 'IFPR Campus Ivaiporã'}.`,
-      education: [{ degree: data.degree || 'Docente', institution: data.institution || 'IFPR Campus Ivaiporã', period: 'Atual' }],
-      classes: [data.discipline || 'Aulas Gerais']
+      verified: false,
+      bio: data.bio || '',
+      education: [],
+      classes: []
     },
     empresa: {
       cnpj: data.cnpj || '',
       isVerifiedCompany: false,
-      sector: data.sector || 'Comércio & Serviços',
-      size: '1-10 funcionários',
-      about: `Empresa sediada em ${city || 'Ivaiporã'}.`,
+      sector: data.sector || '',
+      size: data.size || '',
+      about: data.about || '',
       history: '',
-      perks: ['Vale Transporte', 'Ambiente Colaborativo']
+      perks: []
     },
     freelancer: {
-      category: data.category || 'Serviços Gerais',
-      skills: data.skills || ['Atendimento', 'Manutenção'],
+      category: data.category || '',
+      skills: data.skills || [],
       rating: 5.0,
       reviewsCount: 0,
-      bio: `Prestador de serviços autônomo em ${city || 'Ivaiporã'}.`
+      bio: data.bio || ''
     }
   };
 
