@@ -10,12 +10,17 @@ export const SEED_CHAT_THREADS = [
     participantName: 'ValeTech Soluções Digitais',
     participantRole: 'Empresa / Recrutador',
     participantAvatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150',
+    participantEmail: 'empresa@ivaiconecta.com.br',
+    candidateName: 'Lucas Eduardo Silva',
+    candidateRole: 'Aluno / ADS (IFPR Campus Ivaiporã)',
+    candidateAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    candidateEmail: 'aluno@ivaiconecta.com.br',
     jobTitle: 'Desenvolvedor Front-end Junior',
     lastMessage: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.',
     lastMessageAt: '19/08/2026 - 14:30',
     unreadCount: 1,
     messages: [
-      { id: 'm1', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15' },
+      { id: 'm1', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá Lucas! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15' },
       { id: 'm2', sender: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá! Muito obrigado pela oportunidade. Tenho total interesse na vaga híbrida em Ivaiporã.', timestamp: '19/08/2026 - 14:22' },
       { id: 'm3', sender: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.', timestamp: '19/08/2026 - 14:30' }
     ]
@@ -25,16 +30,60 @@ export const SEED_CHAT_THREADS = [
     participantName: 'Prof. Dr. Ronan Silva',
     participantRole: 'Docente (IFPR Campus Ivaiporã)',
     participantAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    participantEmail: 'ronan.silva@ifpr.edu.br',
+    candidateName: 'Lucas Eduardo Silva',
+    candidateRole: 'Aluno / ADS (IFPR)',
+    candidateAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    candidateEmail: 'aluno@ivaiconecta.com.br',
     jobTitle: 'Parecer Pedagógico - Programação',
     lastMessage: 'Olá! Recebi sua solicitação e já emiti seu parecer pedagógico verificado.',
     lastMessageAt: '20/08/2026 - 09:10',
     unreadCount: 0,
     messages: [
       { id: 'm10', sender: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá Professor Ronan! Gostaria de solicitar um parecer sobre meu desempenho acadêmico.', timestamp: '20/08/2026 - 08:45' },
-      { id: 'm11', sender: 'Prof. Dr. Ronan Silva', senderEmail: 'professor@ivaiconecta.com.br', text: 'Olá! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10' }
+      { id: 'm11', sender: 'Prof. Dr. Ronan Silva', senderEmail: 'ronan.silva@ifpr.edu.br', text: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10' }
     ]
   }
 ];
+
+export function isSameUser(userA, userB) {
+  if (!userA || !userB) return false;
+  if (userA.uid && userB.uid && String(userA.uid) === String(userB.uid)) return true;
+  if (userA.id && userB.id && String(userA.id) === String(userB.id)) return true;
+  if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
+  const nameA = (userA.name || userA.razaoSocial || userA.nomeFantasia || '').toLowerCase().trim();
+  const nameB = (userB.name || userB.razaoSocial || userB.nomeFantasia || '').toLowerCase().trim();
+  if (nameA && nameB && nameA === nameB) return true;
+  return false;
+}
+
+export function getOtherParticipant(thread, currentUser) {
+  if (!thread) return { name: 'Contato', role: 'Contato Regional', avatar: '' };
+  const isCompany = currentUser?.role === 'empresa';
+  const myName = (currentUser?.name || currentUser?.razaoSocial || currentUser?.nomeFantasia || '').toLowerCase().trim();
+  const myEmail = (currentUser?.email || '').toLowerCase().trim();
+
+  const isThreadParticipantMe =
+    (thread.participantEmail && thread.participantEmail.toLowerCase().trim() === myEmail) ||
+    (thread.participantName && myName && thread.participantName.toLowerCase().trim() === myName) ||
+    (isCompany && thread.participantRole?.toLowerCase().includes('empresa'));
+
+  if (isThreadParticipantMe) {
+    return {
+      name: thread.candidateName || 'Lucas Eduardo Silva',
+      role: thread.candidateRole || 'Candidato / Estudante',
+      avatar: thread.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      email: thread.candidateEmail || 'aluno@ivaiconecta.com.br'
+    };
+  }
+
+  return {
+    name: thread.participantName || 'Contato',
+    role: thread.participantRole || 'Contato Regional',
+    avatar: thread.participantAvatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150',
+    email: thread.participantEmail || ''
+  };
+}
 
 function sanitizeThreads(threadsList) {
   if (!Array.isArray(threadsList)) return SEED_CHAT_THREADS;
@@ -43,6 +92,11 @@ function sanitizeThreads(threadsList) {
     participantName: t?.participantName || 'Usuário Ivaí Conecta',
     participantRole: t?.participantRole || 'Contato Regional',
     participantAvatar: t?.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    participantEmail: t?.participantEmail || '',
+    candidateName: t?.candidateName || 'Lucas Eduardo Silva',
+    candidateRole: t?.candidateRole || 'Aluno / Estudante',
+    candidateAvatar: t?.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    candidateEmail: t?.candidateEmail || '',
     jobTitle: t?.jobTitle || 'Conversa Direta',
     lastMessage: t?.lastMessage || 'Nenhuma mensagem recente.',
     lastMessageAt: t?.lastMessageAt || '',
@@ -72,7 +126,11 @@ export function getChatThreads() {
   return SEED_CHAT_THREADS;
 }
 
-export function createOrGetDirectThread(targetUser, jobOrSubject = 'Conversa Direta') {
+export function createOrGetDirectThread(targetUser, jobOrSubject = 'Conversa Direta', currentUser = null) {
+  if (currentUser && isSameUser(targetUser, currentUser)) {
+    return { error: 'self_messaging', message: 'Você não pode iniciar uma conversa consigo mesmo.' };
+  }
+
   const threads = getChatThreads();
   const targetId = targetUser?.id || targetUser?.uid || targetUser?.email;
   
@@ -96,6 +154,10 @@ export function createOrGetDirectThread(targetUser, jobOrSubject = 'Conversa Dir
     participantEmail: targetUser?.email || '',
     participantRole: targetUser?.role ? (targetUser.role === 'empresa' ? 'Empresa / Recrutador' : targetUser.role === 'professor' ? 'Docente' : 'Candidato / Estudante') : 'Contato Regional',
     participantAvatar: targetUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    candidateName: currentUser?.name || 'Candidato / Estudante',
+    candidateRole: currentUser?.role === 'empresa' ? 'Empresa' : currentUser?.role === 'professor' ? 'Docente' : 'Estudante',
+    candidateAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    candidateEmail: currentUser?.email || '',
     jobTitle: jobOrSubject,
     lastMessage: 'Conversa iniciada.',
     lastMessageAt: timestamp,

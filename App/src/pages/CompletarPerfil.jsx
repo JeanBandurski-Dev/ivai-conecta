@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { CITIES, completeUserProfile } from '../lib/ivaiConecta';
+import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
-import { User, MapPin, CheckCircle2, ArrowRight } from 'lucide-react';
+import { User, MapPin, CheckCircle2, ArrowRight, Building2, ShieldCheck, Search, AlertCircle, Loader2 } from 'lucide-react';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: '🎓', desc: 'Acesse vagas de estágio e endossos acadêmicos' },
@@ -23,6 +23,12 @@ export default function CompletarPerfil() {
   const [loading, setLoading]           = useState(false);
   const [alert, setAlert]               = useState('');
 
+  // CNPJ Empresa State
+  const [cnpj, setCnpj]                 = useState(currentUser?.cnpj || '');
+  const [cnpjLoading, setCnpjLoading]   = useState(false);
+  const [cnpjData, setCnpjData]         = useState(null);
+  const [cnpjError, setCnpjError]       = useState('');
+
   useEffect(() => {
     // Se não houver usuário no Google ou no store, volta para login
     if (!currentUser && !auth.currentUser) {
@@ -31,6 +37,56 @@ export default function CompletarPerfil() {
       setName(currentUser.name);
     }
   }, [currentUser, navigate]);
+
+  const handleCnpjChange = (e) => {
+    const rawValue = e.target.value;
+    const masked = maskCNPJ(rawValue);
+    setCnpj(masked);
+    setCnpjError('');
+
+    const digits = cleanCNPJ(rawValue);
+    if (digits.length === 14) {
+      consultarCnpj(digits);
+    } else {
+      setCnpjData(null);
+    }
+  };
+
+  const consultarCnpj = async (digitsToConsult) => {
+    const digits = digitsToConsult || cleanCNPJ(cnpj);
+    if (digits.length !== 14) {
+      setCnpjError('O CNPJ deve conter 14 dígitos numéricos.');
+      return;
+    }
+
+    if (!validateCNPJ(digits)) {
+      setCnpjError('Dígitos verificadores do CNPJ inválidos (Módulo 11 da Receita Federal).');
+      return;
+    }
+
+    setCnpjLoading(true);
+    setCnpjError('');
+
+    const res = await fetchCNPJData(digits);
+    setCnpjLoading(false);
+
+    if (res.success && res.data) {
+      setCnpjData(res.data);
+      // Auto-preenche o nome da empresa com a razão social ou nome fantasia
+      if (res.data.nomeFantasia || res.data.razaoSocial) {
+        setName(res.data.nomeFantasia || res.data.razaoSocial);
+      }
+      // Se a cidade for do Vale do Ivaí, auto-seleciona
+      if (res.data.cidade) {
+        const matchedCity = CITIES.find(c => c.toLowerCase() === res.data.cidade.toLowerCase());
+        if (matchedCity) {
+          setCity(matchedCity);
+        }
+      }
+    } else {
+      setCnpjError(res.error || 'Não foi possível validar os dados do CNPJ na Receita Federal.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,6 +106,18 @@ export default function CompletarPerfil() {
       return;
     }
 
+    if (selectedRole === 'empresa') {
+      const cleanDigits = cleanCNPJ(cnpj);
+      if (!cleanDigits || cleanDigits.length !== 14) {
+        setAlert('Para contas de Empresa, é obrigatório informar um CNPJ com 14 dígitos válidos.');
+        return;
+      }
+      if (!validateCNPJ(cleanDigits)) {
+        setAlert('O CNPJ informado possui dígitos verificadores inválidos.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     const res = await completeUserProfile(uid, {
@@ -57,7 +125,14 @@ export default function CompletarPerfil() {
       email: email,
       city: city,
       role: selectedRole,
-      avatar: auth.currentUser?.photoURL || currentUser?.avatar
+      avatar: auth.currentUser?.photoURL || currentUser?.avatar,
+      ...(selectedRole === 'empresa' && {
+        cnpj: maskCNPJ(cnpj),
+        razaoSocial: cnpjData?.razaoSocial || name.trim(),
+        nomeFantasia: cnpjData?.nomeFantasia || name.trim(),
+        situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
+        isVerifiedCompany: true
+      })
     });
 
     setLoading(false);
@@ -147,6 +222,68 @@ export default function CompletarPerfil() {
               ))}
             </div>
           </div>
+
+          {/* CNPJ Empresarial com Validação & BrasilAPI */}
+          {selectedRole === 'empresa' && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <label className="form-label text-gray-900 dark:text-white font-bold text-sm flex items-center gap-1.5 mb-0">
+                  <Building2 size={16} className="text-primary-blue dark:text-blue-400" />
+                  CNPJ da Empresa (14 dígitos)
+                </label>
+                <span className="text-[11px] font-semibold text-primary-blue dark:text-blue-400 bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                  Consulta Receita Federal
+                </span>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={cnpj}
+                  onChange={handleCnpjChange}
+                  className="form-control pr-10 font-mono"
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                  required
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {cnpjLoading && <Loader2 size={18} className="animate-spin text-primary-blue" />}
+                  {!cnpjLoading && cnpjData && <CheckCircle2 size={18} className="text-green-500" />}
+                </div>
+              </div>
+
+              {cnpjError && (
+                <div className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
+                  <AlertCircle size={14} className="shrink-0" />
+                  {cnpjError}
+                </div>
+              )}
+
+              {cnpjData && (
+                <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-green-200 dark:border-green-800/70 text-xs space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-green-700 dark:text-green-300 flex items-center gap-1">
+                      <ShieldCheck size={14} /> Dados Verificados na Receita Federal
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-200">
+                      {cnpjData.situacaoCadastral}
+                    </span>
+                  </div>
+                  <div className="text-gray-800 dark:text-gray-200">
+                    <strong>Razão Social:</strong> {cnpjData.razaoSocial}
+                  </div>
+                  {cnpjData.nomeFantasia && cnpjData.nomeFantasia !== cnpjData.razaoSocial && (
+                    <div className="text-gray-600 dark:text-slate-300">
+                      <strong>Nome Fantasia:</strong> {cnpjData.nomeFantasia}
+                    </div>
+                  )}
+                  <div className="text-gray-500 dark:text-slate-400">
+                    <strong>Localização:</strong> {cnpjData.cidade} / {cnpjData.uf}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Nome */}
           <div className="form-group">

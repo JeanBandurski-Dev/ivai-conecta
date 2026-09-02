@@ -6,7 +6,7 @@ import {
   BarChart3, CheckCircle2, AlertCircle, Sparkles
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getServices, addService, updateService, CITIES } from '../lib/ivaiConecta';
+import { getServices, addService, updateService, CITIES, maskPhone, sanitizeWhatsAppPhone } from '../lib/ivaiConecta';
 import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
 
@@ -503,7 +503,9 @@ export default function Servicos() {
                 <input
                   type="tel"
                   value={serviceData.phone}
-                  onChange={e => setServiceData(d => ({ ...d, phone: e.target.value }))}
+                  onChange={e => setServiceData(d => ({ ...d, phone: maskPhone(e.target.value) }))}
+                  maxLength={15}
+                  placeholder="(43) 99999-9999"
                   className="form-control"
                   required
                 />
@@ -542,9 +544,11 @@ export default function Servicos() {
               e.preventDefault();
               const category = e.target.category.value;
               const city = e.target.city.value;
-              const phone = e.target.phone.value;
+              const rawPhone = e.target.phone.value;
               const description = e.target.description.value;
               const title = e.target.title.value || category;
+
+              const cleanPhone = sanitizeWhatsAppPhone(rawPhone);
 
               const servicePayload = {
                 title,
@@ -552,7 +556,7 @@ export default function Servicos() {
                 providerName: currentUser?.name || 'Profissional Autônomo',
                 avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
                 city,
-                phone: phone || '5543999887766',
+                phone: cleanPhone,
                 description,
                 createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
                 rating: 5.0,
@@ -584,7 +588,15 @@ export default function Servicos() {
               </div>
               <div className="form-group">
                 <label className="form-label">WhatsApp para Contato</label>
-                <input name="phone" type="tel" className="form-control" placeholder="Ex: (43) 99999-0000" required />
+                <input
+                  name="phone"
+                  type="tel"
+                  className="form-control"
+                  placeholder="Ex: (43) 99999-0000"
+                  maxLength={15}
+                  onChange={e => { e.target.value = maskPhone(e.target.value); }}
+                  required
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Descrição dos Serviços</label>

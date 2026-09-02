@@ -3,12 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText
+  Award, Send, UserCheck, Check, X, FileText, Trash2
 } from 'lucide-react';
 import {
   getUserApplications, generateWhatsAppLink, getJobs,
-  updateJobStatus, getTalents, getEndorsementRequests,
-  approveEndorsementRequest, rejectEndorsementRequest
+  updateJobStatus, deleteJob, getTalents, getEndorsementRequests,
+  approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -35,11 +35,13 @@ export default function MinhasVagas() {
 
   const apps = liveApps;
   const companyJobs = liveJobs.filter(j => 
-    j.createdBy === currentUser?.uid ||
-    j.createdBy === currentUser?.email ||
-    (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser?.name && j.company?.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
-    j.company?.toLowerCase().includes('valetech')
+    (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
+    (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
+    (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+    (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+    (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+    (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
+    (!currentUser?.uid && j.company?.toLowerCase().includes('valetech'))
   );
   
   // Teacher endorsement requests state
@@ -62,9 +64,19 @@ export default function MinhasVagas() {
   }
 
   const handleJobAction = (jobId, action) => {
-    updateJobStatus(jobId, action);
-    showToast(action === 'close' ? 'Vaga encerrada com sucesso.' : 'Prazo da vaga prolongado por mais 30 dias!');
+    const updated = updateJobStatus(jobId, action);
+    if (updated) setLiveJobs(updated);
+    showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso.' : '🔓 Vaga reaberta com sucesso!');
     forceUpdate(n => n + 1);
+  };
+
+  const handleDeleteJob = (jobId) => {
+    if (window.confirm('Tem certeza que deseja remover esta vaga permanentemente?')) {
+      const updated = deleteJob(jobId);
+      if (updated) setLiveJobs(updated);
+      showToast('🗑️ Vaga excluída permanentemente.');
+      forceUpdate(n => n + 1);
+    }
   };
 
   const handleApproveTeacherRequest = (reqId) => {
@@ -257,12 +269,13 @@ export default function MinhasVagas() {
                     <div className="flex items-start justify-between flex-wrap gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
-                            job.status === 'Ativa'
-                              ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                              : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                          <span className={`px-3 py-0.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                            job.status === 'Encerrada'
+                              ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                              : 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                           }`}>
-                            Status: {job.status || 'Ativa'}
+                            <span className={`w-2 h-2 rounded-full ${job.status === 'Encerrada' ? 'bg-red-500' : 'bg-green-500'}`} />
+                            {job.status === 'Encerrada' ? 'Vaga Encerrada' : 'Vaga Ativa'}
                           </span>
                           <span className="text-xs text-gray-400 dark:text-slate-400">Criada em: {job.createdAt || '15/08/2026'}</span>
                         </div>
@@ -285,21 +298,30 @@ export default function MinhasVagas() {
                           <Users size={14} /> Ver Candidatos ({job.applicantsCount || 3})
                         </button>
 
-                        {job.status === 'Ativa' ? (
+                        {job.status === 'Encerrada' ? (
                           <button
-                            onClick={() => handleJobAction(job.id, 'close')}
-                            className="btn btn-outline border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 btn-sm text-xs font-semibold"
-                          >
-                            <XCircle size={14} /> Encerrar Vaga
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleJobAction(job.id, 'extend')}
-                            className="btn btn-outline border-green-200 dark:border-green-900/60 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-semibold"
+                            onClick={() => handleJobAction(job.id, 'reopen')}
+                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1.5"
                           >
                             <RotateCcw size={14} /> Reabrir Vaga
                           </button>
+                        ) : (
+                          <button
+                            onClick={() => handleJobAction(job.id, 'close')}
+                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1.5"
+                          >
+                            <XCircle size={14} /> Encerrar Vaga
+                          </button>
                         )}
+
+                        <button
+                          onClick={() => handleDeleteJob(job.id)}
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900/40 transition-colors cursor-pointer"
+                          title="Excluir Vaga Permanentemente"
+                          aria-label="Excluir vaga"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
 
@@ -441,7 +463,7 @@ export default function MinhasVagas() {
                       <Eye size={13} /> Ver Currículo
                     </button>
                     <a
-                      href={`https://wa.me/${cand.phone}?text=${encodeURIComponent(`Olá ${cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
+                      href={`https://wa.me/${sanitizeWhatsAppPhone(cand.phone)}?text=${encodeURIComponent(`Olá ${cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-whatsapp btn-sm text-xs font-bold"

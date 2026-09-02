@@ -1,16 +1,27 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck
+  Sparkles, Briefcase, Gift, Send, PhoneCall, ShieldCheck, XCircle, RotateCcw
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, generateWhatsAppLink, calculateMatchScore, isSkillMatch } from '../lib/ivaiConecta';
+import { applyToJob, generateWhatsAppLink, calculateMatchScore, isSkillMatch, updateJobStatus } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast } = useAppStore();
   const [applied, setApplied] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(job?.status || 'Ativa');
 
   if (!job) return null;
+
+  const isCompany = currentUser?.role === 'empresa';
+  const isProfessor = currentUser?.role === 'professor';
+  const isJobOwner = isCompany && currentUser && (
+    (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
+    (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
+    (job.createdBy && currentUser.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+    (currentUser.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+  );
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
   const userSkills = currentUser?.skills || [];
@@ -20,6 +31,14 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     isVerifiedStudent: currentUser?.isVerifiedStudent,
     endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
   }) : null);
+
+  const handleToggleJobStatus = () => {
+    const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
+    updateJobStatus(job.id, action);
+    const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
+    setCurrentStatus(newStatus);
+    showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso!' : '🔓 Vaga reaberta com sucesso!');
+  };
 
   const handleApply = () => {
     if (!currentUser) {
@@ -64,9 +83,15 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 <span className="text-xs font-bold uppercase tracking-wider text-accent-sky bg-white/10 px-2.5 py-0.5 rounded-md">
                   {job.company}
                 </span>
-                <span className="bg-green-500/20 text-green-300 border border-green-400/30 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <ShieldCheck size={12} /> Vaga Verificada
-                </span>
+                {currentStatus === 'Encerrada' ? (
+                  <span className="bg-red-500/20 text-red-300 border border-red-400/30 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <XCircle size={12} /> Vaga Encerrada
+                  </span>
+                ) : (
+                  <span className="bg-green-500/20 text-green-300 border border-green-400/30 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <ShieldCheck size={12} /> Vaga Ativa
+                  </span>
+                )}
               </div>
 
               <h2 className="text-xl sm:text-2xl font-heading font-extrabold text-white leading-tight mb-2">
@@ -81,8 +106,25 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             </div>
           </div>
 
-          {/* Banner de Compatibilidade (Match Score Gupy) */}
-          {canSeeMatch && calculatedScore != null ? (
+          {/* Banner de Contexto de Perfil */}
+          {isJobOwner ? (
+            <div className="mt-6 pt-3 border-t border-white/15 text-xs text-green-200 flex items-center justify-between flex-wrap gap-2">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Building2 size={15} /> Sua empresa é a criadora desta vaga ({currentStatus === 'Encerrada' ? 'Encerrada' : 'Ativa'}).
+              </span>
+              <Link to="/minhas-vagas" onClick={onClose} className="px-3 py-1 rounded-lg bg-teal-500 hover:bg-teal-600 text-white font-bold text-xs transition-colors">
+                Gerenciar Candidatos →
+              </Link>
+            </div>
+          ) : isCompany ? (
+            <div className="mt-6 pt-3 border-t border-white/15 text-xs text-sky-200 flex items-center gap-1.5">
+              <Building2 size={14} /> Você está visualizando esta vaga como Empresa Recrutadora.
+            </div>
+          ) : isProfessor ? (
+            <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-center gap-1.5">
+              <span>👨‍🏫</span> Visualização de oportunidade acadêmica para orientação de alunos.
+            </div>
+          ) : canSeeMatch && calculatedScore != null ? (
             <div className="mt-6 pt-4 border-t border-white/15 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-amber-400 shrink-0" size={18} />
@@ -115,7 +157,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               </div>
               <div>
                 <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Horário de Trabalho</div>
-                <div className="text-sm font-bold text-gray-800 dark:text-white">{job.workingHours || '08:00 às 18:00 (Segunda a Sexta)'}</div>
+                <div className="text-sm font-bold text-gray-800 dark:text-white">{job.schedule || job.workingHours || '08:00 às 18:00 (Segunda a Sexta)'}</div>
               </div>
             </div>
 
@@ -125,7 +167,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               </div>
               <div>
                 <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Faixa Salarial / Remuneração</div>
-                <div className="text-sm font-bold text-gray-800 dark:text-white">{job.salary || 'A combinar / Compatível com mercado'}</div>
+                <div className="text-sm font-bold text-gray-800 dark:text-white">{job.salary || 'A combinar'}</div>
               </div>
             </div>
           </div>
@@ -135,7 +177,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2 flex items-center gap-2">
               <Briefcase size={17} className="text-primary-blue dark:text-blue-400" /> Descrição da Oportunidade
             </h3>
-            <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
               {job.description || 'Esta vaga tem como objetivo integrar novos talentos à equipe da empresa, proporcionando desenvolvimento profissional contínuo.'}
             </p>
           </div>
@@ -155,20 +197,22 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             </div>
           )}
 
-          {/* Vales e Benefícios */}
-          <div>
-            <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5 flex items-center gap-2">
-              <Gift size={17} className="text-primary-blue dark:text-blue-400" /> Vales e Benefícios Oferecidos
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {(job.benefits || ['Vale Transporte', 'Vale Refeição', 'Plano de Saúde', 'Ambiente Colaborativo']).map((benefit, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-3 py-1.5 rounded-xl text-xs font-semibold">
-                  <CheckCircle2 size={13} className="text-green-600 dark:text-green-400 shrink-0" />
-                  {benefit}
-                </span>
-              ))}
+          {/* Benefícios */}
+          {job.benefits && job.benefits.length > 0 && (
+            <div>
+              <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5 flex items-center gap-2">
+                <Gift size={17} className="text-green-600 dark:text-green-400" /> Vales e Benefícios Oferecidos
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {job.benefits.map((b, idx) => (
+                  <span key={idx} className="px-3 py-1.5 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 text-xs font-semibold border border-green-200/80 dark:border-green-800/60 flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-green-600 dark:text-green-400" />
+                    {b}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Requisitos vs Habilidades */}
           <div>
@@ -208,7 +252,48 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               <PhoneCall size={14} /> Contatar no WhatsApp
             </a>
 
-            {applied ? (
+            {isJobOwner ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleToggleJobStatus}
+                  className={`btn btn-sm text-xs font-bold flex items-center gap-1.5 border transition-all ${
+                    currentStatus === 'Encerrada'
+                      ? 'border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/40 hover:bg-green-100'
+                      : 'border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
+                  }`}
+                >
+                  {currentStatus === 'Encerrada' ? (
+                    <><RotateCcw size={14} /> Reabrir Vaga</>
+                  ) : (
+                    <><XCircle size={14} /> Encerrar Vaga</>
+                  )}
+                </button>
+                <Link
+                  to="/minhas-vagas"
+                  onClick={onClose}
+                  className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
+                >
+                  <Building2 size={14} /> Gerenciar Candidatos
+                </Link>
+              </div>
+            ) : isCompany ? (
+              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
+                🏢 Empresas não se candidatam a vagas
+              </span>
+            ) : isProfessor ? (
+              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
+                👨‍🏫 Apenas estudantes e candidatos se candidatam
+              </span>
+            ) : !currentUser ? (
+              <Link
+                to="/login"
+                onClick={onClose}
+                className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+              >
+                <Send size={14} /> Entrar para Candidatar-se
+              </Link>
+            ) : applied ? (
               <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5">
                 <CheckCircle2 size={15} /> Candidatura Enviada!
               </button>

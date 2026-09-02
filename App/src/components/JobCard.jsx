@@ -9,6 +9,12 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
   const isFavorite = favoriteJobs.includes(id);
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
+  const isOwner = currentUser?.role === 'empresa' && (
+    (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
+    (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
+    (job.createdBy && currentUser.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+    (currentUser.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+  );
 
   // Compute match score if candidate/aluno is logged in
   const userSkills = currentUser?.skills || [];
@@ -48,9 +54,16 @@ export default function JobCard({ job, matchScore, onSelect }) {
             <div className="font-bold text-gray-900 dark:text-white text-sm leading-tight group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors truncate">
               {company}
             </div>
-            <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-              <ShieldCheck size={11} className="text-green-600 dark:text-green-400 shrink-0" />
-              {job.isVerifiedCompany ? 'CNPJ Validado · Vaga Verificada' : 'Vaga Ativa'}
+            <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span className="flex items-center gap-1">
+                <ShieldCheck size={11} className="text-green-600 dark:text-green-400 shrink-0" />
+                {job.isVerifiedCompany ? 'CNPJ Validado · Vaga Verificada' : 'Vaga Ativa'}
+              </span>
+              {isOwner && (
+                <span className="text-[10px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 px-1.5 py-0.2 rounded">
+                  Sua Empresa
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -115,9 +128,11 @@ export default function JobCard({ job, matchScore, onSelect }) {
         <Link
           to={`/vagas?jobId=${id}`}
           onClick={handleClick}
-          className="btn btn-primary btn-sm w-full text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
+          className={`btn btn-sm w-full text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs ${
+            isOwner ? 'btn-teal' : 'btn-primary'
+          }`}
         >
-          <Eye size={14} /> Ver Detalhes da Vaga
+          <Eye size={14} /> {isOwner ? 'Gerenciar Minha Vaga' : 'Ver Detalhes da Vaga'}
         </Link>
       </div>
     </div>

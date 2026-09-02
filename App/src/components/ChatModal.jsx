@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   MessageSquare, X, Send, User, Check, Clock, ShieldCheck,
   Building2, ArrowLeft, Search, Sparkles, MessageCircle, Plus
@@ -8,32 +8,64 @@ import {
   sendMessageToThread,
   subscribeToFirestoreChat,
   createOrGetDirectThread,
-  markThreadAsRead
+  markThreadAsRead,
+  getOtherParticipant,
+  isSameUser
 } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 
-const SUGGESTED_CONTACTS = [
+const ALL_SUGGESTED_CONTACTS = [
+  // Candidatos / Alunos (para empresas conversarem)
   {
-    name: 'ValeTech Soluções Digitais',
-    role: 'empresa',
-    avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150',
-    subject: 'Desenvolvedor Front-end Junior'
+    name: 'Lucas Eduardo Silva',
+    role: 'aluno',
+    email: 'aluno@ivaiconecta.com.br',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    subject: 'Candidato - ADS (IFPR Campus Ivaiporã)'
   },
+  {
+    name: 'Juliana Aparecida Melo',
+    role: 'aluno',
+    email: 'juliana.melo@ifpr.edu.br',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
+    subject: 'Candidata - ADS (IFPR Campus Ivaiporã)'
+  },
+  {
+    name: 'Rafael Gomes Costa',
+    role: 'candidato',
+    email: 'rafael.costa@uenp.edu.br',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+    subject: 'Candidato - Eng. Software (UENP)'
+  },
+
+  // Professores / Docentes
   {
     name: 'Prof. Dr. Ronan Silva',
     role: 'professor',
+    email: 'ronan.silva@ifpr.edu.br',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-    subject: 'Parecer Pedagógico - Programação'
+    subject: 'Parecer Pedagógico - IFPR'
   },
   {
     name: 'Prof. Dr. Ricardo Oliveira',
     role: 'professor',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-    subject: 'Desenvolvimento Web & Banco de Dados'
+    email: 'ricardo.oliveira@ifpr.edu.br',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
+    subject: 'Parecer Pedagógico - IFPR'
+  },
+
+  // Empresas (para alunos e candidatos conversarem)
+  {
+    name: 'ValeTech Soluções Digitais',
+    role: 'empresa',
+    email: 'empresa@ivaiconecta.com.br',
+    avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150',
+    subject: 'Desenvolvedor Front-end Junior'
   },
   {
     name: 'Cooperativa Agropecuária do Vale',
     role: 'empresa',
+    email: 'contato@coopvale.com.br',
     avatar: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=150',
     subject: 'Assistente Administrativo & Financeiro'
   }
@@ -47,6 +79,15 @@ export default function ChatModal({ onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showMobileChat, setShowMobileChat] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Filtra contatos sugeridos para NUNCA sugerir o próprio usuário ou mesma empresa
+  const suggestedContacts = useMemo(() => {
+    return ALL_SUGGESTED_CONTACTS.filter(c => {
+      if (isSameUser(c, currentUser)) return false;
+      if (currentUser?.role === 'empresa' && c.role === 'empresa') return false;
+      return true;
+    });
+  }, [currentUser]);
 
   // Garantir que activeThread exista
   const activeThread = threads.find(t => t.id === activeThreadId) || threads[0] || null;
@@ -78,6 +119,12 @@ export default function ChatModal({ onClose }) {
     if (e) e.preventDefault();
     if (!messageInput.trim() || !activeThread?.id) return;
 
+    const other = getOtherParticipant(activeThread, currentUser);
+    if (isSameUser(other, currentUser)) {
+      showToast('⚠️ Você não pode enviar mensagens para si mesmo.');
+      return;
+    }
+
     const textToSend = messageInput.trim();
     setMessageInput('');
 
@@ -95,18 +142,27 @@ export default function ChatModal({ onClose }) {
   };
 
   const handleStartNewChat = (contact) => {
-    const thread = createOrGetDirectThread(contact, contact.subject);
+    if (isSameUser(contact, currentUser)) {
+      showToast('⚠️ Você não pode iniciar uma conversa consigo mesmo.');
+      return;
+    }
+    const result = createOrGetDirectThread(contact, contact.subject, currentUser);
+    if (result?.error) {
+      showToast('⚠️ ' + result.message);
+      return;
+    }
     setThreads(getChatThreads());
-    setActiveThreadId(thread.id);
+    setActiveThreadId(result.id);
     setShowMobileChat(true);
     showToast(`Conversa aberta com ${contact.name}!`);
   };
 
   const filteredThreads = threads.filter(t => {
+    const other = getOtherParticipant(t, currentUser);
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase();
     return (
-      (t.participantName && t.participantName.toLowerCase().includes(q)) ||
+      (other.name && other.name.toLowerCase().includes(q)) ||
       (t.jobTitle && t.jobTitle.toLowerCase().includes(q)) ||
       (t.lastMessage && t.lastMessage.toLowerCase().includes(q))
     );
@@ -187,6 +243,7 @@ export default function ChatModal({ onClose }) {
               ) : (
                 filteredThreads.map(t => {
                   const isSelected = activeThread?.id === t.id;
+                  const other = getOtherParticipant(t, currentUser);
                   return (
                     <div
                       key={t.id}
@@ -198,14 +255,14 @@ export default function ChatModal({ onClose }) {
                       }`}
                     >
                       <img
-                        src={t.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
-                        alt={t.participantName}
+                        src={other.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
+                        alt={other.name}
                         className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1 mb-0.5">
                           <span className="font-bold text-xs text-gray-800 dark:text-white truncate">
-                            {t.participantName}
+                            {other.name}
                           </span>
                           {t.lastMessageAt && (
                             <span className="text-[10px] text-gray-400 dark:text-slate-500 shrink-0">
@@ -235,7 +292,7 @@ export default function ChatModal({ onClose }) {
                   <Sparkles size={12} className="text-amber-500" /> Iniciar Nova Conversa
                 </div>
                 <div className="space-y-1">
-                  {SUGGESTED_CONTACTS.map((c, i) => (
+                  {suggestedContacts.map((c, i) => (
                     <button
                       key={i}
                       type="button"
@@ -243,7 +300,10 @@ export default function ChatModal({ onClose }) {
                       className="w-full p-2 rounded-xl text-left hover:bg-white dark:hover:bg-slate-800 transition-colors flex items-center gap-2 text-xs text-gray-700 dark:text-slate-300 cursor-pointer"
                     >
                       <img src={c.avatar} alt={c.name} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                      <span className="truncate font-medium flex-1">{c.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium leading-tight">{c.name}</div>
+                        <div className="text-[10px] text-gray-400 dark:text-slate-500 truncate">{c.subject}</div>
+                      </div>
                       <Plus size={13} className="text-primary-blue dark:text-blue-400 shrink-0" />
                     </button>
                   ))}
@@ -261,37 +321,42 @@ export default function ChatModal({ onClose }) {
             {activeThread ? (
               <>
                 {/* Header da Conversa Ativa */}
-                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Botão de Voltar no Mobile */}
-                    <button
-                      type="button"
-                      onClick={() => setShowMobileChat(false)}
-                      className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 md:hidden cursor-pointer shrink-0"
-                      aria-label="Voltar para a lista"
-                    >
-                      <ArrowLeft size={18} />
-                    </button>
+                {(() => {
+                  const otherActive = getOtherParticipant(activeThread, currentUser);
+                  return (
+                    <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Botão de Voltar no Mobile */}
+                        <button
+                          type="button"
+                          onClick={() => setShowMobileChat(false)}
+                          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 md:hidden cursor-pointer shrink-0"
+                          aria-label="Voltar para a lista"
+                        >
+                          <ArrowLeft size={18} />
+                        </button>
 
-                    <img
-                      src={activeThread.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
-                      alt={activeThread.participantName}
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white"
-                    />
+                        <img
+                          src={otherActive.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
+                          alt={otherActive.name}
+                          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white"
+                        />
 
-                    <div className="min-w-0">
-                      <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
-                        <span className="truncate">{activeThread.participantName}</span>
-                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.2 rounded-full shrink-0">
-                          Online
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate">
-                        {activeThread.participantRole} · {activeThread.jobTitle}
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
+                            <span className="truncate">{otherActive.name}</span>
+                            <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.2 rounded-full shrink-0">
+                              Online
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate">
+                            {otherActive.role} · {activeThread.jobTitle}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Área de Mensagens (Scroll) */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[#F8FAFC] dark:bg-slate-950/50">

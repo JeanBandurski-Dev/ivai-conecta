@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
+import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -285,14 +286,21 @@ export async function completeUserProfile(uid, additionalData) {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
     const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
 
-    await setDoc(doc(db, 'users', uid), {
+    const payload = {
       name: additionalData.name,
       email: additionalData.email,
       city: additionalData.city,
       role: additionalData.role,
       avatar: avatar,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+      updatedAt: new Date().toISOString(),
+      ...(additionalData.cnpj && { cnpj: additionalData.cnpj }),
+      ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
+      ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
+      ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
+      ...(additionalData.isVerifiedCompany !== undefined ? { isVerifiedCompany: additionalData.isVerifiedCompany } : (additionalData.role === 'empresa' && !!additionalData.cnpj ? { isVerifiedCompany: true } : {}))
+    };
+
+    await setDoc(doc(db, 'users', uid), payload, { merge: true });
 
     const updated = updateAuthUser({
       name: additionalData.name,
@@ -300,7 +308,11 @@ export async function completeUserProfile(uid, additionalData) {
       role: additionalData.role,
       avatar: avatar,
       badge: roleMeta.badge,
-      isVerifiedCompany: additionalData.role === 'empresa',
+      ...(additionalData.cnpj && { cnpj: additionalData.cnpj }),
+      ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
+      ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
+      ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
+      isVerifiedCompany: additionalData.isVerifiedCompany ?? (additionalData.role === 'empresa' && !!additionalData.cnpj),
     });
 
     return { success: true, user: updated };
@@ -376,24 +388,34 @@ export function updateAuthUser(data) {
   return updated;
 }
 
-export function submitCompanyVerification(cnpj, fileData) {
-  const cleanCNPJ = cnpj.replace(/\D/g, '');
-  if (cleanCNPJ.length !== 14) {
+export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
+  const digits = cleanCNPJ(cnpj);
+  if (digits.length !== 14) {
     return { success: false, error: 'O CNPJ deve conter 14 dígitos numéricos (Ex: 12.345.678/0001-90).' };
   }
 
-  const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : String(fileData || 'Cartao_CNPJ.pdf');
+  if (!validateCNPJ(digits)) {
+    return { success: false, error: 'CNPJ inválido (dígitos verificadores incorretos pelo cálculo oficial da Receita Federal).' };
+  }
+
+  const formattedCNPJ = maskCNPJ(digits);
+  const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : (fileData ? String(fileData) : 'Cartao_CNPJ.pdf');
   const filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '0.85';
 
   const updated = updateAuthUser({
-    cnpj,
+    cnpj: formattedCNPJ,
     isVerifiedCompany: true,
-    companyProofFile: filename
+    companyProofFile: filename,
+    verifiedAt: new Date().toISOString(),
+    ...(extraData.razaoSocial && { razaoSocial: extraData.razaoSocial }),
+    ...(extraData.nomeFantasia && { nomeFantasia: extraData.nomeFantasia }),
+    ...(extraData.situacaoCadastral && { situacaoCnpj: extraData.situacaoCadastral }),
+    ...(extraData.cnpjProofUrl && { cnpjProofUrl: extraData.cnpjProofUrl })
   });
 
   return {
     success: true,
-    message: `✅ CNPJ ${cnpj} e documento "${filename}" (${filesizeMB}MB) autenticados! Selo de Empresa Verificada concedido.`,
+    message: `✅ CNPJ ${formattedCNPJ} autenticado com sucesso! Selo de Empresa Verificada concedido.`,
     user: updated
   };
 }

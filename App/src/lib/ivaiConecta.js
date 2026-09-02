@@ -9,3 +9,5 @@ export * from '../services/matchService';
 export * from '../services/favoritesService';
 export * from '../services/chatService';
 export * from '../services/storageService';
+export * from '../services/cnpjService';
+export * from '../services/jobTaxonomy';
