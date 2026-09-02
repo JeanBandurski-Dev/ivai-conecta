@@ -243,6 +243,21 @@ export async function applyToJob(jobId, user) {
     return { success: false, message: 'Você precisa estar logado para se candidatar.' };
   }
 
+  // Bloqueia se a conta logada for do tipo empresa
+  if (user.role === 'empresa') {
+    return { success: false, message: 'Contas empresariais não podem se candidatar a vagas.' };
+  }
+
+  const job = getJobById(jobId);
+
+  // Bloqueia se for o criador da própria vaga
+  if (job && (
+    (job.ownerUid && (job.ownerUid === user.uid || job.ownerUid === user.id)) ||
+    (job.createdBy && job.createdBy.toLowerCase() === user.email?.toLowerCase())
+  )) {
+    return { success: false, message: 'Você não pode se candidatar à sua própria vaga!' };
+  }
+
   if (user.role === 'aluno' && !user.isVerifiedStudent) {
     return {
       success: false,
@@ -257,8 +272,6 @@ export async function applyToJob(jobId, user) {
   if (existing) {
     return { success: false, message: 'Você já se candidatou a esta vaga!' };
   }
-
-  const job = getJobById(jobId);
   const newApp = {
     jobId: String(jobId),
     candidateUid: userUid,
