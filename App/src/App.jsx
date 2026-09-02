@@ -21,25 +21,15 @@ const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
 const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
+const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
 const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
-function HomeRoute() {
-  const { currentUser, authLoading } = useAppStore();
-
-  if (authLoading && !currentUser) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
-        <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
-        <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
-      </div>
-    );
+function MinhasVagasRoute() {
+  const { currentUser } = useAppStore();
+  if (currentUser?.role === 'empresa') {
+    return <GerenciamentoVagasEmpresa />;
   }
-
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <Dashboard />;
+  return <MinhasVagas />;
 }
 
 export default function App() {
@@ -72,7 +62,7 @@ export default function App() {
             </div>
           }>
             <Routes>
-              <Route path="/"                 element={<HomeRoute />} />
+              <Route path="/"                 element={<Dashboard />} />
               <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
               <Route path="/completar-perfil" element={<CompletarPerfil />} />
               <Route path="/vagas"            element={<Vagas />} />
@@ -93,7 +83,23 @@ export default function App() {
                 path="/minhas-vagas"
                 element={
                   <ProtectedRoute>
-                    <MinhasVagas />
+                    <MinhasVagasRoute />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/gerenciamento-vagas"
+                element={
+                  <ProtectedRoute>
+                    <GerenciamentoVagasEmpresa />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/painel-empresa"
+                element={
+                  <ProtectedRoute>
+                    <GerenciamentoVagasEmpresa />
                   </ProtectedRoute>
                 }
               />
