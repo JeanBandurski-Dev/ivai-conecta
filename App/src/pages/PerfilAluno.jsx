@@ -91,7 +91,7 @@ export default function PerfilAluno() {
     name: talent?.name || '',
     avatar: talent?.avatar || '',
     city: talent?.city || 'Ivaiporã',
-    institution: talent?.institution || 'IFPR Campus Ivaiporã',
+    institution: talent?.institution || '',
     course: talent?.course || '',
     period: talent?.period || '',
     bio: talent?.bio || '',
@@ -322,15 +322,23 @@ export default function PerfilAluno() {
                 </div>
 
                 <div className="text-accent-sky font-bold text-base sm:text-lg mb-1 flex items-center gap-2">
-                  <GraduationCap size={18} /> {talent.course}
+                  <GraduationCap size={18} /> {talent.course || (isOwner ? 'Adicione seu curso ou formação' : 'Curso não informado')}
                 </div>
 
                 <div className="flex items-center gap-3 text-gray-300 text-xs sm:text-sm flex-wrap">
-                  <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
+                  {talent.institution ? (
+                    <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
+                  ) : (
+                    isOwner && <span className="text-gray-400 italic">Instituição não informada</span>
+                  )}
+                  {talent.period && (
+                    <>
+                      <span>·</span>
+                      <span>{talent.period}</span>
+                    </>
+                  )}
                   <span>·</span>
-                  <span>{talent.period || 'Graduação'}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1.5"><MapPin size={14} />{talent.city}, PR</span>
+                  <span className="flex items-center gap-1.5"><MapPin size={14} />{talent.city || 'Vale do Ivaí'}, PR</span>
                 </div>
 
                 {/* Badges Destacadas de Redes Sociais (LinkedIn e GitHub) */}
@@ -483,7 +491,7 @@ export default function PerfilAluno() {
                   <Sparkles size={17} className="text-primary-blue dark:text-blue-400" /> Sobre o Estudante
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
-                  {talent.bio || 'Estudante dedicado buscando desenvolvimento profissional e oportunidades de carreira no Vale do Ivaí.'}
+                  {talent.bio || (isOwner ? 'Nenhum resumo adicionado. Clique no botão "Editar Perfil" acima para escrever sua biografia e objetivos.' : 'Nenhum resumo profissional adicionado.')}
                 </p>
               </div>
 
@@ -491,11 +499,17 @@ export default function PerfilAluno() {
                 <h3 className="font-heading font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
                   <BookOpen size={17} className="text-primary-blue dark:text-blue-400" /> Habilidades Técnicas
                 </h3>
-                <div className="flex flex-wrap gap-2">
-                  {(talent.skills || []).map(s => (
-                    <span key={s} className="tag tag-blue">{s}</span>
-                  ))}
-                </div>
+                {!talent.skills || talent.skills.length === 0 ? (
+                  <p className="text-xs text-gray-400 dark:text-slate-500 italic">
+                    {isOwner ? 'Nenhuma competência cadastrada. Clique em "Editar Perfil" para adicionar suas habilidades.' : 'Nenhuma habilidade cadastrada ainda.'}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {talent.skills.map(s => (
+                      <span key={s} className="tag tag-blue">{s}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

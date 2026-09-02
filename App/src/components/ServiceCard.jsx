@@ -2,8 +2,11 @@ import { Star, MessageSquare } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 
 export default function ServiceCard({ service }) {
-  const { providerName, category, city, rating, reviewsCount, badge, description, providerEmail, avatar } = service;
+  const { title, name, providerName, category, city, rating, reviewsCount, badge, description, providerEmail, avatar } = service;
   const { currentUser, showToast, startChatWith } = useAppStore();
+
+  const serviceTitle = title || name || category || 'Serviço Profissional';
+  const provider = providerName || 'Profissional Regional';
 
   const handleContact = async () => {
     if (!currentUser) {
@@ -11,14 +14,14 @@ export default function ServiceCard({ service }) {
       return;
     }
 
-    const targetEmail = providerEmail || `${providerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+    const targetEmail = providerEmail || `${provider.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
 
     await startChatWith({
-      name: providerName,
+      name: provider,
       email: targetEmail,
       role: 'freelancer',
       avatar: avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
-    }, `Serviço: ${category}`);
+    }, `Serviço: ${serviceTitle}`);
   };
 
   return (
@@ -29,7 +32,12 @@ export default function ServiceCard({ service }) {
         <span className="text-xs font-bold text-gray-600 dark:text-slate-400 shrink-0">{city}</span>
       </div>
 
-      <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{providerName}</h3>
+      <div>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{serviceTitle}</h3>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+          Por <span className="font-semibold text-gray-700 dark:text-slate-300">{provider}</span>
+        </p>
+      </div>
 
       {/* Rating */}
       <div className="flex items-center gap-1.5 text-sm">

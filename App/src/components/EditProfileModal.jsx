@@ -171,20 +171,31 @@ export default function EditProfileModal({
                   value={editData.course}
                   onChange={e => setEditData(d => ({ ...d, course: e.target.value }))}
                   className="form-control"
-                  required
+                  placeholder="Ex: Análise e Desenvolvimento de Sistemas"
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Período / Semestre</label>
+                <label className="form-label">Instituição de Ensino / Escola</label>
                 <input
                   type="text"
-                  value={editData.period}
-                  onChange={e => setEditData(d => ({ ...d, period: e.target.value }))}
+                  value={editData.institution}
+                  onChange={e => setEditData(d => ({ ...d, institution: e.target.value }))}
                   className="form-control"
-                  placeholder="Ex: 7º Semestre (Vespertino)"
+                  placeholder="Ex: IFPR Campus Ivaiporã, Univale, UENP..."
                 />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Período / Semestre</label>
+              <input
+                type="text"
+                value={editData.period}
+                onChange={e => setEditData(d => ({ ...d, period: e.target.value }))}
+                className="form-control"
+                placeholder="Ex: 3º Semestre / Noturno"
+              />
             </div>
 
             <div className="form-group">

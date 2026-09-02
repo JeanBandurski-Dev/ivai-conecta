@@ -189,47 +189,63 @@ export default function BancoDeTalentos() {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teachers.map(t => (
-                <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-4">
-                      <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white" />
-                      <div>
-                        <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
-                        <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Doutor / Mestre em Ciência da Computação'}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">{t.institution}</div>
+            {teachers.length === 0 ? (
+              <div className="card p-12 text-center space-y-4 max-w-md mx-auto my-8 border border-gray-100 dark:border-slate-800">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+                  <Award size={32} />
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white">
+                    Nenhum professor cadastrado ainda
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                    Os docentes de universidades parceiras (IFPR, Univale, UENP) cadastrados no sistema com o perfil Professor aparecerão aqui.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {teachers.map(t => (
+                  <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-4">
+                        <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white" />
+                        <div>
+                          <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
+                          <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Docente / Orientador'}</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">{t.institution}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-600 dark:text-slate-300 font-medium">
+                        <strong>Disciplina Principal:</strong> {t.discipline}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full w-fit font-bold">
+                        <ShieldCheck size={13} /> {t.endorsementCount || 0} Alunos Recomendados
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-600 dark:text-slate-300 font-medium">
-                      <strong>Disciplina Principal:</strong> {t.discipline}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full w-fit font-bold">
-                      <ShieldCheck size={13} /> {t.endorsementCount || 18} Alunos Recomendados
+                    {/* 2 Botões de Ação */}
+                    <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(`/professor/${t.id}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                      >
+                        <Eye size={13} /> Ver Perfil
+                      </button>
+                      
+                      <button
+                        onClick={() => setSelectedTeacherForEndorsements(t)}
+                        className="btn btn-primary btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                      >
+                        <Award size={13} /> Ver Indicações
+                      </button>
                     </div>
                   </div>
-
-                  {/* 2 Botões de Ação */}
-                  <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
-                    <button
-                      onClick={() => navigate(`/professor/${t.id}`)}
-                      className="btn btn-outline btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
-                    >
-                      <Eye size={13} /> Ver Perfil
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTeacherForEndorsements(t)}
-                      className="btn btn-primary btn-sm text-xs font-bold flex-1 flex items-center justify-center gap-1"
-                    >
-                      <Award size={13} /> Ver Indicações
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

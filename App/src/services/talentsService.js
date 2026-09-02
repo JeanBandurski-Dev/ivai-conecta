@@ -25,10 +25,10 @@ function normalizeUserDoc(docData, docId) {
     experiences: data.experiences || [],
     projects: data.projects || [],
     education: data.education || [],
-    isVerifiedStudent: data.isVerifiedStudent ?? (data.role === 'aluno' ? false : true),
-    course: data.course || (data.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
-    institution: data.institution || 'IFPR Campus Ivaiporã',
-    period: data.period || 'Em andamento',
+    isVerifiedStudent: data.isVerifiedStudent ?? false,
+    course: data.course || '',
+    institution: data.institution || '',
+    period: data.period || '',
   };
 }
 
@@ -42,13 +42,13 @@ function normalizeTeacherDoc(docData, docId) {
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Docente',
-    role: 'professor',
+    role: data.role || 'professor',
     email: data.email || '',
-    degree: data.degree || 'Doutor / Mestre',
-    institution: data.institution || 'IFPR Campus Ivaiporã',
-    discipline: data.discipline || 'Ensino Superior & Técnico',
+    degree: data.degree || '',
+    institution: data.institution || '',
+    discipline: data.discipline || '',
     endorsementCount: data.endorsementCount || 0,
-    verified: data.verified ?? true,
+    verified: data.verified ?? false,
     avatar: data.avatar || '',
     bio: data.bio || '',
     education: data.education || [],
@@ -93,10 +93,12 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
 export function subscribeToTeachers(callback) {
   try {
     const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('role', '==', 'professor'));
 
-    return onSnapshot(usersRef, (snapshot) => {
-      const allUsers = snapshot.docs.map(d => normalizeTeacherDoc(d.data(), d.id));
-      const remoteTeachers = allUsers.filter(u => u.role === 'professor');
+    return onSnapshot(q, (snapshot) => {
+      const remoteTeachers = snapshot.docs
+        .map(d => normalizeTeacherDoc(d.data(), d.id))
+        .filter(u => u.role === 'professor');
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remoteTeachers));
@@ -191,7 +193,9 @@ export function getVerifiedTeachers() {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) teachers = parsed;
+        if (Array.isArray(parsed)) {
+          teachers = parsed.filter(t => t.role === 'professor');
+        }
       } catch {}
     }
   }
@@ -199,7 +203,8 @@ export function getVerifiedTeachers() {
   // Background sync com o Firestore (coleção 'users' role 'professor')
   try {
     const usersRef = collection(db, 'users');
-    getDocs(usersRef).then(snapshot => {
+    const q = query(usersRef, where('role', '==', 'professor'));
+    getDocs(q).then(snapshot => {
       const remote = snapshot.docs
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => u.role === 'professor');

@@ -97,55 +97,55 @@ export async function register(data) {
 
   const defaultRoleData = {
     aluno: {
-      course: data.course || 'Análise e Desenvolvimento de Sistemas',
-      institution: data.institution || 'IFPR Campus Ivaiporã',
-      period: 'Graduação / 1º Semestre',
-      skills: data.skills || ['JavaScript', 'Excel Avançado', 'Gestão'],
+      course: data.course || '',
+      institution: data.institution || '',
+      period: data.period || '',
+      skills: data.skills || [],
       isVerifiedStudent: false,
       raNumber: '',
-      bio: `Estudante no Vale do Ivaí (${city || 'Ivaiporã'}).`,
+      bio: data.bio || '',
       experiences: [],
       projects: [],
-      education: [{ degree: 'Ensino Superior / Técnico', institution: data.institution || 'IFPR Campus Ivaiporã', period: '2024 - 2026' }],
+      education: [],
       endorsements: []
     },
     candidato: {
-      course: data.course || 'Profissional / Graduado',
-      institution: data.institution || 'Instituição Regional',
-      period: 'Formado',
-      skills: data.skills || ['Gestão Financeira', 'Excel Avançado', 'Atendimento ao Cliente'],
-      isVerifiedStudent: true,
-      bio: `Profissional cadastrado no Ivaí Conecta - ${city || 'Ivaiporã'}.`,
+      course: data.course || '',
+      institution: data.institution || '',
+      period: data.period || '',
+      skills: data.skills || [],
+      isVerifiedStudent: false,
+      bio: data.bio || '',
       experiences: [],
       projects: [],
       education: [],
       endorsements: []
     },
     professor: {
-      degree: data.degree || 'Docente / Especialista',
-      institution: data.institution || 'IFPR Campus Ivaiporã',
-      discipline: data.discipline || 'Ensino Superior & Técnico',
+      degree: data.degree || '',
+      institution: data.institution || '',
+      discipline: data.discipline || '',
       endorsementCount: 0,
-      verified: true,
-      bio: `Docente na instituição ${data.institution || 'IFPR Campus Ivaiporã'}.`,
-      education: [{ degree: data.degree || 'Docente', institution: data.institution || 'IFPR Campus Ivaiporã', period: 'Atual' }],
-      classes: [data.discipline || 'Aulas Gerais']
+      verified: false,
+      bio: data.bio || '',
+      education: [],
+      classes: []
     },
     empresa: {
       cnpj: data.cnpj || '',
       isVerifiedCompany: false,
-      sector: data.sector || 'Comércio & Serviços',
-      size: '1-10 funcionários',
-      about: `Empresa sediada em ${city || 'Ivaiporã'}.`,
+      sector: data.sector || '',
+      size: data.size || '',
+      about: data.about || '',
       history: '',
-      perks: ['Vale Transporte', 'Ambiente Colaborativo']
+      perks: []
     },
     freelancer: {
-      category: data.category || 'Serviços Gerais',
-      skills: data.skills || ['Atendimento', 'Manutenção'],
+      category: data.category || '',
+      skills: data.skills || [],
       rating: 5.0,
       reviewsCount: 0,
-      bio: `Prestador de serviços autônomo em ${city || 'Ivaiporã'}.`
+      bio: data.bio || ''
     }
   };
 

@@ -74,6 +74,7 @@ export default function Servicos() {
 
   // Service Edit Form State
   const [serviceData, setServiceData] = useState({
+    title: currentService?.title || currentService?.name || '',
     providerName: currentService?.providerName || currentUser?.name || '',
     category: currentService?.category || 'Construção & Manutenção',
     city: currentService?.city || currentUser?.city || 'Ivaiporã',
@@ -85,6 +86,7 @@ export default function Servicos() {
   useEffect(() => {
     if (currentService) {
       setServiceData({
+        title: currentService.title || currentService.name || '',
         providerName: currentService.providerName || currentUser?.name || '',
         category: currentService.category || 'Construção & Manutenção',
         city: currentService.city || 'Ivaiporã',
@@ -120,6 +122,8 @@ export default function Servicos() {
 
         const q = query.toLowerCase().trim();
         const mQ = !q ||
+          (s.title || '').toLowerCase().includes(q) ||
+          (s.name || '').toLowerCase().includes(q) ||
           (s.providerName || '').toLowerCase().includes(q) ||
           (s.category || '').toLowerCase().includes(q) ||
           (s.city || '').toLowerCase().includes(q) ||
@@ -242,8 +246,13 @@ export default function Servicos() {
                         {currentService.badge || 'Prestador Regional'}
                       </span>
                     </div>
-                    <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white">{currentService.providerName}</h2>
-                    <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
+                    <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white">
+                      {currentService.title || currentService.name || currentService.category}
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                      Prestador: <strong className="text-gray-700 dark:text-slate-200 font-semibold">{currentService.providerName}</strong>
+                    </p>
+                    <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-2 flex-wrap">
                       <span className="flex items-center gap-1"><MapPin size={14} className="text-primary-blue" />{currentService.address || `${currentService.city}, PR`}</span>
                       {currentService.phone && (
                         <>
@@ -514,7 +523,19 @@ export default function Servicos() {
 
             <form onSubmit={handleUpdateService} className="space-y-4">
               <div className="form-group">
-                <label className="form-label">Nome do Serviço / Marca</label>
+                <label className="form-label">Título / Nome do Serviço</label>
+                <input
+                  type="text"
+                  value={serviceData.title}
+                  onChange={e => setServiceData(d => ({ ...d, title: e.target.value }))}
+                  className="form-control"
+                  placeholder="Ex: Manutenção Elétrica Residencial e Predial"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nome do Prestador / Empresa</label>
                 <input
                   type="text"
                   value={serviceData.providerName}
@@ -586,6 +607,7 @@ export default function Servicos() {
 
               const servicePayload = {
                 title,
+                name: title,
                 category,
                 providerName: currentUser?.name || 'Profissional Autônomo',
                 avatar: currentUser?.avatar || '',

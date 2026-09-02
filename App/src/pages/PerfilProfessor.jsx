@@ -155,7 +155,7 @@ export default function PerfilProfessor() {
                   <span>·</span>
                   <span className="flex items-center gap-1.5"><BookOpen size={14} />{teacher.discipline}</span>
                   <span>·</span>
-                  <span className="flex items-center gap-1.5"><Award size={14} className="text-amber-400" />{teacher.endorsementCount || 18} Indicações Concedidas</span>
+                  <span className="flex items-center gap-1.5"><Award size={14} className="text-amber-400" />{teacher.endorsementCount || 0} Indicações Concedidas</span>
                 </div>
               </div>
             </div>
