@@ -411,19 +411,30 @@ export default function GerenciamentoVagasEmpresa() {
        format: finalFormat
     };
 
+    const isAlteration = Boolean(selectedCandidate.interview?.date);
+
     scheduleCandidateInterview(currentJob.id, selectedCandidate.id, finalForm);
     
-    // Auto-send chat message to the candidate
-    const msg = `Olá ${selectedCandidate.name}! Sua entrevista para a vaga de ${currentJob.title} foi agendada para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
+    // Message logic
+    let msg = '';
+    if (isAlteration) {
+      msg = `Olá ${selectedCandidate.name}! O horário da sua entrevista para a vaga de ${currentJob.title} foi alterado para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
+    } else {
+      msg = `Olá ${selectedCandidate.name}! Sua entrevista para a vaga de ${currentJob.title} foi agendada para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
+    }
     
     startChatWith({
       name: selectedCandidate.name,
       email: selectedCandidate.email || 'aluno@ivaiconecta.com.br',
       role: 'aluno',
       avatar: selectedCandidate.avatar
-    }, `Entrevista: ${currentJob.title}`, null, msg);
+    }, `Entrevista: ${currentJob.title}`, isAlteration ? null : msg, isAlteration ? msg : null);
 
-    showToast(`📅 Entrevista salva! Revise o convite no chat antes de enviar.`);
+    if (isAlteration) {
+      showToast(`📅 Horário alterado! Revise o convite no chat antes de enviar.`);
+    } else {
+      showToast(`📅 Entrevista agendada e convite enviado no chat!`);
+    }
     setSelectedCandidate(null);
     forceUpdate(n => n + 1);
   };
