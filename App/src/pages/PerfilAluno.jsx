@@ -25,35 +25,27 @@ export default function PerfilAluno() {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
-  const talentId = id || currentUser?.uid || currentUser?.id || '1';
-  const talent = getTalentById(talentId) || {
-    id: currentUser?.uid || currentUser?.id || 1,
-    name: currentUser?.name || 'Lucas Eduardo Silva',
-    course: currentUser?.course || 'Análise e Desenvolvimento de Sistemas',
-    institution: currentUser?.institution || 'IFPR Campus Ivaiporã',
-    period: currentUser?.period || '5º Semestre (Vespertino)',
-    city: currentUser?.city || 'Ivaiporã',
-    avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-    skills: currentUser?.skills || ['JavaScript', 'HTML5/CSS3', 'React', 'Node.js', 'Git', 'SQL'],
-    isVerifiedStudent: currentUser?.isVerifiedStudent ?? true,
-    raNumber: currentUser?.raNumber || 'IFPR-2024-8891',
-    linkedin: currentUser?.linkedin || 'https://linkedin.com/in/lucas-eduardo-dev',
-    github: currentUser?.github || 'https://github.com/lucas-dev',
-    bio: currentUser?.bio || 'Estudante de ADS apaixonado por desenvolvimento web e mobile. Busco oportunidade de estágio ou vaga junior na região de Ivaiporã.',
-    experiences: currentUser?.experiences || [
-      { id: 'exp1', role: 'Estagiário de TI', company: 'Prefeitura de Ivaiporã', period: 'Jan/2025 - Atual', description: 'Desenvolvimento de telas responsivas e suporte a banco de dados MySQL para o portal público.' },
-      { id: 'exp2', role: 'Monitor de Programação', company: 'IFPR Campus Ivaiporã', period: 'Mar/2024 - Dez/2024', description: 'Auxílio aos alunos ingressantes nas disciplinas de Lógica e Estrutura de Dados.' }
-    ],
-    projects: currentUser?.projects || [
-      { id: 'proj1', title: 'Ivaí Conecta - Plataforma Regional', tech: 'React, Node, Tailwind', link: 'https://github.com/lucas-dev/ivai-conecta', description: 'Sistema de ponte de empregabilidade regional para o Vale do Ivaí.' }
-    ],
-    education: currentUser?.education || [
-      { id: 'edu1', degree: 'Análise e Desenvolvimento de Sistemas', institution: 'IFPR Campus Ivaiporã', period: '2024 - 2026' }
-    ],
-    endorsements: [
-      { id: 'end_01', profName: 'Prof. Dr. Ricardo Oliveira', profEmail: 'ricardo.oliveira@ifpr.edu.br', institution: 'IFPR Campus Ivaiporã', discipline: 'Desenvolvimento Web & Banco de Dados', quote: 'Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.', isVerified: true }
-    ]
-  };
+  const talentId = id || currentUser?.uid || currentUser?.id;
+  const talent = getTalentById(talentId) || (currentUser ? {
+    id: currentUser.uid || currentUser.id,
+    firestoreId: currentUser.uid || currentUser.id,
+    name: currentUser.name || 'Estudante / Profissional',
+    course: currentUser.course || (currentUser.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
+    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+    period: currentUser.period || 'Em andamento',
+    city: currentUser.city || 'Ivaiporã',
+    avatar: currentUser.avatar || '',
+    skills: currentUser.skills || [],
+    isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
+    raNumber: currentUser.raNumber || '',
+    linkedin: currentUser.linkedin || '',
+    github: currentUser.github || '',
+    bio: currentUser.bio || '',
+    experiences: currentUser.experiences || [],
+    projects: currentUser.projects || [],
+    education: currentUser.education || [],
+    endorsements: currentUser.endorsements || []
+  } : null);
 
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
@@ -96,19 +88,19 @@ export default function PerfilAluno() {
 
   // Comprehensive edit form state
   const [editData, setEditData] = useState({
-    name: talent.name,
-    avatar: talent.avatar,
-    city: talent.city,
-    institution: talent.institution,
-    course: talent.course,
-    period: talent.period || '',
-    bio: talent.bio || '',
-    linkedin: talent.linkedin || '',
-    github: talent.github || '',
-    skills: [...(talent.skills || [])],
-    experiences: [...(talent.experiences || [])],
-    projects: [...(talent.projects || [])],
-    education: [...(talent.education || [])],
+    name: talent?.name || '',
+    avatar: talent?.avatar || '',
+    city: talent?.city || 'Ivaiporã',
+    institution: talent?.institution || 'IFPR Campus Ivaiporã',
+    course: talent?.course || '',
+    period: talent?.period || '',
+    bio: talent?.bio || '',
+    linkedin: talent?.linkedin || '',
+    github: talent?.github || '',
+    skills: [...(talent?.skills || [])],
+    experiences: [...(talent?.experiences || [])],
+    projects: [...(talent?.projects || [])],
+    education: [...(talent?.education || [])],
     newSkill: ''
   });
 

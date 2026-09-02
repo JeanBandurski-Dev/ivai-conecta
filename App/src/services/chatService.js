@@ -30,86 +30,16 @@ export function getDeletedThreads() {
 // Canal de comunicação instantâneo (0ms) entre abas normais no mesmo navegador
 const chatChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ivai_conecta_chat_bus') : null;
 
-// Helper para mapear apelidos e aliases de empresas/alunos conhecidos
+// Helper para verificar correspondência de e-mail entre participantes
 export function matchesUserEmail(participantEmail, userEmail) {
   if (!participantEmail || !userEmail) return false;
   const p = participantEmail.toLowerCase().trim();
   const u = userEmail.toLowerCase().trim();
-  if (p === u) return true;
-
-  // Alias para SimasTurbo (suporta tanto o e-mail real turbosimas@gmail.com quanto simasturbo@ivaiconecta.com.br)
-  if (
-    (u === 'turbosimas@gmail.com' || u === 'simasturbo@ivaiconecta.com.br') &&
-    (p === 'turbosimas@gmail.com' || p === 'simasturbo@ivaiconecta.com.br')
-  ) {
-    return true;
-  }
-
-  // Alias para AlunoTeste (suporta tanto emailaluno@gmail.com quanto alunoteste@ivaiconecta.com.br)
-  if (
-    (u === 'emailaluno@gmail.com' || u === 'alunoteste@ivaiconecta.com.br') &&
-    (p === 'emailaluno@gmail.com' || p === 'alunoteste@ivaiconecta.com.br')
-  ) {
-    return true;
-  }
-
-  return false;
+  return p === u;
 }
 
-export const SEED_CHAT_THREADS = [
-  {
-    id: 'thread_101',
-    participants: ['aluno@ivaiconecta.com.br', 'empresa@ivaiconecta.com.br'],
-    participantNames: {
-      'aluno@ivaiconecta.com.br': 'Lucas Eduardo Silva',
-      'empresa@ivaiconecta.com.br': 'ValeTech Soluções Digitais'
-    },
-    participantAvatars: {
-      'aluno@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'empresa@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-    },
-    participantRoles: {
-      'aluno@ivaiconecta.com.br': 'aluno',
-      'empresa@ivaiconecta.com.br': 'empresa'
-    },
-    contextTitle: 'Desenvolvedor Front-end Junior',
-    lastMessage: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.',
-    lastMessageAt: '19/08/2026 - 14:30',
-    updatedAt: Date.now() - 3600000,
-    messages: [
-      { id: 'm1', senderId: 'empresa', sender: 'ValeTech Soluções Digitais', senderName: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá Lucas! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15', createdAt: Date.now() - 7200000 },
-      { id: 'm2', senderId: 'aluno', sender: 'Lucas Eduardo Silva', senderName: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá! Muito obrigado pela oportunidade. Tenho total interesse na vaga híbrida em Ivaiporã.', timestamp: '19/08/2026 - 14:22', createdAt: Date.now() - 5400000 },
-      { id: 'm3', senderId: 'empresa', sender: 'ValeTech Soluções Digitais', senderName: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.', timestamp: '19/08/2026 - 14:30', createdAt: Date.now() - 3600000 }
-    ]
-  },
-  {
-    id: 'thread_102',
-    participants: ['aluno@ivaiconecta.com.br', 'professor@ivaiconecta.com.br'],
-    participantNames: {
-      'aluno@ivaiconecta.com.br': 'Lucas Eduardo Silva',
-      'professor@ivaiconecta.com.br': 'Prof. Dr. Ronan Silva'
-    },
-    participantAvatars: {
-      'aluno@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'professor@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-    },
-    participantRoles: {
-      'aluno@ivaiconecta.com.br': 'aluno',
-      'professor@ivaiconecta.com.br': 'professor'
-    },
-    contextTitle: 'Parecer Pedagógico - Programação',
-    lastMessage: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado.',
-    lastMessageAt: '20/08/2026 - 09:10',
-    updatedAt: Date.now() - 1800000,
-    messages: [
-      { id: 'm10', senderId: 'aluno', sender: 'Lucas Eduardo Silva', senderName: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá Professor Ronan! Gostaria de solicitar um parecer sobre meu desempenho acadêmico.', timestamp: '20/08/2026 - 08:45', createdAt: Date.now() - 3600000 },
-      { id: 'm11', senderId: 'professor', sender: 'Prof. Dr. Ronan Silva', senderName: 'Prof. Dr. Ronan Silva', senderEmail: 'professor@ivaiconecta.com.br', text: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10', createdAt: Date.now() - 1800000 }
-    ]
-  }
-];
-
 export function getChatThreads() {
-  if (typeof localStorage === 'undefined') return SEED_CHAT_THREADS;
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_CHAT_THREADS);
   if (raw !== null) {
     try {
@@ -117,8 +47,7 @@ export function getChatThreads() {
       if (Array.isArray(parsed)) return parsed;
     } catch { }
   }
-  localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(SEED_CHAT_THREADS));
-  return SEED_CHAT_THREADS;
+  return [];
 }
 
 export function saveChatThreads(threads) {

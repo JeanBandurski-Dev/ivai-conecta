@@ -10,7 +10,7 @@ import {
   updateJobStatus, getTalents, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest
 } from '../lib/ivaiConecta';
-import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
+import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
 
 export default function MinhasVagas() {
@@ -22,7 +22,7 @@ export default function MinhasVagas() {
   const isProfessor = currentUser?.role === 'professor';
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
-  const [liveApps, setLiveApps] = useState(() => getUserApplications());
+  const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
 
   useEffect(() => {
     const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
@@ -38,8 +38,8 @@ export default function MinhasVagas() {
     j.createdBy === currentUser?.uid ||
     j.createdBy === currentUser?.email ||
     (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser?.name && j.company?.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
-    j.company?.toLowerCase().includes('valetech')
+    (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
+    (currentUser?.name && j.company?.toLowerCase() === currentUser.name.toLowerCase())
   );
   
   // Teacher endorsement requests state
@@ -49,6 +49,19 @@ export default function MinhasVagas() {
 
   // Selected job to view applicants (for company view)
   const [selectedJobApplicants, setSelectedJobApplicants] = useState(null);
+  const [jobApplicants, setJobApplicants] = useState([]);
+
+  useEffect(() => {
+    if (!selectedJobApplicants) {
+      setJobApplicants([]);
+      return;
+    }
+    const targetId = selectedJobApplicants.firestoreId || selectedJobApplicants.id;
+    const unsub = subscribeToJobApplicants(targetId, (data) => {
+      setJobApplicants(data);
+    });
+    return () => unsub();
+  }, [selectedJobApplicants]);
 
   if (!currentUser) {
     return (
@@ -83,13 +96,6 @@ export default function MinhasVagas() {
     showToast('Solicitação recusada.');
     forceUpdate(n => n + 1);
   };
-
-  // Demo candidates list for company view
-  const demoApplicants = [
-    { id: 1, name: 'Lucas Eduardo Silva', email: 'aluno@ivaiconecta.com.br', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
-    { id: 2, name: 'Juliana Aparecida Melo', email: 'juliana.melo@ifpr.edu.br', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
-    { id: 3, name: 'Rafael Gomes Costa', email: 'rafael.costa@uenp.br', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
-  ];
 
   return (
     <>
@@ -393,15 +399,13 @@ export default function MinhasVagas() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              const targetEmail = app.company?.toLowerCase().includes('simas')
-                                ? 'turbosimas@gmail.com'
-                                : 'empresa@ivaiconecta.com.br';
+                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
 
                               startChatWith({
                                 name: app.company,
                                 email: targetEmail,
                                 role: 'empresa',
-                                avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
                               }, `Candidatura: ${app.title}`);
                             }}
                             className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -430,49 +434,59 @@ export default function MinhasVagas() {
                 <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">
                   Candidatos Inscritos: {selectedJobApplicants.title}
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Alunos e profissionais ordenados por compatibilidade de qualificações.</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Candidatos reais que se inscreveram nesta vaga no Vale do Ivaí.</p>
               </div>
               <button onClick={() => setSelectedJobApplicants(null)}><XCircle size={22} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
 
-            <div className="space-y-3">
-              {demoApplicants.map(cand => (
-                <div key={cand.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
-                      {cand.name}
-                      <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
-                        {cand.matchScore}% Match
-                      </span>
+            {jobApplicants.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 border border-gray-100 dark:border-slate-800">
+                <Users size={36} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                <p className="font-bold text-gray-700 dark:text-white text-sm">Nenhum candidato se inscreveu nesta vaga ainda.</p>
+                <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Assim que um estudante ou profissional clicar em "Candidatar-se", ele aparecerá aqui instantaneamente.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {jobApplicants.map(cand => (
+                  <div key={cand.id || cand.firestoreId} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
+                        {cand.candidateName || cand.name || 'Candidato'}
+                        <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
+                          {cand.matchScore || 90}% Match
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">
+                        {cand.candidateCourse || 'Estudante / Profissional'} · Inscrito em {cand.appliedAt || 'Hoje'}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">{cand.course} · Inscrito em {cand.appliedAt}</div>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        startChatWith({
-                          name: cand.name,
-                          email: cand.email || 'aluno@ivaiconecta.com.br',
-                          role: 'aluno',
-                          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-                        }, `Processo Seletivo: ${selectedJobApplicants.title}`);
-                        setSelectedJobApplicants(null);
-                      }}
-                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <MessageSquare size={13} /> Chat com o Candidato
-                    </button>
-                    <button
-                      onClick={() => navigate(`/perfil/${cand.id}`)}
-                      className="btn btn-outline btn-sm text-xs font-bold"
-                    >
-                      <Eye size={13} /> Ver Currículo
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          startChatWith({
+                            name: cand.candidateName || cand.name || 'Candidato',
+                            email: cand.candidateEmail || cand.email,
+                            role: 'aluno',
+                            avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                          }, `Processo Seletivo: ${selectedJobApplicants.title}`);
+                          setSelectedJobApplicants(null);
+                        }}
+                        className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <MessageSquare size={13} /> Chat com o Candidato
+                      </button>
+                      <button
+                        onClick={() => navigate(`/perfil/${cand.candidateUid || cand.candidateId || cand.id}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold"
+                      >
+                        <Eye size={13} /> Ver Currículo
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

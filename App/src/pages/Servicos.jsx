@@ -64,18 +64,36 @@ export default function Servicos() {
   }, []);
 
   const all = liveServices;
-  const myServices = all.filter(s => s.providerName.toLowerCase().includes(currentUser?.name?.toLowerCase().split(' ')[0] || 'marcos') || s.id === 201);
-  const currentService = myServices[0] || all[0];
+  const myServices = all.filter(s => 
+    s.createdBy === currentUser?.uid || 
+    s.createdBy === currentUser?.email ||
+    (currentUser?.email && s.providerEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
+    (currentUser?.name && s.providerName?.toLowerCase() === currentUser.name.toLowerCase())
+  );
+  const currentService = myServices[0] || null;
 
   // Service Edit Form State
   const [serviceData, setServiceData] = useState({
-    providerName: currentService?.providerName || '',
+    providerName: currentService?.providerName || currentUser?.name || '',
     category: currentService?.category || 'Construção & Manutenção',
-    city: currentService?.city || 'Ivaiporã',
-    address: currentService?.address || 'Rua Paraná, 450 - Centro, Ivaiporã - PR',
-    phone: currentService?.phone || '5543999887766',
+    city: currentService?.city || currentUser?.city || 'Ivaiporã',
+    address: currentService?.address || '',
+    phone: currentService?.phone || currentUser?.phone || '',
     description: currentService?.description || ''
   });
+
+  useEffect(() => {
+    if (currentService) {
+      setServiceData({
+        providerName: currentService.providerName || currentUser?.name || '',
+        category: currentService.category || 'Construção & Manutenção',
+        city: currentService.city || 'Ivaiporã',
+        address: currentService.address || '',
+        phone: currentService.phone || currentUser?.phone || '',
+        description: currentService.description || ''
+      });
+    }
+  }, [currentService, currentUser]);
 
   const hasActiveFilters = query || city !== 'Todas as Cidades' || category !== 'Todas' || badgeFilter !== 'todos' || minRating > 0;
 
@@ -117,9 +135,10 @@ export default function Servicos() {
       });
   }, [all, city, category, badgeFilter, minRating, query, sortBy]);
 
-  const handleUpdateService = (e) => {
+  const handleUpdateService = async (e) => {
     e.preventDefault();
-    updateService(currentService.id, serviceData);
+    if (!currentService) return;
+    await updateService(currentService.firestoreId || currentService.id, serviceData);
     setEditModal(false);
     showToast('Serviço e localização atualizados com sucesso!');
   };
@@ -199,141 +218,160 @@ export default function Servicos() {
         {activeTab === 'dashboard' && currentUser?.role === 'freelancer' ? (
           <div className="space-y-8 max-w-5xl mx-auto">
             
-            {/* Header do Serviço Cadastrado */}
-            <div className="card p-6 bg-white flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-primary-blue bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                    {currentService.category}
-                  </span>
-                  <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
-                    {currentService.badge}
-                  </span>
-                </div>
-                <h2 className="font-heading text-2xl font-bold text-primary-dark">{currentService.providerName}</h2>
-                <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 mt-1 flex-wrap">
-                  <span className="flex items-center gap-1"><MapPin size={14} className="text-primary-blue" />{currentService.address || `${currentService.city}, PR`}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1"><Phone size={14} className="text-green-600" />{currentService.phone}</span>
-                </div>
+            {!currentService ? (
+              <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-4">
+                <TrendingUp size={48} className="mx-auto text-primary-blue/60" />
+                <h3 className="font-heading text-xl font-bold text-gray-800 dark:text-white">Você ainda não possui nenhum serviço publicado</h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+                  Cadastre suas atividades profissionais para começar a receber contatos de clientes de Ivaiporã e região e acompanhar suas métricas de desempenho.
+                </p>
+                <button onClick={() => setModal(true)} className="btn btn-teal px-6 py-2.5 font-bold shadow-md">
+                  <Plus size={16} /> Cadastrar Meu Serviço
+                </button>
               </div>
-
-              <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
-                <Edit3 size={15} /> Editar Dados &amp; Localização
-              </button>
-            </div>
-
-            {/* CARDS DE ANALYTICS / DESEMPENHO DE VENDAS */}
-            <div>
-              <h3 className="font-heading text-xl font-bold text-primary-dark mb-4 flex items-center gap-2">
-                <TrendingUp size={20} className="text-primary-blue" /> Métrica &amp; Conversão de Vendas
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                {/* Visualizações */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <span>Acessos ao Perfil</span>
-                    <Users size={18} className="text-primary-blue" />
+            ) : (
+              <>
+                {/* Header do Serviço Cadastrado */}
+                <div className="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-primary-blue bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                        {currentService.category}
+                      </span>
+                      <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 px-2.5 py-0.5 rounded-full border border-green-200 dark:border-green-800">
+                        {currentService.badge || 'Prestador Regional'}
+                      </span>
+                    </div>
+                    <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white">{currentService.providerName}</h2>
+                    <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1"><MapPin size={14} className="text-primary-blue" />{currentService.address || `${currentService.city}, PR`}</span>
+                      {currentService.phone && (
+                        <>
+                          <span>·</span>
+                          <span className="flex items-center gap-1"><Phone size={14} className="text-green-600" />{currentService.phone}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-3xl font-extrabold text-primary-dark">{currentService.analytics?.views || 412}</div>
-                  <div className="text-xs text-green-600 font-semibold">+18% esta semana</div>
+
+                  <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
+                    <Edit3 size={15} /> Editar Dados &amp; Localização
+                  </button>
                 </div>
 
-                {/* Contatos via Chat */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <span>Leads / Contatos</span>
-                    <MessageSquare size={18} className="text-primary-blue" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-primary-dark">{currentService.analytics?.contacts || 58}</div>
-                  <div className="text-xs text-gray-500 font-medium">Pessoas que iniciaram conversa no chat</div>
-                </div>
-
-                {/* Vendas Fechadas */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <span>Serviços Prestados</span>
-                    <CheckCircle2 size={18} className="text-teal-600" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-teal-600">{currentService.analytics?.closedDeals || 49}</div>
-                  <div className="text-xs font-bold text-teal-700">Taxa: {currentService.analytics?.conversionRate || '84.4%'}</div>
-                </div>
-
-                {/* Não Compraram */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
-                    <span>Desistências</span>
-                    <AlertCircle size={18} className="text-amber-500" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-gray-700">{currentService.analytics?.nonBuyers || 9}</div>
-                  <div className="text-xs text-amber-600 font-semibold">Contataram e não compraram</div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* FÓRUM DE AVALIAÇÕES E FEEDBACK DOS CLIENTES */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              
-              {/* Avaliações dos Clientes */}
-              <div className="card space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-heading text-lg font-bold text-primary-dark flex items-center gap-2">
-                    <Star size={18} className="fill-amber-400 text-amber-400" /> Avaliações ({currentService.reviewsCount})
+                {/* CARDS DE ANALYTICS / DESEMPENHO DE VENDAS */}
+                <div>
+                  <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
+                    <TrendingUp size={20} className="text-primary-blue" /> Métrica &amp; Conversão de Vendas
                   </h3>
-                  <span className="text-sm font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200">
-                    ⭐ {currentService.rating} / 5.0
-                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    {/* Visualizações */}
+                    <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <span>Acessos ao Perfil</span>
+                        <Users size={18} className="text-primary-blue" />
+                      </div>
+                      <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{currentService.analytics?.views || 0}</div>
+                      <div className="text-xs text-green-600 font-semibold">Visualizações reais</div>
+                    </div>
+
+                    {/* Contatos via Chat */}
+                    <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <span>Leads / Contatos</span>
+                        <MessageSquare size={18} className="text-primary-blue" />
+                      </div>
+                      <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{currentService.analytics?.contacts || 0}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Conversas iniciadas</div>
+                    </div>
+
+                    {/* Vendas Fechadas */}
+                    <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <span>Serviços Prestados</span>
+                        <CheckCircle2 size={18} className="text-teal-600" />
+                      </div>
+                      <div className="text-3xl font-extrabold text-teal-600">{currentService.analytics?.closedDeals || 0}</div>
+                      <div className="text-xs font-bold text-teal-700">Taxa: {currentService.analytics?.conversionRate || '0%'}</div>
+                    </div>
+
+                    {/* Não Compraram */}
+                    <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
+                        <span>Desistências</span>
+                        <AlertCircle size={18} className="text-amber-500" />
+                      </div>
+                      <div className="text-3xl font-extrabold text-gray-700 dark:text-slate-200">{currentService.analytics?.nonBuyers || 0}</div>
+                      <div className="text-xs text-amber-600 font-semibold">Sem fechamento</div>
+                    </div>
+
+                  </div>
                 </div>
 
-                {(!currentService.reviews || currentService.reviews.length === 0) ? (
-                  <p className="text-sm text-gray-400">Nenhuma avaliação detalhada recebida ainda.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {currentService.reviews.map(r => (
-                      <div key={r.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-gray-800">{r.client}</span>
-                          <span className="text-xs text-amber-500 font-bold">{'⭐'.repeat(r.stars)}</span>
-                        </div>
-                        <p className="text-xs text-gray-600 italic">"{r.comment}"</p>
-                        <span className="text-[10px] text-gray-400 block pt-1">{r.date}</span>
+                {/* FÓRUM DE AVALIAÇÕES E FEEDBACK DOS CLIENTES */}
+                <div className="grid lg:grid-cols-2 gap-6">
+                  
+                  {/* Avaliações dos Clientes */}
+                  <div className="card space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                        <Star size={18} className="fill-amber-400 text-amber-400" /> Avaliações ({currentService.reviewsCount || 0})
+                      </h3>
+                      <span className="text-sm font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200">
+                        ⭐ {currentService.rating || 5.0} / 5.0
+                      </span>
+                    </div>
+
+                    {(!currentService.reviews || currentService.reviews.length === 0) ? (
+                      <p className="text-sm text-gray-400">Nenhuma avaliação detalhada recebida ainda.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {currentService.reviews.map((r, i) => (
+                          <div key={i} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-sm text-gray-800">{r.client}</span>
+                              <span className="text-xs text-amber-500 font-bold">{'⭐'.repeat(r.stars || 5)}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 italic">"{r.comment}"</p>
+                            <span className="text-[10px] text-gray-400 block pt-1">{r.date}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Fórum de Perguntas & Dúvidas dos Clientes */}
-              <div className="card space-y-4">
-                <h3 className="font-heading text-lg font-bold text-primary-dark flex items-center gap-2">
-                  <MessageSquare size={18} className="text-primary-blue" /> Fórum de Dúvidas &amp; Sugestões
-                </h3>
+                  {/* Fórum de Perguntas & Dúvidas dos Clientes */}
+                  <div className="card space-y-4">
+                    <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                      <MessageSquare size={18} className="text-primary-blue" /> Fórum de Dúvidas &amp; Sugestões
+                    </h3>
 
-                {(!currentService.forumTopics || currentService.forumTopics.length === 0) ? (
-                  <div className="bg-gray-50 rounded-2xl p-6 text-center text-gray-400">
-                    <MessageSquare size={32} className="mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm font-semibold">Nenhuma pergunta aberta no momento.</p>
-                    <p className="text-xs mt-1">Quando clientes tiverem dúvidas sobre seus serviços, elas aparecerão aqui.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {currentService.forumTopics.map(f => (
-                      <div key={f.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
-                        <div className="font-bold text-sm text-gray-800">❓ {f.title}</div>
-                        <div className="text-xs text-gray-600">Cliente perguntou: "{f.question}"</div>
-                        <div className="text-xs font-semibold text-primary-blue bg-white p-2.5 rounded-xl border border-gray-200">
-                          <strong>Sua Resposta:</strong> {f.answer}
-                        </div>
+                    {(!currentService.forumTopics || currentService.forumTopics.length === 0) ? (
+                      <div className="bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 text-center text-gray-400">
+                        <MessageSquare size={32} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                        <p className="text-sm font-semibold">Nenhuma pergunta aberta no momento.</p>
+                        <p className="text-xs mt-1">Quando clientes tiverem dúvidas sobre seus serviços, elas aparecerão aqui.</p>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="space-y-3">
+                        {currentService.forumTopics.map((f, i) => (
+                          <div key={i} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
+                            <div className="font-bold text-sm text-gray-800">❓ {f.title}</div>
+                            <div className="text-xs text-gray-600">Cliente perguntou: "{f.question}"</div>
+                            <div className="text-xs font-semibold text-primary-blue bg-white p-2.5 rounded-xl border border-gray-200">
+                              <strong>Sua Resposta:</strong> {f.answer}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-            </div>
+                </div>
+              </>
+            )}
 
           </div>
         ) : (
@@ -538,7 +576,7 @@ export default function Servicos() {
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Cadastrar Meu Serviço</h3>
               <button onClick={() => setModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
             </div>
-            <form onSubmit={e => {
+            <form onSubmit={async (e) => {
               e.preventDefault();
               const category = e.target.category.value;
               const city = e.target.city.value;
@@ -550,19 +588,20 @@ export default function Servicos() {
                 title,
                 category,
                 providerName: currentUser?.name || 'Profissional Autônomo',
-                avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+                avatar: currentUser?.avatar || '',
+                providerEmail: currentUser?.email || '',
                 city,
-                phone: phone || '5543999887766',
+                phone: phone || currentUser?.phone || '',
                 description,
                 createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
                 rating: 5.0,
-                reviewsCount: 1,
-                badge: 'Novo Profissional',
-                analytics: { views: 1, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
+                reviewsCount: 0,
+                badge: 'Prestador Regional',
+                analytics: { views: 0, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
                 reviews: [],
                 forumTopics: []
               };
-              addService(servicePayload);
+              await addService(servicePayload);
               showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
               setModal(false);
             }} className="space-y-4">

@@ -14,38 +14,18 @@ import {
   STORAGE_KEY_AUTH_USER,
   STORAGE_KEY_USERS_DB,
   STORAGE_KEY_CITY,
-  DEFAULT_USERS,
   USER_ROLES,
 } from '../data/seedData';
 
 export function getUsersDB() {
-  if (typeof localStorage === 'undefined') return DEFAULT_USERS;
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_USERS_DB);
-  let users = DEFAULT_USERS;
+  let users = [];
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-        users = parsed;
-      }
+      if (Array.isArray(parsed)) users = parsed;
     } catch {}
-  }
-  let modified = false;
-  DEFAULT_USERS.forEach(defUser => {
-    if (!users.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
-      users.push(defUser);
-      modified = true;
-    }
-  });
-
-  const authUser = getAuthUser();
-  if (authUser && !users.some(u => u.email.toLowerCase() === authUser.email.toLowerCase())) {
-    users.push(authUser);
-    modified = true;
-  }
-
-  if (modified || !raw) {
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
   }
   return users;
 }
@@ -73,17 +53,6 @@ export async function getUserProfile(uid) {
 export async function login(email, password) {
   const cleanEmail = email.toLowerCase().trim();
 
-  // 1. Verificar primeiro se é conta demo do LocalStorage
-  const users = getUsersDB();
-  const demoFound = users.find(u => u.email.toLowerCase() === cleanEmail && u.password === password);
-  if (demoFound) {
-    const sessionUser = { ...demoFound };
-    delete sessionUser.password;
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-    return { success: true, user: sessionUser };
-  }
-
-  // 2. Tentar login no Firebase Auth
   try {
     const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
@@ -101,7 +70,7 @@ export async function login(email, password) {
       city: profileRes.profile?.city || 'Ivaiporã',
       role,
       badge: roleMeta.badge,
-      avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: profileRes.profile?.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
       ...(profileRes.profile || {})
@@ -110,7 +79,13 @@ export async function login(email, password) {
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser };
   } catch (error) {
-    return { success: false, error: 'E-mail ou senha incorretos. Verifique seus dados.' };
+    let errorMsg = 'E-mail ou senha incorretos. Verifique seus dados.';
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      errorMsg = 'E-mail ou senha inválidos. Verifique suas credenciais.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMsg = 'Muitas tentativas sem sucesso. Tente novamente mais tarde.';
+    }
+    return { success: false, error: errorMsg };
   }
 }
 

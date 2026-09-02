@@ -1,7 +1,18 @@
-// Jobs Service for Ivaí Conecta (Firestore + Local Storage Sync)
+// Jobs & Applications Service for Ivaí Conecta (Firestore Realtime)
 import { db } from '../lib/firebase.js';
-import { collection, getDocs, addDoc, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, SEED_JOBS, SEED_APPLICATIONS } from '../data/seedData.js';
+import {
+  collection,
+  getDocs,
+  getDoc,
+  addDoc,
+  doc,
+  updateDoc,
+  query,
+  where,
+  onSnapshot,
+  increment
+} from 'firebase/firestore';
+import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
 
 /**
  * Escuta vagas em tempo real via Firestore onSnapshot
@@ -10,16 +21,20 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
   try {
     const jobsRef = collection(db, 'jobs');
     const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
-    
+
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const remoteJobs = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
-        const localJobs = getJobs(city);
-        const merged = [...remoteJobs, ...localJobs.filter(j => !remoteJobs.some(rj => String(rj.id) === String(j.id)))];
-        callback(merged);
-      } else {
-        callback(getJobs(city));
+      const remoteJobs = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      // Atualiza cache local apenas com dados reais retornados pelo Firestore
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
       }
+
+      callback(remoteJobs);
     }, (error) => {
       console.warn('[Firestore Jobs Listener] Offline fallback:', error.message);
       callback(getJobs(city));
@@ -32,47 +47,82 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
 }
 
 /**
- * Escuta candidaturas em tempo real via Firestore onSnapshot
+ * Escuta candidaturas de um usuário em tempo real via Firestore onSnapshot
  */
 export function subscribeToApplications(candidateUid, callback) {
   try {
     const appsRef = collection(db, 'applications');
     const q = candidateUid ? query(appsRef, where('candidateUid', '==', candidateUid)) : appsRef;
-    
+
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const remoteApps = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
-        const localApps = getUserApplications();
-        const merged = [...remoteApps, ...localApps.filter(a => !remoteApps.some(ra => String(ra.id) === String(a.id)))];
-        callback(merged);
-      } else {
-        callback(getUserApplications());
+      const remoteApps = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remoteApps));
       }
+
+      callback(remoteApps);
     }, (error) => {
       console.warn('[Firestore Apps Listener] Fallback:', error.message);
-      callback(getUserApplications());
+      callback(getUserApplications(candidateUid));
     });
   } catch (error) {
     console.warn('[Firestore Apps Listener] Falha ao assinar candidaturas:', error.message);
-    callback(getUserApplications());
+    callback(getUserApplications(candidateUid));
     return () => {};
   }
 }
 
 /**
- * Busca vagas (sincronamente usando cache/seedData e atualizando Firestore em background)
+ * Escuta candidatos inscritos em uma vaga específica em tempo real
+ */
+export function subscribeToJobApplicants(jobId, callback) {
+  if (!jobId) {
+    callback([]);
+    return () => {};
+  }
+
+  try {
+    const appsRef = collection(db, 'applications');
+    const q = query(appsRef, where('jobId', 'in', [jobId, Number(jobId) || jobId, String(jobId)]));
+
+    return onSnapshot(q, (snapshot) => {
+      const applicants = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+      callback(applicants);
+    }, (error) => {
+      console.warn('[Firestore Job Applicants Listener] Erro:', error.message);
+      // Fallback para cache local filtrado
+      const allApps = getUserApplications();
+      const matched = allApps.filter(a => String(a.jobId) === String(jobId));
+      callback(matched);
+    });
+  } catch (error) {
+    console.warn('[Firestore Job Applicants] Falha ao assinar:', error.message);
+    callback([]);
+    return () => {};
+  }
+}
+
+/**
+ * Busca vagas do cache local (sem seeds fictícios)
  */
 export function getJobs(city = 'Todas as Cidades') {
-  let jobs = SEED_JOBS;
+  let jobs = [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_JOBS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.length > 0) jobs = parsed;
+        if (Array.isArray(parsed)) jobs = parsed;
       } catch {}
-    } else {
-      localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(SEED_JOBS));
     }
   }
 
@@ -81,18 +131,15 @@ export function getJobs(city = 'Todas as Cidades') {
     const jobsRef = collection(db, 'jobs');
     const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
     getDocs(q).then(snapshot => {
-      if (!snapshot.empty) {
-        const remoteJobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const merged = [...remoteJobs, ...jobs.filter(j => !remoteJobs.some(rj => String(rj.id) === String(j.id)))];
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(merged));
-        }
+      const remoteJobs = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
       }
-    }).catch(err => console.warn('[Firestore] getJobs offline fallback:', err.message));
+    }).catch(err => console.warn('[Firestore] getJobs offline:', err.message));
   } catch {}
 
   if (!city || city === 'Todas as Cidades') return jobs;
-  return jobs.filter(j => j.city.toLowerCase() === city.toLowerCase());
+  return jobs.filter(j => j.city && j.city.toLowerCase() === city.toLowerCase());
 }
 
 /**
@@ -103,79 +150,95 @@ export async function getJobsAsync(city = 'Todas as Cidades') {
     const jobsRef = collection(db, 'jobs');
     const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      return snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+    const remoteJobs = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
     }
+    return remoteJobs;
   } catch (error) {
     console.warn('[Firestore] Erro ao buscar vagas do Firestore:', error.message);
+    return getJobs(city);
   }
-  return getJobs(city);
 }
 
 export function getJobById(id) {
   const jobs = getJobs('Todas as Cidades');
-  return jobs.find(j => j.id === Number(id) || j.id === id || String(j.id) === String(id));
+  return jobs.find(j => j.id === Number(id) || j.id === id || String(j.id) === String(id) || j.firestoreId === id);
 }
 
-export function addJob(jobData) {
+export async function addJob(jobData) {
   const jobs = getJobs('Todas as Cidades');
   const newJob = {
-    id: Date.now(),
     createdAt: new Date().toLocaleDateString('pt-BR'),
+    createdAtTimestamp: Date.now(),
     status: 'Ativa',
     applicantsCount: 0,
     ...jobData,
   };
+
+  // Sincronização no Firestore
+  try {
+    const docRef = await addDoc(collection(db, 'jobs'), newJob);
+    newJob.id = docRef.id;
+    newJob.firestoreId = docRef.id;
+  } catch (err) {
+    console.warn('[Firestore] Erro ao cadastrar vaga no Firestore:', err.message);
+    newJob.id = `job_${Date.now()}`;
+  }
+
   const updated = [newJob, ...jobs];
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
   }
 
-  // Sincronização imediata no Firestore
-  try {
-    addDoc(collection(db, 'jobs'), newJob)
-      .then(docRef => { newJob.firestoreId = docRef.id; })
-      .catch(err => console.warn('[Firestore] Sync erro ao cadastrar vaga:', err.message));
-  } catch {}
-
   return newJob;
 }
 
-export function updateJobStatus(jobId, action) {
+export async function updateJobStatus(jobId, action) {
   const jobs = getJobs('Todas as Cidades');
+  const targetJob = jobs.find(j => j.id === Number(jobId) || j.id === jobId || String(j.id) === String(jobId) || j.firestoreId === jobId);
+  const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
+
+  if (targetJob && (targetJob.firestoreId || targetJob.id)) {
+    const docId = targetJob.firestoreId || targetJob.id;
+    try {
+      await updateDoc(doc(db, 'jobs', String(docId)), { status: newStatus });
+    } catch (err) {
+      console.warn('[Firestore] Erro ao atualizar status da vaga:', err.message);
+    }
+  }
+
   const updated = jobs.map(j => {
-    if (j.id === Number(jobId) || j.id === jobId || String(j.id) === String(jobId)) {
-      const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
-      const updatedJob = { ...j, status: newStatus };
-      if (j.firestoreId) {
-        try {
-          updateDoc(doc(db, 'jobs', j.firestoreId), { status: newStatus }).catch(() => {});
-        } catch {}
-      }
-      return updatedJob;
+    if (j.id === Number(jobId) || j.id === jobId || String(j.id) === String(jobId) || j.firestoreId === jobId) {
+      return { ...j, status: newStatus };
     }
     return j;
   });
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
   }
   return updated;
 }
 
-export function getUserApplications() {
-  if (typeof localStorage === 'undefined') return SEED_APPLICATIONS;
-  const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.length > 0) return parsed;
-    } catch {}
+export function getUserApplications(candidateUid) {
+  let apps = [];
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) apps = parsed;
+      } catch {}
+    }
   }
-  localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(SEED_APPLICATIONS));
-  return SEED_APPLICATIONS;
+  if (candidateUid) {
+    return apps.filter(a => a.candidateUid === candidateUid || a.candidateEmail === candidateUid);
+  }
+  return apps;
 }
 
-export function applyToJob(jobId, user) {
+export async function applyToJob(jobId, user) {
   if (!user) {
     return { success: false, message: 'Você precisa estar logado para se candidatar.' };
   }
@@ -188,24 +251,32 @@ export function applyToJob(jobId, user) {
     };
   }
 
-  const apps = getUserApplications();
-  const existing = apps.find(a => a.jobId === Number(jobId) || a.jobId === jobId || String(a.jobId) === String(jobId));
+  const userUid = user.uid || user.id || 'usr_guest';
+  const apps = getUserApplications(userUid);
+  const existing = apps.find(a => String(a.jobId) === String(jobId));
   if (existing) {
     return { success: false, message: 'Você já se candidatou a esta vaga!' };
   }
 
   const job = getJobById(jobId);
   const newApp = {
-    id: `app_${Date.now()}`,
-    jobId: Number(jobId) || jobId,
-    candidateUid: user.uid || user.id || 'usr_guest',
+    jobId: String(jobId),
+    candidateUid: userUid,
     candidateName: user.name || 'Candidato Ivaí Conecta',
+    candidateEmail: user.email || '',
+    candidateAvatar: user.avatar || '',
+    candidateCourse: user.course || (user.role === 'aluno' ? 'Estudante' : 'Profissional'),
+    candidateCity: user.city || 'Ivaiporã',
+    candidatePhone: user.phone || '',
     title: job ? job.title : 'Vaga de Emprego',
     company: job ? job.company : 'Empresa do Vale do Ivaí',
-    recruiterPhone: job ? job.recruiterPhone : '5543999887766',
+    companyLogo: job ? (job.companyLogo || '') : '',
+    recruiterEmail: job ? (job.recruiterEmail || job.createdBy || '') : '',
+    recruiterPhone: job ? (job.recruiterPhone || '') : '',
     city: job ? job.city : 'Ivaiporã',
     type: job ? job.type : 'Tempo Integral',
     appliedAt: new Date().toLocaleDateString('pt-BR'),
+    appliedTimestamp: Date.now(),
     matchScore: 90,
     status: 'Candidatura Enviada',
     statusClass: 'badge-match-high',
@@ -219,15 +290,32 @@ export function applyToJob(jobId, user) {
     ]
   };
 
-  const updated = [newApp, ...apps];
+  // Grava candidatura no Firestore
+  try {
+    const docRef = await addDoc(collection(db, 'applications'), newApp);
+    newApp.id = docRef.id;
+    newApp.firestoreId = docRef.id;
+
+    // Incrementa o contador de inscritos na vaga no Firestore
+    const targetDocId = job?.firestoreId || job?.id || jobId;
+    if (targetDocId) {
+      try {
+        await updateDoc(doc(db, 'jobs', String(targetDocId)), {
+          applicantsCount: increment(1)
+        });
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('[Firestore] Erro ao gravar candidatura:', err.message);
+    newApp.id = `app_${Date.now()}`;
+  }
+
+  const allApps = getUserApplications();
+  const updated = [newApp, ...allApps];
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
   }
 
-  // Enviar a candidatura ao Firestore
-  try {
-    addDoc(collection(db, 'applications'), newApp).catch(err => console.warn('[Firestore] Erro candidatar vaga:', err.message));
-  } catch {}
-
   return { success: true, application: newApp };
 }
+

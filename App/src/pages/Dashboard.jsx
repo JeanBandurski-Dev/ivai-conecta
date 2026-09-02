@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getTalents, getJobs, getServices, calculateMatchScore } from '../lib/ivaiConecta';
+import { getTalents, getJobs, getServices, subscribeToTalents, subscribeToJobs, subscribeToServices } from '../lib/ivaiConecta';
 import TalentsCarousel from '../components/TalentsCarousel';
 import JobCard from '../components/JobCard';
 import ServiceCard from '../components/ServiceCard';
@@ -27,11 +27,21 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
 
-  const talents  = getTalents(selectedCity);
-  const jobs     = getJobs(selectedCity);
-  const services = getServices(selectedCity);
+  const [talents, setTalents]   = useState(() => getTalents(selectedCity));
+  const [jobs, setJobs]         = useState(() => getJobs(selectedCity));
+  const [services, setServices] = useState(() => getServices(selectedCity));
 
-  const demoSkills = talents[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
+  useEffect(() => {
+    const unsubTalents = subscribeToTalents(selectedCity, setTalents);
+    const unsubJobs = subscribeToJobs(selectedCity, setJobs);
+    const unsubServices = subscribeToServices(selectedCity, setServices);
+
+    return () => {
+      unsubTalents();
+      unsubJobs();
+      unsubServices();
+    };
+  }, [selectedCity]);
 
   const handleSearch = () => {
     if (query.trim()) navigate(`/vagas?q=${encodeURIComponent(query.trim())}`);

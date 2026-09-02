@@ -11,14 +11,6 @@ const ROLES = [
   { id: 'empresa',    label: 'Empresa / Recrutador',     icon: '🏢' },
 ];
 
-const DEMO_ROLES = [
-  { role: 'aluno',      label: 'Entrar como Aluno' },
-  { role: 'professor',  label: 'Entrar como Professor' },
-  { role: 'freelancer', label: 'Entrar como Freelancer' },
-  { role: 'candidato',  label: 'Entrar como Candidato' },
-  { role: 'empresa',    label: 'Entrar como Empresa' },
-];
-
 export default function Login() {
   const { login, register, loginWithGoogle, showToast } = useAppStore();
   const navigate = useNavigate();
@@ -75,17 +67,6 @@ export default function Login() {
     } else {
       showToast(`Bem-vindo(a), ${res.user.name}!`);
       setTimeout(() => navigate(redirectTarget, { replace: true }), 600);
-    }
-  };
-
-  const handleDemo = async (role) => {
-    setAlert('');
-    setLoading(true);
-    const res = await login(`${role}@ivaiconecta.com.br`, '123456');
-    setLoading(false);
-    if (res.success) {
-      showToast(`Conectado no modo demonstração: ${res.user.name}`);
-      setTimeout(() => navigate(redirectTarget, { replace: true }), 500);
     }
   };
 
@@ -246,21 +227,7 @@ export default function Login() {
             </form>
           )}
 
-          {/* ── DEMO ── */}
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-800 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
-            <div className="text-xs font-bold text-gray-600 dark:text-slate-300 mb-3">Teste Rápido (Demonstração 1-Clique):</div>
-            <div className="flex flex-wrap gap-1.5">
-              {DEMO_ROLES.map(d => (
-                <button
-                  key={d.role}
-                  onClick={() => handleDemo(d.role)}
-                  className="btn btn-outline btn-sm text-[11px] font-bold py-1 px-2.5"
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
+
 
         </div>
       </div>

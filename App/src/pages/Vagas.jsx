@@ -71,7 +71,6 @@ export default function Vagas() {
   }, []);
 
   const allJobs = liveJobs;
-  const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
 
   // Check jobId param in URL
   useEffect(() => {
@@ -94,7 +93,7 @@ export default function Vagas() {
     }
   }, [selectedCity]);
 
-  const handleCreateJob = (e) => {
+  const handleCreateJob = async (e) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       showToast('Por favor, informe o título da vaga.');
@@ -111,12 +110,12 @@ export default function Vagas() {
       salary: newSalary || 'A combinar',
       description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
       requiredSkills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : ['Comunicação', 'Trabalho em Equipe'],
-      recruiterPhone: currentUser?.phone || '5543999887766',
-      recruiterEmail: currentUser?.email || 'empresa@ivaiconecta.com.br',
+      recruiterPhone: currentUser?.phone || '',
+      recruiterEmail: currentUser?.email || '',
       createdBy: currentUser?.uid || currentUser?.email || 'empresa',
     };
 
-    addJob(jobPayload);
+    await addJob(jobPayload);
     showToast('🎉 Vaga publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
     setShowModal(false);
     setNewTitle('');

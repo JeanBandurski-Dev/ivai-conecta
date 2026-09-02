@@ -17,20 +17,24 @@ export default function PerfilEmpresa() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [company, setCompany] = useState({
-    name:     currentUser?.name || 'ValeTech Soluções Digitais',
+    name:     currentUser?.name || 'Empresa Cadastrada',
     city:     currentUser?.city || 'Ivaiporã',
-    sector:   currentUser?.sector || 'Tecnologia da Informação & Inovação',
-    size:     currentUser?.size || '11-50 funcionários',
-    cnpj:     currentUser?.cnpj || '12.345.678/0001-90',
-    rating:   4.9,
-    reviews:  28,
-    logo:     currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
-    about:    currentUser?.about || 'Empresa de tecnologia e consultoria digital com sede em Ivaiporã. Desenvolvemos softwares sob medida, portais web e impulsionamos a transformação digital de indústrias, cooperativas e comércios em todo o Vale do Ivaí.',
-    history:  currentUser?.history || 'Fundada em 2018 por egressos de cursos de tecnologia da região, a ValeTech nasceu com o propósito de reter talentos locais e gerar oportunidades de trabalho para estudantes universitários.',
-    perks:    currentUser?.perks || ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido', 'Participação nos Lucros (PPR)', 'Auxílio Educação & Cursos', 'Ambiente de Inovação'],
+    sector:   currentUser?.sector || 'Comércio & Serviços',
+    size:     currentUser?.size || '1-10 funcionários',
+    cnpj:     currentUser?.cnpj || '',
+    rating:   currentUser?.rating || 5.0,
+    reviews:  currentUser?.reviewsCount || 0,
+    logo:     currentUser?.avatar || '',
+    about:    currentUser?.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
+    history:  currentUser?.history || '',
+    perks:    currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
   });
 
-  const jobs = getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]));
+  const jobs = getJobs('Todas as Cidades').filter(j => 
+    (currentUser?.uid && j.createdBy === currentUser.uid) ||
+    (currentUser?.email && j.recruiterEmail === currentUser.email) ||
+    (j.company && company.name && j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]))
+  );
 
   const isCompanyOwner = currentUser?.role === 'empresa';
 

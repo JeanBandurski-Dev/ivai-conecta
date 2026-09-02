@@ -87,32 +87,29 @@ export default function BancoDeTalentos() {
   const filtered = useMemo(() => {
     return all
       .filter(t => {
-        const isVerifiedOrSelf = t.isVerifiedStudent || (currentUser && String(currentUser.id) === String(t.id));
-        if (!isVerifiedOrSelf) return false;
-
         const mCity = city === 'Todas as Cidades' || t.city === city;
-        const mArea = area === 'Todas' || t.course.toLowerCase().includes(area.toLowerCase());
-        const mInst = institution === 'Todas as Instituições' || t.institution.toLowerCase().includes(institution.toLowerCase()) || (institution.includes('Autônomo') && t.institution.includes('Autônomo'));
+        const mArea = area === 'Todas' || (t.course && t.course.toLowerCase().includes(area.toLowerCase()));
+        const mInst = institution === 'Todas as Instituições' || (t.institution && t.institution.toLowerCase().includes(institution.toLowerCase())) || (institution.includes('Autônomo') && t.institution && t.institution.includes('Autônomo'));
         const mEndorsed = !onlyEndorsed || (t.endorsements && t.endorsements.length > 0);
         const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.includes(sk));
 
         const q = query.toLowerCase().trim();
         const mQ = !q ||
-          t.name.toLowerCase().includes(q) ||
-          t.course.toLowerCase().includes(q) ||
-          t.city.toLowerCase().includes(q) ||
-          t.institution.toLowerCase().includes(q) ||
+          (t.name && t.name.toLowerCase().includes(q)) ||
+          (t.course && t.course.toLowerCase().includes(q)) ||
+          (t.city && t.city.toLowerCase().includes(q)) ||
+          (t.institution && t.institution.toLowerCase().includes(q)) ||
           t.skills?.some(s => s.toLowerCase().includes(q));
 
         return mCity && mArea && mInst && mEndorsed && mSkills && mQ;
       })
       .sort((a, b) => {
         if (sortBy === 'endorsements') return (b.endorsements?.length || 0) - (a.endorsements?.length || 0);
-        if (sortBy === 'name') return a.name.localeCompare(b.name);
-        if (sortBy === 'city') return a.city.localeCompare(b.city);
+        if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+        if (sortBy === 'city') return (a.city || '').localeCompare(b.city || '');
         return 0;
       });
-  }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy, currentUser]);
+  }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy]);
 
   return (
     <>
@@ -377,24 +374,30 @@ export default function BancoDeTalentos() {
             </div>
 
             <div className="space-y-3">
-              {getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
-                <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <img src={student.avatar} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
-                    <div>
-                      <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
-                      <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => { setSelectedTeacherForEndorsements(null); navigate(`/perfil/${student.id}`); }}
-                    className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5"
-                  >
-                    <Eye size={13} /> Ver Currículo Completo
-                  </button>
+              {getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).length === 0 ? (
+                <div className="p-8 text-center bg-gray-50 dark:bg-slate-800 rounded-2xl text-gray-400 dark:text-slate-500 text-sm">
+                  Este docente ainda não emitiu recomendações registradas no sistema.
                 </div>
-              ))}
+              ) : (
+                getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
+                  <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <img src={student.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                      <div>
+                        <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
+                        <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => { setSelectedTeacherForEndorsements(null); navigate(`/perfil/${student.id}`); }}
+                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <Eye size={13} /> Ver Currículo Completo
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
