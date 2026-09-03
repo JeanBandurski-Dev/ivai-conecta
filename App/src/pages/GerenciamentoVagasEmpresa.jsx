@@ -6,9 +6,9 @@ import {
   Award, Send, Check, X, FileText, Calendar, Sparkles, Star, Copy, Share2,
   Search, Filter, ExternalLink, ChevronRight, Download, Trash2,
   SlidersHorizontal, Video, AlertCircle, GraduationCap, LayoutGrid,
-  ListFilter, MessageSquare, ChevronDown, Inbox, Settings, BarChart3,
-  Layers, CheckSquare, Save, HelpCircle, UserCheck, GripVertical,
-  ChevronLeft, UserPlus, ArrowUpRight, History
+  ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
+  Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
+  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History
 } from 'lucide-react';
 import {
   getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
@@ -70,9 +70,22 @@ export default function GerenciamentoVagasEmpresa() {
   const [candidateSearch, setCandidateSearch] = useState('');
   const [selectedStageFilter, setSelectedStageFilter] = useState('todos');
   const [minMatchFilter, setMinMatchFilter] = useState(0);
+  const [selectedCityFilter, setSelectedCityFilter] = useState('todas');
+  const [selectedInstitutionFilter, setSelectedInstitutionFilter] = useState('todas');
+  const [selectedRatingFilter, setSelectedRatingFilter] = useState(0);
   const [onlyVerified, setOnlyVerified] = useState(false);
   const [onlyWithInterview, setOnlyWithInterview] = useState(false);
   const [onlyWithEndorsement, setOnlyWithEndorsement] = useState(false);
+  const [onlyWithNotes, setOnlyWithNotes] = useState(false);
+  const [sortBy, setSortBy] = useState('match_desc'); // 'match_desc' | 'match_asc' | 'recent' | 'oldest' | 'rating_desc' | 'name_asc'
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Jobs List Filters (Tab: Minhas Vagas)
+  const [jobSearch, setJobSearch] = useState('');
+  const [jobStatusFilter, setJobStatusFilter] = useState('todos'); // 'todos' | 'Ativa' | 'Encerrada'
+  const [jobModalityFilter, setJobModalityFilter] = useState('todos'); // 'todos' | 'Presencial' | 'Remoto' | 'Híbrido'
+  const [jobCityFilter, setJobCityFilter] = useState('todas');
+  const [jobSortBy, setJobSortBy] = useState('recent'); // 'recent' | 'candidates_desc' | 'title_asc'
 
   // Drag & Drop State
   const [draggedCandidate, setDraggedCandidate] = useState(null);
@@ -165,24 +178,123 @@ export default function GerenciamentoVagasEmpresa() {
     }).filter(Boolean);
   }, [jobCandidates, now]);
 
-  // Filtered Candidates
+  // Dynamic lists for candidate filter selects
+  const availableCandidateCities = useMemo(() => {
+    const set = new Set(jobCandidates.map(c => c.city).filter(Boolean));
+    CITIES.filter(c => c !== 'Todas as Cidades').forEach(c => set.add(c));
+    return Array.from(set);
+  }, [jobCandidates]);
+
+  const availableInstitutions = useMemo(() => {
+    const set = new Set(jobCandidates.map(c => c.institution).filter(Boolean));
+    ['IFPR Campus Ivaiporã', 'Univale Ivaiporã', 'UENP'].forEach(i => set.add(i));
+    return Array.from(set);
+  }, [jobCandidates]);
+
+  // Filtered & Sorted Candidates
   const filteredCandidates = useMemo(() => {
-    return jobCandidates.filter(c => {
+    let result = jobCandidates.filter(c => {
       const matchText = !candidateSearch ||
         c.name?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
         c.course?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
         c.institution?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
+        c.city?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
+        c.email?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
+        c.phone?.includes(candidateSearch) ||
         c.skills?.some(s => s?.toLowerCase().includes(candidateSearch.toLowerCase()));
 
       const matchStage = selectedStageFilter === 'todos' || c.stage === selectedStageFilter;
       const matchScore = (c.matchScore || 0) >= minMatchFilter;
+      const matchCity = selectedCityFilter === 'todas' || c.city === selectedCityFilter;
+      const matchInstitution = selectedInstitutionFilter === 'todas' ||
+        c.institution?.toLowerCase().includes(selectedInstitutionFilter.toLowerCase());
+      const matchRating = selectedRatingFilter === 0 || (c.rating || 0) >= selectedRatingFilter;
       const matchVerified = !onlyVerified || c.isVerifiedStudent;
       const matchInterview = !onlyWithInterview || !!c.interview;
       const matchEndorsement = !onlyWithEndorsement || (c.endorsements && c.endorsements.length > 0);
+      const matchNotes = !onlyWithNotes || Boolean(c.notes && c.notes.trim());
 
-      return matchText && matchStage && matchScore && matchVerified && matchInterview && matchEndorsement;
+      return matchText && matchStage && matchScore && matchCity && matchInstitution && matchRating && matchVerified && matchInterview && matchEndorsement && matchNotes;
     });
-  }, [jobCandidates, candidateSearch, selectedStageFilter, minMatchFilter, onlyVerified, onlyWithInterview, onlyWithEndorsement]);
+
+    return [...result].sort((a, b) => {
+      if (sortBy === 'match_desc') return (b.matchScore || 0) - (a.matchScore || 0);
+      if (sortBy === 'match_asc') return (a.matchScore || 0) - (b.matchScore || 0);
+      if (sortBy === 'rating_desc') return (b.rating || 0) - (a.rating || 0);
+      if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'recent') return (b.id || 0) - (a.id || 0);
+      if (sortBy === 'oldest') return (a.id || 0) - (b.id || 0);
+      return 0;
+    });
+  }, [
+    jobCandidates, candidateSearch, selectedStageFilter, minMatchFilter,
+    selectedCityFilter, selectedInstitutionFilter, selectedRatingFilter,
+    onlyVerified, onlyWithInterview, onlyWithEndorsement, onlyWithNotes, sortBy
+  ]);
+
+  const activeCandidateFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedStageFilter !== 'todos') count++;
+    if (minMatchFilter > 0) count++;
+    if (selectedCityFilter !== 'todas') count++;
+    if (selectedInstitutionFilter !== 'todas') count++;
+    if (selectedRatingFilter > 0) count++;
+    if (onlyVerified) count++;
+    if (onlyWithInterview) count++;
+    if (onlyWithEndorsement) count++;
+    if (onlyWithNotes) count++;
+    if (candidateSearch.trim()) count++;
+    if (sortBy !== 'match_desc') count++;
+    return count;
+  }, [
+    selectedStageFilter, minMatchFilter, selectedCityFilter, selectedInstitutionFilter,
+    selectedRatingFilter, onlyVerified, onlyWithInterview, onlyWithEndorsement,
+    onlyWithNotes, candidateSearch, sortBy
+  ]);
+
+  const resetCandidateFilters = () => {
+    setCandidateSearch('');
+    setSelectedStageFilter('todos');
+    setMinMatchFilter(0);
+    setSelectedCityFilter('todas');
+    setSelectedInstitutionFilter('todas');
+    setSelectedRatingFilter(0);
+    setOnlyVerified(false);
+    setOnlyWithInterview(false);
+    setOnlyWithEndorsement(false);
+    setOnlyWithNotes(false);
+    setSortBy('match_desc');
+  };
+
+  // Filtered & Sorted Jobs for "Minhas Vagas" Tab
+  const filteredCompanyJobs = useMemo(() => {
+    return allCompanyJobs
+      .filter(job => {
+        const matchesSearch = !jobSearch ||
+          job.title?.toLowerCase().includes(jobSearch.toLowerCase()) ||
+          job.description?.toLowerCase().includes(jobSearch.toLowerCase()) ||
+          job.requiredSkills?.some(s => s?.toLowerCase().includes(jobSearch.toLowerCase()));
+
+        const matchesStatus = jobStatusFilter === 'todos' ||
+          (jobStatusFilter === 'Ativa' ? job.status === 'Ativa' : job.status !== 'Ativa');
+
+        const matchesModality = jobModalityFilter === 'todos' ||
+          (job.modality?.toLowerCase() === jobModalityFilter.toLowerCase());
+
+        const matchesCity = jobCityFilter === 'todas' || job.city === jobCityFilter;
+
+        return matchesSearch && matchesStatus && matchesModality && matchesCity;
+      })
+      .sort((a, b) => {
+        if (jobSortBy === 'candidates_desc') {
+          return getJobCandidates(b.id).length - getJobCandidates(a.id).length;
+        }
+        if (jobSortBy === 'title_asc') {
+          return (a.title || '').localeCompare(b.title || '');
+        }
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [allCompanyJobs, jobSearch, jobStatusFilter, jobModalityFilter, jobCityFilter, jobSortBy, updateCount]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -651,30 +763,6 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
             </div>
           </div>
-
-          {/* ── KPI METRICS BAR MINIMALISTA ── */}
-          <div className="flex flex-wrap items-center gap-8 mt-8 pt-6 border-t border-gray-100 dark:border-slate-800/80">
-            <div>
-              <div className="text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Vagas Ativas</div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">{stats.activeJobs} <span className="text-sm text-gray-400 font-normal">/ {stats.totalJobs}</span></div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Candidaturas</div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalApplicants}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Em Avaliação</div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">{stats.inReview}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Entrevistas</div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">{stats.inInterview}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Aprovados</div>
-              <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">{stats.approved}</div>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -874,8 +962,8 @@ export default function GerenciamentoVagasEmpresa() {
         {activeTab === 'pipeline' && (
           <div className="space-y-6">
             
-            {/* Top Toolbar: Minimalist Job Selector & Filters */}
-            <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-2">
+            {/* ── BARRA SUPERIOR: SELEÇÃO DA VAGA & VISUALIZAÇÃO ── */}
+            <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-1">
               <div className="flex-1 max-w-2xl">
                 <label className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">
                   Vaga Selecionada
@@ -884,7 +972,7 @@ export default function GerenciamentoVagasEmpresa() {
                   <select
                     value={selectedJobId}
                     onChange={e => setSelectedJobId(Number(e.target.value) || e.target.value)}
-                    className="w-full appearance-none bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-sm font-medium text-gray-900 dark:text-white outline-none cursor-pointer focus:border-gray-400 transition-colors"
+                    className="w-full appearance-none bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue shadow-2xs transition-colors"
                   >
                     {allCompanyJobs.map(job => (
                       <option key={job.id} value={job.id}>
@@ -892,38 +980,59 @@ export default function GerenciamentoVagasEmpresa() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Campo de Busca Rápida com botão de limpar */}
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Buscar candidato..."
+                    placeholder="Buscar candidato, curso, skill..."
                     value={candidateSearch}
                     onChange={e => setCandidateSearch(e.target.value)}
-                    className="w-64 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-gray-400 text-gray-800 dark:text-white transition-colors"
+                    className="w-72 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-primary-blue text-gray-800 dark:text-white shadow-2xs transition-colors"
                   />
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  {candidateSearch && (
+                    <button
+                      onClick={() => setCandidateSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-full cursor-pointer"
+                      title="Limpar busca"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
                 
+                {/* Botão de Filtros Avançados com Badge de Contagem */}
                 <button
-                  onClick={() => {
-                    setAddCandidateTargetStage('triagem');
-                    setShowAddCandidateModal(true);
-                  }}
-                  className="border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className={`px-3 py-2 rounded-xl border text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                    showAdvancedFilters || (selectedCityFilter !== 'todas' || selectedInstitutionFilter !== 'todas' || selectedRatingFilter > 0 || minMatchFilter > 0)
+                      ? 'bg-primary-blue text-white border-primary-blue'
+                      : 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50'
+                  }`}
                 >
-                  <UserPlus size={14} /> Candidato
+                  <SlidersHorizontal size={14} />
+                  <span className="hidden sm:inline">Filtros Avançados</span>
+                  {(selectedCityFilter !== 'todas' || selectedInstitutionFilter !== 'todas' || selectedRatingFilter > 0 || minMatchFilter > 0) && (
+                    <span className="w-5 h-5 rounded-full bg-white text-primary-blue dark:bg-gray-900 dark:text-white text-[11px] font-black flex items-center justify-center ml-1">
+                      {[selectedCityFilter !== 'todas', selectedInstitutionFilter !== 'todas', selectedRatingFilter > 0, minMatchFilter > 0].filter(Boolean).length}
+                    </span>
+                  )}
+                  {showAdvancedFilters ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
                 </button>
-                
-                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+
+
+                {/* Alternância Kanban / Lista */}
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl">
                   <button
                     onClick={() => setViewMode('kanban')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                       viewMode === 'kanban'
-                        ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
+                        ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-xs'
                         : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                     }`}
                   >
@@ -931,9 +1040,9 @@ export default function GerenciamentoVagasEmpresa() {
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                       viewMode === 'list'
-                        ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
+                        ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-xs'
                         : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                     }`}
                   >
@@ -943,85 +1052,335 @@ export default function GerenciamentoVagasEmpresa() {
               </div>
             </div>
 
-            {/* Row 2: Filter Badges Minimalist */}
-            <div className="flex items-center gap-3 flex-wrap text-xs bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-gray-200 dark:border-slate-700">
-              <span className="font-semibold text-gray-500 flex items-center gap-1 pl-1">
-                <Filter size={13} /> Filtros:
-              </span>
-
-              <button
-                onClick={() => setOnlyVerified(!onlyVerified)}
-                className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  onlyVerified
-                    ? 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white'
-                    : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <ShieldCheck size={13} className={onlyVerified ? "text-emerald-500" : ""} /> Selo IFPR
-              </button>
-
-              <button
-                onClick={() => setOnlyWithInterview(!onlyWithInterview)}
-                className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  onlyWithInterview
-                    ? 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white'
-                    : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <Calendar size={13} className={onlyWithInterview ? "text-purple-500" : ""} /> Entrevista
-              </button>
-              
-              <button
-                onClick={() => setOnlyWithEndorsement(!onlyWithEndorsement)}
-                className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  onlyWithEndorsement
-                    ? 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white'
-                    : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <Award size={13} className={onlyWithEndorsement ? "text-amber-500" : ""} /> Docente
-              </button>
-
-              <div className="flex items-center gap-2 text-gray-500 ml-1 border-l border-gray-200 dark:border-slate-700 pl-4">
-                <span className="font-medium">Match:</span>
-                <select
-                  value={minMatchFilter}
-                  onChange={e => setMinMatchFilter(Number(e.target.value))}
-                  className="bg-transparent font-semibold text-gray-900 dark:text-white outline-none cursor-pointer"
+            {/* ── BARRA DE ABAS DO FUNIL & ORDENAÇÃO ── */}
+            <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-800 flex items-center justify-between gap-4 shadow-2xs overflow-hidden">
+              {/* Lado Esquerdo: Etapas (Scrollable) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                <button
+                  onClick={() => setSelectedStageFilter('todos')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedStageFilter === 'todos'
+                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs'
+                      : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  <option value={0}>Todos</option>
-                  <option value={75}>&gt; 75%</option>
-                  <option value={85}>&gt; 85%</option>
-                  <option value={90}>&gt; 90%</option>
-                </select>
+                  <span>Todas as Etapas</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                    selectedStageFilter === 'todos'
+                      ? 'bg-white/20 dark:bg-gray-900/20 text-current'
+                      : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                  }`}>
+                    {jobCandidates.length}
+                  </span>
+                </button>
+
+                {customStages.map(stage => {
+                  const count = jobCandidates.filter(c => c.stage === stage.id).length;
+                  const isSelected = selectedStageFilter === stage.id;
+                  const style = getStageStyle(stage.id, stage.color);
+
+                  return (
+                    <button
+                      key={stage.id}
+                      onClick={() => setSelectedStageFilter(isSelected ? 'todos' : stage.id)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+                        isSelected
+                          ? 'bg-primary-blue text-white shadow-xs'
+                          : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
+                      <span>{stage.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                        isSelected
+                          ? 'bg-white/25 text-white'
+                          : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {(candidateSearch || onlyVerified || onlyWithInterview || onlyWithEndorsement || minMatchFilter > 0) && (
-                <button
-                  onClick={() => {
-                    setCandidateSearch('');
-                    setOnlyVerified(false);
-                    setOnlyWithInterview(false);
-                    setOnlyWithEndorsement(false);
-                    setMinMatchFilter(0);
-                  }}
-                  className="text-gray-500 hover:text-gray-900 dark:hover:text-white font-medium text-xs ml-auto flex items-center gap-1 cursor-pointer pr-1"
-                >
-                  <X size={12} /> Limpar
-                </button>
-              )}
+              {/* Lado Direito: Ordenação e Contagem */}
+              <div className="flex items-center gap-3 text-xs pr-2 shrink-0">
+                <div className="flex items-center gap-1.5 text-gray-600 dark:text-slate-300 border-l border-gray-200 dark:border-slate-700 pl-4">
+                  <ArrowUpDown size={13} className="text-gray-400" />
+                  <span className="font-semibold hidden lg:inline">Ordenar:</span>
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                    className="bg-transparent border-none text-xs font-bold text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-0"
+                  >
+                    <option value="match_desc">Maior Match</option>
+                    <option value="match_asc">Menor Match</option>
+                    <option value="rating_desc">Melhor Avaliação (★)</option>
+                    <option value="recent">Mais Recentes</option>
+                    <option value="oldest">Mais Antigos</option>
+                    <option value="name_asc">Nome (A-Z)</option>
+                  </select>
+                </div>
+
+                <div className="border-l border-gray-200 dark:border-slate-700 pl-4 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
+                  Mostrando <strong className="text-gray-900 dark:text-white">{filteredCandidates.length}</strong> <span className="hidden sm:inline">de {jobCandidates.length}</span>
+                </div>
+              </div>
             </div>
+
+            {/* ── PAINEL EXPANSÍVEL DE FILTROS AVANÇADOS ── */}
+            {showAdvancedFilters && (
+              <div className="bg-white dark:bg-slate-900 border border-primary-blue/30 dark:border-primary-blue/30 rounded-2xl p-4 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal size={15} className="text-primary-blue" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      Filtros Avançados de Candidatos
+                    </h4>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedCityFilter('todas');
+                      setSelectedInstitutionFilter('todas');
+                      setSelectedRatingFilter(0);
+                      setMinMatchFilter(0);
+                    }}
+                    className="text-xs text-primary-blue hover:underline font-semibold cursor-pointer"
+                  >
+                    Redefinir Filtros Avançados
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                  {/* Cidade do Candidato */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      Cidade do Candidato
+                    </label>
+                    <select
+                      value={selectedCityFilter}
+                      onChange={e => setSelectedCityFilter(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                    >
+                      <option value="todas">Todas as Cidades</option>
+                      {availableCandidateCities.map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Instituição de Ensino */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      Instituição de Ensino
+                    </label>
+                    <select
+                      value={selectedInstitutionFilter}
+                      onChange={e => setSelectedInstitutionFilter(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                    >
+                      <option value="todas">Todas as Instituições</option>
+                      {availableInstitutions.map(inst => (
+                        <option key={inst} value={inst}>{inst}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Nota de Match Mínima */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      Match Mínimo ({minMatchFilter === 0 ? 'Qualquer' : `≥ ${minMatchFilter}%`})
+                    </label>
+                    <div className="flex gap-1">
+                      {[0, 75, 85, 90, 95].map(val => (
+                        <button
+                          key={val}
+                          onClick={() => setMinMatchFilter(val)}
+                          className={`flex-1 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                            minMatchFilter === val
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-slate-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {val === 0 ? 'Todos' : `>${val}%`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Avaliação em Estrelas */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      Avaliação Interna
+                    </label>
+                    <div className="flex gap-1">
+                      {[
+                        { val: 0, label: 'Todas' },
+                        { val: 3, label: '3+ ★' },
+                        { val: 4, label: '4+ ★' },
+                        { val: 5, label: '5 ★' }
+                      ].map(item => (
+                        <button
+                          key={item.val}
+                          onClick={() => setSelectedRatingFilter(item.val)}
+                          className={`flex-1 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                            selectedRatingFilter === item.val
+                              ? 'bg-amber-500 text-white shadow-2xs'
+                              : 'bg-slate-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── CHIPS DE FILTROS ATIVOS ── */}
+            {activeCandidateFiltersCount > 0 && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs text-gray-500 dark:text-slate-400 font-semibold">Filtros Ativos:</span>
+                
+                {candidateSearch && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-primary-blue border border-blue-200 dark:border-blue-800">
+                    Busca: "{candidateSearch}"
+                    <button onClick={() => setCandidateSearch('')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {selectedStageFilter !== 'todos' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    Etapa: {customStages.find(s => s.id === selectedStageFilter)?.name || selectedStageFilter}
+                    <button onClick={() => setSelectedStageFilter('todos')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {selectedCityFilter !== 'todas' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    Cidade: {selectedCityFilter}
+                    <button onClick={() => setSelectedCityFilter('todas')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {selectedInstitutionFilter !== 'todas' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    Inst.: {selectedInstitutionFilter}
+                    <button onClick={() => setSelectedInstitutionFilter('todas')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {minMatchFilter > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    Match: &ge; {minMatchFilter}%
+                    <button onClick={() => setMinMatchFilter(0)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {selectedRatingFilter > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    Avaliação: &ge; {selectedRatingFilter}★
+                    <button onClick={() => setSelectedRatingFilter(0)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {onlyVerified && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    Selo IFPR
+                    <button onClick={() => setOnlyVerified(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {onlyWithInterview && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    Com Entrevista
+                    <button onClick={() => setOnlyWithInterview(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {onlyWithEndorsement && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    Parecer Docente
+                    <button onClick={() => setOnlyWithEndorsement(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {onlyWithNotes && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    Com Anotações
+                    <button onClick={() => setOnlyWithNotes(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                {sortBy !== 'match_desc' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    Ordem: {
+                      sortBy === 'match_asc' ? 'Menor Match' :
+                      sortBy === 'rating_desc' ? 'Melhor Avaliação' :
+                      sortBy === 'recent' ? 'Mais Recentes' :
+                      sortBy === 'oldest' ? 'Mais Antigos' : 'Nome (A-Z)'
+                    }
+                    <button onClick={() => setSortBy('match_desc')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
+                  </span>
+                )}
+
+                <button
+                  onClick={resetCandidateFilters}
+                  className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1 ml-auto"
+                >
+                  <RotateCcw size={12} /> Limpar todos ({activeCandidateFiltersCount})
+                </button>
+              </div>
+            )}
+
+
 
             {/* ═════════════════════════════════════════════════════════════
                 MODERN KANBAN ATS BOARD (DRAG & DROP + LINEAR/ASHBY STYLE)
             ═════════════════════════════════════════════════════════════ */}
             {viewMode === 'kanban' && (
-              <div className="overflow-x-auto pb-6 pt-1 min-w-full">
-                <div className="flex gap-4.5 items-stretch min-w-max">
-                  {customStages.map(stage => {
-                    const stageCandidates = filteredCandidates.filter(c => c.stage === stage.id);
-                    const style = getStageStyle(stage.id, stage.color);
-                    const isDragOver = dragOverStageId === stage.id;
+              <div className="space-y-3">
+                {selectedStageFilter !== 'todos' && (
+                  <div className="flex items-center justify-between bg-primary-blue/10 dark:bg-primary-blue/20 border border-primary-blue/30 rounded-2xl px-4 py-2.5 text-xs text-primary-blue font-medium">
+                    <span>
+                      Filtro por etapa ativo: exibindo apenas a coluna <strong>"{customStages.find(s => s.id === selectedStageFilter)?.name || selectedStageFilter}"</strong>
+                    </span>
+                    <button
+                      onClick={() => setSelectedStageFilter('todos')}
+                      className="underline hover:opacity-80 font-bold cursor-pointer"
+                    >
+                      Ver todas as etapas do funil
+                    </button>
+                  </div>
+                )}
+
+                {filteredCandidates.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-12 text-center my-4 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+                      <Filter size={20} />
+                    </div>
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white">Nenhum candidato encontrado</h3>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+                      Não encontramos candidatos nesta vaga que correspondam aos filtros selecionados.
+                    </p>
+                    <button
+                      onClick={resetCandidateFilters}
+                      className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCcw size={13} /> Limpar Todos os Filtros
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`pb-6 pt-1 ${selectedStageFilter === 'todos' ? 'overflow-x-auto min-w-full' : 'w-full'}`}>
+                    <div className={`flex gap-4.5 items-stretch ${selectedStageFilter === 'todos' ? 'min-w-max' : 'w-full'}`}>
+                      {customStages
+                        .filter(stage => selectedStageFilter === 'todos' || stage.id === selectedStageFilter)
+                        .map(stage => {
+                          const stageCandidates = filteredCandidates.filter(c => c.stage === stage.id);
+                          const style = getStageStyle(stage.id, stage.color);
+                          const isDragOver = dragOverStageId === stage.id;
+                          const isSingleColumn = selectedStageFilter !== 'todos';
 
                     return (
                       <div
@@ -1029,13 +1388,14 @@ export default function GerenciamentoVagasEmpresa() {
                         onDragOver={e => handleDragOver(e, stage.id)}
                         onDragLeave={e => handleDragLeave(e, stage.id)}
                         onDrop={e => handleDrop(e, stage.id)}
-                        className={`w-[330px] min-w-[330px] max-w-[330px] shrink-0 flex flex-col rounded-3xl p-3.5 transition-all duration-200 border shadow-sm ${
+                        className={`${isSingleColumn ? 'w-full pt-2' : 'w-[330px] min-w-[330px] max-w-[330px] shrink-0 bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/90 rounded-3xl p-3.5 shadow-sm'} flex flex-col transition-all duration-200 ${
                           isDragOver
                             ? `${style.dropHighlight} ring-2 ring-primary-blue/60 scale-[1.01]`
-                            : 'bg-slate-100/70 dark:bg-slate-900/60 border-slate-200/90 dark:border-slate-800/90'
+                            : ''
                         }`}
                       >
                         {/* ── Column Header ── */}
+                        {!isSingleColumn && (
                         <div className="bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs mb-3.5 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span className={`w-3 h-3 rounded-full shrink-0 ${style.dot} ring-4 ring-slate-100 dark:ring-slate-800`} />
@@ -1048,26 +1408,15 @@ export default function GerenciamentoVagasEmpresa() {
                               </p>
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${style.badge}`}>
-                              {stageCandidates.length}
-                            </span>
-                            <button
-                              onClick={() => {
-                                setAddCandidateTargetStage(stage.id);
-                                setShowAddCandidateModal(true);
-                              }}
-                              className="w-7 h-7 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary-blue hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                              title={`Adicionar candidato em ${stage.name}`}
-                            >
-                              <Plus size={15} />
-                            </button>
-                          </div>
                         </div>
+                        )}
 
                         {/* ── Cards Container (Scrollable) ── */}
-                        <div className="flex-1 flex flex-col gap-3 min-h-[420px] max-h-[calc(100vh-270px)] overflow-y-auto pr-1">
+                        <div className={`flex-1 ${isSingleColumn ? '' : 'min-h-[420px]'} max-h-[calc(100vh-270px)] overflow-y-auto pr-1 ${
+                          isSingleColumn 
+                            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start pb-4' 
+                            : 'flex flex-col gap-3'
+                        }`}>
                           {stageCandidates.length === 0 ? (
                             <div className={`h-full min-h-[260px] border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all ${
                               isDragOver
@@ -1096,7 +1445,7 @@ export default function GerenciamentoVagasEmpresa() {
                                     if (dragOverCandidateId !== cand.id) setDragOverCandidateId(cand.id);
                                   }}
                                   onDrop={e => handleCardDrop(e, cand)}
-                                  className={`transition-all duration-300 ease-out relative ${isDragOverTarget ? 'pt-32' : 'pt-0'}`}
+                                  className={`transition-all duration-300 ease-out relative ${isSingleColumn ? 'h-full flex flex-col' : ''} ${isDragOverTarget ? 'pt-32' : 'pt-0'}`}
                                 >
                                   {isDragOverTarget && (
                                     <div className="absolute top-0 left-0 right-0 h-28 rounded-2xl border-2 border-dashed border-primary-blue/60 bg-blue-50/60 dark:bg-blue-500/10 pointer-events-none" />
@@ -1114,36 +1463,36 @@ export default function GerenciamentoVagasEmpresa() {
                                       setSelectedCandidate(cand);
                                       setActiveModalTab('overview');
                                     }}
-                                    className={`group relative bg-white dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700/80 hover:border-primary-blue/60 dark:hover:border-blue-400 rounded-2xl p-3.5 shadow-2xs hover:shadow-brand-md transition-all duration-300 ease-out cursor-grab active:cursor-grabbing flex flex-col gap-2.5 ${
+                                    className={`group relative bg-white dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700/80 hover:border-primary-blue/60 dark:hover:border-blue-400 rounded-2xl p-4 shadow-2xs hover:shadow-brand-md transition-all duration-300 ease-out cursor-grab active:cursor-grabbing flex flex-col gap-3 ${isSingleColumn ? 'flex-1' : ''} ${
                                       isBeingDragged
                                         ? 'opacity-40 ring-2 ring-primary-blue rotate-2 scale-95 shadow-xl'
                                         : 'hover:-translate-y-0.5'
                                     }`}
                                   >
                                   {/* ── Card Top Header: Avatar + Info + Match Pill ── */}
-                                  <div className="flex items-start justify-between gap-2.5">
-                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
                                       <div className="relative shrink-0">
                                         <img
                                           src={cand.avatar}
                                           alt={cand.name}
-                                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-2xs bg-slate-50"
+                                          className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-2xs bg-slate-50"
                                         />
                                         {cand.isVerifiedStudent && (
                                           <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow-2xs ring-2 ring-white dark:ring-slate-800" title="Matrícula Verificada">
-                                            <ShieldCheck size={9} />
+                                            <ShieldCheck size={10} />
                                           </span>
                                         )}
                                       </div>
 
                                       <div className="min-w-0 flex-1">
-                                        <h5 className="text-xs font-black text-slate-900 dark:text-white group-hover:text-primary-blue transition-colors leading-snug truncate">
+                                        <h5 className="text-sm font-black text-slate-900 dark:text-white group-hover:text-primary-blue transition-colors leading-snug truncate">
                                           {cand.name}
                                         </h5>
-                                        <div className="text-[11px] font-semibold text-primary-blue dark:text-blue-400 truncate mt-0.2">
+                                        <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 truncate mt-0.5">
                                           {cand.course}
                                         </div>
-                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
                                           <span>{cand.institution}</span>
                                           <span>·</span>
                                           <span>{cand.city}</span>
@@ -1152,7 +1501,7 @@ export default function GerenciamentoVagasEmpresa() {
                                     </div>
 
                                     {/* Match Badge */}
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
                                       cand.matchScore >= 90
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
                                         : cand.matchScore >= 80
@@ -1213,14 +1562,14 @@ export default function GerenciamentoVagasEmpresa() {
                                   })()}
 
                                   {/* ── Skills Chips ── */}
-                                  <div className="flex flex-wrap gap-1">
+                                  <div className="flex flex-wrap gap-1.5 mt-1">
                                     {cand.skills?.slice(0, 3).map(skill => (
-                                      <span key={skill} className="text-[10px] bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-medium">
+                                      <span key={skill} className="text-[11px] bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-md font-medium">
                                         {skill}
                                       </span>
                                     ))}
                                     {cand.skills?.length > 3 && (
-                                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold self-center">
+                                      <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold self-center ml-1">
                                         +{cand.skills.length - 3}
                                       </span>
                                     )}
@@ -1295,7 +1644,9 @@ export default function GerenciamentoVagasEmpresa() {
                       </div>
                     );
                   })}
-                </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1318,7 +1669,28 @@ export default function GerenciamentoVagasEmpresa() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredCandidates.map(cand => (
+                      {filteredCandidates.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-16 px-4 text-center">
+                            <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
+                              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                                <Filter size={20} />
+                              </div>
+                              <h4 className="font-bold text-base text-gray-900 dark:text-white">Nenhum candidato encontrado</h4>
+                              <p className="text-xs text-gray-500 dark:text-slate-400">
+                                Não encontramos nenhum candidato nesta vaga com os filtros selecionados. Tente ajustar os parâmetros.
+                              </p>
+                              <button
+                                onClick={resetCandidateFilters}
+                                className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5 mt-1"
+                              >
+                                <RotateCcw size={13} /> Limpar Todos os Filtros
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCandidates.map(cand => (
                         <tr key={cand.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                           <td className="py-4 px-5">
                             <div className="flex items-center gap-3">
@@ -1396,7 +1768,7 @@ export default function GerenciamentoVagasEmpresa() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>
@@ -1428,8 +1800,127 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
             </div>
 
+            {/* ── BARRA DE FILTROS E BUSCA DE VAGAS DA EMPRESA ── */}
+            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-2xs space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Search */}
+                <div className="relative flex-1 max-w-lg">
+                  <input
+                    type="text"
+                    placeholder="Buscar vaga por título, descrição ou tecnologia..."
+                    value={jobSearch}
+                    onChange={e => setJobSearch(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm outline-none focus:border-primary-blue text-gray-800 dark:text-white transition-colors"
+                  />
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  {jobSearch && (
+                    <button
+                      onClick={() => setJobSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-full cursor-pointer"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Selects */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Status */}
+                  <select
+                    value={jobStatusFilter}
+                    onChange={e => setJobStatusFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-semibold text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                  >
+                    <option value="todos">Todos os Status</option>
+                    <option value="Ativa">Apenas Ativas</option>
+                    <option value="Encerrada">Pausadas / Encerradas</option>
+                  </select>
+
+                  {/* Modalidade */}
+                  <select
+                    value={jobModalityFilter}
+                    onChange={e => setJobModalityFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-semibold text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                  >
+                    <option value="todos">Todas as Modalidades</option>
+                    <option value="Presencial">Presencial</option>
+                    <option value="Híbrido">Híbrido</option>
+                    <option value="Remoto">Remoto</option>
+                  </select>
+
+                  {/* Cidade */}
+                  <select
+                    value={jobCityFilter}
+                    onChange={e => setJobCityFilter(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-semibold text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                  >
+                    <option value="todas">Todas as Cidades</option>
+                    {CITIES.filter(c => c !== 'Todas as Cidades').map(city => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+
+                  {/* Ordenação */}
+                  <select
+                    value={jobSortBy}
+                    onChange={e => setJobSortBy(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-semibold text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                  >
+                    <option value="recent">Mais Recentes</option>
+                    <option value="candidates_desc">Mais Candidatos</option>
+                    <option value="title_asc">Título (A-Z)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Counter and Active Tag Chips */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-slate-800 text-xs">
+                <div className="text-gray-500 dark:text-slate-400 font-medium">
+                  Mostrando <strong className="text-gray-900 dark:text-white">{filteredCompanyJobs.length}</strong> de {allCompanyJobs.length} vagas da empresa
+                </div>
+
+                {(jobSearch || jobStatusFilter !== 'todos' || jobModalityFilter !== 'todos' || jobCityFilter !== 'todas' || jobSortBy !== 'recent') && (
+                  <button
+                    onClick={() => {
+                      setJobSearch('');
+                      setJobStatusFilter('todos');
+                      setJobModalityFilter('todos');
+                      setJobCityFilter('todas');
+                      setJobSortBy('recent');
+                    }}
+                    className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} /> Limpar Filtros de Vagas
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid gap-4">
-              {allCompanyJobs.map(job => {
+              {filteredCompanyJobs.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-12 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+                    <Filter size={20} />
+                  </div>
+                  <h4 className="font-bold text-base text-gray-900 dark:text-white">Nenhuma vaga encontrada</h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+                    Nenhuma vaga da sua empresa corresponde aos filtros selecionados. Tente ajustar os termos de pesquisa ou filtros.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setJobSearch('');
+                      setJobStatusFilter('todos');
+                      setJobModalityFilter('todos');
+                      setJobCityFilter('todas');
+                      setJobSortBy('recent');
+                    }}
+                    className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <RotateCcw size={13} /> Limpar Filtros
+                  </button>
+                </div>
+              ) : (
+                filteredCompanyJobs.map(job => {
                 const candidates = getJobCandidates(job.id);
                 const isActive = job.status === 'Ativa';
 
@@ -1525,7 +2016,7 @@ export default function GerenciamentoVagasEmpresa() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
         )}
