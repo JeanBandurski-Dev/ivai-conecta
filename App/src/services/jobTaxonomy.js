@@ -188,6 +188,158 @@ export function validateProfessionalText(text, fieldName = 'Texto', minLength = 
   return { valid: true };
 }
 
+// 7. TERMOS E CARGOS OCUPACIONAIS RECONHECIDOS (CBO / MERCADO DE TRABALHO)
+export const OCCUPATIONAL_ROLE_KEYWORDS = [
+  // Níveis e Cargos Organizacionais
+  'auxiliar', 'assistente', 'analista', 'gerente', 'coordenador', 'coordenadora',
+  'supervisor', 'supervisora', 'diretor', 'diretora', 'especialista', 'consultor', 'consultora',
+  'assessor', 'assessora', 'lider', 'líder', 'chefe', 'estagiario', 'estagiário',
+  'estagiaria', 'estagiária', 'estagio', 'estágio', 'trainee', 'aprendiz', 'jovem aprendiz',
+
+  // Comercial, Atendimento & Vendas
+  'vendedor', 'vendedora', 'atendente', 'balconista', 'operador', 'operadora', 'caixa',
+  'repositor', 'repositora', 'estoquista', 'almoxarife', 'frentista', 'promotor', 'promotora',
+  'representante', 'comprador', 'compradora', 'conferente', 'expedidor', 'expedidora',
+
+  // Operacional, Logística & Produção
+  'motorista', 'entregador', 'entregadora', 'auxiliar de producao', 'auxiliar de produção',
+  'operador de producao', 'operador de produção', 'embalador', 'embaladora', 'carregador',
+  'ajudante', 'chapa', 'auxiliar geral', 'servicos gerais', 'serviços gerais',
+
+  // Agropecuária & Campo
+  'tratorista', 'agronomo', 'agrônomo', 'agronoma', 'agrônoma', 'tecnico agricola',
+  'técnico agrícola', 'zootecnista', 'veterinario', 'veterinário', 'veterinaria', 'veterinária',
+  'campeiro', 'ordenhador', 'vaqueiro', 'trabalhador rural', 'produtor rural', 'colhedor',
+
+  // Construção, Manutenção & Técnica
+  'tecnico', 'técnico', 'tecnica', 'técnica', 'eletricista', 'mecanico', 'mecânico',
+  'soldador', 'soldadora', 'pedreiro', 'pintor', 'pintora', 'marceneiro', 'marceneira',
+  'carpinteiro', 'serralheiro', 'instalador', 'instaladora', 'encanador', 'montador',
+  'montadora', 'torneiro', 'caldeireiro', 'ferramenteiro', 'borracheiro', 'lavador',
+
+  // Tecnologia, TI & Design
+  'desenvolvedor', 'desenvolvedora', 'programador', 'programadora', 'engenheiro', 'engenheira',
+  'arquiteto', 'arquiteta', 'designer', 'webdesigner', 'dev', 'suporte', 'redes', 'dados',
+  'copywriter', 'social media', 'conteudo', 'conteúdo', 'marketing', 'ti', 'software',
+  'frontend', 'backend', 'fullstack', 'full stack', 'full-stack',
+
+  // Saúde, Farmácia & Cuidados
+  'medico', 'médico', 'medica', 'médica', 'enfermeiro', 'enfermeira', 'farmaceutico',
+  'farmacêutico', 'farmaceutica', 'farmacêutica', 'fisioterapeuta', 'nutricionista',
+  'dentista', 'psicologo', 'psicólogo', 'psicologa', 'psicóloga', 'biomedico', 'biomédico',
+  'cuidador', 'cuidadora', 'terapeuta', 'massoterapeuta', 'fonoaudiologo', 'fonoaudiólogo',
+
+  // Educação & Pedagogia
+  'professor', 'professora', 'docente', 'instrutor', 'instrutora', 'educador', 'educadora',
+  'pedagogo', 'pedagoga', 'tutor', 'tutora', 'monitor', 'monitora',
+
+  // Administrativo, Jurídico & Financeiro
+  'secretario', 'secretário', 'secretaria', 'secretária', 'recepcionista', 'porteiro',
+  'portaria', 'zelador', 'zeladora', 'vigilante', 'seguranca', 'segurança', 'advogado',
+  'advogada', 'contador', 'contadora', 'auditor', 'auditora', 'economista', 'telefonista',
+
+  // Alimentação & Hotelaria
+  'cozinheiro', 'cozinheira', 'garcom', 'garçom', 'garconete', 'garçonete', 'copeiro',
+  'copeira', 'padeiro', 'padeira', 'confeiteiro', 'confeiteira', 'acougueiro', 'açougueiro',
+  'churrasqueiro', 'pizzaiolo', 'bartender', 'sushiman', 'barista',
+
+  // Beleza & Estética
+  'cabeleireiro', 'cabeleireira', 'barbeiro', 'manicure', 'pedicure', 'esteticista'
+];
+
+export const JOB_CATEGORIES = [
+  {
+    category: 'Tecnologia & TI',
+    roles: [
+      'Desenvolvedor Front-end', 'Desenvolvedor Back-end', 'Desenvolvedor Full Stack',
+      'Desenvolvedor Mobile', 'Estagiário de TI / Software', 'Analista de Suporte Técnico',
+      'Analista de Dados & BI', 'UI/UX Designer', 'Técnico em Informática', 'Administrador de Redes'
+    ]
+  },
+  {
+    category: 'Administrativo & Financeiro',
+    roles: [
+      'Auxiliar Administrativo', 'Assistente Administrativo', 'Analista Administrativo',
+      'Assistente Financeiro', 'Analista Financeiro', 'Auxiliar Contábil', 'Assistente Contábil',
+      'Assistente de Recursos Humanos (RH)', 'Recepcionista / Atendente', 'Secretário(a) Executivo(a)',
+      'Gerente de Loja / Unidade'
+    ]
+  },
+  {
+    category: 'Comercial & Vendas',
+    roles: [
+      'Vendedor(a) Comercial', 'Atendente de Loja', 'Consultor(a) de Vendas',
+      'Representante Comercial', 'Operador(a) de Caixa', 'Assistente Comercial',
+      'Executivo(a) de Contas (B2B)', 'Balconista'
+    ]
+  },
+  {
+    category: 'Agro, Indústria & Operacional',
+    roles: [
+      'Eletricista Industrial', 'Eletricista Predial', 'Mecânico de Manutenção',
+      'Técnico Agrícola', 'Engenheiro(a) Agrônomo(a)', 'Operador(a) de Produção',
+      'Auxiliar de Logística / Estoque', 'Estoquista / Almoxarife', 'Motorista / Entregador',
+      'Técnico em Segurança do Trabalho', 'Tratorista Agrícola'
+    ]
+  },
+  {
+    category: 'Saúde, Educação & Serviços',
+    roles: [
+      'Farmacêutico(a)', 'Enfermeiro(a)', 'Técnico(a) em Enfermagem', 'Professor(a) / Docente',
+      'Instrutor(a) de Treinamento', 'Nutricionista', 'Fisioterapeuta', 'Cozinheiro(a) / Auxiliar de Cozinha',
+      'Zelador(a) / Serviços Gerais', 'Cuidador(a) de Idosos / Saúde'
+    ]
+  }
+];
+
+/**
+ * Validação de Título Profissional de Vaga (CBO / Mercado de Trabalho)
+ * Exige que o título contenha um cargo, função ou profissão de trabalho real.
+ */
+export function validateJobTitle(title) {
+  if (!title || typeof title !== 'string') {
+    return { valid: false, error: 'O título do cargo é obrigatório.' };
+  }
+
+  const clean = title.trim();
+
+  // Validação básica profissional (palavrões, tamanho, repetição)
+  const basicVal = validateProfessionalText(clean, 'Título do Cargo', 3, 75);
+  if (!basicVal.valid) {
+    return basicVal;
+  }
+
+  const norm = clean
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Verifica se corresponde ou contém algum título padronizado oficial
+  const isExactStandard = STANDARD_JOB_TITLES.some(st => {
+    const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
+  });
+  if (isExactStandard) {
+    return { valid: true };
+  }
+
+  // 2. Verifica se contém ao menos uma palavra-chave ocupacional/CBO de trabalho
+  const hasOccupationalRole = OCCUPATIONAL_ROLE_KEYWORDS.some(kw => {
+    const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const regex = new RegExp(`(^|\\s|\\W)${normKw}($|\\s|\\W)`, 'i');
+    return regex.test(norm);
+  });
+
+  if (hasOccupationalRole) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    error: 'O título da vaga deve especificar um cargo ou profissão de trabalho legítima (ex.: "Vendedor(a)", "Desenvolvedor(a)", "Auxiliar Administrativo", "Técnico(a)", "Eletricista"). Selecione uma opção na lista de cargos recomendados ou informe uma função profissional.'
+  };
+}
+
 /**
  * Template Profissional de Vaga Padrão LinkedIn / Gupy
  */

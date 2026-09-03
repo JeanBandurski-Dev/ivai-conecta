@@ -14,7 +14,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
-import { validateProfessionalText } from './jobTaxonomy.js';
+import { validateProfessionalText, validateJobTitle } from './jobTaxonomy.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
@@ -42,7 +42,7 @@ function getJobStatusOverrides() {
 function isCleanProfessionalJob(job) {
   if (!job || typeof job !== 'object' || !job.title) return false;
   try {
-    const tCheck = validateProfessionalText(String(job.title), 'Título', 2);
+    const tCheck = validateJobTitle(String(job.title));
     if (!tCheck.valid) return false;
     const salStr = String(job.salary || '').toLowerCase().trim();
     if (salStr === 'cu' || salStr === 'bosta') return false;
@@ -51,7 +51,6 @@ function isCleanProfessionalJob(job) {
       if (!dCheck.valid) return false;
     }
   } catch {
-    // If validation fails unexpectedly, don't crash
     return true;
   }
   return true;

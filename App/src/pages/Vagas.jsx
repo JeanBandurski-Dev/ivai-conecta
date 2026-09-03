@@ -5,7 +5,8 @@ import useAppStore from '../store/useAppStore';
 import {
   getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById, safeSkillsArray,
   STANDARD_JOB_TITLES, STANDARD_SKILLS, SALARY_RANGES, WORK_SCHEDULES,
-  STANDARD_BENEFITS, validateProfessionalText, getJobDescriptionTemplate
+  STANDARD_BENEFITS, validateProfessionalText, getJobDescriptionTemplate,
+  validateJobTitle, JOB_CATEGORIES
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
@@ -148,8 +149,8 @@ export default function Vagas() {
       return;
     }
 
-    // 1. Validação Profissional do Título
-    const titleVal = validateProfessionalText(newTitle, 'Título do Cargo', 4, 75);
+    // 1. Validação Profissional do Título de Trabalho (CBO / Mercado)
+    const titleVal = validateJobTitle(newTitle);
     if (!titleVal.valid) {
       setFormError(titleVal.error);
       return;
@@ -532,7 +533,19 @@ export default function Vagas() {
               <div className="form-group">
                 <label className="form-label flex items-center justify-between">
                   <span className="font-bold">Cargo / Título da Oportunidade *</span>
-                  <span className="text-[11px] font-normal text-gray-400">Classificação CBO / Mercado</span>
+                  {newTitle && (
+                    <span className={`text-[11px] font-semibold flex items-center gap-1 ${
+                      validateJobTitle(newTitle).valid
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {validateJobTitle(newTitle).valid ? (
+                        <>✓ Cargo Profissional Válido</>
+                      ) : (
+                        <>⚠️ Deve conter uma profissão / cargo real</>
+                      )}
+                    </span>
+                  )}
                 </label>
                 <div className="relative">
                   <input
@@ -540,8 +553,10 @@ export default function Vagas() {
                     list="job-titles-list"
                     value={newTitle}
                     onChange={e => { setNewTitle(e.target.value); setFormError(''); }}
-                    className="form-control text-sm font-semibold"
-                    placeholder="Selecione ou busque um cargo (Ex: Desenvolvedor Front-end, Auxiliar Administrativo...)"
+                    className={`form-control text-sm font-semibold transition-all ${
+                      newTitle && !validateJobTitle(newTitle).valid ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20' : ''
+                    }`}
+                    placeholder="Selecione ou busque um cargo (Ex: Desenvolvedor, Auxiliar Administrativo, Vendedor...)"
                     required
                   />
                   <datalist id="job-titles-list">
@@ -551,17 +566,25 @@ export default function Vagas() {
                   </datalist>
                 </div>
 
+                {newTitle && !validateJobTitle(newTitle).valid && newTitle.trim().length >= 3 && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 font-medium bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800">
+                    💡 O título precisa especificar uma função ou ocupação de trabalho (ex.: <em>Auxiliar Administrativo</em>, <em>Vendedor(a)</em>, <em>Desenvolvedor(a)</em>, <em>Técnico(a)</em>, <em>Operador(a)</em>). Termos avulsos ou não relacionados a trabalho não são aceitos.
+                  </p>
+                )}
+
                 {/* Sugestões Rápidas de Cargos */}
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <span className="text-[10px] text-gray-400 self-center font-medium">Cargos Populares:</span>
                   {[
                     'Desenvolvedor Front-end',
                     'Assistente Administrativo',
+                    'Vendedor(a) Comercial',
+                    'Atendente de Loja',
                     'Estagiário de TI / Software',
                     'Auxiliar Contábil',
-                    'Vendedor(a) Comercial',
-                    'Social Media & Marketing Digital',
-                    'Eletricista Industrial'
+                    'Operador(a) de Caixa',
+                    'Eletricista Industrial',
+                    'Técnico Agrícola'
                   ].map(sug => (
                     <button
                       key={sug}
@@ -569,11 +592,11 @@ export default function Vagas() {
                       onClick={() => { setNewTitle(sug); setFormError(''); }}
                       className={`text-[11px] px-2 py-0.5 rounded-lg border transition-colors cursor-pointer font-medium ${
                         newTitle === sug
-                          ? 'bg-primary-blue text-white border-primary-blue font-bold'
+                          ? 'bg-primary-blue text-white border-primary-blue font-bold shadow-xs'
                           : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:border-primary-blue hover:text-primary-blue'
                       }`}
                     >
-                      {sug}
+                      + {sug}
                     </button>
                   ))}
                 </div>
