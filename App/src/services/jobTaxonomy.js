@@ -135,9 +135,11 @@ export const STANDARD_BENEFITS = [
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
 const PROFANITY_LIST = [
-  'cu', 'bosta', 'merda', 'caralho', 'porra', 'puta', 'pinto', 'foder',
-  'foda', 'carai', 'cacete', 'buceta', 'piroca', 'viado', 'corno',
-  'otario', 'vagabundo', 'safado', 'desgraca', 'vsf', 'vtnc', 'fdp'
+  'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
+  'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
+  'piroca', 'viado', 'viadagem', 'corno', 'otario', 'otaria', 'vagabundo', 'safado',
+  'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'chupa', 'rola', 'penis', 'vagina',
+  'arrombado', 'krl', 'kct', 'cu'
 ];
 
 /**
@@ -159,13 +161,20 @@ export function validateProfessionalText(text, fieldName = 'Texto', minLength = 
   }
 
   const lower = clean.toLowerCase();
+  const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
 
-  // 1. Verificação de Palavrões ou Termos Troll
+  // 1. Verificação Aprofundada de Palavrões ou Termos Troll (inclusive compostos como cubosta123)
   for (const bad of PROFANITY_LIST) {
-    // Procura palavra isolada ou exata
-    const regex = new RegExp(`\\b${bad}\\b`, 'i');
-    if (regex.test(lower) || lower === bad) {
-      return { valid: false, error: `O termo "${bad}" não é apropriado para a publicação de uma vaga profissional.` };
+    if (bad.length >= 3) {
+      if (lower.includes(bad) || cleanAlpha.includes(bad)) {
+        return { valid: false, error: `O termo "${bad}" não é apropriado para uma publicação profissional.` };
+      }
+    } else {
+      // Para termos curtos como 'cu'
+      const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bosta|merda|lhao|lhão)/i;
+      if (regexCu.test(lower) || cleanAlpha === 'cu' || cleanAlpha.startsWith('cubosta')) {
+        return { valid: false, error: 'Termo impróprio ou inadequado detectado.' };
+      }
     }
   }
 
@@ -337,6 +346,111 @@ export function validateJobTitle(title) {
   return {
     valid: false,
     error: 'O título da vaga deve especificar um cargo ou profissão de trabalho legítima (ex.: "Vendedor(a)", "Desenvolvedor(a)", "Auxiliar Administrativo", "Técnico(a)", "Eletricista"). Selecione uma opção na lista de cargos recomendados ou informe uma função profissional.'
+  };
+}
+
+// 8. BANCO DE PALAVRAS-CHAVE E COMPETÊNCIAS OCUPACIONAIS HOMOLOGADAS
+export const OCCUPATIONAL_SKILL_KEYWORDS = [
+  // Tecnologia & Ferramentas
+  'react', 'vue', 'angular', 'node', 'javascript', 'typescript', 'python', 'java', 'c#', 'c++', 'php',
+  'ruby', 'go', 'rust', 'sql', 'mysql', 'postgres', 'oracle', 'mongodb', 'html', 'css', 'sass',
+  'tailwind', 'bootstrap', 'git', 'github', 'gitlab', 'docker', 'kubernetes', 'aws', 'azure', 'gcp',
+  'linux', 'windows', 'excel', 'word', 'powerpoint', 'office', 'power bi', 'tableau', 'erp', 'crm',
+  'sap', 'totvs', 'figma', 'photoshop', 'illustrator', 'canva', 'coreldraw', 'autocad', 'solidworks',
+  'revit', 'sketchup', 'programacao', 'programação', 'redes', 'suporte', 'software', 'hardware',
+
+  // Operacional, Agro & Técnica
+  'nr-10', 'nr-11', 'nr-12', 'nr-35', 'cnh', 'eletrica', 'elétrica', 'mecanica', 'mecânica',
+  'solda', 'usinagem', 'torno', 'cnc', 'empilhadeira', 'trator', 'colheitadeira', 'manutencao',
+  'manutenção', 'operacao', 'operação', 'logistica', 'logística', 'estoque', 'expedicao', 'expedição',
+  'inventario', 'inventário', 'almoxarifado', 'producao', 'produção', 'segurança do trabalho',
+  'agronomia', 'veterinaria', 'veterinária', 'plantio', 'colheita', 'irrigacao', 'irrigação',
+
+  // Comercial & Administrativo
+  'vendas', 'negociacao', 'negociação', 'atendimento', 'caixa', 'faturamento', 'nfe', 'fiscal',
+  'contabil', 'contábil', 'financeiro', 'cobranca', 'cobrança', 'rh', 'recrutamento', 'dp',
+  'marketing', 'seo', 'midias sociais', 'mídias sociais', 'copywriting', 'gestao', 'gestão',
+  'projetos', 'compras', 'b2b', 'b2c', 'rotinas administrativas', 'fluxo de caixa', 'arquivos',
+
+  // Soft Skills & Habilidades Humanas
+  'comunicacao', 'comunicação', 'trabalho em equipe', 'proatividade', 'organizacao', 'organização',
+  'lideranca', 'liderança', 'pontualidade', 'resiliencia', 'resiliência', 'empatia', 'foco',
+  'etica', 'ética', 'compromisso', 'resolucao de problemas', 'resolução de problemas', 'adaptabilidade',
+  'inteligência emocional', 'pensamento crítico',
+
+  // Saúde, Educação & Serviços
+  'enfermagem', 'farmacia', 'farmácia', 'triagem', 'pedagogia', 'didatica', 'didática',
+  'culinaria', 'culinária', 'gastronomia', 'limpeza', 'zeladoria', 'portaria', 'vigilancia', 'vigilância',
+  'ingles', 'inglês', 'espanhol'
+];
+
+/**
+ * Validador de Competências e Habilidades Profissionais
+ * Impede termos pejorativos, troll, sequências numéricas aleatórias (ex.: cubosta123)
+ * e exige consistência profissional com o mercado de trabalho.
+ */
+export function validateSkill(skill) {
+  if (!skill || typeof skill !== 'string') {
+    return { valid: false, error: 'O nome da competência é obrigatório.' };
+  }
+
+  const clean = skill.trim();
+
+  // 1. Checagem básica profissional (palavrões, tamanho mínimo/máximo)
+  const basicVal = validateProfessionalText(clean, 'Competência / Habilidade', 2, 45);
+  if (!basicVal.valid) {
+    return basicVal;
+  }
+
+  const lower = clean.toLowerCase();
+  const norm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 2. Bloqueio de sufixos numéricos aleatórios / troll (ex: "cubosta123", "teste123", "abc000")
+  // Exceto normas e ferramentas conhecidas como NR-10, NR-35, ISO 9001, HTML5, CSS3, etc.
+  const isTechnicalStandard = /^(NR[-\s]?\d+|ISO[-\s]?\d+|HTML\d|CSS\d|IPV\d|VUE\s?\d|REACT\s?\d|WINDOWS\s?\d+|OFFICE\s?\d+|SQL\s?\d+)$/i.test(clean);
+  if (!isTechnicalStandard && (/\d{3,}$/.test(clean) || /\d{2,}$/.test(norm.replace(/[^a-z0-9]/g, '')))) {
+    return { valid: false, error: 'A habilidade não deve conter sufixos numéricos aleatórios (ex.: "123").' };
+  }
+
+  // 3. Bloqueio de termos que não contenham letras
+  if (!/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
+    return { valid: false, error: 'A habilidade deve conter letras e representar uma competência profissional real.' };
+  }
+
+  // 4. Verificação direta contra a lista homologada de habilidades
+  const isStandardSkill = STANDARD_SKILLS.some(st => {
+    const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
+  });
+  if (isStandardSkill) {
+    return { valid: true };
+  }
+
+  // 5. Verificação de termos e raízes de competências ocupacionais reconhecidas
+  const isRecognizedCompetency = OCCUPATIONAL_SKILL_KEYWORDS.some(kw => {
+    const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const regex = new RegExp(`(^|\\s|\\W)${normKw}($|\\s|\\W)`, 'i');
+    return regex.test(norm) || norm.includes(normKw);
+  });
+
+  if (isRecognizedCompetency) {
+    return { valid: true };
+  }
+
+  // 6. Se for um termo novo plausível sem números ou troll
+  const words = clean.split(/\s+/).filter(w => w.length >= 2);
+  const hasRandomConsonants = /^[bcdfghjklmnpqrstvwxyz]{5,}$/i.test(clean.replace(/\s/g, ''));
+  if (hasRandomConsonants) {
+    return { valid: false, error: 'Por favor, digite uma habilidade ou competência profissional compreensível.' };
+  }
+
+  if (clean.length >= 3 && words.length >= 1 && !/\d/.test(clean)) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    error: 'Habilidade não reconhecida. Por favor, insira uma competência profissional válida ou selecione na lista recomendada.'
   };
 }
 

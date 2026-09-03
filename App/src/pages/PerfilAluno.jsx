@@ -5,7 +5,7 @@ import {
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
   Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture, validateSkill } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -198,12 +198,22 @@ export default function PerfilAluno() {
   };
 
   const addSkill = () => {
-    if (editData.newSkill.trim()) {
-      setEditData(prev => ({
-        ...prev,
-        skills: [...prev.skills, prev.newSkill.trim()],
-        newSkill: ''
-      }));
+    const sk = (editData.newSkill || '').trim();
+    if (sk) {
+      const val = validateSkill(sk);
+      if (!val.valid) {
+        showToast(`⚠️ ${val.error}`);
+        return;
+      }
+      if (!editData.skills.some(s => s.toLowerCase() === sk.toLowerCase())) {
+        setEditData(prev => ({
+          ...prev,
+          skills: [...prev.skills, sk],
+          newSkill: ''
+        }));
+      } else {
+        showToast('Esta habilidade já foi adicionada.');
+      }
     }
   };
 

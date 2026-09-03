@@ -6,7 +6,7 @@ import {
   getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById, safeSkillsArray,
   STANDARD_JOB_TITLES, STANDARD_SKILLS, SALARY_RANGES, WORK_SCHEDULES,
   STANDARD_BENEFITS, validateProfessionalText, getJobDescriptionTemplate,
-  validateJobTitle, JOB_CATEGORIES
+  validateJobTitle, validateSkill, JOB_CATEGORIES
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
@@ -114,19 +114,21 @@ export default function Vagas() {
   };
 
   const addSkillTag = (skillToAdd) => {
-    const cleanSkill = skillToAdd.trim();
+    const cleanSkill = (skillToAdd || '').trim();
     if (!cleanSkill) return;
 
-    const val = validateProfessionalText(cleanSkill, 'Habilidade', 2, 40);
+    const val = validateSkill(cleanSkill);
     if (!val.valid) {
       setFormError(val.error);
       return;
     }
 
-    if (!newSkillsList.includes(cleanSkill)) {
+    if (!newSkillsList.some(s => s.toLowerCase() === cleanSkill.toLowerCase())) {
       setNewSkillsList(prev => [...prev, cleanSkill]);
       setCustomSkillInput('');
       setFormError('');
+    } else {
+      setFormError('Esta habilidade já foi adicionada.');
     }
   };
 
@@ -165,7 +167,13 @@ export default function Vagas() {
 
     // 3. Validação de Habilidades
     if (newSkillsList.length === 0) {
-      setFormError('Selecione pelo menos uma competência ou habilidade exigida para a vaga.');
+      setFormError('Selecione ou adicione pelo menos uma competência ou habilidade exigida para a vaga.');
+      return;
+    }
+
+    const invalidSkill = newSkillsList.find(s => !validateSkill(s).valid);
+    if (invalidSkill) {
+      setFormError(`A competência "${invalidSkill}" é inválida ou inadequada. Por favor, remova-a.`);
       return;
     }
 
@@ -711,27 +719,38 @@ export default function Vagas() {
                 </div>
 
                 {/* Adicionar Habilidade Personalizada com Validação */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={customSkillInput}
-                    onChange={e => setCustomSkillInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addSkillTag(customSkillInput);
-                      }
-                    }}
-                    placeholder="Digite outra competência profissional e pressione Adicionar..."
-                    className="form-control text-xs flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addSkillTag(customSkillInput)}
-                    className="btn btn-outline btn-sm text-xs font-bold shrink-0"
-                  >
-                    + Adicionar
-                  </button>
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customSkillInput}
+                      onChange={e => setCustomSkillInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addSkillTag(customSkillInput);
+                        }
+                      }}
+                      placeholder="Digite outra competência profissional (ex: Gestão de Projetos, SolidWorks)..."
+                      className={`form-control text-xs flex-1 transition-all ${
+                        customSkillInput.trim() && !validateSkill(customSkillInput).valid
+                          ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
+                          : ''
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addSkillTag(customSkillInput)}
+                      className="btn btn-outline btn-sm text-xs font-bold shrink-0"
+                    >
+                      + Adicionar
+                    </button>
+                  </div>
+                  {customSkillInput.trim() && !validateSkill(customSkillInput).valid && customSkillInput.trim().length >= 3 && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                      ⚠️ {validateSkill(customSkillInput).error}
+                    </p>
+                  )}
                 </div>
               </div>
 

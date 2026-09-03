@@ -14,7 +14,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
-import { validateProfessionalText, validateJobTitle } from './jobTaxonomy.js';
+import { validateProfessionalText, validateJobTitle, validateSkill } from './jobTaxonomy.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
@@ -70,11 +70,14 @@ function applyJobOverrides(job) {
   const overrideStatus = statusOverrides[idStr] || (fIdStr && statusOverrides[fIdStr]);
 
   // Garante que requiredSkills e benefits sejam sempre arrays limpos de strings
-  const safeRequiredSkills = Array.isArray(job.requiredSkills)
+  const rawRequiredSkills = Array.isArray(job.requiredSkills)
     ? job.requiredSkills.map(s => String(s || '').trim()).filter(Boolean)
     : (typeof job.requiredSkills === 'string'
       ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean)
       : []);
+
+  // Remove qualquer habilidade com palavrão, termos troll ou sequências numéricas (ex: cubosta123)
+  const safeRequiredSkills = rawRequiredSkills.filter(s => validateSkill(s).valid);
 
   const safeBenefits = Array.isArray(job.benefits)
     ? job.benefits.map(b => String(b || '').trim()).filter(Boolean)
@@ -270,12 +273,16 @@ export function getJobById(id) {
 
 export async function addJob(jobData) {
   const jobs = getJobs('Todas as Cidades');
+  const rawSkills = Array.isArray(jobData?.requiredSkills) ? jobData.requiredSkills : [];
+  const cleanSkills = rawSkills.filter(s => validateSkill(s).valid);
+
   const newJob = {
     createdAt: new Date().toLocaleDateString('pt-BR'),
     createdAtTimestamp: Date.now(),
     status: 'Ativa',
     applicantsCount: 0,
     ...jobData,
+    requiredSkills: cleanSkills.length > 0 ? cleanSkills : ['Comunicação Assertiva']
   };
 
   // Sincronização no Firestore

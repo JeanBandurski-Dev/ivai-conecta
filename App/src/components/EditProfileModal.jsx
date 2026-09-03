@@ -3,6 +3,7 @@ import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
   FolderKanban, Globe, CheckCircle2, Sparkles, Award
 } from 'lucide-react';
+import { validateSkill } from '../lib/ivaiConecta';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -45,7 +46,12 @@ export default function EditProfileModal({
     if (e) e.preventDefault();
     if (!editData.newSkill || !editData.newSkill.trim()) return;
     const sk = editData.newSkill.trim();
-    if (!editData.skills.includes(sk)) {
+    const val = validateSkill(sk);
+    if (!val.valid) {
+      alert(val.error);
+      return;
+    }
+    if (!editData.skills.some(s => s.toLowerCase() === sk.toLowerCase())) {
       setEditData(d => ({ ...d, skills: [...d.skills, sk], newSkill: '' }));
     } else {
       setEditData(d => ({ ...d, newSkill: '' }));
