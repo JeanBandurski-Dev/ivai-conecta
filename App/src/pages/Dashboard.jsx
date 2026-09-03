@@ -27,9 +27,9 @@ export default function Dashboard() {
   const [services, setServices] = useState(() => getServices(selectedCity));
 
   useEffect(() => {
-    const unsubTalents = subscribeToTalents(selectedCity, setTalents);
-    const unsubJobs = subscribeToJobs(selectedCity, setJobs);
-    const unsubServices = subscribeToServices(selectedCity, setServices);
+    const unsubTalents = subscribeToTalents(selectedCity, data => { if (Array.isArray(data)) setTalents(data); });
+    const unsubJobs = subscribeToJobs(selectedCity, data => { if (Array.isArray(data)) setJobs(data); });
+    const unsubServices = subscribeToServices(selectedCity, data => { if (Array.isArray(data)) setServices(data); });
 
     return () => {
       unsubTalents();

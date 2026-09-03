@@ -25,23 +25,30 @@ export default function MinhasVagas() {
   const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
 
   useEffect(() => {
-    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
-    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => setLiveApps(data));
+    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => {
+      if (Array.isArray(data)) setLiveJobs(data);
+    });
+    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => {
+      if (Array.isArray(data)) setLiveApps(data);
+    });
     return () => {
       unsubJobs();
       unsubApps();
     };
   }, [currentUser]);
 
-  const apps = liveApps;
-  const companyJobs = liveJobs.filter(j => 
-    (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
-    (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
-    (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-    (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-    (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+  const apps = Array.isArray(liveApps) ? liveApps : [];
+  const safeLiveJobs = Array.isArray(liveJobs) ? liveJobs : [];
+  const companyJobs = safeLiveJobs.filter(j => 
+    j && (
+      (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
+      (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
+      (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+      (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
+      (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+      (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+      (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+    )
   );
   
   // Teacher endorsement requests state
@@ -76,19 +83,29 @@ export default function MinhasVagas() {
     );
   }
 
-  const handleJobAction = (jobId, action) => {
-    const updated = updateJobStatus(jobId, action);
-    if (updated) setLiveJobs(updated);
-    showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso.' : '🔓 Vaga reaberta com sucesso!');
-    forceUpdate(n => n + 1);
+  const handleJobAction = async (jobId, action) => {
+    try {
+      const updated = await updateJobStatus(jobId, action);
+      if (Array.isArray(updated)) setLiveJobs(updated);
+      showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso.' : '🔓 Vaga reaberta com sucesso!');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao atualizar status da vaga:', err);
+      showToast('Erro ao atualizar status da vaga.');
+    }
   };
 
-  const handleDeleteJob = (jobId) => {
+  const handleDeleteJob = async (jobId) => {
     if (window.confirm('Tem certeza que deseja remover esta vaga permanentemente?')) {
-      const updated = deleteJob(jobId);
-      if (updated) setLiveJobs(updated);
-      showToast('🗑️ Vaga excluída permanentemente.');
-      forceUpdate(n => n + 1);
+      try {
+        const updated = await deleteJob(jobId);
+        if (Array.isArray(updated)) setLiveJobs(updated);
+        showToast('🗑️ Vaga excluída permanentemente.');
+        forceUpdate(n => n + 1);
+      } catch (err) {
+        console.error('Erro ao excluir vaga:', err);
+        showToast('Erro ao excluir vaga.');
+      }
     }
   };
 

@@ -73,12 +73,12 @@ export default function Vagas() {
 
   useEffect(() => {
     const unsub = subscribeToJobs('Todas as Cidades', (data) => {
-      setLiveJobs(data);
+      if (Array.isArray(data)) setLiveJobs(data);
     });
     return () => unsub();
   }, []);
 
-  const allJobs = liveJobs;
+  const allJobs = Array.isArray(liveJobs) ? liveJobs : [];
 
   // Check jobId param in URL
   useEffect(() => {
