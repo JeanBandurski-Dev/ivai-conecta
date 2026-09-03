@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft, Clock, DollarSign, ShieldCheck } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById,
+  getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById, safeSkillsArray,
   STANDARD_JOB_TITLES, STANDARD_SKILLS, SALARY_RANGES, WORK_SCHEDULES,
   STANDARD_BENEFITS, validateProfessionalText, getJobDescriptionTemplate
 } from '../lib/ivaiConecta';
@@ -217,48 +217,63 @@ export default function Vagas() {
   };
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
-  const userSkills = currentUser?.skills || [];
+  const userSkills = useMemo(() => safeSkillsArray(currentUser?.skills), [currentUser?.skills]);
 
   const filtered = useMemo(() => {
+    if (!Array.isArray(allJobs)) return [];
+
     return allJobs
+      .filter(j => j && typeof j === 'object')
       .map(job => {
+        const reqSkills = safeSkillsArray(job.requiredSkills);
         const score = canSeeMatch
-          ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+          ? calculateMatchScore(userSkills, reqSkills, {
               userCity: currentUser?.city,
               jobCity: job.city,
               isVerifiedStudent: currentUser?.isVerifiedStudent,
               endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
             })
           : null;
-        return { ...job, calculatedScore: score };
+        return { ...job, requiredSkills: reqSkills, calculatedScore: score };
       })
       .filter(j => {
         // Cidade
-        const matchCity = !filterCity || filterCity === 'Todas as Cidades' || j.city === filterCity;
+        const filterCityClean = String(filterCity || '').trim().toLowerCase();
+        const jCityClean = String(j.city || '').trim().toLowerCase();
+        const matchCity = !filterCity || filterCity === 'Todas as Cidades' || jCityClean === filterCityClean;
         
         // Tipo
-        const matchType = filterType === 'Todos' || (j.type && j.type.toLowerCase().includes(filterType.toLowerCase()));
+        const matchType = filterType === 'Todos' || (j.type && String(j.type).toLowerCase().includes(filterType.toLowerCase()));
         
         // Modalidade
-        const matchModality = filterModality === 'Todas' || (j.modality && j.modality.toLowerCase().includes(filterModality.toLowerCase()));
+        const matchModality = filterModality === 'Todas' || (j.modality && String(j.modality).toLowerCase().includes(filterModality.toLowerCase()));
         
         // Match Mínimo
-        const matchScoreOk = !canSeeMatch || minMatch === 0 || (j.calculatedScore && j.calculatedScore >= minMatch);
+        const matchScoreOk = !canSeeMatch || minMatch === 0 || (typeof j.calculatedScore === 'number' && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r && r.toLowerCase().includes(sk.toLowerCase())));
+        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => 
+          (j.requiredSkills || []).some(r => r && String(r).toLowerCase().includes(String(sk).toLowerCase()))
+        );
 
         // Busca Textual
-        const text = ((j.title || '') + ' ' + (j.company || '') + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
+        const text = (
+          String(j.title || '') + ' ' + 
+          String(j.company || '') + ' ' + 
+          String(j.description || '') + ' ' + 
+          (j.requiredSkills || []).join(' ')
+        ).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
         return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
-        if (sortBy === 'match' && canSeeMatch) return (b.calculatedScore || 0) - (a.calculatedScore || 0);
+        if (sortBy === 'match' && canSeeMatch) {
+          return (Number(b.calculatedScore) || 0) - (Number(a.calculatedScore) || 0);
+        }
         if (sortBy === 'recent') {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const timeA = a.createdAtTimestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0) || 0;
+          const timeB = b.createdAtTimestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0) || 0;
           return timeB - timeA;
         }
         return 0;

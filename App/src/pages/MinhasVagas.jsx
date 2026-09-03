@@ -8,7 +8,7 @@ import {
 import {
   getUserApplications, generateWhatsAppLink, getJobs,
   updateJobStatus, deleteJob, getTalents, getEndorsementRequests,
-  approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone
+  approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone, safeSkillsArray
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -339,7 +339,7 @@ export default function MinhasVagas() {
                     {/* Vales e Requisitos */}
                     <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap gap-2 text-xs">
                       <span className="font-semibold text-gray-500 dark:text-slate-400">Habilidades Exigidas:</span>
-                      {(job.requiredSkills || []).map(s => (
+                      {safeSkillsArray(job.requiredSkills).map(s => (
                         <span key={s} className="tag tag-blue text-[11px]">{s}</span>
                       ))}
                     </div>
@@ -376,37 +376,37 @@ export default function MinhasVagas() {
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            app.matchScore >= 85
+                            (Number(app.matchScore) || 0) >= 85
                               ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                               : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
                           }`}>
-                            {app.matchScore}% Match
+                            {app.matchScore || 0}% Match
                           </span>
                           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            app.status.includes('Entrevista')
+                            String(app.status || '').includes('Entrevista')
                               ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                               : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
                           }`}>
-                            {app.status}
+                            {app.status || 'Candidatura Enviada'}
                           </span>
                         </div>
                       </div>
 
                       {/* Progress stages (Linha do Tempo Gupy) */}
                       <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-                        {app.stages.map((stage, i) => (
+                        {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
                           <div key={i} className="flex items-center gap-2 shrink-0">
                             <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                              stage.completed
+                              stage?.completed
                                 ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
-                                : stage.active
+                                : stage?.active
                                 ? 'bg-primary-blue text-white shadow-xs font-bold'
                                 : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
                             }`}>
-                              {stage.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
-                              {stage.name}
+                              {stage?.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
+                              {stage?.name || 'Etapa'}
                             </div>
-                            {i < app.stages.length - 1 && (
+                            {i < arr.length - 1 && (
                               <ArrowRight size={13} className="text-gray-300 dark:text-slate-700 shrink-0" />
                             )}
                           </div>

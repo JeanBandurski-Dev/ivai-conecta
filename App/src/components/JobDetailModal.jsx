@@ -5,14 +5,31 @@ import {
   Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus } from '../lib/ivaiConecta';
+import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus, safeSkillsArray } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
   const [applied, setApplied] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job?.status || 'Ativa');
 
-  if (!job) return null;
+  if (!job || typeof job !== 'object') return null;
+
+  const jobId = job.id || job.firestoreId || '';
+  const title = job.title || 'Oportunidade Profissional';
+  const company = job.company || 'Empresa Regional';
+  const companyLogo = job.companyLogo;
+  const city = job.city || 'Ivaiporã';
+  const type = job.type || 'Tempo Integral';
+
+  const requiredSkills = safeSkillsArray(job.requiredSkills);
+  const benefits = Array.isArray(job.benefits)
+    ? job.benefits.map(b => String(b || '').trim()).filter(Boolean)
+    : (typeof job.benefits === 'string' ? job.benefits.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+  const responsibilities = Array.isArray(job.responsibilities)
+    ? job.responsibilities.map(r => String(r || '').trim()).filter(Boolean)
+    : (typeof job.responsibilities === 'string' ? job.responsibilities.split('\n').map(s => s.trim()).filter(Boolean) : []);
 
   const isCompany = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
@@ -20,37 +37,46 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
     (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
     (job.createdBy && currentUser.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (currentUser.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+    (currentUser.name && company && company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
   );
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
-  const userSkills = currentUser?.skills || [];
-  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+  const userSkills = safeSkillsArray(currentUser?.skills);
+  const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, {
     userCity: currentUser?.city,
-    jobCity: job.city,
+    jobCity: city,
     isVerifiedStudent: currentUser?.isVerifiedStudent,
     endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
   }) : null);
 
-  const handleToggleJobStatus = () => {
+  const handleToggleJobStatus = async () => {
     const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
-    updateJobStatus(job.id, action);
+    await updateJobStatus(jobId, action);
     const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
     setCurrentStatus(newStatus);
     showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso!' : '🔓 Vaga reaberta com sucesso!');
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!currentUser) {
       showToast('Faça login como Aluno ou Candidato para se candidatar!');
       return;
     }
-    const res = applyToJob(job.id, currentUser);
-    if (res.success) {
-      setApplied(true);
-      showToast('🎉 Candidatura realizada com sucesso!');
-    } else {
-      showToast(res.message);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await applyToJob(jobId, currentUser);
+      if (res?.success) {
+        setApplied(true);
+        showToast('🎉 Candidatura realizada com sucesso!');
+      } else {
+        showToast(res?.message || 'Não foi possível concluir a candidatura.');
+      }
+    } catch {
+      showToast('Erro ao processar candidatura. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -61,26 +87,26 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     }
 
     // Busca o email real da empresa no banco de usuários
-    const allUsers = getUsersDB();
+    const allUsers = getUsersDB() || [];
     const companyUser = allUsers.find(u => 
-      u.name?.toLowerCase().trim() === job.company?.toLowerCase().trim() ||
-      (job.createdBy && u.email?.toLowerCase().trim() === job.createdBy?.toLowerCase().trim())
+      u?.name?.toLowerCase().trim() === company?.toLowerCase().trim() ||
+      (job.createdBy && u?.email?.toLowerCase().trim() === String(job.createdBy).toLowerCase().trim())
     );
 
     const targetEmail = companyUser?.email || 
-      (job.recruiterEmail && job.recruiterEmail.includes('@') ? job.recruiterEmail : null) || 
-      (job.createdBy && job.createdBy.includes('@') ? job.createdBy : null) || 
-      (job.company ? `${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+      (job.recruiterEmail && String(job.recruiterEmail).includes('@') ? job.recruiterEmail : null) || 
+      (job.createdBy && String(job.createdBy).includes('@') ? job.createdBy : null) || 
+      (company ? `${company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
 
     const companyTarget = {
-      name: job.company,
+      name: company,
       email: targetEmail,
       role: 'empresa',
-      avatar: job.companyLogo || companyUser?.avatar || ''
+      avatar: companyLogo || companyUser?.avatar || ''
     };
 
     onClose();
-    await startChatWith(companyTarget, `Vaga: ${job.title}`);
+    await startChatWith(companyTarget, `Vaga: ${title}`);
   };
 
   return (
@@ -93,7 +119,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
         <div className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-6 sm:p-8">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Fechar modal"
           >
             <X size={20} />
@@ -101,14 +127,14 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
           <div className="flex items-start gap-4 sm:gap-5">
             <img
-              src={job.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
-              alt={job.company}
+              src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+              alt={company}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white"
             />
             <div className="pr-8">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-accent-sky bg-white/10 px-2.5 py-0.5 rounded-md">
-                  {job.company}
+                  {company}
                 </span>
                 {currentStatus === 'Encerrada' ? (
                   <span className="bg-red-500/20 text-red-300 border border-red-400/30 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
@@ -122,13 +148,13 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               </div>
 
               <h2 className="text-xl sm:text-2xl font-heading font-extrabold text-white leading-tight mb-2">
-                {job.title}
+                {title}
               </h2>
 
               <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-200 flex-wrap">
-                <span className="flex items-center gap-1.5"><MapPin size={14} className="text-accent-sky" />{job.city}</span>
+                <span className="flex items-center gap-1.5"><MapPin size={14} className="text-accent-sky" />{city}</span>
                 <span>·</span>
-                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-accent-sky" />{job.type}</span>
+                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-accent-sky" />{type}</span>
               </div>
             </div>
           </div>
@@ -151,7 +177,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-center gap-1.5">
               <span>👨‍🏫</span> Visualização de oportunidade acadêmica para orientação de alunos.
             </div>
-          ) : canSeeMatch && calculatedScore != null ? (
+          ) : canSeeMatch && typeof calculatedScore === 'number' ? (
             <div className="mt-6 pt-4 border-t border-white/15 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-amber-400 shrink-0" size={18} />
@@ -210,11 +236,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </div>
 
           {/* Responsabilidades */}
-          {job.responsibilities && job.responsibilities.length > 0 && (
+          {responsibilities.length > 0 && (
             <div>
               <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5">Principais Atividades &amp; Responsabilidades</h3>
               <ul className="space-y-2">
-                {job.responsibilities.map((resp, idx) => (
+                {responsibilities.map((resp, idx) => (
                   <li key={idx} className="flex items-start gap-2.5 text-sm text-gray-700 dark:text-slate-300">
                     <span className="text-primary-blue dark:text-blue-400 font-bold shrink-0">•</span>
                     <span>{resp}</span>
@@ -225,13 +251,13 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           )}
 
           {/* Benefícios */}
-          {job.benefits && job.benefits.length > 0 && (
+          {benefits.length > 0 && (
             <div>
               <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5 flex items-center gap-2">
                 <Gift size={17} className="text-green-600 dark:text-green-400" /> Vales e Benefícios Oferecidos
               </h3>
               <div className="flex flex-wrap gap-2">
-                {job.benefits.map((b, idx) => (
+                {benefits.map((b, idx) => (
                   <span key={idx} className="px-3 py-1.5 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 text-xs font-semibold border border-green-200/80 dark:border-green-800/60 flex items-center gap-1.5">
                     <CheckCircle2 size={13} className="text-green-600 dark:text-green-400" />
                     {b}
@@ -242,24 +268,26 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           )}
 
           {/* Requisitos vs Habilidades */}
-          <div>
-            <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5">Habilidades Exigidas</h3>
-            <div className="flex flex-wrap gap-2">
-              {(job.requiredSkills || []).map(skill => {
-                const isMatched = userSkills.some(us => isSkillMatch(us, skill));
-                return (
-                  <span key={skill} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
-                    isMatched
-                      ? 'bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 border-blue-200 dark:border-blue-800 font-bold'
-                      : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700'
-                  }`}>
-                    {isMatched && <CheckCircle2 size={13} className="text-primary-blue dark:text-blue-400" />}
-                    {skill}
-                  </span>
-                );
-              })}
+          {requiredSkills.length > 0 && (
+            <div>
+              <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white mb-2.5">Habilidades Exigidas</h3>
+              <div className="flex flex-wrap gap-2">
+                {requiredSkills.map(skill => {
+                  const isMatched = userSkills.some(us => isSkillMatch(us, skill));
+                  return (
+                    <span key={skill} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
+                      isMatched
+                        ? 'bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 border-blue-200 dark:border-blue-800 font-bold'
+                        : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700'
+                    }`}>
+                      {isMatched && <CheckCircle2 size={13} className="text-primary-blue dark:text-blue-400" />}
+                      {skill}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
 
@@ -324,8 +352,12 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 <CheckCircle2 size={15} /> Candidatura Enviada!
               </button>
             ) : (
-              <button onClick={handleApply} className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5">
-                <Send size={14} /> Candidatar-se à Vaga
+              <button 
+                onClick={handleApply} 
+                disabled={isSubmitting}
+                className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Send size={14} /> {isSubmitting ? 'Enviando...' : 'Candidatar-se à Vaga'}
               </button>
             )}
           </div>

@@ -40,21 +40,27 @@ function getJobStatusOverrides() {
 }
 
 function isCleanProfessionalJob(job) {
-  if (!job || !job.title) return false;
-  const tCheck = validateProfessionalText(job.title, 'Título', 3);
-  if (!tCheck.valid) return false;
-  if (job.salary && (job.salary.toLowerCase() === 'cu' || job.salary.toLowerCase() === 'bosta')) return false;
-  if (job.description) {
-    const dCheck = validateProfessionalText(job.description, 'Descrição', 10);
-    if (!dCheck.valid) return false;
+  if (!job || typeof job !== 'object' || !job.title) return false;
+  try {
+    const tCheck = validateProfessionalText(String(job.title), 'Título', 2);
+    if (!tCheck.valid) return false;
+    const salStr = String(job.salary || '').toLowerCase().trim();
+    if (salStr === 'cu' || salStr === 'bosta') return false;
+    if (job.description) {
+      const dCheck = validateProfessionalText(String(job.description), 'Descrição', 5);
+      if (!dCheck.valid) return false;
+    }
+  } catch {
+    // If validation fails unexpectedly, don't crash
+    return true;
   }
   return true;
 }
 
 function applyJobOverrides(job) {
-  if (!job) return null;
+  if (!job || typeof job !== 'object') return null;
   const deletedIds = getDeletedJobIds();
-  const idStr = String(job.id);
+  const idStr = String(job.id || job.firestoreId || '');
   const fIdStr = job.firestoreId ? String(job.firestoreId) : null;
 
   if (deletedIds.includes(idStr) || (fIdStr && deletedIds.includes(fIdStr))) {
@@ -64,7 +70,31 @@ function applyJobOverrides(job) {
   const statusOverrides = getJobStatusOverrides();
   const overrideStatus = statusOverrides[idStr] || (fIdStr && statusOverrides[fIdStr]);
 
-  const finalJob = overrideStatus ? { ...job, status: overrideStatus } : job;
+  // Garante que requiredSkills e benefits sejam sempre arrays limpos de strings
+  const safeRequiredSkills = Array.isArray(job.requiredSkills)
+    ? job.requiredSkills.map(s => String(s || '').trim()).filter(Boolean)
+    : (typeof job.requiredSkills === 'string'
+      ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean)
+      : []);
+
+  const safeBenefits = Array.isArray(job.benefits)
+    ? job.benefits.map(b => String(b || '').trim()).filter(Boolean)
+    : (typeof job.benefits === 'string'
+      ? job.benefits.split(',').map(b => b.trim()).filter(Boolean)
+      : []);
+
+  const finalJob = {
+    ...job,
+    id: job.id || job.firestoreId || idStr,
+    title: String(job.title || 'Oportunidade Profissional'),
+    company: String(job.company || 'Empresa Regional'),
+    city: String(job.city || 'Ivaiporã'),
+    type: String(job.type || 'Tempo Integral'),
+    status: overrideStatus || job.status || 'Ativa',
+    requiredSkills: safeRequiredSkills,
+    benefits: safeBenefits
+  };
+
   return isCleanProfessionalJob(finalJob) ? finalJob : null;
 }
 
@@ -227,8 +257,16 @@ export async function getJobsAsync(city = 'Todas as Cidades') {
 }
 
 export function getJobById(id) {
+  if (!id) return null;
+  const idStr = String(id).trim();
   const jobs = getJobs('Todas as Cidades');
-  return jobs.find(j => j.id === Number(id) || j.id === id || String(j.id) === String(id) || (j.firestoreId && String(j.firestoreId) === String(id)));
+  return jobs.find(j => 
+    j && (
+      String(j.id) === idStr || 
+      String(j.firestoreId) === idStr || 
+      (typeof j.id === 'number' && String(j.id) === idStr)
+    )
+  ) || null;
 }
 
 export async function addJob(jobData) {

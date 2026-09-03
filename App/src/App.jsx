@@ -9,6 +9,7 @@ import GuestRoute from './components/auth/GuestRoute';
 import ChatModal from './components/ChatModal';
 import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Lazy-loaded pages for fast initial page load & code-splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -47,43 +48,45 @@ export default function App() {
         <Navbar />
 
         <main className="flex-1">
-          <Suspense fallback={
-            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
-              <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
-              <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
-            </div>
-          }>
-            <Routes>
-              <Route path="/"                 element={<Dashboard />} />
-              <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
-              <Route path="/completar-perfil" element={<CompletarPerfil />} />
-              <Route path="/vagas"            element={<Vagas />} />
-              <Route path="/servicos"         element={<Servicos />} />
-              <Route path="/talentos"         element={<BancoDeTalentos />} />
-              <Route path="/perfil/:id"       element={<PerfilAluno />} />
-              <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-              <Route path="/professor/:id"    element={<PerfilProfessor />} />
-              <Route
-                path="/configuracoes"
-                element={
-                  <ProtectedRoute>
-                    <Configuracoes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/minhas-vagas"
-                element={
-                  <ProtectedRoute>
-                    <MinhasVagas />
-                  </ProtectedRoute>
-                }
-              />
+          <ErrorBoundary>
+            <Suspense fallback={
+              <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+                <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+                <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
+              </div>
+            }>
+              <Routes>
+                <Route path="/"                 element={<Dashboard />} />
+                <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
+                <Route path="/completar-perfil" element={<CompletarPerfil />} />
+                <Route path="/vagas"            element={<Vagas />} />
+                <Route path="/servicos"         element={<Servicos />} />
+                <Route path="/talentos"         element={<BancoDeTalentos />} />
+                <Route path="/perfil/:id"       element={<PerfilAluno />} />
+                <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+                <Route path="/professor/:id"    element={<PerfilProfessor />} />
+                <Route
+                  path="/configuracoes"
+                  element={
+                    <ProtectedRoute>
+                      <Configuracoes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/minhas-vagas"
+                  element={
+                    <ProtectedRoute>
+                      <MinhasVagas />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* 404 fallback */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+                {/* 404 fallback */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
 
         <Footer />
