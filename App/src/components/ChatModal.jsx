@@ -23,7 +23,7 @@ function getOtherParticipant(thread, currentUser) {
 }
 
 export default function ChatModal({ onClose }) {
-  const { currentUser, activeChatThreadId, startChatWith } = useAppStore();
+  const { currentUser, activeChatThreadId, chatDraftMessage, setChatDraftMessage, startChatWith } = useAppStore();
 
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(activeChatThreadId || null);
@@ -34,6 +34,7 @@ export default function ChatModal({ onClose }) {
   const [mobileShowChat, setMobileShowChat] = useState(Boolean(activeChatThreadId));
 
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
     if (activeChatThreadId) {
@@ -41,6 +42,21 @@ export default function ChatModal({ onClose }) {
       setMobileShowChat(true);
     }
   }, [activeChatThreadId]);
+
+  useEffect(() => {
+    if (chatDraftMessage) {
+      setMessageInput(chatDraftMessage);
+      setChatDraftMessage(null); // Limpa depois de popular
+      
+      // Ajusta a altura inicial se a mensagem for longa
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+      }, 50);
+    }
+  }, [chatDraftMessage, setChatDraftMessage]);
 
   useEffect(() => {
     if (!currentUser?.email) return;
@@ -80,12 +96,22 @@ export default function ChatModal({ onClose }) {
   }, [messages]);
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!messageInput.trim() || !activeThreadId) return;
 
     const text = messageInput.trim();
     setMessageInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reseta a altura após o envio
+    }
     await sendChatMessage(activeThreadId, currentUser, text);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   const handleDeleteThread = async (threadId, e) => {
@@ -100,7 +126,6 @@ export default function ChatModal({ onClose }) {
       if (remaining.length === 0) setMobileShowChat(false);
     }
   };
-
   const activeThread = threads.find(t => t.id === activeThreadId);
   const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
@@ -278,13 +303,21 @@ export default function ChatModal({ onClose }) {
                             {m.senderName || m.sender} · {m.timestamp}
                           </div>
                           <div
-                            className={`max-w-[85%] sm:max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                            className={`max-w-[85%] sm:max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                               isMe
                                 ? 'bg-primary-blue text-white rounded-br-xs shadow-xs font-medium'
                                 : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
                             }`}
                           >
-                            {m.text}
+                            {m.text?.split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
+                              /(https?:\/\/[^\s]+)/g.test(part) ? (
+                                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`underline font-bold hover:opacity-80 break-all ${isMe ? 'text-white' : 'text-primary-blue dark:text-blue-400'}`}>
+                                  {part}
+                                </a>
+                              ) : (
+                                part
+                              )
+                            )}
                           </div>
                         </div>
                       );
@@ -294,13 +327,19 @@ export default function ChatModal({ onClose }) {
                 </div>
 
                 {/* Formulário de Envio */}
-                <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2 shrink-0">
-                  <input
-                    type="text"
+                <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-end gap-2 shrink-0">
+                  <textarea
+                    ref={textareaRef}
                     value={messageInput}
-                    onChange={e => setMessageInput(e.target.value)}
+                    onChange={e => {
+                      setMessageInput(e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
+                    onKeyDown={handleKeyDown}
                     placeholder={`Mensagem para ${otherPerson.name}...`}
-                    className="flex-1 input input-bordered text-sm py-2 px-3 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue"
+                    className="flex-1 input input-bordered text-sm py-3 px-4 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue resize-none overflow-y-auto min-h-[44px] max-h-[160px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600"
+                    rows={1}
                   />
                   <button
                     type="submit"

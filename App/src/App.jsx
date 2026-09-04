@@ -22,8 +22,16 @@ const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
 const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
+const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
 const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
+function MinhasVagasRoute() {
+  const { currentUser } = useAppStore();
+  if (currentUser?.role === 'empresa') {
+    return <GerenciamentoVagasEmpresa />;
+  }
+  return <MinhasVagas />;
+}
 
 export default function App() {
   const { isChatOpen, closeChat } = useAppStore();
@@ -77,7 +85,23 @@ export default function App() {
                   path="/minhas-vagas"
                   element={
                     <ProtectedRoute>
-                      <MinhasVagas />
+                      <MinhasVagasRoute />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/gerenciamento-vagas"
+                  element={
+                    <ProtectedRoute>
+                      <GerenciamentoVagasEmpresa />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/painel-empresa"
+                  element={
+                    <ProtectedRoute>
+                      <GerenciamentoVagasEmpresa />
                     </ProtectedRoute>
                   }
                 />

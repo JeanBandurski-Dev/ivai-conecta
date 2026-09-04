@@ -33,7 +33,7 @@ export default function Navbar() {
     setShowLogoutModal(false);
     closeMobile();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/');
+    navigate('/login');
   };
 
   const navLinkClass = ({ isActive }) =>
@@ -74,7 +74,7 @@ export default function Navbar() {
 
             {/* Nav links — desktop centered */}
             <ul className="hidden md:flex items-center gap-8 list-none mx-auto">
-              <li><NavLink to="/" end className={navLinkClass}>Dashboard</NavLink></li>
+              <li><NavLink to="/" end className={navLinkClass}>Início</NavLink></li>
               <li><NavLink to="/vagas" className={navLinkClass}>Vagas &amp; Match</NavLink></li>
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>
               <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
@@ -166,9 +166,9 @@ export default function Navbar() {
 
                         {currentUser.role === 'empresa' && (
                           <>
-                            <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
+                            <Link to="/gerenciamento-vagas" onClick={() => setDropdownOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                              <Building2 size={15} /> Minhas Vagas Criadas
+                              <Building2 size={15} /> Gestão de Vagas &amp; Funil ATS
                             </Link>
                             <Link to="/talentos" onClick={() => setDropdownOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
@@ -238,7 +238,7 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
             <div className="container py-4 space-y-1">
-              <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Dashboard</NavLink>
+              <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Início</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>
               <NavLink to="/talentos" className={mobileNavLinkClass} onClick={closeMobile}>Banco de Talentos</NavLink>
@@ -288,8 +288,8 @@ export default function Navbar() {
                   )}
 
                   {currentUser.role === 'empresa' && (
-                    <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
-                      <span className="flex items-center gap-2.5"><Building2 size={16} /> Minhas Vagas Criadas</span>
+                    <NavLink to="/gerenciamento-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Building2 size={16} /> Gestão de Vagas &amp; Funil ATS</span>
                     </NavLink>
                   )}
 

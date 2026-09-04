@@ -17,7 +17,6 @@ import {
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 export const STORAGE_KEY_DELETED_THREADS = 'ivai_conecta_deleted_threads';
-
 export function getDeletedThreads() {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -411,8 +410,8 @@ export async function sendChatMessage(chatId, senderUser, text) {
 
 // 4. Iniciar uma nova conversa (ou recuperar existente)
 export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'Contato Direto') {
-  const user1Email = currentUser.email.toLowerCase().trim();
-  const user2Email = targetUser.email.toLowerCase().trim();
+  const user1Email = (currentUser?.email || '').toLowerCase().trim();
+  const user2Email = (targetUser?.email || '').toLowerCase().trim();
 
   // Cria o ID determinístico único
   const sortedEmails = [user1Email, user2Email].sort();

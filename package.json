@@ -1,9 +1,12 @@
 {
   "name": "ivai-conecta",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "npm run dev --prefix App",
+    "start": "npm run dev --prefix App",
+    "build": "npm run build --prefix App",
+    "dev:proto": "npm start --prefix Prototipo",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -17,5 +20,6 @@
   "bugs": {
     "url": "https://github.com/JeanBandurski-Dev/ivai-conecta/issues"
   },
-  "homepage": "https://github.com/JeanBandurski-Dev/ivai-conecta#readme"
+  "homepage": "https://github.com/JeanBandurski-Dev/ivai-conecta#readme",
+  "description": ""
 }

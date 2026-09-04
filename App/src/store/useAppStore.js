@@ -153,8 +153,11 @@ const useAppStore = create((set, get) => ({
     set({ isChatOpen: false });
   },
 
+  chatDraftMessage: null,
+  setChatDraftMessage: (msg) => set({ chatDraftMessage: msg }),
+
   // Inicia ou recupera uma conversa com outro usuário e já abre a janela
-  startChatWith: async (targetUser, contextTitle = 'Contato Direto') => {
+  startChatWith: async (targetUser, contextTitle = 'Contato Direto', initialMessage = null, draftMessage = null) => {
     const currentUser = get().currentUser;
     if (!currentUser) {
       get().showToast('Faça login para iniciar uma conversa!');
@@ -165,10 +168,16 @@ const useAppStore = create((set, get) => ({
       // Chama a função que já temos no chatService para criar o ID único da conversa no Firestore
       const chatId = await getOrCreateChat(currentUser, targetUser, contextTitle);
 
+      if (initialMessage) {
+        const { sendChatMessage } = await import('../services/chatService');
+        await sendChatMessage(chatId, currentUser, initialMessage);
+      }
+
       // Abre o modal apontando exatamente para esse chat criado
       set({
         isChatOpen: true,
-        activeChatThreadId: chatId
+        activeChatThreadId: chatId,
+        chatDraftMessage: draftMessage || null
       });
       return chatId;
     } catch (error) {
