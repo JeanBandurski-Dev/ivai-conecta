@@ -12,6 +12,7 @@ import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
 import JobFormModal from '../components/JobFormModal';
+import CustomSelect from '../components/ui/CustomSelect';
 
 const TYPES = [
   { label: 'Todos os Tipos', value: 'Todos' },
@@ -249,24 +250,23 @@ export default function Vagas() {
 
             {/* Cidade */}
             <div className="lg:col-span-3">
-              <select
+              <CustomSelect
                 value={filterCity}
-                onChange={e => setFilterCity(e.target.value)}
-                className="form-control text-sm py-2.5 cursor-pointer"
-              >
-                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                onChange={setFilterCity}
+                options={CITIES}
+                searchable={true}
+                placeholder="Cidade"
+              />
             </div>
 
             {/* Tipo */}
             <div className="lg:col-span-3">
-              <select
+              <CustomSelect
                 value={filterType}
-                onChange={e => setFilterType(e.target.value)}
-                className="form-control text-sm py-2.5 cursor-pointer"
-              >
-                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+                onChange={setFilterType}
+                options={TYPES}
+                placeholder="Tipo de Contrato"
+              />
             </div>
 
             {/* Botão Filtros Avançados */}
@@ -293,41 +293,40 @@ export default function Vagas() {
                 
                 {/* Modalidade */}
                 <div>
-                  <label className="form-label text-xs mb-1.5 block">Modalidade de Trabalho</label>
-                  <select
+                  <label className="form-label text-xs mb-1.5 block font-bold">Modalidade de Trabalho</label>
+                  <CustomSelect
                     value={filterModality}
-                    onChange={e => setFilterModality(e.target.value)}
-                    className="form-control text-xs py-2"
-                  >
-                    {MODALITIES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
+                    onChange={setFilterModality}
+                    options={MODALITIES}
+                    size="sm"
+                  />
                 </div>
 
                 {/* Match Mínimo (Alunos / Candidatos) */}
                 {canSeeMatch && (
                   <div>
-                    <label className="form-label text-xs mb-1.5 block">Nível de Match de Habilidades</label>
-                    <select
+                    <label className="form-label text-xs mb-1.5 block font-bold">Nível de Match de Habilidades</label>
+                    <CustomSelect
                       value={minMatch}
-                      onChange={e => setMinMatch(Number(e.target.value))}
-                      className="form-control text-xs py-2"
-                    >
-                      {MATCH_RANGES.map(mr => <option key={mr.value} value={mr.value}>{mr.label}</option>)}
-                    </select>
+                      onChange={val => setMinMatch(Number(val))}
+                      options={MATCH_RANGES}
+                      size="sm"
+                    />
                   </div>
                 )}
 
                 {/* Ordenação */}
                 <div>
-                  <label className="form-label text-xs mb-1.5 block">Ordenar Vagas por</label>
-                  <select
+                  <label className="form-label text-xs mb-1.5 block font-bold">Ordenar Vagas por</label>
+                  <CustomSelect
                     value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="form-control text-xs py-2"
-                  >
-                    {canSeeMatch && <option value="match">Maior Match com Meu Perfil</option>}
-                    <option value="recent">Mais Recentes Primeiro</option>
-                  </select>
+                    onChange={setSortBy}
+                    options={[
+                      ...(canSeeMatch ? [{ value: 'match', label: 'Maior Match com Meu Perfil' }] : []),
+                      { value: 'recent', label: 'Mais Recentes Primeiro' }
+                    ]}
+                    size="sm"
+                  />
                 </div>
 
               </div>

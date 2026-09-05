@@ -14,6 +14,9 @@ import {
   validateJobTitle,
   validateSkill
 } from '../lib/ivaiConecta';
+import CustomSelect from './ui/CustomSelect';
+import JobTitleCombobox from './ui/JobTitleCombobox';
+import SkillCombobox from './ui/SkillCombobox';
 
 const TYPES = [
   { label: 'Tempo Integral (CLT)', value: 'Tempo Integral' },
@@ -26,6 +29,12 @@ const MODALITIES = [
   { label: 'Presencial', value: 'Presencial' },
   { label: 'Híbrido', value: 'Híbrido' },
   { label: '100% Remoto', value: 'Remoto' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'Ativa', label: 'Ativa (Aberta para Novas Inscrições)', badge: '🟢 Ativa' },
+  { value: 'Pausada', label: 'Pausada (Inscrições Suspensas Temporariamente)', badge: '🟡 Pausada' },
+  { value: 'Encerrada', label: 'Encerrada (Processo Finalizado)', badge: '🔴 Encerrada' },
 ];
 
 const POPULAR_TITLE_SUGGESTIONS = [
@@ -56,7 +65,6 @@ export default function JobFormModal({
   const [salary, setSalary] = useState(SALARY_RANGES[0]?.value || 'A combinar');
   const [schedule, setSchedule] = useState(WORK_SCHEDULES[0] || 'Comercial (Segunda a Sexta)');
   const [skillsList, setSkillsList] = useState(['Comunicação Assertiva', 'Trabalho em Equipe']);
-  const [customSkillInput, setCustomSkillInput] = useState('');
   const [description, setDescription] = useState('');
   const [benefits, setBenefits] = useState(['Vale Transporte (VT)', 'Vale Refeição / Alimentação (VR/VA)']);
   const [status, setStatus] = useState('Ativa');
@@ -96,7 +104,6 @@ export default function JobFormModal({
       setDescription('');
       setStatus('Ativa');
     }
-    setCustomSkillInput('');
     setFormError('');
     setIsSubmitting(false);
   }, [isOpen, initialJob, currentUser]);
@@ -273,23 +280,19 @@ export default function JobFormModal({
           {/* Status da Vaga (Apenas na edição) */}
           {isEditing && (
             <div className="form-group bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-gray-200 dark:border-slate-700">
-              <label className="form-label font-bold text-xs">Status Atual da Vaga:</label>
-              <select
+              <label className="form-label font-bold text-xs mb-1.5 block">Status Atual da Vaga:</label>
+              <CustomSelect
                 value={status}
-                onChange={e => setStatus(e.target.value)}
-                className="form-control text-sm font-bold"
-              >
-                <option value="Ativa">🟢 Ativa (Aberta para Novas Inscrições)</option>
-                <option value="Pausada">🟡 Pausada (Inscrições Suspensas Temporariamente)</option>
-                <option value="Encerrada">🔴 Encerrada (Processo Finalizado)</option>
-              </select>
+                onChange={setStatus}
+                options={STATUS_OPTIONS}
+              />
             </div>
           )}
 
           {/* Cargo / Título Padronizado com CBO */}
           <div className="form-group">
-            <label className="form-label flex items-center justify-between">
-              <span className="font-bold">Cargo / Ocupação Profissional *</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="form-label font-bold mb-0">Cargo / Ocupação Profissional *</label>
               {title && (
                 <span className={`text-[11px] font-semibold flex items-center gap-1 ${
                   validateJobTitle(title).valid
@@ -303,25 +306,14 @@ export default function JobFormModal({
                   )}
                 </span>
               )}
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                list="cbo-job-titles-list"
-                value={title}
-                onChange={e => { setTitle(e.target.value); setFormError(''); }}
-                className={`form-control text-sm font-semibold transition-all ${
-                  title && !validateJobTitle(title).valid ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20' : ''
-                }`}
-                placeholder="Ex: Desenvolvedor Front-end, Auxiliar Administrativo, Vendedor(a)..."
-                required
-              />
-              <datalist id="cbo-job-titles-list">
-                {STANDARD_JOB_TITLES.map(t => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
             </div>
+
+            <JobTitleCombobox
+              value={title}
+              onChange={newTitle => { setTitle(newTitle); setFormError(''); }}
+              placeholder="Ex: Desenvolvedor Front-end, Auxiliar Administrativo, Vendedor(a)..."
+              required
+            />
 
             {title && !validateJobTitle(title).valid && title.trim().length >= 3 && (
               <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 font-medium bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800">
@@ -352,76 +344,55 @@ export default function JobFormModal({
           {/* Regime de Contratação & Modalidade */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="form-group">
-              <label className="form-label font-bold">Tipo de Contratação</label>
-              <select
+              <label className="form-label font-bold mb-1.5 block">Tipo de Contratação</label>
+              <CustomSelect
                 value={type}
-                onChange={e => setType(e.target.value)}
-                className="form-control text-sm font-medium"
-              >
-                {TYPES.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+                onChange={setType}
+                options={TYPES}
+              />
             </div>
             <div className="form-group">
-              <label className="form-label font-bold">Modalidade de Atuação</label>
-              <select
+              <label className="form-label font-bold mb-1.5 block">Modalidade de Atuação</label>
+              <CustomSelect
                 value={modality}
-                onChange={e => setModality(e.target.value)}
-                className="form-control text-sm font-medium"
-              >
-                {MODALITIES.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
+                onChange={setModality}
+                options={MODALITIES}
+              />
             </div>
           </div>
 
           {/* Município & Faixa Salarial Padronizada */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="form-group">
-              <label className="form-label font-bold">Município (Vale do Ivaí)</label>
-              <select
+              <label className="form-label font-bold mb-1.5 block">Município (Vale do Ivaí)</label>
+              <CustomSelect
                 value={city}
-                onChange={e => setCity(e.target.value)}
-                className="form-control text-sm font-medium"
-              >
-                {CITIES.filter(c => c !== 'Todas as Cidades').map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                onChange={setCity}
+                options={CITIES.filter(c => c !== 'Todas as Cidades')}
+                searchable={true}
+              />
             </div>
             <div className="form-group">
-              <label className="form-label font-bold flex items-center justify-between">
+              <label className="form-label font-bold flex items-center justify-between mb-1.5">
                 <span>Faixa Salarial / Remuneração *</span>
                 <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">Padronizada</span>
               </label>
-              <select
+              <CustomSelect
                 value={salary}
-                onChange={e => { setSalary(e.target.value); setFormError(''); }}
-                className="form-control text-sm font-semibold text-gray-800 dark:text-white"
-              >
-                {SALARY_RANGES.map(sal => (
-                  <option key={sal.id} value={sal.value}>
-                    {sal.label}
-                  </option>
-                ))}
-              </select>
+                onChange={val => { setSalary(val); setFormError(''); }}
+                options={SALARY_RANGES}
+              />
             </div>
           </div>
 
           {/* Horário de Trabalho Padronizado */}
           <div className="form-group">
-            <label className="form-label font-bold">Jornada / Horário de Trabalho</label>
-            <select
+            <label className="form-label font-bold mb-1.5 block">Jornada / Horário de Trabalho</label>
+            <CustomSelect
               value={schedule}
-              onChange={e => setSchedule(e.target.value)}
-              className="form-control text-sm font-medium"
-            >
-              {WORK_SCHEDULES.map(sch => (
-                <option key={sch} value={sch}>{sch}</option>
-              ))}
-            </select>
+              onChange={setSchedule}
+              options={WORK_SCHEDULES}
+            />
           </div>
 
           {/* Habilidades e Competências Homologadas */}
@@ -475,58 +446,11 @@ export default function JobFormModal({
               })}
             </div>
 
-            {/* Adicionar Habilidade Personalizada com Validação e Banco de Dados (Datalist) */}
-            <div className="space-y-1.5">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  list="standard-skills-datalist"
-                  value={customSkillInput}
-                  onChange={e => { setCustomSkillInput(e.target.value); setFormError(''); }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addSkillTag(customSkillInput);
-                    }
-                  }}
-                  placeholder="Digite outra competência profissional (ex: Gestão de Projetos, SolidWorks)..."
-                  className={`form-control text-xs flex-1 transition-all ${
-                    customSkillInput.trim() && !validateSkill(customSkillInput).valid
-                      ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
-                      : customSkillInput.trim() && validateSkill(customSkillInput).valid
-                      ? 'border-green-400 dark:border-green-500 bg-green-50/20'
-                      : ''
-                  }`}
-                />
-                <datalist id="standard-skills-datalist">
-                  {STANDARD_SKILLS.map(s => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-                <button
-                  type="button"
-                  onClick={() => addSkillTag(customSkillInput)}
-                  className="btn btn-outline btn-sm text-xs font-bold shrink-0 hover:bg-primary-blue hover:text-white transition-colors"
-                >
-                  + Adicionar
-                </button>
-              </div>
-
-              {/* Feedback em Tempo Real da Competência */}
-              {customSkillInput.trim() && (
-                <div className="text-[11px] font-medium pt-0.5">
-                  {validateSkill(customSkillInput).valid ? (
-                    <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                      ✓ Competência profissional reconhecida no banco de talentos
-                    </p>
-                  ) : customSkillInput.trim().length >= 2 ? (
-                    <p className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      ⚠️ {validateSkill(customSkillInput).error}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            </div>
+            {/* Adicionar Habilidade com Pesquisa e Autocomplete Moderno */}
+            <SkillCombobox
+              skillsList={skillsList}
+              onAddSkill={addSkillTag}
+            />
           </div>
 
           {/* Benefícios Estruturados (LinkedIn / Gupy) */}
