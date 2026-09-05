@@ -475,13 +475,14 @@ export default function JobFormModal({
               })}
             </div>
 
-            {/* Adicionar Habilidade Personalizada com Validação */}
+            {/* Adicionar Habilidade Personalizada com Validação e Banco de Dados (Datalist) */}
             <div className="space-y-1.5">
               <div className="flex gap-2">
                 <input
                   type="text"
+                  list="standard-skills-datalist"
                   value={customSkillInput}
-                  onChange={e => setCustomSkillInput(e.target.value)}
+                  onChange={e => { setCustomSkillInput(e.target.value); setFormError(''); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -492,21 +493,38 @@ export default function JobFormModal({
                   className={`form-control text-xs flex-1 transition-all ${
                     customSkillInput.trim() && !validateSkill(customSkillInput).valid
                       ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
+                      : customSkillInput.trim() && validateSkill(customSkillInput).valid
+                      ? 'border-green-400 dark:border-green-500 bg-green-50/20'
                       : ''
                   }`}
                 />
+                <datalist id="standard-skills-datalist">
+                  {STANDARD_SKILLS.map(s => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
                 <button
                   type="button"
                   onClick={() => addSkillTag(customSkillInput)}
-                  className="btn btn-outline btn-sm text-xs font-bold shrink-0"
+                  className="btn btn-outline btn-sm text-xs font-bold shrink-0 hover:bg-primary-blue hover:text-white transition-colors"
                 >
                   + Adicionar
                 </button>
               </div>
-              {customSkillInput.trim() && !validateSkill(customSkillInput).valid && customSkillInput.trim().length >= 3 && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                  ⚠️ {validateSkill(customSkillInput).error}
-                </p>
+
+              {/* Feedback em Tempo Real da Competência */}
+              {customSkillInput.trim() && (
+                <div className="text-[11px] font-medium pt-0.5">
+                  {validateSkill(customSkillInput).valid ? (
+                    <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                      ✓ Competência profissional reconhecida no banco de talentos
+                    </p>
+                  ) : customSkillInput.trim().length >= 2 ? (
+                    <p className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      ⚠️ {validateSkill(customSkillInput).error}
+                    </p>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
@@ -546,7 +564,7 @@ export default function JobFormModal({
               <button
                 type="button"
                 onClick={fillDescriptionTemplate}
-                className="text-xs text-primary-blue hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                className="text-xs text-primary-blue hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <Sparkles size={13} /> Gerar Modelo Pré-formatado
               </button>
@@ -554,15 +572,40 @@ export default function JobFormModal({
             <textarea
               value={description}
               onChange={e => { setDescription(e.target.value); setFormError(''); }}
-              className="form-control text-xs leading-relaxed"
+              className={`form-control text-xs leading-relaxed transition-all ${
+                description.trim().length >= 10 && !validateProfessionalText(description, 'Descrição', 30, 2500).valid
+                  ? 'border-amber-400 dark:border-amber-500 bg-amber-50/15'
+                  : description.trim().length >= 30 && validateProfessionalText(description, 'Descrição', 30, 2500).valid
+                  ? 'border-green-400 dark:border-green-500 bg-green-50/10'
+                  : ''
+              }`}
               rows={6}
               placeholder="Descreva as atribuições diárias, requisitos obrigatórios, diferenciais e informações sobre a equipe..."
               required
             />
+
+            {/* Feedback e Estatísticas da Descrição */}
             <div className="flex justify-between items-center text-[10px] text-gray-400 mt-1">
-              <span>Mínimo 30 caracteres. Seja claro e profissional.</span>
-              <span>{description.length}/2500 caracteres</span>
+              <span>Mínimo 30 caracteres. Redija atribuições reais e profissionais.</span>
+              <span className={description.length >= 30 ? 'text-green-600 dark:text-green-400 font-semibold' : ''}>
+                {description.length}/2500 caracteres
+              </span>
             </div>
+
+            {/* Alerta em tempo real de validação da descrição */}
+            {description.trim().length >= 10 && (
+              <div className={`mt-1.5 text-[11px] font-medium p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
+                validateProfessionalText(description, 'Descrição', 30, 2500).valid
+                  ? 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800'
+                  : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+              }`}>
+                {validateProfessionalText(description, 'Descrição', 30, 2500).valid ? (
+                  <>✓ Descrição com padrão, vocabulário e estrutura profissional aprovados</>
+                ) : (
+                  <>⚠️ {validateProfessionalText(description, 'Descrição', 30, 2500).error}</>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Ações do Formulário */}

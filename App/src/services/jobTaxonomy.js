@@ -73,25 +73,47 @@ export const STANDARD_JOB_TITLES = [
 
 // 2. BANCO DE HABILIDADES PROFISSIONAIS HOMOLOGADAS
 export const STANDARD_SKILLS = [
-  // Tecnologia & Ferramentas
-  'JavaScript', 'React', 'Node.js', 'TypeScript', 'Python', 'PHP', 'HTML5 & CSS3',
-  'SQL / Bancos de Dados', 'Git & GitHub', 'Figma', 'Power BI', 'Excel Avançado',
-  'Pacote Office', 'Suporte a Sistemas ERP', 'Design Gráfico / Canva',
+  // Tecnologia, Programação & Ferramentas
+  'JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js', 'Vue.js', 'Angular',
+  'Python', 'PHP', 'Java', 'C#', 'C++', 'Go', 'Rust', 'Ruby', 'HTML5 & CSS3', 'Sass',
+  'TailwindCSS', 'Bootstrap', 'Git & GitHub', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud (GCP)',
+  'Linux', 'SQL / Bancos de Dados', 'PostgreSQL', 'MySQL', 'MongoDB', 'Redis',
+  'Figma', 'UI/UX Design', 'Power BI', 'Tableau', 'Excel Avançado', 'Pacote Office',
+  'Suporte a Sistemas ERP', 'SAP', 'TOTVS', 'Salesforce / CRM', 'Design Gráfico / Canva',
+  'Adobe Photoshop', 'Adobe Illustrator', 'Edição de Vídeo', 'AutoCAD', 'SolidWorks',
 
-  // Habilidades Comerciais & Administrativas
-  'Atendimento ao Cliente', 'Negociação & Vendas', 'Emissão de Notas Fiscais (NFe)',
-  'Rotinas Administrativas', 'Fluxo de Caixa & Cobrança', 'Contas a Pagar e Receber',
-  'Gestão de Redes Sociais', 'Marketing Digital', 'Organização de Arquivos',
-  'Controle de Estoque & Inventário', 'Vendas Consultivas B2B',
+  // Gestão, Administrativo & Financeiro
+  'Atendimento ao Cliente', 'Rotinas Administrativas', 'Emissão de Notas Fiscais (NFe)',
+  'Fluxo de Caixa & Cobrança', 'Contas a Pagar e Receber', 'Contabilidade Geral',
+  'Escrita Fiscal', 'Departamento Pessoal (DP)', 'Recrutamento e Seleção (RH)',
+  'Gestão de Pessoas', 'Organização de Arquivos', 'Gestão de Tempo', 'Gestão de Projetos',
+  'Metodologias Ágeis (Scrum/Kanban)', 'Planejamento Estratégico',
+
+  // Comercial, Vendas & Marketing
+  'Vendas Consultivas B2B', 'Negociação & Fechamento', 'Técnicas de Vendas (B2C)',
+  'Prospecção de Clientes', 'Marketing Digital', 'Gestão de Redes Sociais',
+  'Gestão de Tráfego Pago', 'Google Ads', 'Meta Ads', 'Copywriting', 'SEO',
+  'Comunicação Corporativa', 'Pós-Venda & Sucesso do Cliente',
 
   // Habilidades Interpessoais (Soft Skills)
   'Comunicação Assertiva', 'Trabalho em Equipe', 'Proatividade & Iniciativa',
-  'Gestão de Tempo', 'Liderança & Coordenação', 'Resolução de Problemas',
-  'Inteligência Emocional', 'Pontualidade & Compromisso', 'Pensamento Crítico',
+  'Resolução de Problemas', 'Liderança & Coordenação', 'Inteligência Emocional',
+  'Pontualidade & Compromisso', 'Pensamento Crítico', 'Adaptabilidade & Resiliência',
+  'Relacionamento Interpessoal', 'Ética Profissional', 'Orientação para Resultados',
 
-  // Operacional & Técnico
-  'Manutenção Elétrica', 'Manutenção Mecânica', 'Segurança do Trabalho (NRs)',
-  'Operação de Máquinas', 'Logística & Expedição', 'Gestão Agropecuária'
+  // Operacional, Logística & Indústria
+  'Segurança do Trabalho (NRs)', 'NR-10 (Segurança Elétrica)', 'NR-35 (Trabalho em Altura)',
+  'NR-11 (Transporte e Movimentação)', 'NR-12 (Segurança em Máquinas)', 'Manutenção Elétrica',
+  'Manutenção Mecânica', 'Operação de Empilhadeira', 'Operação de Máquinas Industriais',
+  'Solda Elétrica / MIG / TIG', 'Torneamento & Usinagem CNC', 'Logística & Expedição',
+  'Controle de Estoque & Inventário', 'Gestão de Almoxarifado', 'Controle de Qualidade / 5S',
+  'Carteira de Habilitação (CNH)',
+
+  // Agro, Saúde, Educação & Idiomas
+  'Gestão Agropecuária', 'Manejo de Pastagens & Solos', 'Operação de Tratores e Implementos',
+  'Técnicas Agrícolas', 'Zootecnia Básica', 'Primeiros Socorros', 'Enfermagem Geral',
+  'Dispensação Farmacêutica', 'Didática & Ensino', 'Inglês Básico', 'Inglês Intermediário',
+  'Inglês Avançado / Fluente', 'Espanhol'
 ];
 
 // 3. FAIXAS SALARIAIS PADRONIZADAS (SEM CAMPOS DE TEXTO LIVRE TROLL)
@@ -134,6 +156,12 @@ export const STANDARD_BENEFITS = [
 ];
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
+const PROFANITY_ROOTS = [
+  'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
+  'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
+  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp'
+];
+
 const PROFANITY_LIST = [
   'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
   'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
@@ -163,7 +191,13 @@ export function validateProfessionalText(text, fieldName = 'Texto', minLength = 
   const lower = clean.toLowerCase();
   const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
 
-  // 1. Verificação Aprofundada de Palavrões ou Termos Troll (inclusive compostos como cubosta123)
+  // 1. Verificação Aprofundada de Raízes Ofensivas (inclusive termos compostos como cubost, cubosta123)
+  for (const root of PROFANITY_ROOTS) {
+    if (cleanAlpha.includes(root)) {
+      return { valid: false, error: 'Termo impróprio ou inadequado detectado.' };
+    }
+  }
+
   for (const bad of PROFANITY_LIST) {
     if (bad.length >= 3) {
       if (lower.includes(bad) || cleanAlpha.includes(bad)) {
@@ -171,8 +205,8 @@ export function validateProfessionalText(text, fieldName = 'Texto', minLength = 
       }
     } else {
       // Para termos curtos como 'cu'
-      const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bosta|merda|lhao|lhão)/i;
-      if (regexCu.test(lower) || cleanAlpha === 'cu' || cleanAlpha.startsWith('cubosta')) {
+      const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão)/i;
+      if (regexCu.test(lower) || cleanAlpha === 'cu' || cleanAlpha.startsWith('cu') && !['curso', 'curriculo', 'currículo', 'custom', 'custos', 'cuidados', 'cultura', 'cuidado', 'curadoria'].some(ok => cleanAlpha.startsWith(ok))) {
         return { valid: false, error: 'Termo impróprio ou inadequado detectado.' };
       }
     }
@@ -183,15 +217,55 @@ export function validateProfessionalText(text, fieldName = 'Texto', minLength = 
     return { valid: false, error: `O campo ${fieldName} contém repetições excessivas de caracteres.` };
   }
 
-  // 3. Verificação de Teclas Apertadas Aleatoriamente (Gibberish: ex: "waqeqeqwerererererererere")
-  if (/^[bcdfghjklmnpqrstvwxyz]{6,}$/i.test(clean) || /^[aeiou]{6,}$/i.test(clean)) {
+  // 3. Verificação de Teclas Apertadas Aleatoriamente (Gibberish: ex: "waqeqeqwerererererererere", "asdfgh")
+  const keyboardPatterns = ['asdfgh', 'qwerty', 'zxcvbn', 'poiuyt', 'lkjhgf', 'mnbvcx', '123456'];
+  for (const pat of keyboardPatterns) {
+    if (cleanAlpha.includes(pat)) {
+      return { valid: false, error: `O texto de ${fieldName} contém sequências de teclado aleatórias (ex.: "${pat}").` };
+    }
+  }
+
+  if (/^[bcdfghjklmnpqrstvwxyz]{5,}$/i.test(clean) || /^[aeiou]{5,}$/i.test(clean)) {
     return { valid: false, error: `Por favor, digite um texto compreensível para ${fieldName}.` };
   }
 
-  // 4. Verificação de palavras legíveis mínimas
   const words = clean.split(/\s+/).filter(w => w.length >= 2);
-  if (minLength >= 20 && words.length < 4) {
-    return { valid: false, error: `Por favor, elabore uma descrição mais detalhada e profissional para ${fieldName}.` };
+
+  // 4. Verificações Estruturais para Descrição de Oportunidades (evita textos aleatórios ou repetitivos)
+  if (minLength >= 20) {
+    // a) Evita palavras excessivamente longas sem espaço (gibberish/mashing de teclado)
+    if (words.some(w => w.length > 28)) {
+      return { valid: false, error: 'O texto contém palavras ou sequências aleatórias sem espaçamento adequado.' };
+    }
+
+    // b) Palavras sem nenhuma vogal com 4 ou mais letras (teclado mashing)
+    const hasVowellessWords = words.some(w => {
+      const alphaOnly = w.replace(/[^a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/g, '');
+      return alphaOnly.length >= 4 && !/[aeiouyáàâãéèêíïóôõöúÁÀÂÃÉÈÊÍÏÓÔÕÖÚ]/i.test(alphaOnly);
+    });
+    if (hasVowellessWords) {
+      return { valid: false, error: 'O texto contém palavras aleatórias ou incompreensíveis.' };
+    }
+
+    // c) Evita repetição excessiva de palavras idênticas (ex: "vaga legal vaga legal vaga legal")
+    if (words.length >= 6) {
+      const lowerWords = words.map(w => w.toLowerCase());
+      const unique = new Set(lowerWords);
+      if (unique.size / lowerWords.length < 0.45) {
+        return { valid: false, error: 'O texto contém repetição excessiva de palavras idênticas. Por favor, detalhe as atividades reais da vaga ou use o modelo pré-formatado.' };
+      }
+    }
+
+    // d) Exige no mínimo 7 palavras com sentido
+    if (words.length < 7) {
+      return { valid: false, error: `Por favor, elabore uma descrição mais detalhada e profissional para ${fieldName} (mínimo 7 palavras).` };
+    }
+
+    // e) Verifica se contém texto alfabético suficiente (e não só números ou pontuação)
+    const letterMatches = clean.match(/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/g);
+    if (!letterMatches || letterMatches.length < 20) {
+      return { valid: false, error: 'A descrição deve conter informações legíveis sobre as atividades da vaga.' };
+    }
   }
 
   return { valid: true };
@@ -366,25 +440,33 @@ export function validateJobTitle(title) {
 // 8. BANCO DE PALAVRAS-CHAVE E COMPETÊNCIAS OCUPACIONAIS HOMOLOGADAS
 export const OCCUPATIONAL_SKILL_KEYWORDS = [
   // Tecnologia & Ferramentas
-  'react', 'vue', 'angular', 'node', 'javascript', 'typescript', 'python', 'java', 'c#', 'c++', 'php',
-  'ruby', 'go', 'rust', 'sql', 'mysql', 'postgres', 'oracle', 'mongodb', 'html', 'css', 'sass',
-  'tailwind', 'bootstrap', 'git', 'github', 'gitlab', 'docker', 'kubernetes', 'aws', 'azure', 'gcp',
+  'react', 'react native', 'vue', 'angular', 'node', 'javascript', 'typescript', 'python', 'java', 'c#', 'c++', 'php',
+  'ruby', 'go', 'rust', 'sql', 'mysql', 'postgres', 'postgresql', 'oracle', 'mongodb', 'redis', 'html', 'css', 'sass',
+  'tailwind', 'bootstrap', 'git', 'github', 'gitlab', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'google cloud',
   'linux', 'windows', 'excel', 'word', 'powerpoint', 'office', 'power bi', 'tableau', 'erp', 'crm',
   'sap', 'totvs', 'figma', 'photoshop', 'illustrator', 'canva', 'coreldraw', 'autocad', 'solidworks',
   'revit', 'sketchup', 'programacao', 'programação', 'redes', 'suporte', 'software', 'hardware',
+  'flutter', 'kotlin', 'swift', 'django', 'flask', 'spring', 'next.js', 'nextjs', 'api', 'rest', 'scrum',
+  'kanban', 'jira', 'trello', 'blender', 'indesign', 'premiere', 'after effects',
 
   // Operacional, Agro & Técnica
-  'nr-10', 'nr-11', 'nr-12', 'nr-35', 'cnh', 'eletrica', 'elétrica', 'mecanica', 'mecânica',
-  'solda', 'usinagem', 'torno', 'cnc', 'empilhadeira', 'trator', 'colheitadeira', 'manutencao',
-  'manutenção', 'operacao', 'operação', 'logistica', 'logística', 'estoque', 'expedicao', 'expedição',
-  'inventario', 'inventário', 'almoxarifado', 'producao', 'produção', 'segurança do trabalho',
-  'agronomia', 'veterinaria', 'veterinária', 'plantio', 'colheita', 'irrigacao', 'irrigação',
+  'nr-10', 'nr-11', 'nr-12', 'nr-35', 'cnh', 'cnh a', 'cnh b', 'cnh c', 'cnh d', 'cnh e',
+  'eletrica', 'elétrica', 'mecanica', 'mecânica', 'solda', 'usinagem', 'torno', 'cnc', 'empilhadeira',
+  'trator', 'colheitadeira', 'manutencao', 'manutenção', 'operacao', 'operação', 'logistica', 'logística',
+  'estoque', 'expedicao', 'expedição', 'inventario', 'inventário', 'almoxarifado', 'producao', 'produção',
+  'segurança do trabalho', 'agronomia', 'veterinaria', 'veterinária', 'plantio', 'colheita', 'irrigacao',
+  'irrigação', 'mecatronica', 'mecatrônica', 'clp', 'pneumatica', 'pneumática', 'hidraulica', 'hidráulica',
+  'metrologia', 'paquimetro', 'paquímetro', '5s', 'kaizen', 'lean', 'seis sigma', 'six sigma', 'iso 9001',
+  'boas praticas', 'boas práticas', 'bpf',
 
   // Comercial & Administrativo
   'vendas', 'negociacao', 'negociação', 'atendimento', 'caixa', 'faturamento', 'nfe', 'fiscal',
   'contabil', 'contábil', 'financeiro', 'cobranca', 'cobrança', 'rh', 'recrutamento', 'dp',
   'marketing', 'seo', 'midias sociais', 'mídias sociais', 'copywriting', 'gestao', 'gestão',
   'projetos', 'compras', 'b2b', 'b2c', 'rotinas administrativas', 'fluxo de caixa', 'arquivos',
+  'dre', 'conciliacao', 'conciliação', 'sped', 'sintegra', 'icms', 'contas a pagar', 'contas a receber',
+  'tesouraria', 'folha de pagamento', 'esocial', 'ponto eletronico', 'ponto eletrônico', 'fgts', 'inss',
+  'pos-venda', 'pós-venda', 'customer success', 'prospeccao', 'prospecção', 'funil de vendas', 'telemarketing',
 
   // Soft Skills & Habilidades Humanas
   'comunicacao', 'comunicação', 'trabalho em equipe', 'proatividade', 'organizacao', 'organização',
@@ -395,13 +477,15 @@ export const OCCUPATIONAL_SKILL_KEYWORDS = [
   // Saúde, Educação & Serviços
   'enfermagem', 'farmacia', 'farmácia', 'triagem', 'pedagogia', 'didatica', 'didática',
   'culinaria', 'culinária', 'gastronomia', 'limpeza', 'zeladoria', 'portaria', 'vigilancia', 'vigilância',
-  'ingles', 'inglês', 'espanhol'
+  'ingles', 'inglês', 'espanhol', 'socorrista', 'curativos', 'administracao de medicamentos',
+  'administração de medicamentos', 'coleta de exames', 'prontuario', 'prontuário', 'psicologia',
+  'nutricao', 'nutrição', 'fisioterapia', 'servicos gerais', 'serviços gerais'
 ];
 
 /**
  * Validador de Competências e Habilidades Profissionais
- * Impede termos pejorativos, troll, sequências numéricas aleatórias (ex.: cubosta123)
- * e exige consistência profissional com o mercado de trabalho.
+ * Exige correspondência estrita com o banco de competências homologadas (STANDARD_SKILLS / OCCUPATIONAL_SKILL_KEYWORDS)
+ * e impede termos pejorativos, troll ou inventados (ex.: cubost, teste123, blabla).
  */
 export function validateSkill(skill) {
   try {
@@ -420,33 +504,37 @@ export function validateSkill(skill) {
     const lower = clean.toLowerCase();
     const norm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // 2. Bloqueio de sufixos numéricos aleatórios / troll (ex: "cubosta123", "teste123", "abc000")
-    // Exceto normas e ferramentas conhecidas como NR-10, NR-35, ISO 9001, HTML5, CSS3, C++, C#, etc.
+    // 2. Reconhecimento de padrões técnicos oficiais (ex.: NR-10, ISO 9001, HTML5, C++, C#, .NET)
     const isTechnicalStandard = /^(NR[-\s]?\d+|ISO[-\s]?\d+|HTML\d|CSS\d|IPV\d|VUE\s?\d|REACT\s?\d|WINDOWS\s?\d+|OFFICE\s?\d+|SQL\s?\d+|C\+\+|C#|\.NET)$/i.test(clean);
-    if (!isTechnicalStandard && (/\d{3,}$/.test(clean) || /\d{2,}$/.test(norm.replace(/[^a-z0-9]/g, '')))) {
+    if (isTechnicalStandard) {
+      return { valid: true };
+    }
+
+    // 3. Bloqueio de sufixos numéricos aleatórios / troll (ex: "cubosta123", "teste123", "abc000")
+    if (/\d{3,}$/.test(clean) || /\d{2,}$/.test(norm.replace(/[^a-z0-9]/g, ''))) {
       return { valid: false, error: 'A habilidade não deve conter sufixos numéricos aleatórios (ex.: "123").' };
     }
 
-    // 3. Bloqueio de termos que não contenham letras (exceto C++, C#, .NET etc)
-    if (!isTechnicalStandard && !/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
+    // 4. Bloqueio de termos que não contenham letras
+    if (!/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
       return { valid: false, error: 'A habilidade deve conter letras e representar uma competência profissional real.' };
     }
 
-    // 4. Verificação direta contra a lista homologada de habilidades
+    // 5. Verificação direta contra a lista homologada de habilidades (STANDARD_SKILLS)
     const isStandardSkill = STANDARD_SKILLS.some(st => {
       const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
+      return norm === normSt || norm.includes(normSt);
     });
     if (isStandardSkill) {
       return { valid: true };
     }
 
-    // 5. Verificação de termos e raízes de competências ocupacionais reconhecidas
+    // 6. Verificação de termos e raízes de competências ocupacionais reconhecidas
     const isRecognizedCompetency = OCCUPATIONAL_SKILL_KEYWORDS.some(kw => {
       try {
         const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const regex = new RegExp(`(^|\\s|\\W)${escapeRegex(normKw)}($|\\s|\\W)`, 'i');
-        return regex.test(norm) || norm.includes(normKw);
+        return regex.test(norm) || norm === normKw;
       } catch {
         return false;
       }
@@ -456,20 +544,10 @@ export function validateSkill(skill) {
       return { valid: true };
     }
 
-    // 6. Se for um termo novo plausível sem números ou troll
-    const words = clean.split(/\s+/).filter(w => w.length >= 2);
-    const hasRandomConsonants = /^[bcdfghjklmnpqrstvwxyz]{5,}$/i.test(clean.replace(/\s/g, ''));
-    if (hasRandomConsonants) {
-      return { valid: false, error: 'Por favor, digite uma habilidade ou competência profissional compreensível.' };
-    }
-
-    if (clean.length >= 3 && words.length >= 1 && !/\d/.test(clean)) {
-      return { valid: true };
-    }
-
+    // 7. Rejeição estrita de qualquer termo fora da base homologada do mercado de trabalho
     return {
       valid: false,
-      error: 'Habilidade não reconhecida. Por favor, insira uma competência profissional válida ou selecione na lista recomendada.'
+      error: 'Competência não reconhecida no mercado de trabalho. Selecione uma opção na lista de habilidades sugeridas ou informe uma competência profissional válida.'
     };
   } catch (err) {
     console.error('Erro defensivo em validateSkill:', err);
