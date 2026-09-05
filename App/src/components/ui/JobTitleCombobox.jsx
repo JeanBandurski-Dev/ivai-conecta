@@ -56,7 +56,6 @@ export default function JobTitleCombobox({
     if (onSelect) onSelect(titleToSelect);
     setIsOpen(false);
     setHighlightedIndex(-1);
-    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e) => {
@@ -85,9 +84,13 @@ export default function JobTitleCombobox({
         prev > 0 ? prev - 1 : filteredTitles.length - 1
       );
     } else if (e.key === 'Enter') {
+      e.preventDefault();
       if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredTitles.length) {
-        e.preventDefault();
         handleSelectTitle(filteredTitles[highlightedIndex]);
+      } else if (value.trim()) {
+        handleSelectTitle(value.trim());
+      } else {
+        setIsOpen(false);
       }
     }
   };
@@ -112,7 +115,7 @@ export default function JobTitleCombobox({
             setIsOpen(true);
             setHighlightedIndex(0);
           }}
-          onFocus={() => setIsOpen(true)}
+          onClick={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           required={required}
@@ -178,17 +181,27 @@ export default function JobTitleCombobox({
             className="overflow-y-auto space-y-0.5 max-h-52 py-1 pr-0.5 custom-scrollbar"
           >
             {filteredTitles.length === 0 ? (
-              <div className="px-3 py-3 text-center">
-                <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">
-                  Nenhum cargo idêntico no catálogo padrão.
+              <div className="p-3 text-center">
+                <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-2">
+                  Nenhum cargo idêntico no catálogo CBO.
                 </p>
                 {value.trim().length >= 3 && (
                   <button
                     type="button"
-                    onClick={() => handleSelectTitle(value.trim())}
-                    className="mt-2 text-xs font-bold text-primary-blue dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSelectTitle(value.trim());
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-primary-blue dark:text-blue-300 transition-all font-bold text-xs flex items-center justify-between cursor-pointer group shadow-xs"
                   >
-                    Usar cargo personalizado: &quot;{value.trim()}&quot;
+                    <div className="flex items-center gap-2 truncate">
+                      <Check size={14} className="text-primary-blue dark:text-blue-400 shrink-0" />
+                      <span className="truncate">Usar cargo personalizado: &quot;{value.trim()}&quot;</span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 font-bold border border-blue-200 dark:border-blue-800 group-hover:scale-105 transition-transform">
+                      Confirmar
+                    </span>
                   </button>
                 )}
               </div>

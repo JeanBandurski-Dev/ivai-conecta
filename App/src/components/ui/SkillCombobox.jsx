@@ -62,7 +62,6 @@ export default function SkillCombobox({
     setInputValue('');
     setIsOpen(false);
     setHighlightedIndex(-1);
-    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e) => {
@@ -118,7 +117,7 @@ export default function SkillCombobox({
               setIsOpen(true);
               setHighlightedIndex(0);
             }}
-            onFocus={() => setIsOpen(true)}
+            onClick={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={`form-control pl-9 pr-14 text-xs transition-all ${
@@ -209,7 +208,10 @@ export default function SkillCombobox({
             {/* Se o usuário digitou uma habilidade que não está no catálogo, mas é válida */}
             {inputValue.trim() && !isExactMatchInCatalog && (
               <div
-                onClick={() => currentValidation?.valid && handleAdd(inputValue)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (currentValidation?.valid) handleAdd(inputValue);
+                }}
                 className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer border mb-1 transition-all ${
                   currentValidation?.valid
                     ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 hover:bg-green-100'
@@ -237,7 +239,8 @@ export default function SkillCombobox({
                   key={skill}
                   role="option"
                   aria-selected={isAlreadyAdded}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (!isAlreadyAdded) handleAdd(skill);
                   }}
                   onMouseEnter={() => setHighlightedIndex(idx)}
