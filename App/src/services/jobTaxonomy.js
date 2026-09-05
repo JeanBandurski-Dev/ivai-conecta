@@ -140,19 +140,67 @@ export const WORK_SCHEDULES = [
   'Horário Flexível / Home Office'
 ];
 
-// 5. VALES E BENEFÍCIOS OFERECIDOS
+// 5. VALES E BENEFÍCIOS OFERECIDOS (PADRÃO MERCADO BRASIL / LINKEDIN / GUPY)
 export const STANDARD_BENEFITS = [
-  'Vale Transporte (VT)',
+  // Alimentação & Refeição
+  'Vale Refeição (VR)',
+  'Vale Alimentação (VA)',
   'Vale Refeição / Alimentação (VR/VA)',
-  'Plano de Saúde',
+  'Cartão Benefícios Flexíveis (Caju / Flash / Swile)',
+  'Refeitório no Local / Restaurante',
+  'Café da Manhã & Frutas no Escritório',
+
+  // Saúde & Bem-Estar
+  'Plano de Saúde (Médico)',
   'Plano Odontológico',
-  'Ambiente Colaborativo',
+  'Gympass / Wellhub (Academias)',
+  'TotalPass / Saúde Física',
+  'Assistência Psicológica / Terapia Online',
+  'Seguro de Vida em Grupo',
+  'Telemedicina 24h',
+  'Convênio Farmácia (Desconto Medicamentos)',
+  'Massoterapia / Quick Massage',
+
+  // Transporte & Mobilidade
+  'Vale Transporte (VT)',
+  'Vale Combustível / Auxílio Mobilidade',
+  'Estacionamento Gratuito no Local',
+  'Vale Pedágio',
+  'Bicicletário & Vestiário',
+
+  // Flexibilidade & Família
   'Horário Flexível',
-  'Seguro de Vida',
-  'Auxílio Educação / Cursos',
   'Home Office Híbrido',
+  '100% Remoto (Home Office)',
+  'Auxílio Home Office / Ergonomia',
   'Day-off no Aniversário',
-  'Comissão / PLR'
+  'Sexta-feira Curta (Short Friday)',
+  'Auxílio Creche',
+  'Auxílio Babá',
+  'Licença Maternidade Estendida (6 meses)',
+  'Licença Paternidade Estendida (20 dias)',
+
+  // Educação & Carreira
+  'Auxílio Educação / Graduação e Pós',
+  'Auxílio Cursos & Treinamentos',
+  'Auxílio Idiomas (Inglês / Espanhol)',
+  'Reembolso de Certificações',
+  'Plano de Carreira Estruturado',
+  'Parcerias com Universidades & Escolas',
+
+  // Finanças & Recompensas
+  'Participação nos Lucros e Resultados (PLR / PPR)',
+  'Bônus por Metas / Premiações',
+  'Previdência Privada',
+  'Empréstimo Consignado com Juros Baixos',
+  'Comissão sobre Vendas',
+
+  // Cultura & Vantagens
+  'Ambiente Colaborativo & Descontraído',
+  'Dress Code Livre / Casual',
+  'Espaço de Descompressão / Jogos',
+  'Pet Friendly',
+  'Clube de Descontos e Convênios Locais'
 ];
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
@@ -575,3 +623,34 @@ ${company} está em busca de um(a) profissional para atuar como ${jobTitle || 'i
 ⭐ Diferenciais:
 - Experiência prévia em funções similares na região do Vale do Ivaí.`;
 }
+
+/**
+ * Validador de Benefícios e Vantagens Profissionais
+ */
+export function validateBenefit(benefitName) {
+  if (!benefitName || typeof benefitName !== 'string') {
+    return { valid: false, error: 'O nome do benefício é obrigatório.' };
+  }
+
+  const clean = benefitName.trim();
+
+  if (clean.length < 3) {
+    return { valid: false, error: 'O benefício deve conter no mínimo 3 caracteres.' };
+  }
+
+  if (clean.length > 70) {
+    return { valid: false, error: 'O nome do benefício deve conter no máximo 70 caracteres.' };
+  }
+
+  const basicVal = validateProfessionalText(clean, 'Benefício', 3, 70);
+  if (!basicVal.valid) {
+    return basicVal;
+  }
+
+  if (!/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
+    return { valid: false, error: 'O benefício deve conter letras e representar uma vantagem profissional real.' };
+  }
+
+  return { valid: true };
+}
+

@@ -12,11 +12,13 @@ import {
   validateProfessionalText,
   getJobDescriptionTemplate,
   validateJobTitle,
-  validateSkill
+  validateSkill,
+  validateBenefit
 } from '../lib/ivaiConecta';
 import CustomSelect from './ui/CustomSelect';
 import JobTitleCombobox from './ui/JobTitleCombobox';
 import SkillCombobox from './ui/SkillCombobox';
+import BenefitCombobox from './ui/BenefitCombobox';
 
 const TYPES = [
   { label: 'Tempo Integral (CLT)', value: 'Tempo Integral' },
@@ -110,10 +112,34 @@ export default function JobFormModal({
 
   if (!isOpen) return null;
 
+  const addBenefitTag = (benefitToAdd) => {
+    const clean = (benefitToAdd || '').trim();
+    if (!clean) return;
+
+    const val = validateBenefit(clean);
+    if (!val.valid) {
+      setFormError(val.error);
+      return;
+    }
+
+    if (!benefits.some(b => b.toLowerCase() === clean.toLowerCase())) {
+      setBenefits(prev => [...prev, clean]);
+      setFormError('');
+    } else {
+      setFormError('Este benefício já foi adicionado.');
+    }
+  };
+
+  const removeBenefitTag = (benefitToRemove) => {
+    setBenefits(prev => prev.filter(b => b !== benefitToRemove));
+  };
+
   const toggleBenefit = (benefit) => {
-    setBenefits(prev =>
-      prev.includes(benefit) ? prev.filter(b => b !== benefit) : [...prev, benefit]
-    );
+    if (benefits.includes(benefit)) {
+      removeBenefitTag(benefit);
+    } else {
+      addBenefitTag(benefit);
+    }
   };
 
   const addSkillTag = (skillToAdd) => {
@@ -128,7 +154,6 @@ export default function JobFormModal({
 
     if (!skillsList.some(s => s.toLowerCase() === cleanSkill.toLowerCase())) {
       setSkillsList(prev => [...prev, cleanSkill]);
-      setCustomSkillInput('');
       setFormError('');
     } else {
       setFormError('Esta habilidade já foi adicionada.');
@@ -453,32 +478,63 @@ export default function JobFormModal({
             />
           </div>
 
-          {/* Benefícios Estruturados (LinkedIn / Gupy) */}
+          {/* Benefícios Estruturados & Customizados (LinkedIn / Gupy) */}
           <div className="form-group">
-            <label className="form-label font-bold flex items-center justify-between">
-              <span>Benefícios &amp; Vantagens Oferecidas</span>
-              <span className="text-[10px] text-gray-400 font-normal">Clique para marcar/desmarcar</span>
+            <label className="form-label flex items-center justify-between">
+              <span className="font-bold">Benefícios &amp; Vantagens Oferecidas *</span>
+              <span className="text-[11px] font-normal text-gray-400">Atraia talentos qualificados</span>
             </label>
-            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl max-h-32 overflow-y-auto">
-              {STANDARD_BENEFITS.map(b => {
-                const checked = benefits.includes(b);
+
+            {/* Benefícios Selecionados */}
+            <div className="p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl flex flex-wrap gap-1.5 min-h-[46px] items-center mb-2">
+              {benefits.map(b => (
+                <span
+                  key={b}
+                  className="inline-flex items-center gap-1.5 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 px-2.5 py-1 rounded-xl text-xs font-bold"
+                >
+                  <Check size={12} className="text-teal-600 dark:text-teal-400" />
+                  {b}
+                  <button
+                    type="button"
+                    onClick={() => removeBenefitTag(b)}
+                    className="hover:text-red-500 font-bold ml-0.5 cursor-pointer"
+                    title="Remover benefício"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {benefits.length === 0 && (
+                <span className="text-xs text-gray-400 italic">Nenhum benefício selecionado ainda. Escolha nas sugestões ou adicione abaixo:</span>
+              )}
+            </div>
+
+            {/* Sugestões Rápidas de Benefícios Populares */}
+            <div className="flex flex-wrap gap-1.5 mb-2 max-h-24 overflow-y-auto p-1">
+              {STANDARD_BENEFITS.slice(0, 14).map(b => {
+                const isSelected = benefits.includes(b);
                 return (
                   <button
                     key={b}
                     type="button"
                     onClick={() => toggleBenefit(b)}
-                    className={`text-xs px-2.5 py-1 rounded-xl border transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${
-                      checked
-                        ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-700 shadow-xs'
-                        : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 border-gray-200 dark:border-slate-700 hover:border-teal-400'
+                    className={`text-[11px] px-2 py-0.5 rounded-lg border transition-all cursor-pointer font-medium ${
+                      isSelected
+                        ? 'bg-teal-600 text-white border-teal-600 font-bold shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-teal-500 hover:text-teal-600'
                     }`}
                   >
-                    {checked ? <Check size={13} className="text-teal-600 dark:text-teal-400" /> : <span className="text-gray-300">+</span>}
-                    {b}
+                    {isSelected ? '✓ ' : '+ '}{b}
                   </button>
                 );
               })}
             </div>
+
+            {/* Caixa de Pesquisa e Adição Inteligente de Benefícios */}
+            <BenefitCombobox
+              benefitsList={benefits}
+              onAddBenefit={addBenefitTag}
+            />
           </div>
 
           {/* Descrição e Responsabilidades */}
