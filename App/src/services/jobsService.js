@@ -498,16 +498,103 @@ export async function applyToJob(jobId, user) {
   return { success: true, application: newApp };
 }
 
+
+/**
+ * Sanitizador contra artefatos de encoding (mojibake)
+ */
+export function sanitizeMojibake(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/T[├\u251c][®\u00ae]?cnico/gi, 'Técnico')
+    .replace(/T[é\u00e9]cnico/gi, 'Técnico')
+    .replace(/t[é\u00e9]cnic([ao])/gi, 'técnic$1')
+    .replace(/An[├\u251c][í\u00ed]lise/gi, 'Análise')
+    .replace(/An[á\u00e1]lise/gi, 'Análise')
+    .replace(/Ivaipor[├\u251c][ú\u00fa]/gi, 'Ivaiporã')
+    .replace(/Arapu[├\u251c][ú\u00fa]/gi, 'Arapuã')
+    .replace(/Iva[├\u251c][¡\u00a1]/gi, 'Ivaí')
+    .replace(/c[├\u251c][│\u2502]digo/gi, 'código')
+    .replace(/neg[├\u251c][│\u2502]cios/gi, 'negócios')
+    .replace(/pr[├\u251c][í\u00ed]tic([ao]s?)/gi, 'prátic$1')
+    .replace(/avalia[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'avaliação')
+    .replace(/Programa[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'Programação')
+    .replace(/Informa[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'Informação')
+    .replace(/Inform[├\u251c][í\u00ed]tica/gi, 'Informática')
+    .replace(/contrata[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'contratação')
+    .replace(/evolu[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'evolução')
+    .replace(/resolu[├\u251c][º\u00ba][├\u251c][ú\u00fa]/gi, 'resolução')
+    .replace(/lideran[├\u251c][º\u00ba]a/gi, 'liderança')
+    .replace(/avan[├\u251c][º\u00ba]ada/gi, 'avançada')
+    .replace(/experi[├\u251c][¬\u00ac]ncia/gi, 'experiência')
+    .replace(/est[├\u251c][í\u00ed]gio/gi, 'estágio')
+    .replace(/est[├\u251c][®\u00ae]tico/gi, 'estético')
+    .replace(/memor[├\u251c][í\u00ed]veis/gi, 'memoráveis')
+    .replace(/Conclu[├\u251c][¡\u00a1]do/gi, 'Concluído')
+    .replace(/dom[├\u251c][¡\u00a1]nio/gi, 'domínio')
+    .replace(/racioc[├\u251c][¡\u00a1]nio/gi, 'raciocínio')
+    .replace(/curr[├\u251c][í\u00ed]culo/gi, 'currículo')
+    .replace(/pedag[├\u251c][│\u2502]gico/gi, 'pedagógico')
+    .replace(/[├\u251c][│\u2502]timo/gi, 'ótimo')
+    .replace(/N[├\u251c][ú\u00fa]o/gi, 'Não')
+    .replace(/n[├\u251c][ú\u00fa]o/gi, 'não')
+    .replace(/Gr[├\u251c][í\u00ed]fico/gi, 'Gráfico')
+    .replace(/Prof[┬\u252c][¬\u00ac]\.?/gi, 'Profª.')
+    .replace(/Andr[├\u251c][®\u00ae]/gi, 'André')
+    .replace(/Patr[├\u251c][¡\u00a1]cia/gi, 'Patrícia')
+    .replace(/C[├\u251c][│\u2502]pia/gi, 'Cópia');
+}
+
+export function deepSanitizeMojibake(obj) {
+  if (!obj) return obj;
+  if (typeof obj === 'string') return sanitizeMojibake(obj);
+  if (Array.isArray(obj)) return obj.map(deepSanitizeMojibake);
+  if (typeof obj === 'object') {
+    const res = {};
+    for (const key of Object.keys(obj)) {
+      res[key] = deepSanitizeMojibake(obj[key]);
+    }
+    return res;
+  }
+  return obj;
+}
+
+export function sanitizeStageItem(stage) {
+  if (!stage || typeof stage !== 'object') return stage;
+  let name = sanitizeMojibake(stage.name || '');
+  let description = sanitizeMojibake(stage.description || '');
+
+  if (stage.id === 'desafio' && (name.toLowerCase().includes('desafio') || name.toLowerCase().includes('t') || name.toLowerCase().includes('cnico'))) {
+    name = 'Desafio Técnico';
+  } else if (stage.id === 'analise') {
+    name = 'Em Análise';
+  } else if (stage.id === 'triagem') {
+    name = 'Triagem / Novos';
+  } else if (stage.id === 'entrevista') {
+    name = 'Entrevista Agendada';
+  } else if (stage.id === 'aprovado') {
+    name = 'Aprovados';
+    description = 'Candidatos que passaram na entrevista';
+  } else if (stage.id === 'reprovado') {
+    name = 'Banco de Talentos';
+  }
+
+  return {
+    ...stage,
+    name,
+    description
+  };
+}
+
 export const STORAGE_KEY_JOB_CANDIDATES = 'ivai_conecta_job_candidates_map';
 export const STORAGE_KEY_COMPANY_CUSTOM_STAGES = 'ivai_conecta_custom_stages';
 
 export const SELECTION_STAGES = [
   { id: 'triagem', name: 'Triagem / Novos', color: 'blue', description: 'Candidaturas recebidas recentemente' },
-  { id: 'analise', name: 'Em An├ílise', color: 'amber', description: 'Curr├¡culo em avalia├º├úo detalhada' },
+  { id: 'analise', name: 'Em Análise', color: 'amber', description: 'Currículo em avaliação detalhada' },
   { id: 'entrevista', name: 'Entrevista Agendada', color: 'purple', description: 'Entrevista marcada ou em andamento' },
-  { id: 'desafio', name: 'Desafio T├®cnico', color: 'indigo', description: 'Teste pr├ítico ou case de neg├│cios' },
+  { id: 'desafio', name: 'Desafio Técnico', color: 'indigo', description: 'Teste prático ou case de negócios' },
   { id: 'aprovado', name: 'Aprovados', color: 'emerald', description: 'Candidatos que passaram na entrevista' },
-  { id: 'reprovado', name: 'Banco de Talentos', color: 'slate', description: 'N├úo aprovado nesta vaga / mantido no banco' },
+  { id: 'reprovado', name: 'Banco de Talentos', color: 'slate', description: 'Não aprovado nesta vaga / mantido no banco' },
 ];
 
 export const INITIAL_JOB_CANDIDATES = {
@@ -515,10 +602,10 @@ export const INITIAL_JOB_CANDIDATES = {
     {
       id: 1,
       name: 'Lucas Eduardo Silva',
-      course: 'An├ílise e Desenvolvimento de Sistemas',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: '5┬║ Semestre',
-      city: 'Ivaipor├ú',
+      course: 'Análise e Desenvolvimento de Sistemas',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '5º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       matchScore: 95,
       stage: 'entrevista',
@@ -528,7 +615,7 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'IFPR-2024-8891',
       rating: 5,
-      notes: 'Excelente dom├¡nio de React, Tailwind e Git. Apresentou o projeto do Iva├¡ Conecta no GitHub com c├│digo limpo e arquitetura bem estruturada. Parecer pedag├│gico positivo do Prof. Ronan.',
+      notes: 'Excelente domínio de React, Tailwind e Git. Apresentou o projeto do Ivaí Conecta no GitHub com código limpo e arquitetura bem estruturada. Parecer pedagógico positivo do Prof. Ronan.',
       interview: {
         date: '2026-08-28',
         time: '14:30',
@@ -538,22 +625,22 @@ export const INITIAL_JOB_CANDIDATES = {
       },
       skills: ['React', 'JavaScript', 'HTML5/CSS3', 'Git', 'Node.js', 'SQL'],
       endorsements: [
-        { profName: 'Prof. Dr. Ronan Silva', institution: 'IFPR Campus Ivaipor├ú', discipline: 'Programa├º├úo de Computadores', quote: 'Excelente aluno, destaque na resolu├º├úo de algoritmos e desenvolvimento pr├ítico.' },
-        { profName: 'Prof. Dr. Ricardo Oliveira', institution: 'IFPR Campus Ivaipor├ú', discipline: 'Desenvolvimento Web', quote: 'Profissional exemplar, com ├│timo racioc├¡nio l├│gico e lideran├ºa em projetos pr├íticos.' }
+        { profName: 'Prof. Dr. Ronan Silva', institution: 'IFPR Campus Ivaiporã', discipline: 'Programação de Computadores', quote: 'Excelente aluno, destaque na resolução de algoritmos e desenvolvimento prático.' },
+        { profName: 'Prof. Dr. Ricardo Oliveira', institution: 'IFPR Campus Ivaiporã', discipline: 'Desenvolvimento Web', quote: 'Profissional exemplar, com ótimo raciocínio lógico e liderança em projetos práticos.' }
       ],
       activity: [
-        { date: '16/08/2026 14:30', text: 'Candidatura submetida via Iva├¡ Conecta' },
+        { date: '16/08/2026 14:30', text: 'Candidatura submetida via Ivaí Conecta' },
         { date: '17/08/2026 10:15', text: 'Triagem realizada pelo RH' },
-        { date: '19/08/2026 16:00', text: 'Entrevista t├®cnica agendada com o Tech Lead via Google Meet' }
+        { date: '19/08/2026 16:00', text: 'Entrevista técnica agendada com o Tech Lead via Google Meet' }
       ]
     },
     {
       id: 2,
       name: 'Juliana Aparecida Melo',
-      course: 'An├ílise e Desenvolvimento de Sistemas',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: '3┬║ Semestre',
-      city: 'Ivaipor├ú',
+      course: 'Análise e Desenvolvimento de Sistemas',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '3º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250',
       matchScore: 89,
       stage: 'desafio',
@@ -563,16 +650,16 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'IFPR-2024-3312',
       rating: 4,
-      notes: 'Boa desenvoltura em l├│gica de programa├º├úo e componentes React. Enviado o desafio pr├ítico de consumo de API de produtos.',
+      notes: 'Boa desenvoltura em lógica de programação e componentes React. Enviado o desafio prático de consumo de API de produtos.',
       interview: null,
       skills: ['JavaScript', 'React', 'HTML5/CSS3', 'Git', 'Figma'],
       endorsements: [
-        { profName: 'Prof┬¬. Ma. Amanda Costa', institution: 'IFPR Campus Ivaipor├ú', discipline: 'Engenharia de Software', quote: 'Aluna muito focada em boas pr├íticas de c├│digo e testes automatizados.' }
+        { profName: 'Profª. Ma. Amanda Costa', institution: 'IFPR Campus Ivaiporã', discipline: 'Engenharia de Software', quote: 'Aluna muito focada em boas práticas de código e testes automatizados.' }
       ],
       activity: [
         { date: '17/08/2026 11:20', text: 'Candidatura submetida' },
         { date: '18/08/2026 15:45', text: 'Triagem realizada' },
-        { date: '21/08/2026 10:00', text: 'Desafio t├®cnico de React enviado por e-mail com prazo de 5 dias' }
+        { date: '21/08/2026 10:00', text: 'Desafio técnico de React enviado por e-mail com prazo de 5 dias' }
       ]
     },
     {
@@ -580,8 +667,8 @@ export const INITIAL_JOB_CANDIDATES = {
       name: 'Rafael Gomes Costa',
       course: 'Engenharia de Software',
       institution: 'UENP',
-      period: '6┬║ Semestre',
-      city: 'Ivaipor├ú',
+      period: '6º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
       matchScore: 86,
       stage: 'analise',
@@ -595,17 +682,17 @@ export const INITIAL_JOB_CANDIDATES = {
       interview: null,
       skills: ['Python', 'REST APIs', 'Git', 'JavaScript', 'SQL', 'Docker'],
       endorsements: [
-        { profName: 'Prof. Dr. Andr├® Luciano', institution: 'UENP', discipline: 'Engenharia de Software Avan├ºada', quote: 'Rafael demonstra maturidade t├®cnica rara para um estudante.' }
+        { profName: 'Prof. Dr. André Luciano', institution: 'UENP', discipline: 'Engenharia de Software Avançada', quote: 'Rafael demonstra maturidade técnica rara para um estudante.' }
       ],
       activity: [
         { date: '18/08/2026 16:15', text: 'Candidatura submetida' },
-        { date: '20/08/2026 09:00', text: 'Perfil movido para an├ílise detalhada do Tech Lead' }
+        { date: '20/08/2026 09:00', text: 'Perfil movido para análise detalhada do Tech Lead' }
       ]
     },
     {
       id: 4,
       name: 'Camila Fernandes',
-      course: 'Design Gr├ífico & UI/UX',
+      course: 'Design Gráfico & UI/UX',
       institution: 'UENP / Unicesumar',
       period: 'Graduada',
       city: 'Manoel Ribas',
@@ -618,30 +705,30 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'UENP-2023-5510',
       rating: 5,
-      notes: 'Perfeita sintonia entre design de interfaces e front-end Tailwind/HTML. Aprovada na entrevista final, proposta de est├ígio encaminhada.',
+      notes: 'Perfeita sintonia entre design de interfaces e front-end Tailwind/HTML. Aprovada na entrevista final, proposta de estágio encaminhada.',
       interview: {
         date: '2026-08-20',
         time: '10:00',
         format: 'Presencial',
-        link: 'Av. Brasil, 800 - Ivaipor├ú',
+        link: 'Av. Brasil, 800 - Ivaiporã',
         notes: 'Entrevista de alinhamento com Diretoria'
       },
       skills: ['Figma', 'UI/UX Design', 'HTML5/CSS3', 'Branding', 'Tailwind'],
       endorsements: [
-        { profName: 'Prof┬¬. Dra. Vanessa Martins', institution: 'UENP', discipline: 'Identidade Visual & UX/UI', quote: 'Camila possui um olhar est├®tico apurado e cria identidades visuais memor├íveis.' }
+        { profName: 'Profª. Dra. Vanessa Martins', institution: 'UENP', discipline: 'Identidade Visual & UX/UI', quote: 'Camila possui um olhar estético apurado e cria identidades visuais memoráveis.' }
       ],
       activity: [
         { date: '15/08/2026 08:30', text: 'Candidatura recebida' },
-        { date: '17/08/2026 11:00', text: 'Entrevista t├®cnica realizada com sucesso' },
-        { date: '22/08/2026 17:00', text: 'Candidata aprovada! Proposta de contrata├º├úo formalizada' }
+        { date: '17/08/2026 11:00', text: 'Entrevista técnica realizada com sucesso' },
+        { date: '22/08/2026 17:00', text: 'Candidata aprovada! Proposta de contratação formalizada' }
       ]
     },
     {
       id: 5,
       name: 'Gabriel Augusto Lima',
-      course: 'Sistemas de Informa├º├úo',
-      institution: 'Univale Ivaipor├ú',
-      period: '3┬║ Semestre',
+      course: 'Sistemas de Informação',
+      institution: 'Univale Ivaiporã',
+      period: '3º Semestre',
       city: 'Jardim Alegre',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
       matchScore: 75,
@@ -663,10 +750,10 @@ export const INITIAL_JOB_CANDIDATES = {
     {
       id: 6,
       name: 'Lucas Vinicius Prado',
-      course: 'T├®cnico em Inform├ítica',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: 'Conclu├¡do',
-      city: 'Ivaipor├ú',
+      course: 'Técnico em Informática',
+      institution: 'IFPR Campus Ivaiporã',
+      period: 'Concluído',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=250',
       matchScore: 64,
       stage: 'reprovado',
@@ -676,9 +763,9 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: false,
       raNumber: '',
       rating: 2,
-      notes: 'N├úo possui experi├¬ncia suficiente com React nesta etapa. Adicionado ao banco de talentos para futuras oportunidades de suporte e WordPress.',
+      notes: 'Não possui experiência suficiente com React nesta etapa. Adicionado ao banco de talentos para futuras oportunidades de suporte e WordPress.',
       interview: null,
-      skills: ['WordPress', 'HTML5/CSS3', 'Suporte T├®cnico'],
+      skills: ['WordPress', 'HTML5/CSS3', 'Suporte Técnico'],
       endorsements: [],
       activity: [
         { date: '14/08/2026 19:00', text: 'Candidatura recebida' },
@@ -688,10 +775,10 @@ export const INITIAL_JOB_CANDIDATES = {
     {
       id: 7,
       name: 'Mariana Azevedo',
-      course: 'Sistemas de Informa├º├úo',
-      institution: 'Univale Ivaipor├ú',
-      period: '6┬║ Semestre',
-      city: 'Ivaipor├ú',
+      course: 'Sistemas de Informação',
+      institution: 'Univale Ivaiporã',
+      period: '6º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
       matchScore: 92,
       stage: 'triagem',
@@ -706,16 +793,16 @@ export const INITIAL_JOB_CANDIDATES = {
       skills: ['Vue.js', 'React', 'Git', 'CSS3'],
       endorsements: [],
       activity: [
-        { date: '25/08/2026 09:30', text: 'Candidatura submetida via Iva├¡ Conecta' }
+        { date: '25/08/2026 09:30', text: 'Candidatura submetida via Ivaí Conecta' }
       ]
     },
     {
       id: 8,
       name: 'Fernando Rocha',
-      course: 'T├®cnico em Inform├ítica',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: '4┬║ Semestre',
-      city: 'Arapu├ú',
+      course: 'Técnico em Informática',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '4º Semestre',
+      city: 'Arapuã',
       avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=250',
       matchScore: 78,
       stage: 'analise',
@@ -730,17 +817,17 @@ export const INITIAL_JOB_CANDIDATES = {
       skills: ['Linux', 'Redes', 'JavaScript', 'HTML5'],
       endorsements: [],
       activity: [
-        { date: '24/08/2026 14:00', text: 'Candidatura submetida via Iva├¡ Conecta' },
+        { date: '24/08/2026 14:00', text: 'Candidatura submetida via Ivaí Conecta' },
         { date: '26/08/2026 10:15', text: 'Triagem realizada pelo RH' }
       ]
     },
     {
       id: 9,
-      name: 'Patr├¡cia Souza',
-      course: 'An├ílise e Desenvolvimento de Sistemas',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: '2┬║ Semestre',
-      city: 'Ivaipor├ú',
+      name: 'Patrícia Souza',
+      course: 'Análise e Desenvolvimento de Sistemas',
+      institution: 'IFPR Campus Ivaiporã',
+      period: '2º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250',
       matchScore: 85,
       stage: 'triagem',
@@ -750,12 +837,12 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'IFPR-2026-0123',
       rating: 4,
-      notes: 'Iniciante muito focada, projetos no GitHub mostram boa evolu├º├úo.',
+      notes: 'Iniciante muito focada, projetos no GitHub mostram boa evolução.',
       interview: null,
       skills: ['JavaScript', 'HTML', 'CSS', 'Figma'],
       endorsements: [],
       activity: [
-        { date: '27/08/2026 11:20', text: 'Candidatura submetida via Iva├¡ Conecta' }
+        { date: '27/08/2026 11:20', text: 'Candidatura submetida via Ivaí Conecta' }
       ]
     },
     {
@@ -763,8 +850,8 @@ export const INITIAL_JOB_CANDIDATES = {
       name: 'Thiago Mendes',
       course: 'Engenharia de Software',
       institution: 'UENP',
-      period: '8┬║ Semestre',
-      city: 'Ivaipor├ú',
+      period: '8º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=250',
       matchScore: 94,
       stage: 'entrevista',
@@ -774,7 +861,7 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'UENP-2022-0998',
       rating: 5,
-      notes: 'Excelente curr├¡culo. Tem experi├¬ncia pr├®via como freelancer.',
+      notes: 'Excelente currículo. Tem experiência prévia como freelancer.',
       interview: {
         date: '2026-08-30',
         time: '15:00',
@@ -784,11 +871,11 @@ export const INITIAL_JOB_CANDIDATES = {
       },
       skills: ['React', 'Node.js', 'PostgreSQL', 'Docker', 'AWS'],
       endorsements: [
-        { profName: 'Prof. Dr. Ricardo Silva', institution: 'UENP', discipline: 'Projeto Integrador', quote: 'L├¡der t├®cnico nato. Excelente comunica├º├úo e resolu├º├úo de problemas complexos.' }
+        { profName: 'Prof. Dr. Ricardo Silva', institution: 'UENP', discipline: 'Projeto Integrador', quote: 'Líder técnico nato. Excelente comunicação e resolução de problemas complexos.' }
       ],
       activity: [
-        { date: '21/08/2026 09:00', text: 'Candidatura submetida via Iva├¡ Conecta' },
-        { date: '23/08/2026 14:00', text: 'Entrevista t├®cnica agendada' }
+        { date: '21/08/2026 09:00', text: 'Candidatura submetida via Ivaí Conecta' },
+        { date: '23/08/2026 14:00', text: 'Entrevista técnica agendada' }
       ]
     }
   ],
@@ -796,9 +883,9 @@ export const INITIAL_JOB_CANDIDATES = {
     {
       id: 2,
       name: 'Beatriz Santos',
-      course: 'Administra├º├úo',
-      institution: 'Univale Ivaipor├ú',
-      period: '7┬║ Semestre',
+      course: 'Administração',
+      institution: 'Univale Ivaiporã',
+      period: '7º Semestre',
       city: 'Jardim Alegre',
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
       matchScore: 96,
@@ -809,20 +896,20 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'UNIVALE-2023-4122',
       rating: 5,
-      notes: 'Destaque acad├¬mico em Gest├úo Financeira e Excel Avan├ºado. Experi├¬ncia s├│lida em concilia├º├úo banc├íria e sistemas ERP.',
+      notes: 'Destaque acadêmico em Gestão Financeira e Excel Avançado. Experiência sólida em conciliação bancária e sistemas ERP.',
       interview: {
         date: '2026-08-27',
         time: '09:00',
         format: 'Presencial',
-        link: 'Sede da Cooperativa - Ivaipor├ú',
+        link: 'Sede da Cooperativa - Ivaiporã',
         notes: 'Entrevista com o Gerente Administrativo'
       },
-      skills: ['Gest├úo Financeira', 'Excel Avan├ºado', 'ERP', 'Atendimento ao Cliente', 'Marketing Digital'],
+      skills: ['Gestão Financeira', 'Excel Avançado', 'ERP', 'Atendimento ao Cliente', 'Marketing Digital'],
       endorsements: [
-        { profName: 'Prof. Carlos Alberto Ramos', institution: 'Univale Ivaipor├ú', discipline: 'Gest├úo Financeira e Or├ºament├íria', quote: 'Extremamente dedicada, respons├ível e proativa na solu├º├úo de casos de gest├úo empresarial.' }
+        { profName: 'Prof. Carlos Alberto Ramos', institution: 'Univale Ivaiporã', discipline: 'Gestão Financeira e Orçamentária', quote: 'Extremamente dedicada, responsável e proativa na solução de casos de gestão empresarial.' }
       ],
       activity: [
-        { date: '12/08/2026 10:00', text: 'Candidatura recebida via Iva├¡ Conecta' },
+        { date: '12/08/2026 10:00', text: 'Candidatura recebida via Ivaí Conecta' },
         { date: '14/08/2026 15:30', text: 'Entrevista presencial agendada' }
       ]
     },
@@ -830,9 +917,9 @@ export const INITIAL_JOB_CANDIDATES = {
       id: 7,
       name: 'Larissa de Oliveira',
       course: 'Processos Gerenciais',
-      institution: 'Univale Ivaipor├ú',
-      period: '4┬║ Semestre',
-      city: 'Ivaipor├ú',
+      institution: 'Univale Ivaiporã',
+      period: '4º Semestre',
+      city: 'Ivaiporã',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       matchScore: 84,
       stage: 'analise',
@@ -842,9 +929,9 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'UNIVALE-2024-8821',
       rating: 4,
-      notes: 'Boa experi├¬ncia pr├®via em emiss├úo de notas fiscais e atendimento.',
+      notes: 'Boa experiência prévia em emissão de notas fiscais e atendimento.',
       interview: null,
-      skills: ['Excel Avan├ºado', 'Gest├úo Financeira', 'Atendimento ao Cliente'],
+      skills: ['Excel Avançado', 'Gestão Financeira', 'Atendimento ao Cliente'],
       endorsements: [],
       activity: [
         { date: '14/08/2026 14:20', text: 'Candidatura recebida' }
@@ -855,10 +942,10 @@ export const INITIAL_JOB_CANDIDATES = {
     {
       id: 3,
       name: 'Matheus Henrique',
-      course: 'T├®cnico em Eletrot├®cnica',
-      institution: 'IFPR Campus Ivaipor├ú',
-      period: 'Conclu├¡do',
-      city: 'S├úo Jo├úo do Iva├¡',
+      course: 'Técnico em Eletrotécnica',
+      institution: 'IFPR Campus Ivaiporã',
+      period: 'Concluído',
+      city: 'São João do Ivaí',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
       matchScore: 98,
       stage: 'entrevista',
@@ -868,21 +955,21 @@ export const INITIAL_JOB_CANDIDATES = {
       isVerifiedStudent: true,
       raNumber: 'IFPR-2024-9912',
       rating: 5,
-      notes: 'Certifica├º├úo NR-10 em dia, dom├¡nio pleno de comandos el├®tricos industriais e automa├º├úo com CLPs.',
+      notes: 'Certificação NR-10 em dia, domínio pleno de comandos elétricos industriais e automação com CLPs.',
       interview: {
         date: '2026-08-29',
         time: '10:30',
         format: 'Presencial',
-        link: 'F├íbrica - S├úo Jo├úo do Iva├¡',
-        notes: 'Teste pr├ítico de bancada e entrevista de seguran├ºa'
+        link: 'Fábrica - São João do Ivaí',
+        notes: 'Teste prático de bancada e entrevista de segurança'
       },
-      skills: ['Instala├º├Áes El├®tricas', 'Automa├º├úo Industrial', 'Comandos El├®tricos', 'AutoCAD', 'NR-10'],
+      skills: ['Instalações Elétricas', 'Automação Industrial', 'Comandos Elétricos', 'AutoCAD', 'NR-10'],
       endorsements: [
-        { profName: 'Prof. Eng. Fernando Souza', institution: 'IFPR Campus Ivaipor├ú', discipline: 'Instala├º├Áes El├®tricas Industriais', quote: 'Profissional t├®cnico com excelente vis├úo de seguran├ºa e precis├úo em diagramas unifilares.' }
+        { profName: 'Prof. Eng. Fernando Souza', institution: 'IFPR Campus Ivaiporã', discipline: 'Instalações Elétricas Industriais', quote: 'Profissional técnico com excelente visão de segurança e precisão em diagramas unifilares.' }
       ],
       activity: [
         { date: '13/08/2026 11:00', text: 'Candidatura submetida' },
-        { date: '15/08/2026 16:00', text: 'Entrevista na f├íbrica agendada' }
+        { date: '15/08/2026 16:00', text: 'Entrevista na fábrica agendada' }
       ]
     }
   ]
@@ -899,6 +986,7 @@ export function getAllJobCandidatesMap() {
   }
   
   if (parsed && typeof parsed === 'object') {
+    parsed = deepSanitizeMojibake(parsed);
     let updated = false;
     Object.keys(INITIAL_JOB_CANDIDATES).forEach(jobId => {
       if (!parsed[jobId]) {
@@ -925,22 +1013,83 @@ export function getAllJobCandidatesMap() {
 
 export function getJobCandidates(jobId) {
   const map = getAllJobCandidatesMap();
-  const list = map[jobId] || map[Number(jobId)] || [];
-  if (list.length === 0 && INITIAL_JOB_CANDIDATES[jobId]) {
-    return INITIAL_JOB_CANDIDATES[jobId];
+  const idStr = String(jobId || '');
+  let list = map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null) || [];
+  list = deepSanitizeMojibake(list);
+
+  // 1. Incorpora candidaturas reais gravadas no sistema (Firestore / LocalStorage)
+  try {
+    const allApps = getUserApplications();
+    const jobApps = allApps.filter(a => String(a.jobId) === idStr || (jobId && a.jobId == jobId));
+    if (jobApps.length > 0) {
+      const merged = [...list];
+      jobApps.forEach(app => {
+        const candId = app.id || app.candidateUid;
+        if (!merged.find(c => String(c.id) === String(candId))) {
+          const stageMap = {
+            'Candidatura Enviada': 'triagem',
+            'Triagem de Currículo': 'analise',
+            'Entrevista': 'entrevista',
+            'Desafio Técnico': 'desafio',
+            'Aprovado': 'aprovado',
+            'Proposta / Admissão': 'aprovado',
+            'Banco de Talentos': 'reprovado'
+          };
+          merged.push({
+            id: candId,
+            firestoreApplicationId: app.firestoreId || app.id,
+            name: app.candidateName || 'Candidato Ivaí Conecta',
+            course: app.candidateCourse || 'Análise e Desenvolvimento de Sistemas',
+            institution: app.candidateInstitution || 'IFPR Campus Ivaiporã',
+            city: app.candidateCity || 'Ivaiporã',
+            avatar: app.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            matchScore: app.matchScore || 90,
+            stage: app.stage || stageMap[app.status] || 'triagem',
+            appliedAt: app.appliedAt || new Date().toLocaleDateString('pt-BR'),
+            phone: app.candidatePhone || '5543999887766',
+            email: app.candidateEmail || 'candidato@ivaiconecta.com.br',
+            isVerifiedStudent: app.isVerifiedStudent ?? true,
+            rating: app.rating || 4,
+            notes: app.notes || app.nextStepNote || 'Candidatura realizada através do portal.',
+            skills: Array.isArray(app.skills) && app.skills.length > 0 ? app.skills : ['React', 'JavaScript', 'Git'],
+            activity: app.activity || [
+              { date: app.appliedAt || 'Hoje', text: 'Candidatura submetida via Ivaí Conecta' }
+            ],
+            interview: app.interview || null,
+            endorsements: app.endorsements || []
+          });
+        }
+      });
+      list = merged;
+    }
+  } catch {}
+
+  // 2. Se a lista ainda estiver vazia (vaga recém-criada em modo de teste),
+  // disponibiliza candidatos de demonstração para a empresa poder testar as etapas
+  if (list.length === 0) {
+    if (INITIAL_JOB_CANDIDATES[jobId]) {
+      return deepSanitizeMojibake(INITIAL_JOB_CANDIDATES[jobId]);
+    }
+    const sample = INITIAL_JOB_CANDIDATES[101] || [];
+    return deepSanitizeMojibake(sample.map(c => ({ ...c, jobId: idStr })));
   }
+
   return list;
 }
 
 export function updateCandidateStage(jobId, candidateId, newStage) {
   const map = { ...getAllJobCandidatesMap() };
-  const currentList = map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [];
+  const idStr = String(jobId || '');
+  let currentList = map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null);
+  if (!currentList || currentList.length === 0) {
+    currentList = getJobCandidates(jobId);
+  }
   
   const stageNameMap = {
     triagem: 'Triagem / Novos',
-    analise: 'Em An├ílise',
+    analise: 'Em Análise',
     entrevista: 'Entrevista Agendada',
-    desafio: 'Desafio T├®cnico',
+    desafio: 'Desafio Técnico',
     aprovado: 'Aprovados',
     reprovado: 'Banco de Talentos'
   };
@@ -951,12 +1100,27 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
         ...(cand.activity || []),
         { date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), text: `Candidato movido para a etapa: ${stageNameMap[newStage] || newStage}` }
       ];
+
+      // Sincroniza em background no Firestore caso seja uma aplicação real
+      const appDocId = cand.firestoreApplicationId || cand.id;
+      if (appDocId) {
+        try {
+          updateDoc(doc(db, 'applications', String(appDocId)), {
+            stage: newStage,
+            status: stageNameMap[newStage] || newStage,
+            updatedAt: new Date().toISOString()
+          }).catch(() => {});
+        } catch {}
+      }
+
       return { ...cand, stage: newStage, activity: newActivity };
     }
     return cand;
   });
 
   map[jobId] = updatedList;
+  if (idStr) map[idStr] = updatedList;
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
@@ -965,7 +1129,8 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
 
 export function reorderCandidateStage(jobId, candidateId, targetCandidateId, newStage) {
   const map = { ...getAllJobCandidatesMap() };
-  const currentList = [...(map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [])];
+  const idStr = String(jobId || '');
+  let currentList = [...(map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null) || getJobCandidates(jobId))];
   
   const draggedIndex = currentList.findIndex(c => String(c.id) === String(candidateId));
   if (draggedIndex === -1) return currentList;
@@ -985,6 +1150,8 @@ export function reorderCandidateStage(jobId, candidateId, targetCandidateId, new
   }
 
   map[jobId] = currentList;
+  if (idStr) map[idStr] = currentList;
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
@@ -993,7 +1160,8 @@ export function reorderCandidateStage(jobId, candidateId, targetCandidateId, new
 
 export function updateCandidateData(jobId, candidateId, patchData) {
   const map = { ...getAllJobCandidatesMap() };
-  const currentList = map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [];
+  const idStr = String(jobId || '');
+  let currentList = map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null) || getJobCandidates(jobId);
 
   const updatedList = currentList.map(cand => {
     if (cand.id === candidateId || String(cand.id) === String(candidateId)) {
@@ -1003,6 +1171,8 @@ export function updateCandidateData(jobId, candidateId, patchData) {
   });
 
   map[jobId] = updatedList;
+  if (idStr) map[idStr] = updatedList;
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
@@ -1011,14 +1181,27 @@ export function updateCandidateData(jobId, candidateId, patchData) {
 
 export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
   const map = { ...getAllJobCandidatesMap() };
-  const currentList = map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [];
+  const idStr = String(jobId || '');
+  let currentList = map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null) || getJobCandidates(jobId);
 
   const updatedList = currentList.map(cand => {
     if (cand.id === candidateId || String(cand.id) === String(candidateId)) {
       const newActivity = [
         ...(cand.activity || []),
-        { date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), text: `Entrevista agendada para ${interviewData.date} ├ás ${interviewData.time} (${interviewData.format})` }
+        { date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), text: `Entrevista agendada para ${interviewData.date} às ${interviewData.time} (${interviewData.format})` }
       ];
+
+      const appDocId = cand.firestoreApplicationId || cand.id;
+      if (appDocId) {
+        try {
+          updateDoc(doc(db, 'applications', String(appDocId)), {
+            stage: 'entrevista',
+            interview: interviewData,
+            updatedAt: new Date().toISOString()
+          }).catch(() => {});
+        } catch {}
+      }
+
       return {
         ...cand,
         stage: 'entrevista',
@@ -1030,6 +1213,8 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
   });
 
   map[jobId] = updatedList;
+  if (idStr) map[idStr] = updatedList;
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
@@ -1038,8 +1223,9 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
 
 export function updateJob(jobId, patchData) {
   const jobs = getJobs('Todas as Cidades');
+  const idStr = String(jobId);
   const updated = jobs.map(j => {
-    if (j.id === Number(jobId) || j.id === jobId || String(j.id) === String(jobId)) {
+    if (j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr)) {
       const updatedJob = { ...j, ...patchData, updatedAt: new Date().toLocaleDateString('pt-BR') };
       if (j.firestoreId) {
         try {
@@ -1061,12 +1247,12 @@ export function duplicateJob(jobId) {
   if (!job) return null;
   const newJob = {
     ...job,
-    id: Date.now(),
     title: `${job.title} (Cópia)`,
     createdAt: new Date().toLocaleDateString('pt-BR'),
     status: 'Ativa',
     applicantsCount: 0
   };
+  delete newJob.id;
   delete newJob.firestoreId;
   return addJob(newJob);
 }
@@ -1079,7 +1265,15 @@ export function getAllJobCustomStagesMap() {
     const raw = localStorage.getItem(STORAGE_KEY_JOB_CUSTOM_STAGES);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') return parsed;
+      if (parsed && typeof parsed === 'object') {
+        const cleaned = {};
+        for (const k of Object.keys(parsed)) {
+          if (Array.isArray(parsed[k])) {
+            cleaned[k] = parsed[k].map(sanitizeStageItem);
+          }
+        }
+        return cleaned;
+      }
     }
   } catch {}
   return {};
@@ -1103,14 +1297,8 @@ export function getJobCustomStages(jobId) {
     }
   }
 
-  if (stagesToReturn) {
-    stagesToReturn.forEach(s => {
-      if (s.id === 'aprovado' && (s.name === 'Aprovado / Proposta' || s.name === 'Aprovados / Finalizados')) {
-        s.name = 'Aprovados';
-        s.description = 'Candidatos que passaram na entrevista';
-      }
-    });
-    return stagesToReturn;
+  if (stagesToReturn && Array.isArray(stagesToReturn)) {
+    return stagesToReturn.map(sanitizeStageItem);
   }
 
   // 3. Fallback to default company stages
@@ -1119,48 +1307,49 @@ export function getJobCustomStages(jobId) {
 
 export function saveJobCustomStages(jobId, stages) {
   if (!jobId || !Array.isArray(stages)) return stages;
+  const cleaned = stages.map(sanitizeStageItem);
 
   // 1. Save in map
   if (typeof localStorage !== 'undefined') {
     try {
       const map = { ...getAllJobCustomStagesMap() };
-      map[jobId] = stages;
-      map[String(jobId)] = stages;
+      map[jobId] = cleaned;
+      map[String(jobId)] = cleaned;
       localStorage.setItem(STORAGE_KEY_JOB_CUSTOM_STAGES, JSON.stringify(map));
     } catch {}
   }
 
   // 2. Save in job item
-  updateJob(jobId, { customStages: stages });
+  updateJob(jobId, { customStages: cleaned });
 
-  return stages;
+  return cleaned;
 }
 
 export function getCompanyCustomStages() {
-  if (typeof localStorage === 'undefined') return SELECTION_STAGES;
+  if (typeof localStorage === 'undefined') return SELECTION_STAGES.map(sanitizeStageItem);
   try {
     const raw = localStorage.getItem(STORAGE_KEY_COMPANY_CUSTOM_STAGES);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        parsed.forEach(s => {
-          if (s.id === 'aprovado' && (s.name === 'Aprovado / Proposta' || s.name === 'Aprovados / Finalizados')) {
-            s.name = 'Aprovados';
-            s.description = 'Candidatos que passaram na entrevista';
-          }
-        });
-        return parsed;
+        const cleaned = parsed.map(sanitizeStageItem);
+        if (JSON.stringify(cleaned) !== raw) {
+          localStorage.setItem(STORAGE_KEY_COMPANY_CUSTOM_STAGES, JSON.stringify(cleaned));
+        }
+        return cleaned;
       }
     }
   } catch {}
-  return SELECTION_STAGES;
+  return SELECTION_STAGES.map(sanitizeStageItem);
 }
 
 export function saveCompanyCustomStages(stages) {
+  if (!Array.isArray(stages)) return SELECTION_STAGES.map(sanitizeStageItem);
+  const cleaned = stages.map(sanitizeStageItem);
   if (typeof localStorage !== 'undefined') {
     try {
-      localStorage.setItem(STORAGE_KEY_COMPANY_CUSTOM_STAGES, JSON.stringify(stages));
+      localStorage.setItem(STORAGE_KEY_COMPANY_CUSTOM_STAGES, JSON.stringify(cleaned));
     } catch {}
   }
-  return stages;
+  return cleaned;
 }

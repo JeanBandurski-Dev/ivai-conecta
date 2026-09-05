@@ -22,6 +22,55 @@ import useAppStore from '../store/useAppStore';
 
 let isDraggingLock = false;
 
+const DEMO_COMPANY_JOBS = [
+  {
+    id: 101,
+    title: 'Desenvolvedor Front-end React',
+    company: 'ValeTech Soluções Digitais',
+    city: 'Ivaiporã',
+    type: 'Tempo Integral',
+    modality: 'Híbrido',
+    salary: 'R$ 3.500 - R$ 4.800',
+    experienceLevel: 'Júnior',
+    status: 'Ativa',
+    requiredSkills: ['React', 'JavaScript', 'TailwindCSS', 'Git', 'HTML5/CSS3'],
+    description: 'Desenvolvimento de interfaces modernas e responsivas para soluções corporativas da região do Vale do Ivaí.',
+    createdAt: '15/08/2026',
+    applicantsCount: 5
+  },
+  {
+    id: 102,
+    title: 'Assistente Administrativo & Comercial',
+    company: 'ValeTech Soluções Digitais',
+    city: 'Ivaiporã',
+    type: 'Tempo Integral',
+    modality: 'Presencial',
+    salary: 'R$ 2.400 - R$ 3.000',
+    experienceLevel: 'Júnior',
+    status: 'Ativa',
+    requiredSkills: ['Atendimento ao Cliente', 'Excel', 'Faturamento', 'Organização'],
+    description: 'Suporte à rotina administrativa e comercial, atendimento aos clientes e emissão de relatórios.',
+    createdAt: '18/08/2026',
+    applicantsCount: 3
+  },
+  {
+    id: 103,
+    title: 'Técnico de Suporte & Infraestrutura',
+    company: 'ValeTech Soluções Digitais',
+    city: 'Ivaiporã',
+    type: 'Tempo Integral',
+    modality: 'Presencial',
+    salary: 'R$ 2.200 - R$ 2.900',
+    experienceLevel: 'Júnior',
+    status: 'Ativa',
+    requiredSkills: ['Redes de Computadores', 'Hardware', 'Suporte Técnico', 'Windows'],
+    description: 'Manutenção de computadores, suporte técnico a usuários e monitoramento de redes locais.',
+    createdAt: '20/08/2026',
+    applicantsCount: 2
+  }
+];
+
+
 export default function GerenciamentoVagasEmpresa() {
   const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
@@ -62,6 +111,16 @@ export default function GerenciamentoVagasEmpresa() {
   // Selected Job for Pipeline
   const [selectedJobId, setSelectedJobId] = useState(allCompanyJobs[0]?.id || 101);
   const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || allCompanyJobs[0];
+
+  useEffect(() => {
+    if (allCompanyJobs && allCompanyJobs.length > 0) {
+      const exists = allCompanyJobs.some(j => String(j.id) === String(selectedJobId));
+      if (!exists) {
+        setSelectedJobId(allCompanyJobs[0].id);
+      }
+    }
+  }, [allCompanyJobs, selectedJobId]);
+
 
   // Pipeline View Mode: 'kanban' | 'list'
   const [viewMode, setViewMode] = useState('list');
@@ -120,11 +179,11 @@ export default function GerenciamentoVagasEmpresa() {
   });
 
   // Custom Stages State for selected job
-  const [customStages, setCustomStages] = useState(() => getJobCustomStages(currentJob?.id));
+  const [customStages, setCustomStages] = useState(() => (getJobCustomStages(currentJob?.id) || []).map(sanitizeStageItem));
 
   useEffect(() => {
     if (currentJob) {
-      setCustomStages(getJobCustomStages(currentJob.id));
+      setCustomStages((getJobCustomStages(currentJob.id) || []).map(sanitizeStageItem));
     }
   }, [currentJob?.id, selectedJobId]);
 
@@ -612,7 +671,13 @@ export default function GerenciamentoVagasEmpresa() {
   };
 
   // ── Job Actions ──
-  const handleToggleJobStatus = (jobId, currentStatus) => {
+  const handleToggleJobStatus = async (jobId, currentStatus) => {
+    const newStatus = currentStatus === 'Ativa' ? 'close' : 'reopen';
+    await updateJobStatus(jobId, newStatus);
+    showToast(newStatus === 'close' ? 'Vaga pausada/encerrada.' : 'Vaga reaberta e ativada com sucesso!');
+    forceUpdate(n => n + 1);
+  };
+  const _skipOldToggle = () => {
     const newStatus = currentStatus === 'Ativa' ? 'close' : 'reopen';
     updateJobStatus(jobId, newStatus);
     showToast(newStatus === 'close' ? 'Vaga pausada/encerrada.' : 'Vaga reaberta e ativada com sucesso!');
@@ -1090,7 +1155,7 @@ export default function GerenciamentoVagasEmpresa() {
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
-                      <span>{stage.name}</span>
+                      <span>{sanitizeStageItem(stage).name}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
                         isSelected
                           ? 'bg-white/25 text-white'
@@ -1252,7 +1317,7 @@ export default function GerenciamentoVagasEmpresa() {
 
                 {selectedStageFilter !== 'todos' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                    Etapa: {customStages.find(s => s.id === selectedStageFilter)?.name || selectedStageFilter}
+                    Etapa: {sanitizeStageItem(customStages.find(s => s.id === selectedStageFilter) || { name: selectedStageFilter }).name}
                     <button onClick={() => setSelectedStageFilter('todos')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                   </span>
                 )}
@@ -1344,7 +1409,7 @@ export default function GerenciamentoVagasEmpresa() {
                 {selectedStageFilter !== 'todos' && (
                   <div className="flex items-center justify-between bg-primary-blue/10 dark:bg-primary-blue/20 border border-primary-blue/30 rounded-2xl px-4 py-2.5 text-xs text-primary-blue font-medium">
                     <span>
-                      Filtro por etapa ativo: exibindo apenas a coluna <strong>"{customStages.find(s => s.id === selectedStageFilter)?.name || selectedStageFilter}"</strong>
+                      Filtro por etapa ativo: exibindo apenas a coluna <strong>"{sanitizeStageItem(customStages.find(s => s.id === selectedStageFilter) || { name: selectedStageFilter }).name}"</strong>
                     </span>
                     <button
                       onClick={() => setSelectedStageFilter('todos')}
