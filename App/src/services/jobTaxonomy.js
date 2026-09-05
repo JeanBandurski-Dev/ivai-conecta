@@ -301,52 +301,66 @@ export const JOB_CATEGORIES = [
   }
 ];
 
+export function escapeRegex(string) {
+  if (typeof string !== 'string') return '';
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Validação de Título Profissional de Vaga (CBO / Mercado de Trabalho)
  * Exige que o título contenha um cargo, função ou profissão de trabalho real.
  */
 export function validateJobTitle(title) {
-  if (!title || typeof title !== 'string') {
-    return { valid: false, error: 'O título do cargo é obrigatório.' };
+  try {
+    if (!title || typeof title !== 'string') {
+      return { valid: false, error: 'O título do cargo é obrigatório.' };
+    }
+
+    const clean = title.trim();
+
+    // Validação básica profissional (palavrões, tamanho, repetição)
+    const basicVal = validateProfessionalText(clean, 'Título do Cargo', 3, 75);
+    if (!basicVal.valid) {
+      return basicVal;
+    }
+
+    const norm = clean
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    // 1. Verifica se corresponde ou contém algum título padronizado oficial
+    const isExactStandard = STANDARD_JOB_TITLES.some(st => {
+      const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
+    });
+    if (isExactStandard) {
+      return { valid: true };
+    }
+
+    // 2. Verifica se contém ao menos uma palavra-chave ocupacional/CBO de trabalho
+    const hasOccupationalRole = OCCUPATIONAL_ROLE_KEYWORDS.some(kw => {
+      try {
+        const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const regex = new RegExp(`(^|\\s|\\W)${escapeRegex(normKw)}($|\\s|\\W)`, 'i');
+        return regex.test(norm) || norm.includes(normKw);
+      } catch {
+        return false;
+      }
+    });
+
+    if (hasOccupationalRole) {
+      return { valid: true };
+    }
+
+    return {
+      valid: false,
+      error: 'O título da vaga deve especificar um cargo ou profissão de trabalho legítima (ex.: "Vendedor(a)", "Desenvolvedor(a)", "Auxiliar Administrativo", "Técnico(a)", "Eletricista"). Selecione uma opção na lista de cargos recomendados ou informe uma função profissional.'
+    };
+  } catch (err) {
+    console.error('Erro defensivo em validateJobTitle:', err);
+    return { valid: false, error: 'Título com formato inválido.' };
   }
-
-  const clean = title.trim();
-
-  // Validação básica profissional (palavrões, tamanho, repetição)
-  const basicVal = validateProfessionalText(clean, 'Título do Cargo', 3, 75);
-  if (!basicVal.valid) {
-    return basicVal;
-  }
-
-  const norm = clean
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-
-  // 1. Verifica se corresponde ou contém algum título padronizado oficial
-  const isExactStandard = STANDARD_JOB_TITLES.some(st => {
-    const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
-  });
-  if (isExactStandard) {
-    return { valid: true };
-  }
-
-  // 2. Verifica se contém ao menos uma palavra-chave ocupacional/CBO de trabalho
-  const hasOccupationalRole = OCCUPATIONAL_ROLE_KEYWORDS.some(kw => {
-    const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const regex = new RegExp(`(^|\\s|\\W)${normKw}($|\\s|\\W)`, 'i');
-    return regex.test(norm);
-  });
-
-  if (hasOccupationalRole) {
-    return { valid: true };
-  }
-
-  return {
-    valid: false,
-    error: 'O título da vaga deve especificar um cargo ou profissão de trabalho legítima (ex.: "Vendedor(a)", "Desenvolvedor(a)", "Auxiliar Administrativo", "Técnico(a)", "Eletricista"). Selecione uma opção na lista de cargos recomendados ou informe uma função profissional.'
-  };
 }
 
 // 8. BANCO DE PALAVRAS-CHAVE E COMPETÊNCIAS OCUPACIONAIS HOMOLOGADAS
@@ -390,68 +404,77 @@ export const OCCUPATIONAL_SKILL_KEYWORDS = [
  * e exige consistência profissional com o mercado de trabalho.
  */
 export function validateSkill(skill) {
-  if (!skill || typeof skill !== 'string') {
-    return { valid: false, error: 'O nome da competência é obrigatório.' };
+  try {
+    if (!skill || typeof skill !== 'string') {
+      return { valid: false, error: 'O nome da competência é obrigatório.' };
+    }
+
+    const clean = skill.trim();
+
+    // 1. Checagem básica profissional (palavrões, tamanho mínimo/máximo)
+    const basicVal = validateProfessionalText(clean, 'Competência / Habilidade', 2, 45);
+    if (!basicVal.valid) {
+      return basicVal;
+    }
+
+    const lower = clean.toLowerCase();
+    const norm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // 2. Bloqueio de sufixos numéricos aleatórios / troll (ex: "cubosta123", "teste123", "abc000")
+    // Exceto normas e ferramentas conhecidas como NR-10, NR-35, ISO 9001, HTML5, CSS3, C++, C#, etc.
+    const isTechnicalStandard = /^(NR[-\s]?\d+|ISO[-\s]?\d+|HTML\d|CSS\d|IPV\d|VUE\s?\d|REACT\s?\d|WINDOWS\s?\d+|OFFICE\s?\d+|SQL\s?\d+|C\+\+|C#|\.NET)$/i.test(clean);
+    if (!isTechnicalStandard && (/\d{3,}$/.test(clean) || /\d{2,}$/.test(norm.replace(/[^a-z0-9]/g, '')))) {
+      return { valid: false, error: 'A habilidade não deve conter sufixos numéricos aleatórios (ex.: "123").' };
+    }
+
+    // 3. Bloqueio de termos que não contenham letras (exceto C++, C#, .NET etc)
+    if (!isTechnicalStandard && !/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
+      return { valid: false, error: 'A habilidade deve conter letras e representar uma competência profissional real.' };
+    }
+
+    // 4. Verificação direta contra a lista homologada de habilidades
+    const isStandardSkill = STANDARD_SKILLS.some(st => {
+      const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
+    });
+    if (isStandardSkill) {
+      return { valid: true };
+    }
+
+    // 5. Verificação de termos e raízes de competências ocupacionais reconhecidas
+    const isRecognizedCompetency = OCCUPATIONAL_SKILL_KEYWORDS.some(kw => {
+      try {
+        const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const regex = new RegExp(`(^|\\s|\\W)${escapeRegex(normKw)}($|\\s|\\W)`, 'i');
+        return regex.test(norm) || norm.includes(normKw);
+      } catch {
+        return false;
+      }
+    });
+
+    if (isRecognizedCompetency) {
+      return { valid: true };
+    }
+
+    // 6. Se for um termo novo plausível sem números ou troll
+    const words = clean.split(/\s+/).filter(w => w.length >= 2);
+    const hasRandomConsonants = /^[bcdfghjklmnpqrstvwxyz]{5,}$/i.test(clean.replace(/\s/g, ''));
+    if (hasRandomConsonants) {
+      return { valid: false, error: 'Por favor, digite uma habilidade ou competência profissional compreensível.' };
+    }
+
+    if (clean.length >= 3 && words.length >= 1 && !/\d/.test(clean)) {
+      return { valid: true };
+    }
+
+    return {
+      valid: false,
+      error: 'Habilidade não reconhecida. Por favor, insira uma competência profissional válida ou selecione na lista recomendada.'
+    };
+  } catch (err) {
+    console.error('Erro defensivo em validateSkill:', err);
+    return { valid: false, error: 'Competência com formato inválido.' };
   }
-
-  const clean = skill.trim();
-
-  // 1. Checagem básica profissional (palavrões, tamanho mínimo/máximo)
-  const basicVal = validateProfessionalText(clean, 'Competência / Habilidade', 2, 45);
-  if (!basicVal.valid) {
-    return basicVal;
-  }
-
-  const lower = clean.toLowerCase();
-  const norm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  // 2. Bloqueio de sufixos numéricos aleatórios / troll (ex: "cubosta123", "teste123", "abc000")
-  // Exceto normas e ferramentas conhecidas como NR-10, NR-35, ISO 9001, HTML5, CSS3, etc.
-  const isTechnicalStandard = /^(NR[-\s]?\d+|ISO[-\s]?\d+|HTML\d|CSS\d|IPV\d|VUE\s?\d|REACT\s?\d|WINDOWS\s?\d+|OFFICE\s?\d+|SQL\s?\d+)$/i.test(clean);
-  if (!isTechnicalStandard && (/\d{3,}$/.test(clean) || /\d{2,}$/.test(norm.replace(/[^a-z0-9]/g, '')))) {
-    return { valid: false, error: 'A habilidade não deve conter sufixos numéricos aleatórios (ex.: "123").' };
-  }
-
-  // 3. Bloqueio de termos que não contenham letras
-  if (!/[a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]/.test(clean)) {
-    return { valid: false, error: 'A habilidade deve conter letras e representar uma competência profissional real.' };
-  }
-
-  // 4. Verificação direta contra a lista homologada de habilidades
-  const isStandardSkill = STANDARD_SKILLS.some(st => {
-    const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
-  });
-  if (isStandardSkill) {
-    return { valid: true };
-  }
-
-  // 5. Verificação de termos e raízes de competências ocupacionais reconhecidas
-  const isRecognizedCompetency = OCCUPATIONAL_SKILL_KEYWORDS.some(kw => {
-    const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const regex = new RegExp(`(^|\\s|\\W)${normKw}($|\\s|\\W)`, 'i');
-    return regex.test(norm) || norm.includes(normKw);
-  });
-
-  if (isRecognizedCompetency) {
-    return { valid: true };
-  }
-
-  // 6. Se for um termo novo plausível sem números ou troll
-  const words = clean.split(/\s+/).filter(w => w.length >= 2);
-  const hasRandomConsonants = /^[bcdfghjklmnpqrstvwxyz]{5,}$/i.test(clean.replace(/\s/g, ''));
-  if (hasRandomConsonants) {
-    return { valid: false, error: 'Por favor, digite uma habilidade ou competência profissional compreensível.' };
-  }
-
-  if (clean.length >= 3 && words.length >= 1 && !/\d/.test(clean)) {
-    return { valid: true };
-  }
-
-  return {
-    valid: false,
-    error: 'Habilidade não reconhecida. Por favor, insira uma competência profissional válida ou selecione na lista recomendada.'
-  };
 }
 
 /**
