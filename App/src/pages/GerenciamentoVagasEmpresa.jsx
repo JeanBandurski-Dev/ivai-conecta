@@ -15,7 +15,7 @@ import {
   getJobCandidates, updateCandidateStage, updateCandidateData,
   scheduleCandidateInterview, SELECTION_STAGES, calculateMatchScore,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage
+  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem, sanitizeMojibake
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
