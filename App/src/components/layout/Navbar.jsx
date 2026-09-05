@@ -51,10 +51,10 @@ export default function Navbar() {
   const getProfileLink = () => {
     if (!currentUser) return '/login';
     const userIdentifier = currentUser.uid || currentUser.id;
-    if (currentUser.role === 'empresa') return '/empresa';
-    if (currentUser.role === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/talentos';
+    if (currentUser.role === 'empresa') return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
+    if (currentUser.role === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
     if (currentUser.role === 'freelancer') return '/servicos?view=dashboard';
-    return userIdentifier ? `/perfil/${userIdentifier}` : '/talentos';
+    return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
   return (

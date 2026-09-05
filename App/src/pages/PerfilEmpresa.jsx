@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
@@ -10,14 +10,24 @@ import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilEmpresa() {
+  const { id } = useParams();
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  const isCompanyOwner = Boolean(
+    currentUser && currentUser.role === 'empresa' && (
+      !id ||
+      String(id) === String(currentUser.uid) ||
+      String(id) === String(currentUser.id) ||
+      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase()))
+    )
+  );
+
   const [company, setCompany] = useState({
-    name:     currentUser?.name || 'Empresa Cadastrada',
+    name:     currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Cadastrada',
     city:     currentUser?.city || 'Ivaiporã',
     sector:   currentUser?.sector || 'Comércio & Serviços',
     size:     currentUser?.size || '1-10 funcionários',
@@ -30,13 +40,58 @@ export default function PerfilEmpresa() {
     perks:    currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
   });
 
-  const jobs = getJobs('Todas as Cidades').filter(j => 
-    (currentUser?.uid && j.createdBy === currentUser.uid) ||
-    (currentUser?.email && j.recruiterEmail === currentUser.email) ||
-    (j.company && company.name && j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]))
-  );
+  useEffect(() => {
+    if (isCompanyOwner && currentUser) {
+      setCompany({
+        name:     currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada',
+        city:     currentUser.city || 'Ivaiporã',
+        sector:   currentUser.sector || 'Comércio & Serviços',
+        size:     currentUser.size || '1-10 funcionários',
+        cnpj:     currentUser.cnpj || '',
+        rating:   currentUser.rating || 5.0,
+        reviews:  currentUser.reviewsCount || 0,
+        logo:     currentUser.avatar || '',
+        about:    currentUser.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
+        history:  currentUser.history || '',
+        perks:    currentUser.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+      });
+    } else if (id) {
+      const allJobs = getJobs('Todas as Cidades');
+      const matchJob = allJobs.find(j =>
+        (j.createdBy && String(j.createdBy) === String(id)) ||
+        (j.company && j.company.toLowerCase() === decodeURIComponent(id).toLowerCase())
+      );
+      if (matchJob) {
+        setCompany(prev => ({
+          ...prev,
+          name: matchJob.company || prev.name,
+          city: matchJob.city || prev.city,
+          logo: matchJob.companyLogo || prev.logo,
+        }));
+      }
+    }
+  }, [currentUser, isCompanyOwner, id]);
 
-  const isCompanyOwner = currentUser?.role === 'empresa';
+  const allJobs = getJobs('Todas as Cidades');
+  const jobs = allJobs.filter(j => {
+    if (!j) return false;
+    if (isCompanyOwner) {
+      return (
+        (currentUser?.uid && j.createdBy === currentUser.uid) ||
+        (currentUser?.id && j.createdBy === currentUser.id) ||
+        (currentUser?.email && j.recruiterEmail === currentUser.email) ||
+        (company.name && j.company && j.company.toLowerCase().trim() === company.name.toLowerCase().trim())
+      );
+    }
+    if (id) {
+      return (
+        (j.createdBy && String(j.createdBy) === String(id)) ||
+        (company.name && j.company && j.company.toLowerCase().trim() === company.name.toLowerCase().trim()) ||
+        (j.company && j.company.toLowerCase() === decodeURIComponent(id).toLowerCase())
+      );
+    }
+    return false;
+  });
 
   const totalApplicants = jobs.reduce((acc, j) => acc + (j.applicantsCount || 0), 0);
   const activeJobsCount = jobs.filter(j => (j.status || 'Ativa') === 'Ativa').length;

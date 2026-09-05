@@ -70,8 +70,11 @@ export default function App() {
                 <Route path="/vagas"            element={<Vagas />} />
                 <Route path="/servicos"         element={<Servicos />} />
                 <Route path="/talentos"         element={<BancoDeTalentos />} />
+                <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
                 <Route path="/perfil/:id"       element={<PerfilAluno />} />
+                <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
                 <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+                <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
                 <Route path="/professor/:id"    element={<PerfilProfessor />} />
                 <Route
                   path="/configuracoes"

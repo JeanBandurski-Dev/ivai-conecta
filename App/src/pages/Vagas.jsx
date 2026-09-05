@@ -11,6 +11,7 @@ import {
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
+import JobFormModal from '../components/JobFormModal';
 
 const TYPES = [
   { label: 'Todos os Tipos', value: 'Todos' },
@@ -57,18 +58,7 @@ export default function Vagas() {
 
   const [refreshKey,    setRefreshKey]    = useState(0);
 
-  // New Job Form State (Padrão LinkedIn / Gupy)
-  const [newTitle,        setNewTitle]        = useState('');
-  const [newType,         setNewType]         = useState('Tempo Integral');
-  const [newModality,     setNewModality]     = useState('Presencial');
-  const [newCity,         setNewCity]         = useState('Ivaiporã');
-  const [newSalary,       setNewSalary]       = useState(SALARY_RANGES[0].value);
-  const [newSchedule,     setNewSchedule]     = useState(WORK_SCHEDULES[0]);
-  const [newSkillsList,   setNewSkillsList]   = useState(['Comunicação Assertiva', 'Trabalho em Equipe']);
-  const [customSkillInput,setCustomSkillInput]= useState('');
-  const [newDesc,         setNewDesc]         = useState('');
-  const [newBenefits,     setNewBenefits]     = useState(['Vale Transporte (VT)', 'Vale Refeição / Alimentação (VR/VA)']);
-  const [formError,       setFormError]       = useState('');
+
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
 
@@ -107,102 +97,14 @@ export default function Vagas() {
     }
   }, [selectedCity]);
 
-  const toggleBenefit = (benefit) => {
-    setNewBenefits(prev =>
-      prev.includes(benefit) ? prev.filter(b => b !== benefit) : [...prev, benefit]
-    );
-  };
-
-  const addSkillTag = (skillToAdd) => {
-    const cleanSkill = (skillToAdd || '').trim();
-    if (!cleanSkill) return;
-
-    const val = validateSkill(cleanSkill);
-    if (!val.valid) {
-      setFormError(val.error);
-      return;
-    }
-
-    if (!newSkillsList.some(s => s.toLowerCase() === cleanSkill.toLowerCase())) {
-      setNewSkillsList(prev => [...prev, cleanSkill]);
-      setCustomSkillInput('');
-      setFormError('');
-    } else {
-      setFormError('Esta habilidade já foi adicionada.');
-    }
-  };
-
-  const removeSkillTag = (skillToRemove) => {
-    setNewSkillsList(prev => prev.filter(s => s !== skillToRemove));
-  };
-
-  const fillDescriptionTemplate = () => {
-    const template = getJobDescriptionTemplate(newTitle || 'Oportunidade Profissional', currentUser?.name || 'Nossa Empresa');
-    setNewDesc(template);
-    setFormError('');
-  };
-
-  const handleCreateJob = async (e) => {
-    e.preventDefault();
-    setFormError('');
-
+  const handleSaveJob = async (jobPayload) => {
     if (!currentUser || currentUser.role !== 'empresa') {
       showToast('⚠️ Apenas empresas cadastradas podem cadastrar e publicar vagas.');
       return;
     }
-
-    // 1. Validação Profissional do Título de Trabalho (CBO / Mercado)
-    const titleVal = validateJobTitle(newTitle);
-    if (!titleVal.valid) {
-      setFormError(titleVal.error);
-      return;
-    }
-
-    // 2. Validação Profissional da Descrição
-    const descVal = validateProfessionalText(newDesc, 'Descrição da Oportunidade', 30, 2500);
-    if (!descVal.valid) {
-      setFormError(descVal.error);
-      return;
-    }
-
-    // 3. Validação de Habilidades
-    if (newSkillsList.length === 0) {
-      setFormError('Selecione ou adicione pelo menos uma competência ou habilidade exigida para a vaga.');
-      return;
-    }
-
-    const invalidSkill = newSkillsList.find(s => !validateSkill(s).valid);
-    if (invalidSkill) {
-      setFormError(`A competência "${invalidSkill}" é inválida ou inadequada. Por favor, remova-a.`);
-      return;
-    }
-
-    const jobPayload = {
-      title: newTitle.trim(),
-      company: currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa do Vale do Ivaí',
-      companyLogo: currentUser?.avatar || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150',
-      isVerifiedCompany: currentUser?.isVerifiedCompany ?? true,
-      city: newCity,
-      type: newType,
-      modality: newModality,
-      salary: newSalary || 'A combinar',
-      schedule: newSchedule,
-      description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
-      requiredSkills: newSkillsList && newSkillsList.length > 0 ? newSkillsList : ['Comunicação Assertiva', 'Trabalho em Equipe'],
-      benefits: newBenefits.length > 0 ? newBenefits : ['Vale Transporte (VT)'],
-      recruiterPhone: currentUser?.phone || '',
-      recruiterEmail: currentUser?.email || '',
-      createdBy: currentUser?.uid || currentUser?.id || currentUser?.email || 'empresa',
-    };
-
     await addJob(jobPayload);
     showToast('🎉 Vaga homologada e publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
     setShowModal(false);
-    setNewTitle('');
-    setNewDesc('');
-    setNewSkillsList(['Comunicação Assertiva', 'Trabalho em Equipe']);
-    setNewBenefits(['Vale Transporte (VT)', 'Vale Refeição / Alimentação (VR/VA)']);
-    setFormError('');
     setParams({});
     setRefreshKey(k => k + 1);
   };
@@ -494,326 +396,16 @@ export default function Vagas() {
         />
       )}
 
-      {/* New Job Modal */}
       {/* New Job Modal (Padrão LinkedIn / Gupy Profissional) */}
-      {showNewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setShowModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-2xl p-6 sm:p-8 border border-gray-200 dark:border-slate-800 my-8 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                  <Briefcase size={22} className="text-primary-blue dark:text-blue-400" /> Publicar Oportunidade Profissional
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Formulário estruturado de vagas nos padrões de conformidade do Vale do Ivaí.</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Banner da Empresa Publicadora */}
-            <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 flex items-center gap-3.5">
-              <img
-                src={currentUser?.avatar || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150'}
-                alt={currentUser?.name || 'Empresa'}
-                className="w-11 h-11 rounded-xl object-cover border border-primary-blue/30 shrink-0 bg-white"
-              />
-              <div className="min-w-0">
-                <div className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Empresa Recrutadora Homologada</div>
-                <div className="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
-                  {currentUser?.name || 'Sua Empresa'}
-                  <span className="text-[10px] font-bold bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full border border-green-200 dark:border-green-800 flex items-center gap-1">
-                    <ShieldCheck size={11} /> CNPJ Verificado
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {formError && (
-              <div className="mb-4 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold flex items-center gap-2">
-                <span>⚠️</span> {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateJob} className="space-y-4">
-              {/* Cargo / Título Padronizado */}
-              <div className="form-group">
-                <label className="form-label flex items-center justify-between">
-                  <span className="font-bold">Cargo / Título da Oportunidade *</span>
-                  {newTitle && (
-                    <span className={`text-[11px] font-semibold flex items-center gap-1 ${
-                      validateJobTitle(newTitle).valid
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-amber-600 dark:text-amber-400'
-                    }`}>
-                      {validateJobTitle(newTitle).valid ? (
-                        <>✓ Cargo Profissional Válido</>
-                      ) : (
-                        <>⚠️ Deve conter uma profissão / cargo real</>
-                      )}
-                    </span>
-                  )}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    list="job-titles-list"
-                    value={newTitle}
-                    onChange={e => { setNewTitle(e.target.value); setFormError(''); }}
-                    className={`form-control text-sm font-semibold transition-all ${
-                      newTitle && !validateJobTitle(newTitle).valid ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20' : ''
-                    }`}
-                    placeholder="Selecione ou busque um cargo (Ex: Desenvolvedor, Auxiliar Administrativo, Vendedor...)"
-                    required
-                  />
-                  <datalist id="job-titles-list">
-                    {STANDARD_JOB_TITLES.map(title => (
-                      <option key={title} value={title} />
-                    ))}
-                  </datalist>
-                </div>
-
-                {newTitle && !validateJobTitle(newTitle).valid && newTitle.trim().length >= 3 && (
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 font-medium bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800">
-                    💡 O título precisa especificar uma função ou ocupação de trabalho (ex.: <em>Auxiliar Administrativo</em>, <em>Vendedor(a)</em>, <em>Desenvolvedor(a)</em>, <em>Técnico(a)</em>, <em>Operador(a)</em>). Termos avulsos ou não relacionados a trabalho não são aceitos.
-                  </p>
-                )}
-
-                {/* Sugestões Rápidas de Cargos */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  <span className="text-[10px] text-gray-400 self-center font-medium">Cargos Populares:</span>
-                  {[
-                    'Desenvolvedor Front-end',
-                    'Assistente Administrativo',
-                    'Vendedor(a) Comercial',
-                    'Atendente de Loja',
-                    'Estagiário de TI / Software',
-                    'Auxiliar Contábil',
-                    'Operador(a) de Caixa',
-                    'Eletricista Industrial',
-                    'Técnico Agrícola'
-                  ].map(sug => (
-                    <button
-                      key={sug}
-                      type="button"
-                      onClick={() => { setNewTitle(sug); setFormError(''); }}
-                      className={`text-[11px] px-2 py-0.5 rounded-lg border transition-colors cursor-pointer font-medium ${
-                        newTitle === sug
-                          ? 'bg-primary-blue text-white border-primary-blue font-bold shadow-xs'
-                          : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:border-primary-blue hover:text-primary-blue'
-                      }`}
-                    >
-                      + {sug}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Regime de Contratação & Modalidade */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="form-group">
-                  <label className="form-label font-bold">Tipo de Contratação</label>
-                  <select value={newType} onChange={e => setNewType(e.target.value)} className="form-control text-sm font-medium">
-                    {TYPES.slice(1).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label font-bold">Modalidade de Atuação</label>
-                  <select value={newModality} onChange={e => setNewModality(e.target.value)} className="form-control text-sm font-medium">
-                    {MODALITIES.slice(1).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Cidade & Faixa Salarial Padronizada */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="form-group">
-                  <label className="form-label font-bold">Município (Vale do Ivaí)</label>
-                  <select value={newCity} onChange={e => setNewCity(e.target.value)} className="form-control text-sm font-medium">
-                    {CITIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label font-bold flex items-center justify-between">
-                    <span>Faixa Salarial / Remuneração *</span>
-                    <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">Padronizada</span>
-                  </label>
-                  <select
-                    value={newSalary}
-                    onChange={e => { setNewSalary(e.target.value); setFormError(''); }}
-                    className="form-control text-sm font-semibold text-gray-800 dark:text-white"
-                  >
-                    {SALARY_RANGES.map(sal => (
-                      <option key={sal.id} value={sal.value}>
-                        {sal.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Horário de Trabalho Padronizado */}
-              <div className="form-group">
-                <label className="form-label font-bold">Jornada / Horário de Trabalho</label>
-                <select
-                  value={newSchedule}
-                  onChange={e => setNewSchedule(e.target.value)}
-                  className="form-control text-sm font-medium"
-                >
-                  {WORK_SCHEDULES.map(sch => (
-                    <option key={sch} value={sch}>{sch}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Habilidades e Competências Homologadas */}
-              <div className="form-group">
-                <label className="form-label flex items-center justify-between">
-                  <span className="font-bold">Competências &amp; Habilidades Exigidas *</span>
-                  <span className="text-[11px] font-normal text-gray-400">Usado no cálculo de compatibilidade Gupy</span>
-                </label>
-
-                {/* Habilidades Selecionadas */}
-                <div className="p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl flex flex-wrap gap-1.5 min-h-[46px] items-center mb-2">
-                  {newSkillsList.map(skill => (
-                    <span
-                      key={skill}
-                      className="inline-flex items-center gap-1.5 bg-blue-100 dark:bg-blue-900/60 text-primary-blue dark:text-blue-300 border border-blue-200 dark:border-blue-700 px-2.5 py-1 rounded-xl text-xs font-bold"
-                    >
-                      {skill}
-                      <button
-                        type="button"
-                        onClick={() => removeSkillTag(skill)}
-                        className="hover:text-red-500 font-bold ml-0.5 cursor-pointer"
-                        title="Remover"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  {newSkillsList.length === 0 && (
-                    <span className="text-xs text-gray-400 italic">Nenhuma habilidade adicionada ainda. Clique nas sugestões abaixo:</span>
-                  )}
-                </div>
-
-                {/* Banco de Sugestões de Habilidades */}
-                <div className="flex flex-wrap gap-1.5 mb-2 max-h-24 overflow-y-auto p-1">
-                  {STANDARD_SKILLS.slice(0, 16).map(s => {
-                    const isSelected = newSkillsList.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => isSelected ? removeSkillTag(s) : addSkillTag(s)}
-                        className={`text-[11px] px-2 py-0.5 rounded-lg border transition-all cursor-pointer font-medium ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue hover:text-primary-blue'
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}{s}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Adicionar Habilidade Personalizada com Validação */}
-                <div className="space-y-1.5">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customSkillInput}
-                      onChange={e => setCustomSkillInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addSkillTag(customSkillInput);
-                        }
-                      }}
-                      placeholder="Digite outra competência profissional (ex: Gestão de Projetos, SolidWorks)..."
-                      className={`form-control text-xs flex-1 transition-all ${
-                        customSkillInput.trim() && !validateSkill(customSkillInput).valid
-                          ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
-                          : ''
-                      }`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => addSkillTag(customSkillInput)}
-                      className="btn btn-outline btn-sm text-xs font-bold shrink-0"
-                    >
-                      + Adicionar
-                    </button>
-                  </div>
-                  {customSkillInput.trim() && !validateSkill(customSkillInput).valid && customSkillInput.trim().length >= 3 && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                      ⚠️ {validateSkill(customSkillInput).error}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Vales e Benefícios */}
-              <div className="form-group">
-                <label className="form-label block mb-1.5 font-bold">Vales &amp; Benefícios Oferecidos</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {STANDARD_BENEFITS.map(b => {
-                    const isSelected = newBenefits.includes(b);
-                    return (
-                      <button
-                        key={b}
-                        type="button"
-                        onClick={() => toggleBenefit(b)}
-                        className={`text-xs px-2.5 py-1 rounded-xl border transition-all cursor-pointer font-medium ${
-                          isSelected
-                            ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700 font-bold'
-                            : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-200 dark:border-slate-700 hover:border-gray-300'
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}{b}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Descrição Estruturada da Oportunidade */}
-              <div className="form-group">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="form-label font-bold mb-0">Descrição da Oportunidade *</label>
-                  <button
-                    type="button"
-                    onClick={fillDescriptionTemplate}
-                    className="text-xs font-bold text-primary-blue dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles size={13} /> Usar Modelo Padrão LinkedIn / Gupy
-                  </button>
-                </div>
-                <textarea
-                  value={newDesc}
-                  onChange={e => { setNewDesc(e.target.value); setFormError(''); }}
-                  className="form-control font-sans text-xs sm:text-sm leading-relaxed"
-                  rows={5}
-                  placeholder="Descreva o papel, principais responsabilidades, requisitos e diferenciais..."
-                  required
-                />
-                <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                  <span>Mínimo 30 caracteres</span>
-                  <span>{newDesc.length} caracteres digitados</span>
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-slate-800">
-                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-1.5">
-                  <CheckCircle2 size={16} /> Homologar &amp; Publicar Vaga
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <JobFormModal
+        isOpen={showNewModal}
+        onClose={() => {
+          setShowModal(false);
+          setParams({});
+        }}
+        onSave={handleSaveJob}
+        currentUser={currentUser}
+      />
     </>
   );
 }
