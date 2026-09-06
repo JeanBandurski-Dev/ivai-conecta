@@ -4,7 +4,7 @@ import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
   BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera, MessageSquare,
-  Share2, Globe, Phone, Mail, Image as ImageIcon, Check
+  Share2, Globe, Phone, Mail, Image as ImageIcon, Check, Loader2
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
@@ -306,7 +306,11 @@ export default function PerfilEmpresa() {
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-primary-blue/90 hover:bg-primary-blue backdrop-blur-md px-4 py-2 rounded-full border border-blue-400/40 transition-all cursor-pointer shadow-md hover:scale-105 active:scale-95"
                   title="Alterar foto de capa da empresa"
                 >
-                  <Camera size={14} />
+                  {uploadingBanner ? (
+                    <Loader2 size={14} className="animate-spin text-white" />
+                  ) : (
+                    <Camera size={14} />
+                  )}
                   <span>{uploadingBanner ? 'Enviando capa...' : 'Alterar Capa'}</span>
                   <input
                     type="file"
@@ -327,17 +331,36 @@ export default function PerfilEmpresa() {
             <div className="flex flex-wrap items-end gap-5 sm:gap-6">
               
               {/* Foto de Perfil com Ícone de Câmera Sobreposto */}
-              <div className="relative group/avatar shrink-0 -mb-1 sm:-mb-2">
-                <img
-                  src={company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250'}
-                  alt={company.name}
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl object-cover border-4 border-white/90 shadow-2xl bg-white transition-transform group-hover/avatar:scale-[1.02]"
-                />
+              <div className="relative shrink-0 -mb-1 sm:-mb-2">
+                {/* Moldura da Foto com Borda e Overflow Perfeitos */}
+                <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-3xl overflow-hidden border-4 border-white/95 shadow-2xl bg-white group/avatar">
+                  <img
+                    src={company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250'}
+                    alt={company.name}
+                    className={`w-full h-full object-cover transition-transform duration-300 ${
+                      uploadingLogo ? 'scale-105 filter blur-[1px]' : 'group-hover/avatar:scale-105'
+                    }`}
+                  />
+
+                  {/* Overlay de Upload: contido 100% dentro da moldura arredondada */}
+                  {uploadingLogo && (
+                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm flex flex-col items-center justify-center text-white gap-1.5 z-10 transition-all">
+                      <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 text-primary-blue animate-spin drop-shadow" />
+                      <span className="text-[10px] sm:text-xs font-bold tracking-wider text-slate-100 uppercase drop-shadow">
+                        Salvando...
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Ícone de Câmera na Foto de Perfil (Apenas Dono) */}
                 {isCompanyOwner && (
                   <label
-                    className="absolute -bottom-1 -right-1 p-2 sm:p-2.5 rounded-2xl bg-primary-blue text-white shadow-xl hover:bg-blue-600 transition-all cursor-pointer hover:scale-110 active:scale-95 flex items-center justify-center border-2 border-white dark:border-slate-900 group-hover/avatar:ring-4 group-hover/avatar:ring-primary-blue/30"
+                    className={`absolute -bottom-1 -right-1 p-2 sm:p-2.5 rounded-2xl bg-primary-blue text-white shadow-xl border-2 border-white dark:border-slate-900 transition-all duration-200 z-20 flex items-center justify-center ${
+                      uploadingLogo
+                        ? 'opacity-0 scale-50 pointer-events-none'
+                        : 'hover:bg-blue-600 cursor-pointer hover:scale-110 active:scale-95 hover:ring-4 hover:ring-primary-blue/30'
+                    }`}
                     title="Clique para trocar a foto de perfil diretamente"
                     aria-label="Trocar logotipo da empresa"
                   >
@@ -350,14 +373,6 @@ export default function PerfilEmpresa() {
                       className="hidden"
                     />
                   </label>
-                )}
-
-                {/* Spinner de Upload no Avatar */}
-                {uploadingLogo && (
-                  <div className="absolute inset-0 rounded-3xl bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-1 z-10">
-                    <div className="w-7 h-7 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span className="text-[10px] font-bold">Salvando...</span>
-                  </div>
                 )}
               </div>
 
@@ -693,8 +708,8 @@ export default function PerfilEmpresa() {
                     className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white"
                   />
                   {uploadingLogo && (
-                    <div className="absolute inset-0 bg-black/70 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
-                      ...
+                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs rounded-2xl flex items-center justify-center text-white z-10">
+                      <Loader2 size={18} className="animate-spin text-primary-blue" />
                     </div>
                   )}
                 </div>
@@ -704,7 +719,12 @@ export default function PerfilEmpresa() {
                     Sua marca ganha destaque nas buscas e candidaturas.
                   </p>
                   <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 mt-1 bg-white dark:bg-slate-900">
-                    <Camera size={13} /> {uploadingLogo ? 'Enviando...' : 'Alterar Foto'}
+                    {uploadingLogo ? (
+                      <Loader2 size={13} className="animate-spin text-primary-blue" />
+                    ) : (
+                      <Camera size={13} />
+                    )}
+                    <span>{uploadingLogo ? 'Enviando...' : 'Alterar Foto'}</span>
                     <input
                       type="file"
                       accept="image/*"
