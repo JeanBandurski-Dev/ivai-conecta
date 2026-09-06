@@ -112,15 +112,19 @@ export default function GerenciamentoVagasEmpresa() {
   }, [liveJobs, currentUser]);
 
   // Selected Job for Pipeline
-  const [selectedJobId, setSelectedJobId] = useState(allCompanyJobs[0]?.id || 101);
-  const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || allCompanyJobs[0];
+  const [selectedJobId, setSelectedJobId] = useState(allCompanyJobs[0]?.id || 'default');
+  const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
 
   useEffect(() => {
     if (allCompanyJobs && allCompanyJobs.length > 0) {
-      const exists = allCompanyJobs.some(j => String(j.id) === String(selectedJobId));
-      if (!exists) {
-        setSelectedJobId(allCompanyJobs[0].id);
+      if (selectedJobId !== 'default') {
+        const exists = allCompanyJobs.some(j => String(j.id) === String(selectedJobId));
+        if (!exists) {
+          setSelectedJobId(allCompanyJobs[0].id);
+        }
       }
+    } else {
+      setSelectedJobId('default');
     }
   }, [allCompanyJobs, selectedJobId]);
 
@@ -185,7 +189,9 @@ export default function GerenciamentoVagasEmpresa() {
   const [customStages, setCustomStages] = useState(() => (getJobCustomStages(currentJob?.id) || []).map(sanitizeStageItem));
 
   useEffect(() => {
-    if (currentJob) {
+    if (selectedJobId === 'default' || !currentJob) {
+      setCustomStages((getCompanyCustomStages() || []).map(sanitizeStageItem));
+    } else if (currentJob) {
       setCustomStages((getJobCustomStages(currentJob.id) || []).map(sanitizeStageItem));
     }
   }, [currentJob?.id, selectedJobId]);
@@ -809,7 +815,12 @@ export default function GerenciamentoVagasEmpresa() {
   };
 
   const handleSaveCustomStagesForJob = () => {
-    if (!currentJob) return;
+    if (selectedJobId === 'default' || !currentJob) {
+      saveCompanyCustomStages(customStages);
+      showToast('⭐ Modelo padrão de etapas da empresa salvo com sucesso!');
+      forceUpdate(n => n + 1);
+      return;
+    }
     saveJobCustomStages(currentJob.id, customStages);
     showToast(`✅ Etapas do funil salvas exclusivamente para a vaga: "${currentJob.title}"!`);
     forceUpdate(n => n + 1);
@@ -817,10 +828,14 @@ export default function GerenciamentoVagasEmpresa() {
 
   const handleApplyCustomStagesToAllJobs = () => {
     saveCompanyCustomStages(customStages);
-    allCompanyJobs.forEach(job => {
-      saveJobCustomStages(job.id, customStages);
-    });
-    showToast('🚀 Estas etapas foram salvas e aplicadas a TODAS as vagas da empresa!');
+    if (allCompanyJobs.length > 0) {
+      allCompanyJobs.forEach(job => {
+        saveJobCustomStages(job.id, customStages);
+      });
+      showToast('🚀 Estas etapas foram salvas e aplicadas a TODAS as vagas da empresa!');
+    } else {
+      showToast('⭐ Etapas salvas como modelo padrão para todas as futuras vagas!');
+    }
     forceUpdate(n => n + 1);
   };
 
@@ -2207,25 +2222,54 @@ export default function GerenciamentoVagasEmpresa() {
               <div className="bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-4 sm:p-5 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                    <Briefcase size={14} className="text-primary-blue" /> Configurando as Etapas da Vaga:
+                    <Briefcase size={14} className="text-primary-blue" /> Configurando as Etapas de:
                   </label>
                   <span className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
-                    Vaga selecionada no painel
+                    {selectedJobId === 'default' || !currentJob
+                      ? '⭐ Modelo Padrão da Empresa'
+                      : 'Vaga selecionada no painel'}
                   </span>
                 </div>
+
+                {allCompanyJobs.length === 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                      <span className="text-base">💡</span>
+                      <span>Sua empresa não possui vagas abertas no momento. Você está editando o <strong>Modelo Padrão da Empresa</strong>.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewJobModal(true)}
+                      className="btn btn-primary btn-sm text-xs font-bold rounded-lg shrink-0 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={13} /> Publicar Nova Vaga
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                   <div className={allCompanyJobs.length > 1 ? "md:col-span-7" : "md:col-span-12"}>
                     <select
                       value={selectedJobId}
-                      onChange={e => setSelectedJobId(Number(e.target.value) || e.target.value)}
+                      onChange={e => setSelectedJobId(e.target.value === 'default' ? 'default' : (Number(e.target.value) || e.target.value))}
                       className="w-full bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue shadow-2xs truncate"
                     >
-                      {allCompanyJobs.map(job => (
-                        <option key={job.id} value={job.id}>
-                          {job.title} ({job.city} · {job.type})
-                        </option>
-                      ))}
+                      {allCompanyJobs.length === 0 ? (
+                        <option value="default">⭐ Modelo Padrão da Empresa (Todas as novas vagas)</option>
+                      ) : (
+                        <>
+                          <optgroup label="Vagas da Sua Empresa">
+                            {allCompanyJobs.map(job => (
+                              <option key={job.id} value={job.id}>
+                                {job.title} — {job.city || 'Ivaiporã'} ({job.type || 'Tempo Integral'})
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Modelo Global">
+                            <option value="default">⭐ Modelo Padrão da Empresa (Todas as novas vagas)</option>
+                          </optgroup>
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -2256,7 +2300,12 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-blue-800 dark:text-blue-300 pt-1">
-                  <span className="font-semibold">💡 Dica:</span> As etapas configuradas abaixo serão salvas exclusivamente para <strong>{currentJob?.title}</strong>.
+                  <span className="font-semibold">💡 Dica:</span>{' '}
+                  {selectedJobId === 'default' || !currentJob ? (
+                    <span>As etapas configuradas abaixo serão salvas como <strong>Modelo Padrão Global da Empresa</strong> para todas as próximas vagas.</span>
+                  ) : (
+                    <span>As etapas configuradas abaixo serão salvas exclusivamente para <strong>{currentJob.title}</strong>.</span>
+                  )}
                 </div>
               </div>
 
@@ -2340,7 +2389,10 @@ export default function GerenciamentoVagasEmpresa() {
                     onClick={handleSaveCustomStagesForJob}
                     className="btn btn-primary px-5 py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer rounded-xl"
                   >
-                    <Save size={15} /> Salvar Etapas Desta Vaga
+                    <Save size={15} />{' '}
+                    {selectedJobId === 'default' || !currentJob
+                      ? 'Salvar Modelo Padrão da Empresa'
+                      : 'Salvar Etapas Desta Vaga'}
                   </button>
                 </div>
               </div>
