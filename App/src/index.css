@@ -148,7 +148,8 @@
   }
   .dark .btn-outline {
     border-color: #475569;
-    color: #cbd5e1;
+    color: #f1f5f9;
+    background-color: rgba(30, 41, 59, 0.45);
   }
   .btn-outline:hover { 
     border-color: var(--color-primary-blue); 
@@ -156,9 +157,9 @@
     background-color: var(--color-primary-light); 
   }
   .dark .btn-outline:hover {
-    border-color: var(--color-primary-blue);
-    color: #60a5fa;
-    background-color: rgba(30, 58, 138, 0.4);
+    border-color: #60a5fa;
+    color: #ffffff;
+    background-color: rgba(30, 58, 138, 0.5);
   }
 
   .btn-outline-white {
@@ -374,12 +375,18 @@
     letter-spacing: 0.08em;
     margin-bottom: 0.25rem;
   }
+  .dark .section-subtitle {
+    color: #38bdf8;
+  }
   .section-title {
     font-size: clamp(1.6rem, 2.75vw, 2.25rem);
     font-family: var(--font-heading);
     font-weight: 700;
     color: var(--color-primary-dark);
     letter-spacing: -0.02em;
+  }
+  .dark .section-title {
+    color: #ffffff;
   }
 
   /* ── Grid layouts (Espaçamento e proporções refinadas) ── */

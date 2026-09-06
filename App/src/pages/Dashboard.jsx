@@ -192,8 +192,8 @@ export default function Dashboard() {
         <div className="container">
           <div className="section-header">
             <div>
-              <div className="section-subtitle">Banco de Talentos</div>
-              <h2 className="section-title">Talentos &amp; Profissionais Regionais</h2>
+              <div className="section-subtitle dark:text-sky-400">Banco de Talentos</div>
+              <h2 className="section-title dark:text-white">Talentos &amp; Profissionais Regionais</h2>
             </div>
             <div className="flex gap-2.5 items-center">
               <Link to="/talentos" className="btn btn-outline btn-sm shrink-0">Ver Banco Completo</Link>
@@ -213,8 +213,8 @@ export default function Dashboard() {
         <div className="container">
           <div className="section-header">
             <div>
-              <div className="section-subtitle">Ecossistema Empresarial &amp; Empregabilidade</div>
-              <h2 className="section-title">Empresas Cadastradas &amp; Parceiras no Vale do Ivaí</h2>
+              <div className="section-subtitle dark:text-sky-400">Ecossistema Empresarial &amp; Empregabilidade</div>
+              <h2 className="section-title dark:text-white">Empresas Cadastradas &amp; Parceiras no Vale do Ivaí</h2>
             </div>
             <div className="flex gap-2.5 items-center flex-wrap">
               <Link to="/vagas" className="btn btn-outline btn-sm shrink-0">
@@ -236,8 +236,8 @@ export default function Dashboard() {
         <div className="container">
           <div className="section-header">
             <div>
-              <div className="section-subtitle">Oportunidades Regionais</div>
-              <h2 className="section-title">Vagas em Destaque com Algoritmo de Matching</h2>
+              <div className="section-subtitle dark:text-sky-400">Oportunidades Regionais</div>
+              <h2 className="section-title dark:text-white">Vagas em Destaque com Algoritmo de Matching</h2>
             </div>
             <div className="flex gap-3 flex-wrap shrink-0">
               {currentUser?.role === 'empresa' && (
@@ -264,8 +264,8 @@ export default function Dashboard() {
         <div className="container">
           <div className="section-header">
             <div>
-              <div className="section-subtitle">Marketplace Vale do Ivaí</div>
-              <h2 className="section-title">Serviços Locais Recomendados</h2>
+              <div className="section-subtitle dark:text-sky-400">Marketplace Vale do Ivaí</div>
+              <h2 className="section-title dark:text-white">Serviços Locais Recomendados</h2>
             </div>
             <div className="flex gap-3 flex-wrap shrink-0">
               {currentUser?.role === 'freelancer' && (

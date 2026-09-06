@@ -505,7 +505,7 @@ export default function PerfilEmpresa() {
               <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
                 <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Total de Vagas</div>
                 <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{jobs.length}</div>
-                <div className="text-xs text-primary-blue font-semibold">{activeJobsCount} ativas · {closedJobsCount} encerradas</div>
+                <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{activeJobsCount} ativas · {closedJobsCount} encerradas</div>
               </div>
 
               <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
@@ -516,10 +516,10 @@ export default function PerfilEmpresa() {
 
               <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
                 <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Média de Candidatos / Vaga</div>
-                <div className="text-3xl font-extrabold text-teal-600">
+                <div className="text-3xl font-extrabold text-teal-600 dark:text-teal-400">
                   {jobs.length > 0 ? (totalApplicants / jobs.length).toFixed(1) : '0'}
                 </div>
-                <div className="text-xs text-teal-700 font-semibold">Engajamento regional</div>
+                <div className="text-xs text-teal-700 dark:text-teal-300 font-semibold">Engajamento regional</div>
               </div>
 
               <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-1">
@@ -527,7 +527,7 @@ export default function PerfilEmpresa() {
                 <div className="text-xl font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5 pt-1">
                   <ShieldCheck size={20} /> CNPJ Validado
                 </div>
-                <div className="text-xs text-green-700 font-medium">Empresa certificada</div>
+                <div className="text-xs text-green-700 dark:text-green-300 font-medium">Empresa certificada</div>
               </div>
             </div>
           </div>

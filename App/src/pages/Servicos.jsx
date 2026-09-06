@@ -515,10 +515,10 @@ export default function Servicos() {
       {editModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setEditModal(false)}>
-          <div className="bg-white rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-xl font-bold text-primary-dark">Editar Dados &amp; Localização do Negócio</h3>
-              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Editar Dados &amp; Localização do Negócio</h3>
+              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
 
             <form onSubmit={handleUpdateService} className="space-y-4">
