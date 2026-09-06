@@ -415,5 +415,47 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* ── Barra de Rolagem Horizontal Elegante para Etapas (Barrinha de Arrastar) ── */
+  .stages-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  .dark .stages-scrollbar {
+    scrollbar-color: #475569 #1e293b;
+  }
+  .stages-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+  .stages-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 9999px;
+    margin: 0 4px;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 9999px;
+    cursor: grab;
+    transition: background-color 0.2s ease;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #0052ff;
+    cursor: grabbing;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #3b82f6;
+  }
 }
 

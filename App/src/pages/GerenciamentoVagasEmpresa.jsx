@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, CheckCircle2, Clock, ArrowRight,
@@ -233,6 +233,62 @@ export default function GerenciamentoVagasEmpresa() {
   const [onlyWithNotes, setOnlyWithNotes] = useState(false);
   const [sortBy, setSortBy] = useState('match_desc'); // 'match_desc' | 'match_asc' | 'recent' | 'oldest' | 'rating_desc' | 'name_asc'
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // ── Drag & Scroll para a Barra de Etapas (Barrinha de Arrastar) ──
+  const stagesTrackRef = useRef(null);
+  const isDraggingStages = useRef(false);
+  const startX = useRef(0);
+  const scrollStartLeft = useRef(0);
+  const hasDragged = useRef(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScrollability = () => {
+    if (!stagesTrackRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = stagesTrackRef.current;
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(checkScrollability, 100);
+    window.addEventListener('resize', checkScrollability);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', checkScrollability);
+    };
+  }, [allCompanyJobs, selectedJobId]);
+
+  const handleStageMouseDown = (e) => {
+    if (e.button !== 0 || !stagesTrackRef.current) return;
+    isDraggingStages.current = true;
+    hasDragged.current = false;
+    startX.current = e.pageX - stagesTrackRef.current.offsetLeft;
+    scrollStartLeft.current = stagesTrackRef.current.scrollLeft;
+  };
+
+  const handleStageMouseMove = (e) => {
+    if (!isDraggingStages.current || !stagesTrackRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - stagesTrackRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5;
+    if (Math.abs(x - startX.current) > 4) {
+      hasDragged.current = true;
+    }
+    stagesTrackRef.current.scrollLeft = scrollStartLeft.current - walk;
+    checkScrollability();
+  };
+
+  const handleStageMouseUp = () => {
+    isDraggingStages.current = false;
+  };
+
+  const scrollStages = (direction) => {
+    if (!stagesTrackRef.current) return;
+    const scrollAmount = 260 * direction;
+    stagesTrackRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    setTimeout(checkScrollability, 300);
+  };
 
   // Jobs List Filters (Tab: Minhas Vagas)
   const [jobSearch, setJobSearch] = useState('');
@@ -1290,62 +1346,106 @@ export default function GerenciamentoVagasEmpresa() {
               </div>
             </div>
 
-            {/* ── BARRA DE ABAS DO FUNIL & ORDENAÇÃO ── */}
+            {/* ── BARRA DE ABAS DO FUNIL & ORDENAÇÃO (COM BARRINHA DE ARRASTAR) ── */}
             <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-gray-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3 shadow-2xs">
-              {/* Lado Esquerdo: Etapas (Scrollable com min-w-0 e botões shrink-0 para nunca cortar texto) */}
-              <div
-                className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 min-w-0 flex-1"
-                onWheel={(e) => {
-                  if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
-                    e.currentTarget.scrollLeft += e.deltaY;
-                  }
-                }}
-              >
-                <button
-                  onClick={() => setSelectedStageFilter('todos')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
-                    selectedStageFilter === 'todos'
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs'
-                      : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
-                  }`}
+              {/* Lado Esquerdo: Etapas com Barra de Rolagem Arrastável + Drag com o Mouse */}
+              <div className="relative min-w-0 flex-1 flex items-center group/stages">
+                {/* Botão de Scroll para a Esquerda */}
+                {canScrollLeft && (
+                  <button
+                    type="button"
+                    onClick={() => scrollStages(-1)}
+                    className="absolute left-1 top-[42%] -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-gray-200 dark:border-slate-700 shadow-md flex items-center justify-center text-gray-700 dark:text-slate-200 hover:bg-primary-blue hover:text-white transition-all cursor-pointer"
+                    title="Rolar etapas para a esquerda"
+                    aria-label="Rolar para a esquerda"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                )}
+
+                {/* Faixa de Etapas com stages-scrollbar visível e arrasto interativo */}
+                <div
+                  ref={stagesTrackRef}
+                  onMouseDown={handleStageMouseDown}
+                  onMouseMove={handleStageMouseMove}
+                  onMouseUp={handleStageMouseUp}
+                  onMouseLeave={handleStageMouseUp}
+                  onScroll={checkScrollability}
+                  className="flex items-center gap-2 overflow-x-auto stages-scrollbar py-1 pb-2.5 min-w-0 flex-1 select-none cursor-grab active:cursor-grabbing"
+                  onWheel={(e) => {
+                    if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                      e.currentTarget.scrollLeft += e.deltaY;
+                      checkScrollability();
+                    }
+                  }}
                 >
-                  <span>Todas as Etapas</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
-                    selectedStageFilter === 'todos'
-                      ? 'bg-white/20 dark:bg-gray-900/20 text-current'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
-                  }`}>
-                    {jobCandidates.length}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (hasDragged.current) return;
+                      setSelectedStageFilter('todos');
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
+                      selectedStageFilter === 'todos'
+                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs'
+                        : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>Todas as Etapas</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
+                      selectedStageFilter === 'todos'
+                        ? 'bg-white/20 dark:bg-gray-900/20 text-current'
+                        : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                    }`}>
+                      {jobCandidates.length}
+                    </span>
+                  </button>
 
-                {customStages.map(stage => {
-                  const count = jobCandidates.filter(c => c.stage === stage.id).length;
-                  const isSelected = selectedStageFilter === stage.id;
-                  const style = getStageStyle(stage.id, stage.color);
+                  {customStages.map(stage => {
+                    const count = jobCandidates.filter(c => c.stage === stage.id).length;
+                    const isSelected = selectedStageFilter === stage.id;
+                    const style = getStageStyle(stage.id, stage.color);
 
-                  return (
-                    <button
-                      key={stage.id}
-                      onClick={() => setSelectedStageFilter(isSelected ? 'todos' : stage.id)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-2 cursor-pointer ${
-                        isSelected
-                          ? 'bg-primary-blue text-white shadow-xs'
-                          : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
-                      <span className="whitespace-nowrap">{sanitizeStageItem(stage).name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
-                        isSelected
-                          ? 'bg-white/25 text-white'
-                          : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
-                      }`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={stage.id}
+                        type="button"
+                        onClick={(e) => {
+                          if (hasDragged.current) return;
+                          setSelectedStageFilter(isSelected ? 'todos' : stage.id);
+                        }}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-2 cursor-pointer ${
+                          isSelected
+                            ? 'bg-primary-blue text-white shadow-xs'
+                            : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
+                        <span className="whitespace-nowrap">{sanitizeStageItem(stage).name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
+                          isSelected
+                            ? 'bg-white/25 text-white'
+                            : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Botão de Scroll para a Direita */}
+                {canScrollRight && (
+                  <button
+                    type="button"
+                    onClick={() => scrollStages(1)}
+                    className="absolute right-1 top-[42%] -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-gray-200 dark:border-slate-700 shadow-md flex items-center justify-center text-gray-700 dark:text-slate-200 hover:bg-primary-blue hover:text-white transition-all cursor-pointer"
+                    title="Rolar etapas para a direita"
+                    aria-label="Rolar para a direita"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                )}
               </div>
 
               {/* Lado Direito: Ordenação e Contagem */}
