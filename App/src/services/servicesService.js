@@ -23,12 +23,26 @@ export function maskPhone(value) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
 }
 
-export function sanitizeWhatsAppPhone(phone) {
+export function sanitizeWhatsAppPhone(phone, defaultDDD = '43') {
   if (!phone) return '';
-  const digits = String(phone).replace(/\D/g, '');
+  let digits = String(phone).replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.startsWith('55') && digits.length >= 12) return digits;
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+
+  // Se o número for informado sem DDD local (8 ou 9 dígitos), aplica o DDD regional 43 (Vale do Ivaí)
+  if (digits.length === 8 || digits.length === 9) {
+    digits = `${defaultDDD}${digits}`;
+  }
+
+  // Se tiver 10 ou 11 dígitos (DDD + número), adiciona código do Brasil (55)
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`;
+  }
+
+  // Se já tiver 55 no início
+  if (digits.startsWith('55') && digits.length >= 12) {
+    return digits;
+  }
+
   return digits;
 }
 
@@ -36,6 +50,70 @@ export function generateWhatsAppLink(phone, message = '') {
   const cleanPhone = sanitizeWhatsAppPhone(phone);
   if (!cleanPhone) return '#';
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+
+export const WHATSAPP_MESSAGE_PRESETS = [
+  {
+    id: 'orcamento',
+    icon: '💼',
+    label: 'Solicitar Orçamento',
+    description: 'Pedir valores, forma de pagamento e prazo estimado',
+    getTemplate: ({ providerName, serviceTitle, city }) =>
+      `Olá, ${providerName || 'tudo bem'}! Encontrei seu serviço de *${serviceTitle || 'prestação de serviços'}* no *Ivaí Conecta* (${city || 'Vale do Ivaí'}). Gostaria de solicitar um orçamento para um atendimento, você teria disponibilidade?`
+  },
+  {
+    id: 'duvidas',
+    icon: '❓',
+    label: 'Tirar Dúvidas',
+    description: 'Esclarecer escopo, materiais e como funciona o serviço',
+    getTemplate: ({ providerName, serviceTitle, city }) =>
+      `Olá, ${providerName || 'tudo bem'}! Vi seu anúncio de *${serviceTitle || 'serviço'}* no portal *Ivaí Conecta* (${city || 'região'}) e gostaria de tirar algumas dúvidas antes de contratar.`
+  },
+  {
+    id: 'agendamento',
+    icon: '📅',
+    label: 'Agendar Visita / Horário',
+    description: 'Combinar uma data ou visita técnica presencial no local',
+    getTemplate: ({ providerName, serviceTitle, city }) =>
+      `Olá, ${providerName || 'tudo bem'}! Vi seu perfil no *Ivaí Conecta* em *${city || 'Ivaiporã'}*. Gostaria de verificar a possibilidade de agendarmos uma visita técnica ou horário para *${serviceTitle || 'seu serviço'}*.`
+  },
+  {
+    id: 'urgente',
+    icon: '🚨',
+    label: 'Atendimento Urgente',
+    description: 'Para reparos rápidos ou demandas com início imediato',
+    getTemplate: ({ providerName, serviceTitle, city }) =>
+      `Olá, ${providerName || 'tudo bem'}! Localizei seu contato no *Ivaí Conecta* (${city || 'Ivaiporã'}) e tenho uma demanda urgente para *${serviceTitle || 'este serviço'}*. Você teria disponibilidade para atendimento hoje?`
+  }
+];
+
+export async function incrementServiceContact(id) {
+  if (!id) return;
+  const services = getServices('Todas as Cidades');
+  const target = services.find(s => s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id);
+  const docId = target?.firestoreId || target?.id || id;
+
+  const currentContacts = target?.analytics?.contacts || 0;
+  const newContacts = currentContacts + 1;
+  const views = target?.analytics?.views || 1;
+  const newConversion = `${Math.min(100, Math.round((newContacts / Math.max(1, views)) * 100))}%`;
+
+  const updatedAnalytics = {
+    ...(target?.analytics || {}),
+    contacts: newContacts,
+    conversionRate: newConversion
+  };
+
+  if (docId) {
+    try {
+      await updateDoc(doc(db, 'services', String(docId)), { analytics: updatedAnalytics });
+    } catch {}
+  }
+
+  const updated = services.map(s => (s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id ? { ...s, analytics: updatedAnalytics } : s));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(updated));
+  }
 }
 
 /**
