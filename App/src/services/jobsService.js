@@ -4,18 +4,36 @@ import { collection, getDocs, addDoc, query, where, doc, updateDoc, deleteDoc, o
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, SEED_JOBS, SEED_APPLICATIONS } from '../data/seedData.js';
 
 /**
- * Escuta vagas em tempo real via Firestore onSnapshot
+ * Escuta vagas em tempo real via Firestore onSnapshot + Eventos Locais Imediatos
  */
 export function subscribeToJobs(city = 'Todas as Cidades', callback) {
+  // 1. Emite dados locais imediatamente
+  callback(getJobs(city));
+
+  // 2. Escuta atualizações locais para sincronização instantânea entre abas e telas
+  const handleLocalUpdate = () => {
+    callback(getJobs(city));
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('ivai_jobs_updated', handleLocalUpdate);
+    window.addEventListener('storage', handleLocalUpdate);
+  }
+
+  // 3. Sincronização em tempo real via Cloud Firestore
+  let unsubFirestore = () => {};
   try {
     const jobsRef = collection(db, 'jobs');
     const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
     
-    return onSnapshot(q, (snapshot) => {
+    unsubFirestore = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const remoteJobs = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
         const localJobs = getJobs(city);
         const merged = [...remoteJobs, ...localJobs.filter(j => !remoteJobs.some(rj => String(rj.id) === String(j.id)))];
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(merged));
+        }
         callback(merged);
       } else {
         callback(getJobs(city));
@@ -27,8 +45,15 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
   } catch (error) {
     console.warn('[Firestore Jobs Listener] Falha ao assinar vagas:', error.message);
     callback(getJobs(city));
-    return () => {};
   }
+
+  return () => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('ivai_jobs_updated', handleLocalUpdate);
+      window.removeEventListener('storage', handleLocalUpdate);
+    }
+    if (typeof unsubFirestore === 'function') unsubFirestore();
+  };
 }
 
 /**
@@ -118,25 +143,87 @@ export function getJobById(id) {
 }
 
 export function addJob(jobData) {
-  const jobs = getJobs('Todas as Cidades');
+  let jobs = [];
+  try {
+    jobs = getJobs('Todas as Cidades') || [];
+  } catch (e) {
+    console.warn('[JobsService] Erro ao obter vagas existentes:', e);
+    jobs = SEED_JOBS || [];
+  }
+
+  // Sanitiza dados de entrada removendo qualquer chave com valor undefined
+  const cleanData = {};
+  if (jobData && typeof jobData === 'object') {
+    Object.keys(jobData).forEach(key => {
+      if (jobData[key] !== undefined) {
+        cleanData[key] = jobData[key];
+      }
+    });
+  }
+
   const newJob = {
     id: Date.now(),
     createdAt: new Date().toLocaleDateString('pt-BR'),
     status: 'Ativa',
     applicantsCount: 0,
-    ...jobData,
+    title: 'Nova Vaga',
+    company: 'ValeTech Soluções Digitais',
+    companyLogo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
+    type: 'Tempo Integral',
+    modality: 'Presencial',
+    city: 'Ivaiporã',
+    level: 'Júnior',
+    salary: 'A Combinar',
+    workingHours: '08:00 às 18:00 (Segunda a Sexta)',
+    recruiterPhone: '5543999887766',
+    recruiterEmail: 'empresa@ivaiconecta.com.br',
+    requiredSkills: ['Trabalho em Equipe', 'Comunicação'],
+    benefits: ['Vale Transporte'],
+    description: 'Estamos em busca de novos talentos para somar à nossa equipe no Vale do Ivaí.',
+    responsibilities: [
+      'Atuar nas rotinas diárias do setor',
+      'Contribuir com ideias e projetos da equipe'
+    ],
+    createdBy: 'empresa',
+    isVerifiedCompany: true,
+    ...cleanData,
   };
-  const updated = [newJob, ...jobs];
+
+  const updated = [newJob, ...jobs.filter(j => j && j.id !== newJob.id)];
+
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+    try {
+      localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+    } catch (lsErr) {
+      console.warn('[JobsService] LocalStorage quota warning ao salvar vaga:', lsErr);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
+    } catch (evErr) {
+      console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
+    }
   }
 
-  // Sincronização imediata no Firestore
+  // Sincronização assíncrona segura no Cloud Firestore
   try {
-    addDoc(collection(db, 'jobs'), newJob)
-      .then(docRef => { newJob.firestoreId = docRef.id; })
-      .catch(err => console.warn('[Firestore] Sync erro ao cadastrar vaga:', err.message));
-  } catch {}
+    if (db) {
+      const firestorePayload = { ...newJob };
+      delete firestorePayload.firestoreId;
+      addDoc(collection(db, 'jobs'), firestorePayload)
+        .then(docRef => { 
+          newJob.firestoreId = docRef.id;
+          if (typeof localStorage !== 'undefined') {
+            try {
+              const current = (getJobs('Todas as Cidades') || []).map(j => j.id === newJob.id ? { ...j, firestoreId: docRef.id } : j);
+              localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(current));
+            } catch {}
+          }
+        })
+        .catch(err => console.warn('[Firestore] Sync erro ao cadastrar vaga:', err.message));
+    }
+  } catch (fsErr) {
+    console.warn('[Firestore] Aviso ao gravar documento no Firestore:', fsErr);
+  }
 
   return newJob;
 }
@@ -158,6 +245,7 @@ export function updateJobStatus(jobId, action) {
   });
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
   }
   return updated;
 }
@@ -822,6 +910,7 @@ export function updateJob(jobId, patchData) {
   });
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
   }
   return updated;
 }
@@ -847,6 +936,7 @@ export function deleteJob(jobId) {
   const updated = jobs.filter(j => j.id !== Number(jobId) && j.id !== jobId && String(j.id) !== String(jobId));
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
   }
   if (target?.firestoreId) {
     try {

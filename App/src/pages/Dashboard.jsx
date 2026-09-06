@@ -96,14 +96,11 @@ export default function Dashboard() {
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-3 mt-5 flex-wrap">
-                {currentUser?.role === 'freelancer' && (
+              {currentUser?.role === 'freelancer' && (
+                <div className="flex gap-3 mt-5 flex-wrap">
                   <Link to="/servicos?action=new" className="btn btn-teal btn-sm">+ Cadastrar Serviço</Link>
-                )}
-                {currentUser?.role === 'empresa' && (
-                  <Link to="/vagas?action=new" className="btn btn-outline-white btn-sm">+ Publicar Vaga</Link>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column — Metrics Card */}
@@ -169,9 +166,6 @@ export default function Dashboard() {
               <h2 className="section-title text-primary-dark dark:text-white">Vagas em Destaque com Algoritmo de Matching</h2>
             </div>
             <div className="flex gap-3 flex-wrap shrink-0">
-              {currentUser?.role === 'empresa' && (
-                <Link to="/vagas?action=new" className="btn btn-teal btn-sm">+ Publicar Vaga</Link>
-              )}
               <Link to="/vagas" className="btn btn-primary btn-sm">Explorar Todas as Vagas</Link>
             </div>
           </div>

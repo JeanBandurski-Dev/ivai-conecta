@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
+import { getJobs, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
+import PublishJobModal from '../components/PublishJobModal';
 
 const TYPES = [
   { label: 'Todos os Tipos', value: 'Todos' },
@@ -52,15 +53,6 @@ export default function Vagas() {
 
   const [refreshKey,    setRefreshKey]    = useState(0);
 
-  // New Job Form State
-  const [newTitle,      setNewTitle]      = useState('');
-  const [newType,       setNewType]       = useState('Tempo Integral');
-  const [newModality,   setNewModality]   = useState('Presencial');
-  const [newCity,       setNewCity]       = useState('Ivaiporã');
-  const [newSkills,     setNewSkills]     = useState('');
-  const [newSalary,     setNewSalary]     = useState('A combinar');
-  const [newDesc,       setNewDesc]       = useState('');
-
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
 
   useEffect(() => {
@@ -68,7 +60,7 @@ export default function Vagas() {
       setLiveJobs(data);
     });
     return () => unsub();
-  }, []);
+  }, [refreshKey]);
 
   const allJobs = liveJobs;
   const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
@@ -93,38 +85,6 @@ export default function Vagas() {
       setFilterCity(selectedCity);
     }
   }, [selectedCity]);
-
-  const handleCreateJob = (e) => {
-    e.preventDefault();
-    if (!newTitle.trim()) {
-      showToast('Por favor, informe o título da vaga.');
-      return;
-    }
-
-    const jobPayload = {
-      title: newTitle.trim(),
-      company: currentUser?.name || 'Empresa do Vale do Ivaí',
-      companyLogo: currentUser?.avatar || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150',
-      city: newCity,
-      type: newType,
-      modality: newModality,
-      salary: newSalary || 'A combinar',
-      description: newDesc.trim() || 'Vaga publicada via Ivaí Conecta.',
-      requiredSkills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : ['Comunicação', 'Trabalho em Equipe'],
-      recruiterPhone: currentUser?.phone || '5543999887766',
-      recruiterEmail: currentUser?.email || 'empresa@ivaiconecta.com.br',
-      createdBy: currentUser?.uid || currentUser?.email || 'empresa',
-    };
-
-    addJob(jobPayload);
-    showToast('Vaga publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
-    setShowModal(false);
-    setNewTitle('');
-    setNewDesc('');
-    setNewSkills('');
-    setParams({});
-    setRefreshKey(k => k + 1);
-  };
 
   const toggleSkill = (skill) => {
     setSelectedSkills(prev =>
@@ -209,14 +169,12 @@ export default function Vagas() {
               </p>
             </div>
 
-            {currentUser?.role === 'empresa' && (
-              <button
-                onClick={() => setShowModal(true)}
-                className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2"
-              >
-                <Plus size={18} /> Publicar Nova Vaga
-              </button>
-            )}
+            <button
+              onClick={() => setShowModal(true)}
+              className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <Plus size={18} /> Publicar Nova Vaga
+            </button>
           </div>
         </div>
       </header>
@@ -398,91 +356,24 @@ export default function Vagas() {
       )}
 
       {/* New Job Modal */}
-      {showNewModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Publicar Nova Vaga</h3>
-              <button onClick={() => setShowModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
-            </div>
-            <form onSubmit={handleCreateJob} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Título da Vaga *</label>
-                <input
-                  type="text"
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                  className="form-control"
-                  placeholder="Ex: Desenvolvedor Front-end Junior"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="form-group">
-                  <label className="form-label">Tipo de Contratação</label>
-                  <select value={newType} onChange={e => setNewType(e.target.value)} className="form-control">
-                    {TYPES.slice(1).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Modalidade</label>
-                  <select value={newModality} onChange={e => setNewModality(e.target.value)} className="form-control">
-                    {MODALITIES.slice(1).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="form-group">
-                  <label className="form-label">Cidade no Vale do Ivaí</label>
-                  <select value={newCity} onChange={e => setNewCity(e.target.value)} className="form-control">
-                    {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Faixa Salarial</label>
-                  <input
-                    type="text"
-                    value={newSalary}
-                    onChange={e => setNewSalary(e.target.value)}
-                    className="form-control"
-                    placeholder="Ex: R$ 2.500 ou A combinar"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Habilidades Necessárias (separadas por vírgula)</label>
-                <input
-                  type="text"
-                  value={newSkills}
-                  onChange={e => setNewSkills(e.target.value)}
-                  className="form-control"
-                  placeholder="Ex: React, JavaScript, Git, Tailwind"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Descrição das Atividades &amp; Benefícios</label>
-                <textarea
-                  value={newDesc}
-                  onChange={e => setNewDesc(e.target.value)}
-                  className="form-control"
-                  rows={3}
-                  placeholder="Descreva o papel, principais responsabilidades e requisitos..."
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">Publicar Vaga</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PublishJobModal
+        isOpen={showNewModal}
+        onClose={() => {
+          setShowModal(false);
+          setParams({});
+        }}
+        onJobCreated={(created) => {
+          setQuery('');
+          setFilterCity('Todas as Cidades');
+          setFilterType('Todos');
+          setFilterModality('Todas');
+          setMinMatch(0);
+          setSelectedSkills([]);
+          setSortBy('recent');
+          setLiveJobs(getJobs('Todas as Cidades'));
+          setRefreshKey(k => k + 1);
+        }}
+      />
     </>
   );
 }

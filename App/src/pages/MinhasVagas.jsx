@@ -12,11 +12,13 @@ import {
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
+import PublishJobModal from '../components/PublishJobModal';
 
 export default function MinhasVagas() {
   const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
   const [, forceUpdate] = useState(0);
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
   const isCompany   = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
@@ -124,9 +126,12 @@ export default function MinhasVagas() {
             </div>
 
             {isCompany && (
-              <Link to="/vagas?action=new" className="btn btn-teal px-6 py-3 font-bold shadow-md shrink-0">
+              <button
+                onClick={() => setShowPublishModal(true)}
+                className="btn btn-teal px-6 py-3 font-bold shadow-md shrink-0 flex items-center gap-2 cursor-pointer"
+              >
                 <Plus size={18} /> Publicar Nova Vaga
-              </Link>
+              </button>
             )}
           </div>
         </div>
@@ -275,7 +280,12 @@ export default function MinhasVagas() {
                 </div>
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga criada ainda.</p>
                 <p className="text-sm text-gray-400 dark:text-slate-400 mb-5 max-w-md mx-auto">Publique uma vaga para começar a receber candidaturas de alunos e talentos locais da região do Vale do Ivaí.</p>
-                <Link to="/vagas?action=new" className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs">Publicar Primeira Vaga</Link>
+                <button
+                  onClick={() => setShowPublishModal(true)}
+                  className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs cursor-pointer"
+                >
+                  Publicar Primeira Vaga
+                </button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -505,6 +515,15 @@ export default function MinhasVagas() {
           </div>
         </div>
       )}
+      {/* Modal: Publicar Nova Vaga */}
+      <PublishJobModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onJobCreated={() => {
+          setLiveJobs(getJobs('Todas as Cidades'));
+          forceUpdate(n => n + 1);
+        }}
+      />
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
@@ -8,12 +8,15 @@ import {
 import { getJobs, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
+import PublishJobModal from '../components/PublishJobModal';
 
 export default function PerfilEmpresa() {
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [company, setCompany] = useState({
@@ -30,7 +33,9 @@ export default function PerfilEmpresa() {
     perks:    currentUser?.perks || ['Vale Refeição (R$ 35/dia)', 'Plano de Saúde Unimed', 'Home Office Híbrido', 'Participação nos Lucros (PPR)', 'Auxílio Educação & Cursos', 'Ambiente de Inovação'],
   });
 
-  const jobs = getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]));
+  const jobs = useMemo(() => {
+    return getJobs('Todas as Cidades').filter(j => j.company.toLowerCase().includes(company.name.toLowerCase().split(' ')[0]));
+  }, [company.name, refreshKey]);
 
   const isCompanyOwner = currentUser?.role === 'empresa';
 
@@ -322,11 +327,12 @@ export default function PerfilEmpresa() {
                 <p className="text-sm text-gray-500 dark:text-slate-400">Vagas abertas ativas publicadas por {company.name}.</p>
               </div>
 
-              {isCompanyOwner && (
-                <Link to="/vagas?action=new" className="btn btn-teal btn-sm font-bold shadow-md">
-                  <Plus size={16} /> Publicar Nova Vaga
-                </Link>
-              )}
+              <button
+                onClick={() => setShowPublishModal(true)}
+                className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={16} /> Publicar Nova Vaga
+              </button>
             </div>
 
             {jobs.length === 0 ? (
@@ -419,6 +425,12 @@ export default function PerfilEmpresa() {
           </div>
         </div>
       )}
+      {/* Modal: Publicar Nova Vaga */}
+      <PublishJobModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onJobCreated={() => setRefreshKey(k => k + 1)}
+      />
     </>
   );
 }
