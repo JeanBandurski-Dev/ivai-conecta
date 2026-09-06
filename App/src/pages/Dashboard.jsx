@@ -172,13 +172,13 @@ export default function Dashboard() {
       </header>
 
       {/* ── BRAND PILLARS BAR ── */}
-      <section className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 py-6 transition-colors duration-300">
+      <section className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 py-6 transition-colors duration-300">
         <div className="container">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
             {PILLARS.map((p, i) => (
               <div
                 key={i}
-                className="flex items-center justify-center p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 hover:border-primary-blue dark:hover:border-blue-400 hover:shadow-md transition-all text-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-200"
+                className="flex items-center justify-center p-3.5 rounded-2xl border border-gray-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 hover:border-primary-blue dark:hover:border-blue-400 hover:shadow-md transition-all text-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-200"
               >
                 {p}
               </div>
@@ -188,8 +188,8 @@ export default function Dashboard() {
       </section>
 
       {/* ── TALENTS CAROUSEL ── */}
-      <section className="section bg-gray-50/50 dark:bg-slate-950/40 overflow-hidden transition-colors duration-300">
-        <div className="container">
+      <section className="section bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-300 relative">
+        <div className="container relative z-10">
           <div className="section-header">
             <div>
               <div className="section-subtitle dark:text-sky-400">Banco de Talentos</div>
@@ -209,8 +209,8 @@ export default function Dashboard() {
       </section>
 
       {/* ── EMPRESAS PARCEIRAS & CADASTRADAS ── */}
-      <section className="section bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 overflow-hidden transition-colors duration-300">
-        <div className="container">
+      <section className="section bg-gradient-to-b from-blue-50/20 via-white to-white dark:from-slate-950/60 dark:via-slate-900 dark:to-slate-900 border-t border-gray-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 relative">
+        <div className="container relative z-10">
           <div className="section-header">
             <div>
               <div className="section-subtitle dark:text-sky-400">Ecossistema Empresarial &amp; Empregabilidade</div>
@@ -232,8 +232,8 @@ export default function Dashboard() {
       </section>
 
       {/* ── JOBS ── */}
-      <section className="section bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300">
-        <div className="container">
+      <section className="section bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300 relative">
+        <div className="container relative z-10">
           <div className="section-header">
             <div>
               <div className="section-subtitle dark:text-sky-400">Oportunidades Regionais</div>
@@ -260,8 +260,8 @@ export default function Dashboard() {
       </section>
 
       {/* ── SERVICES ── */}
-      <section className="section bg-gray-50/50 dark:bg-slate-950/40 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300">
-        <div className="container">
+      <section className="section bg-gradient-to-b from-blue-50/20 via-white to-white dark:from-slate-950/60 dark:via-slate-900 dark:to-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors duration-300 relative">
+        <div className="container relative z-10">
           <div className="section-header">
             <div>
               <div className="section-subtitle dark:text-sky-400">Marketplace Vale do Ivaí</div>
