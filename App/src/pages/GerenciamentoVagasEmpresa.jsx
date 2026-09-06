@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, CheckCircle2, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck,
@@ -76,7 +76,8 @@ const DEMO_COMPANY_JOBS = [
 export default function GerenciamentoVagasEmpresa() {
   const { currentUser, showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [updateCount, forceUpdate] = useState(0);
   const [now, setNow] = useState(new Date());
 
@@ -85,9 +86,75 @@ export default function GerenciamentoVagasEmpresa() {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Helper para normalizar o identificador da aba ──
+  const normalizeTab = (t) => {
+    if (!t) return null;
+    const lower = String(t).toLowerCase().trim();
+    if (lower === 'jobs_list' || lower === 'minhas-vagas' || lower === 'minhas_vagas' || lower === 'vagas' || lower === 'jobs') return 'jobs_list';
+    if (lower === 'pipeline' || lower === 'kanban' || lower === 'funil') return 'pipeline';
+    if (lower === 'stage_settings' || lower === 'etapas' || lower === 'configurar-etapas' || lower === 'configurar_etapas') return 'stage_settings';
+    if (lower === 'analytics' || lower === 'indicadores' || lower === 'metricas') return 'analytics';
+    return null;
+  };
+
   // ── Tab Navigation ──
   // 'pipeline' | 'jobs_list' | 'stage_settings' | 'analytics'
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'pipeline');
+  const [activeTab, setActiveTab] = useState(() => {
+    // 1. Prioridade máxima: parâmetro da URL ?tab=...
+    const fromUrl = normalizeTab(searchParams.get('tab'));
+    if (fromUrl) return fromUrl;
+
+    // 2. Se a rota acessada for explicitamente /minhas-vagas sem query param
+    if (location.pathname.includes('/minhas-vagas')) {
+      const fromStorage = normalizeTab(typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_active_tab') : null);
+      return fromStorage || 'jobs_list';
+    }
+
+    // 3. Fallback: última aba gravada no localStorage para este dispositivo
+    const fromStorage = normalizeTab(typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_active_tab') : null);
+    if (fromStorage) return fromStorage;
+
+    return 'pipeline';
+  });
+
+  // Função para troca explícita de aba (atualiza state, URL e localStorage de forma imediata)
+  const handleTabChange = (newTab) => {
+    const norm = normalizeTab(newTab) || newTab;
+    setActiveTab(norm);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ivai_empresa_gerenciamento_active_tab', norm);
+    }
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', norm);
+      return next;
+    }, { replace: true });
+  };
+
+  // Sincroniza parâmetros na URL e localStorage quando o estado mudar
+  useEffect(() => {
+    if (!activeTab) return;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ivai_empresa_gerenciamento_active_tab', activeTab);
+    }
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      let changed = false;
+      if (next.get('tab') !== activeTab) {
+        next.set('tab', activeTab);
+        changed = true;
+      }
+      return changed ? next : prev;
+    }, { replace: true });
+  }, [activeTab, setSearchParams]);
+
+  // Sincroniza se o usuário usar os botões Voltar / Avançar do navegador
+  useEffect(() => {
+    const urlTab = normalizeTab(searchParams.get('tab'));
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams]);
   
   // ── Company Jobs State ──
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
@@ -111,8 +178,13 @@ export default function GerenciamentoVagasEmpresa() {
     return userCompanyMatch;
   }, [liveJobs, currentUser]);
 
-  // Selected Job for Pipeline
-  const [selectedJobId, setSelectedJobId] = useState(allCompanyJobs[0]?.id || 'default');
+  // Selected Job for Pipeline (com persistência em localStorage / query param)
+  const [selectedJobId, setSelectedJobId] = useState(() => {
+    const fromParam = searchParams.get('jobId') || searchParams.get('job');
+    if (fromParam) return fromParam;
+    const fromStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_selected_job') : null;
+    return fromStorage || allCompanyJobs[0]?.id || 'default';
+  });
   const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
 
   useEffect(() => {
@@ -122,15 +194,31 @@ export default function GerenciamentoVagasEmpresa() {
         if (!exists) {
           setSelectedJobId(allCompanyJobs[0].id);
         }
+      } else {
+        setSelectedJobId(allCompanyJobs[0].id);
       }
     } else {
       setSelectedJobId('default');
     }
   }, [allCompanyJobs, selectedJobId]);
 
+  useEffect(() => {
+    if (selectedJobId && selectedJobId !== 'default' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('ivai_empresa_gerenciamento_selected_job', String(selectedJobId));
+    }
+  }, [selectedJobId]);
 
   // Pipeline View Mode: 'kanban' | 'list'
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(() => {
+    const fromStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_view_mode') : null;
+    return (fromStorage === 'kanban' || fromStorage === 'list') ? fromStorage : 'list';
+  });
+
+  useEffect(() => {
+    if (viewMode && typeof localStorage !== 'undefined') {
+      localStorage.setItem('ivai_empresa_gerenciamento_view_mode', viewMode);
+    }
+  }, [viewMode]);
 
   // Pipeline Filters
   const [candidateSearch, setCandidateSearch] = useState('');
@@ -787,7 +875,7 @@ export default function GerenciamentoVagasEmpresa() {
       if (created?.id) {
         setSelectedJobId(created.id);
       }
-      setActiveTab('pipeline');
+      handleTabChange('pipeline');
     }
     forceUpdate(n => n + 1);
   };
@@ -1038,7 +1126,7 @@ export default function GerenciamentoVagasEmpresa() {
         <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center overflow-x-auto scrollbar-none gap-6 pt-1">
             <button
-              onClick={() => setActiveTab('pipeline')}
+              onClick={() => handleTabChange('pipeline')}
               className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 activeTab === 'pipeline'
                   ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
@@ -1049,7 +1137,7 @@ export default function GerenciamentoVagasEmpresa() {
             </button>
 
             <button
-              onClick={() => setActiveTab('jobs_list')}
+              onClick={() => handleTabChange('jobs_list')}
               className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 activeTab === 'jobs_list'
                   ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
@@ -1060,7 +1148,7 @@ export default function GerenciamentoVagasEmpresa() {
             </button>
 
             <button
-              onClick={() => setActiveTab('stage_settings')}
+              onClick={() => handleTabChange('stage_settings')}
               className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 activeTab === 'stage_settings'
                   ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
@@ -1071,7 +1159,7 @@ export default function GerenciamentoVagasEmpresa() {
             </button>
             
             <button
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => handleTabChange('analytics')}
               className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 activeTab === 'analytics'
                   ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
@@ -2134,7 +2222,7 @@ export default function GerenciamentoVagasEmpresa() {
                         <button
                           onClick={() => {
                             setSelectedJobId(job.id);
-                            setActiveTab('pipeline');
+                            handleTabChange('pipeline');
                           }}
                           className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 rounded-xl cursor-pointer"
                         >
