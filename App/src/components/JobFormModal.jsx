@@ -200,7 +200,7 @@ export default function JobFormModal({
       return;
     }
 
-    const companyName = currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || initialJob?.company || 'ValeTech Soluções Digitais';
+    const companyName = currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || initialJob?.company || 'Minha Empresa';
     const companyLogo = currentUser?.avatar || initialJob?.companyLogo || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=150';
 
     const payload = {

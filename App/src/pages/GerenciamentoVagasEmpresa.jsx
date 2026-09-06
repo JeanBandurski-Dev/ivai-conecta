@@ -929,7 +929,7 @@ export default function GerenciamentoVagasEmpresa() {
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                {currentUser?.name || 'ValeTech Soluções Digitais'}
+                {currentUser?.name || currentUser?.razaoSocial || 'Minha Empresa'}
               </h1>
             </div>
 

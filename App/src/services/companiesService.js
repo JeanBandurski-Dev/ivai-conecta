@@ -7,92 +7,11 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { getJobs, subscribeToJobs } from './jobsService.js';
-import { getTalents, subscribeToTalents } from './talentsService.js';
-import { getServices, subscribeToServices } from './servicesService.js';
 import { getUsersDB } from './authService.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 
-export const DEFAULT_COMPANIES = [
-  {
-    id: 'empresa_valetech',
-    name: 'ValeTech Soluções Digitais',
-    city: 'Ivaiporã',
-    sector: 'Tecnologia & Inovação',
-    logo: 'https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&q=80&w=200',
-    about: 'Líder em desenvolvimento de software e transformação digital no Vale do Ivaí. Foco em formação e absorção de talentos regionais.',
-    cnpj: '45.123.890/0001-12',
-    isVerified: true,
-    rating: 4.9,
-    reviews: 18,
-    perks: ['Trabalho Híbrido', 'Bolsa de Estudos', 'Plano de Saúde', 'Ambiente Colaborativo']
-  },
-  {
-    id: 'empresa_coamo',
-    name: 'Coamo Agroindustrial Cooperativa',
-    city: 'Ivaiporã',
-    sector: 'Agronegócio & Cooperativismo',
-    logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200',
-    about: 'Uma das maiores cooperativas da América Latina, gerando centenas de oportunidades industriais, administrativas e agronômicas no Vale do Ivaí.',
-    cnpj: '75.890.123/0001-45',
-    isVerified: true,
-    rating: 4.8,
-    reviews: 34,
-    perks: ['Participação nos Resultados', 'Plano Odontológico', 'Vale Alimentação', 'Seguro de Vida']
-  },
-  {
-    id: 'empresa_sicredi',
-    name: 'Sicredi Vale do Ivaí',
-    city: 'Ivaiporã',
-    sector: 'Instituição Financeira Cooperativa',
-    logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=200',
-    about: 'Construindo juntos uma sociedade mais próspera. Oportunidades nas áreas financeira, de atendimento, crédito e tecnologia bancária regional.',
-    cnpj: '01.234.567/0001-89',
-    isVerified: true,
-    rating: 4.9,
-    reviews: 26,
-    perks: ['Previdência Privada', 'Auxílio Educação', 'Plano de Saúde Unimed', 'Carreira Estruturada']
-  },
-  {
-    id: 'empresa_hospital_ivaipora',
-    name: 'Hospital e Maternidade Ivaiporã',
-    city: 'Ivaiporã',
-    sector: 'Saúde & Cuidados Hospitalares',
-    logo: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=200',
-    about: 'Referência em atendimento médico e emergencial no Vale do Ivaí. Integração constante de técnicos, enfermeiros, médicos e equipe administrativa.',
-    cnpj: '12.345.678/0001-90',
-    isVerified: true,
-    rating: 4.7,
-    reviews: 19,
-    perks: ['Refeitório no Local', 'Treinamento Hospitalar', 'Adicional de Insalubridade']
-  },
-  {
-    id: 'empresa_super_ivaipora',
-    name: 'Supermercados Ivaiporã',
-    city: 'Ivaiporã',
-    sector: 'Varejo & Distribuição Alimentícia',
-    logo: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=200',
-    about: 'Rede varejista tradicional presente nos principais polos do Vale do Ivaí, contratando jovens aprendizes, operadores de caixa e lideranças de loja.',
-    cnpj: '23.456.789/0001-01',
-    isVerified: true,
-    rating: 4.6,
-    reviews: 15,
-    perks: ['Vale Transporte', 'Desconto em Compras', 'Plano de Carreira Interno']
-  },
-  {
-    id: 'empresa_inovavale',
-    name: 'InovaVale Hub Regional',
-    city: 'Jardim Alegre',
-    sector: 'Inovação & Coworking',
-    logo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=200',
-    about: 'Espaço compartilhado e aceleradora de negócios locais conectando startups, autônomos e cooperativas da região central do Paraná.',
-    cnpj: '34.567.890/0001-23',
-    isVerified: true,
-    rating: 4.9,
-    reviews: 12,
-    perks: ['Ambiente Aberto', 'Café & Networking', 'Capacitação Contínua']
-  }
-];
+export const DEFAULT_COMPANIES = [];
 
 export function getCompanies(city = 'Todas as Cidades') {
   const users = getUsersDB() || [];
