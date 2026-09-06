@@ -15,22 +15,23 @@ export default function WhatsAppContactModal({ isOpen, onClose, service, onOpenC
   const [customText, setCustomText] = useState('');
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen || !service) return null;
-
-  const providerName = service.providerName || 'Profissional';
-  const serviceTitle = service.title || service.name || service.category || 'Serviço';
-  const city = service.city || 'Ivaiporã';
-  const rawPhone = service.phone || '';
+  const providerName = service?.providerName || 'Profissional';
+  const serviceTitle = service?.title || service?.name || service?.category || 'Serviço';
+  const city = service?.city || 'Ivaiporã';
+  const rawPhone = service?.phone || '';
   const cleanPhone = sanitizeWhatsAppPhone(rawPhone);
   const hasPhone = Boolean(cleanPhone && cleanPhone.length >= 10);
 
-  // Inicializa o texto da mensagem quando abre ou muda o preset
+  // Inicializa o texto da mensagem quando abre ou muda o preset (sem violar regras de hooks)
   useEffect(() => {
+    if (!isOpen || !service) return;
     const preset = WHATSAPP_MESSAGE_PRESETS.find(p => p.id === selectedPresetId);
     if (preset) {
       setCustomText(preset.getTemplate({ providerName, serviceTitle, city }));
     }
-  }, [selectedPresetId, providerName, serviceTitle, city]);
+  }, [isOpen, service, selectedPresetId, providerName, serviceTitle, city]);
+
+  if (!isOpen || !service) return null;
 
   const handleSelectPreset = (id) => {
     setSelectedPresetId(id);

@@ -144,12 +144,14 @@ export default function ServiceCard({ service, onDelete }) {
       </div>
 
       {/* Modal Interativo de Contato WhatsApp com Presets de Mensagem */}
-      <WhatsAppContactModal
-        isOpen={showWhatsAppModal}
-        onClose={() => setShowWhatsAppModal(false)}
-        service={service}
-        onOpenChat={handleContactChat}
-      />
+      {showWhatsAppModal && (
+        <WhatsAppContactModal
+          isOpen={showWhatsAppModal}
+          onClose={() => setShowWhatsAppModal(false)}
+          service={service}
+          onOpenChat={handleContactChat}
+        />
+      )}
     </>
   );
 }
