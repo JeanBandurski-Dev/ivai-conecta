@@ -968,7 +968,7 @@ export default function GerenciamentoVagasEmpresa() {
 
             <div className="flex items-center gap-3 flex-wrap">
               <Link
-                to="/empresa/1"
+                to={currentUser?.uid ? `/empresa/${currentUser.uid}` : '/empresa'}
                 className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
               >
                 <Eye size={15} /> Ver Perfil

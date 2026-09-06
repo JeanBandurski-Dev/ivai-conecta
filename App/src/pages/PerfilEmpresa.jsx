@@ -17,17 +17,6 @@ export default function PerfilEmpresa() {
   const [editModal, setEditModal] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const isCompanyOwner = Boolean(
-    currentUser && currentUser.role === 'empresa' && (
-      !id ||
-      String(id) === String(currentUser.uid) ||
-      String(id) === String(currentUser.id) ||
-      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
-      (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
-      (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase()))
-    )
-  );
-
   const [company, setCompany] = useState({
     name:     currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Cadastrada',
     city:     currentUser?.city || 'Ivaiporã',
@@ -42,8 +31,43 @@ export default function PerfilEmpresa() {
     perks:    currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
   });
 
+  const isCompanyOwner = Boolean(
+    currentUser && currentUser.role === 'empresa' && (
+      !id ||
+      String(id) === 'empresa' ||
+      String(id) === String(currentUser.uid) ||
+      String(id) === String(currentUser.id) ||
+      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
+      (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
+      (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase())) ||
+      (currentUser.name && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+      (currentUser.razaoSocial && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+      (currentUser.nomeFantasia && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
+      (company?.name && currentUser?.name && company.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+      (company?.name && currentUser?.razaoSocial && company.name.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+      (company?.name && currentUser?.nomeFantasia && company.name.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
+      (company?.email && currentUser?.email && company.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+      (company?.cnpj && currentUser?.cnpj && company.cnpj.replace(/\D/g, '') === currentUser.cnpj.replace(/\D/g, ''))
+    )
+  );
+
   useEffect(() => {
-    if (isCompanyOwner && currentUser) {
+    const isOwnerByAuthOrId = Boolean(
+      currentUser && currentUser.role === 'empresa' && (
+        !id ||
+        String(id) === 'empresa' ||
+        String(id) === String(currentUser.uid) ||
+        String(id) === String(currentUser.id) ||
+        (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
+        (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
+        (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase())) ||
+        (currentUser.name && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+        (currentUser.razaoSocial && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+        (currentUser.nomeFantasia && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+      )
+    );
+
+    if (isOwnerByAuthOrId && currentUser) {
       setCompany({
         name:     currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada',
         city:     currentUser.city || 'Ivaiporã',
@@ -94,10 +118,19 @@ export default function PerfilEmpresa() {
             city: matchJob.city || prev.city,
             logo: matchJob.companyLogo || prev.logo,
           }));
+        } else if (currentUser && currentUser.role === 'empresa') {
+          setCompany(prev => ({
+            ...prev,
+            name: currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || prev.name,
+            city: currentUser.city || prev.city,
+            sector: currentUser.sector || prev.sector,
+            logo: currentUser.avatar || prev.logo,
+            about: currentUser.about || prev.about,
+          }));
         }
       }
     }
-  }, [currentUser, isCompanyOwner, id]);
+  }, [currentUser, id]);
 
   const allJobs = getJobs('Todas as Cidades');
   const jobs = allJobs.filter(j => {
@@ -207,35 +240,37 @@ export default function PerfilEmpresa() {
 
             {isCompanyOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
+                <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md cursor-pointer">
                   <Edit3 size={15} /> Editar Perfil da Empresa
                 </button>
-                <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
+                <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md cursor-pointer">
                   <Building2 size={15} /> Gerenciar Minhas Vagas
                 </Link>
               </div>
             ) : (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => {
-                    if (isCompanyOwner) {
-                      showToast('⚠️ Você não pode iniciar uma conversa com sua própria empresa.');
-                      return;
-                    }
-                    const companyEmail = company.email || `${(company.name || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
-                    
-                    startChatWith({
-                      name: company.name,
-                      email: companyEmail,
-                      role: 'empresa',
-                      avatar: company.logo
-                    }, `Contato com Empresa: ${company.name}`);
-                  }}
-                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
-                >
-                  <MessageSquare size={15} /> 💬 Conversar com a Empresa
-                </button>
-              </div>
+              currentUser?.role !== 'empresa' && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => {
+                      if (isCompanyOwner) {
+                        showToast('⚠️ Você não pode iniciar uma conversa com sua própria empresa.');
+                        return;
+                      }
+                      const companyEmail = company.email || `${(company.name || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+                      
+                      startChatWith({
+                        name: company.name,
+                        email: companyEmail,
+                        role: 'empresa',
+                        avatar: company.logo
+                      }, `Contato com Empresa: ${company.name}`);
+                    }}
+                    className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                  >
+                    <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                  </button>
+                </div>
+              )
             )}
           </div>
 

@@ -306,7 +306,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {!isJobOwner && (
+            {!isJobOwner && currentUser?.role !== 'empresa' && (
               <button
                 type="button"
                 onClick={handleOpenChat}

@@ -147,7 +147,7 @@ export default function CompanyCard({ company }) {
         </Link>
 
         {/* Direct Chat with Company */}
-        {!isOwner && (
+        {!isOwner && currentUser?.role !== 'empresa' && (
           <button
             onClick={handleStartChat}
             className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"
