@@ -37,7 +37,10 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
     (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
     (job.createdBy && currentUser.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (currentUser.name && company && company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+    (job.recruiterEmail && currentUser.email && job.recruiterEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+    (currentUser.name && company && company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+    (currentUser.razaoSocial && company && company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+    (currentUser.nomeFantasia && company && company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
@@ -83,6 +86,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const handleOpenChat = async () => {
     if (!currentUser) {
       showToast('Faça login como Aluno ou Candidato para conversar com a empresa!');
+      return;
+    }
+
+    if (isJobOwner) {
+      showToast('⚠️ Você é o autor desta vaga e não pode iniciar uma conversa com sua própria empresa.');
       return;
     }
 
@@ -298,13 +306,15 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={handleOpenChat}
-              className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <MessageSquare size={14} /> Conversar no Chat
-            </button>
+            {!isJobOwner && (
+              <button
+                type="button"
+                onClick={handleOpenChat}
+                className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <MessageSquare size={14} /> Conversar no Chat
+              </button>
+            )}
 
             {isJobOwner ? (
               <div className="flex items-center gap-2">

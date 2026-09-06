@@ -22,7 +22,9 @@ export default function PerfilEmpresa() {
       !id ||
       String(id) === String(currentUser.uid) ||
       String(id) === String(currentUser.id) ||
-      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase()))
+      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
+      (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
+      (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase()))
     )
   );
 
@@ -190,7 +192,11 @@ export default function PerfilEmpresa() {
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => {
-                    const companyEmail = company.email || currentUser?.email || 'empresa@ivaiconecta.com.br';
+                    if (isCompanyOwner) {
+                      showToast('⚠️ Você não pode iniciar uma conversa com sua própria empresa.');
+                      return;
+                    }
+                    const companyEmail = company.email || `${(company.name || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
                     
                     startChatWith({
                       name: company.name,

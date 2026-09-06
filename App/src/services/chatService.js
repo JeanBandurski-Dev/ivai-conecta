@@ -41,10 +41,14 @@ export function isSameUser(userA, userB) {
   if (!userA || !userB) return false;
   if (userA.uid && userB.uid && String(userA.uid) === String(userB.uid)) return true;
   if (userA.id && userB.id && String(userA.id) === String(userB.id)) return true;
+  if (userA.uid && userB.id && String(userA.uid) === String(userB.id)) return true;
+  if (userA.id && userB.uid && String(userA.id) === String(userB.uid)) return true;
   if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
-  const nameA = (userA.name || userA.razaoSocial || userA.nomeFantasia || '').toLowerCase().trim();
-  const nameB = (userB.name || userB.razaoSocial || userB.nomeFantasia || '').toLowerCase().trim();
+  
+  const nameA = (userA.name || userA.razaoSocial || userA.nomeFantasia || userA.company || userA.providerName || '').toLowerCase().trim();
+  const nameB = (userB.name || userB.razaoSocial || userB.nomeFantasia || userB.company || userB.providerName || '').toLowerCase().trim();
   if (nameA && nameB && nameA === nameB) return true;
+  
   return false;
 }
 
@@ -163,7 +167,8 @@ export function subscribeToUserThreads(userEmail, callback) {
   const emitLocal = () => {
     const allThreads = getChatThreads();
     const myThreads = allThreads.filter(t =>
-      t.participants?.some(p => matchesUserEmail(p, cleanEmail))
+      t.participants?.some(p => matchesUserEmail(p, cleanEmail)) &&
+      !(t.participants?.length === 2 && matchesUserEmail(t.participants[0], t.participants[1]))
     );
     myThreads.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     callback(myThreads);
@@ -408,10 +413,19 @@ export async function sendChatMessage(chatId, senderUser, text) {
   return messageData;
 }
 
-// 4. Iniciar uma nova conversa (ou recuperar existente)
 export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'Contato Direto') {
+  if (!currentUser || !targetUser) {
+    throw new Error('Usuários inválidos para iniciar conversa.');
+  }
+
   const user1Email = (currentUser?.email || '').toLowerCase().trim();
   const user2Email = (targetUser?.email || '').toLowerCase().trim();
+
+  // Bloqueio rigoroso: ninguém (empresa, freelancer ou aluno) pode criar chat consigo mesmo
+  if (isSameUser(currentUser, targetUser) || (user1Email && user2Email && user1Email === user2Email)) {
+    console.warn('[Chat] Tentativa de iniciar conversa consigo mesmo bloqueada.');
+    throw new Error('Você não pode iniciar uma conversa consigo mesmo.');
+  }
 
   // Cria o ID determinístico único
   const sortedEmails = [user1Email, user2Email].sort();

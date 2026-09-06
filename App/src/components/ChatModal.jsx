@@ -7,7 +7,8 @@ import {
   sendChatMessage,
   getChatThreads,
   deleteChatThread,
-  matchesUserEmail
+  matchesUserEmail,
+  isSameUser
 } from '../services/chatService';
 import { getUsersDB } from '../lib/ivaiConecta';
 
@@ -129,9 +130,12 @@ export default function ChatModal({ onClose }) {
   const activeThread = threads.find(t => t.id === activeThreadId);
   const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
-  const allUsers = getUsersDB();
+  const allUsers = getUsersDB() || [];
   const myEmail = currentUser?.email?.toLowerCase().trim();
-  const availableContacts = allUsers.filter(u => !matchesUserEmail(u.email, myEmail));
+  const availableContacts = allUsers.filter(u => 
+    !isSameUser(currentUser, u) && 
+    !matchesUserEmail(u.email, myEmail)
+  );
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>

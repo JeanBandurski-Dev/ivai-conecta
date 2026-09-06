@@ -11,7 +11,9 @@ export default function ServiceCard({ service, onDelete }) {
 
   const isOwner = currentUser && (
     (createdBy && currentUser.uid && String(createdBy) === String(currentUser.uid)) ||
+    (createdBy && currentUser.id && String(createdBy) === String(currentUser.id)) ||
     (createdBy && currentUser.email && String(createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+    (providerEmail && currentUser.email && providerEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
     (currentUser.name && providerName && currentUser.name.toLowerCase().trim() === providerName.toLowerCase().trim())
   );
 
@@ -28,6 +30,11 @@ export default function ServiceCard({ service, onDelete }) {
   const handleContact = async () => {
     if (!currentUser) {
       showToast('Faça login para conversar com o prestador de serviço!');
+      return;
+    }
+
+    if (isOwner) {
+      showToast('⚠️ Você não pode enviar mensagens para o seu próprio anúncio de serviço.');
       return;
     }
 
@@ -84,14 +91,20 @@ export default function ServiceCard({ service, onDelete }) {
 
       {/* Action */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={handleContact}
-          className="btn btn-primary btn-sm w-full text-xs gap-1.5 cursor-pointer font-bold"
-        >
-          <MessageSquare size={14} />
-          Conversar no Chat
-        </button>
+        {isOwner ? (
+          <div className="text-xs text-center py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5">
+            <span>✨ Seu anúncio de serviço</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleContact}
+            className="btn btn-primary btn-sm w-full text-xs gap-1.5 cursor-pointer font-bold"
+          >
+            <MessageSquare size={14} />
+            Conversar no Chat
+          </button>
+        )}
       </div>
     </div>
   );
