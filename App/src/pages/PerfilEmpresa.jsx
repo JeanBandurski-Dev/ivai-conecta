@@ -5,7 +5,7 @@ import {
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
   BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera, MessageSquare
 } from 'lucide-react';
-import { getJobs, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
+import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 
@@ -58,18 +58,43 @@ export default function PerfilEmpresa() {
         perks:    currentUser.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
       });
     } else if (id) {
-      const allJobs = getJobs('Todas as Cidades');
-      const matchJob = allJobs.find(j =>
-        (j.createdBy && String(j.createdBy) === String(id)) ||
-        (j.company && j.company.toLowerCase() === decodeURIComponent(id).toLowerCase())
+      const allCompanies = getCompanies('Todas as Cidades');
+      const decodedId = decodeURIComponent(id).toLowerCase().trim();
+      const matchCompany = allCompanies.find(c =>
+        (c.id && String(c.id).toLowerCase() === decodedId) ||
+        (c.uid && String(c.uid).toLowerCase() === decodedId) ||
+        (c.name && c.name.toLowerCase().trim() === decodedId)
       );
-      if (matchJob) {
+
+      if (matchCompany) {
         setCompany(prev => ({
           ...prev,
-          name: matchJob.company || prev.name,
-          city: matchJob.city || prev.city,
-          logo: matchJob.companyLogo || prev.logo,
+          name: matchCompany.name || prev.name,
+          city: matchCompany.city || prev.city,
+          sector: matchCompany.sector || prev.sector,
+          size: matchCompany.size || prev.size || '10-50 colaboradores',
+          cnpj: matchCompany.cnpj || prev.cnpj,
+          rating: matchCompany.rating || prev.rating,
+          reviews: matchCompany.reviews || prev.reviews,
+          logo: matchCompany.logo || prev.logo,
+          about: matchCompany.about || prev.about,
+          history: matchCompany.history || prev.history || `Empresa atuante no ecossistema do Vale do Ivaí com sede em ${matchCompany.city || 'Ivaiporã'}, promovendo empregabilidade e inovação regional.`,
+          perks: matchCompany.perks && matchCompany.perks.length > 0 ? matchCompany.perks : prev.perks,
         }));
+      } else {
+        const allJobs = getJobs('Todas as Cidades');
+        const matchJob = allJobs.find(j =>
+          (j.createdBy && String(j.createdBy) === String(id)) ||
+          (j.company && j.company.toLowerCase() === decodedId)
+        );
+        if (matchJob) {
+          setCompany(prev => ({
+            ...prev,
+            name: matchJob.company || prev.name,
+            city: matchJob.city || prev.city,
+            logo: matchJob.companyLogo || prev.logo,
+          }));
+        }
       }
     }
   }, [currentUser, isCompanyOwner, id]);
@@ -86,10 +111,11 @@ export default function PerfilEmpresa() {
       );
     }
     if (id) {
+      const decoded = decodeURIComponent(id).toLowerCase().trim();
       return (
-        (j.createdBy && String(j.createdBy) === String(id)) ||
+        (j.createdBy && String(j.createdBy).toLowerCase() === decoded) ||
         (company.name && j.company && j.company.toLowerCase().trim() === company.name.toLowerCase().trim()) ||
-        (j.company && j.company.toLowerCase() === decodeURIComponent(id).toLowerCase())
+        (j.company && j.company.toLowerCase().trim() === decoded)
       );
     }
     return false;
