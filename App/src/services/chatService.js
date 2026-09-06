@@ -17,12 +17,31 @@ import {
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 export const STORAGE_KEY_DELETED_THREADS = 'ivai_conecta_deleted_threads';
+export const STORAGE_KEY_CHAT_READ_TIMESTAMPS = 'ivai_conecta_chat_read_timestamps';
+
 export function getDeletedThreads() {
   if (typeof localStorage === 'undefined') return [];
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY_DELETED_THREADS) || '[]');
   } catch {
     return [];
+  }
+}
+
+export function getReadTimestamps() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CHAT_READ_TIMESTAMPS);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveReadTimestamps(map) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_CHAT_READ_TIMESTAMPS, JSON.stringify(map));
+    window.dispatchEvent(new CustomEvent('ivai_chat_updated'));
   }
 }
 
@@ -35,6 +54,100 @@ export function matchesUserEmail(participantEmail, userEmail) {
   const p = participantEmail.toLowerCase().trim();
   const u = userEmail.toLowerCase().trim();
   return p === u;
+}
+
+/**
+ * Marca uma conversa como lida pelo usuário atual
+ */
+export function markThreadAsRead(threadId, userEmail) {
+  if (!threadId || !userEmail) return;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const key = `${threadId}_${cleanEmail}`;
+  const map = getReadTimestamps();
+  map[key] = Date.now();
+  saveReadTimestamps(map);
+}
+
+/**
+ * Calcula a quantidade de mensagens não lidas em uma conversa específica
+ */
+export function getThreadUnreadCount(thread, userEmail) {
+  if (!thread || !userEmail) return 0;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const key = `${thread.id}_${cleanEmail}`;
+  const map = getReadTimestamps();
+  const lastRead = map[key] || 0;
+
+  const messages = thread.messages || [];
+  let unread = 0;
+  for (const m of messages) {
+    const isFromOther = m.senderEmail && !matchesUserEmail(m.senderEmail, cleanEmail);
+    const msgTime = m.createdAt || 0;
+    if (isFromOther && msgTime > lastRead) {
+      unread++;
+    }
+  }
+  return unread;
+}
+
+/**
+ * Retorna o total geral de mensagens não lidas do usuário
+ */
+export function getTotalUnreadMessagesCount(userEmail) {
+  if (!userEmail) return 0;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const allThreads = getChatThreads();
+  const myThreads = allThreads.filter(t =>
+    t.participants?.some(p => matchesUserEmail(p, cleanEmail))
+  );
+
+  let total = 0;
+  for (const t of myThreads) {
+    total += getThreadUnreadCount(t, cleanEmail);
+  }
+  return total;
+}
+
+/**
+ * Escuta em tempo real o contador de mensagens não lidas
+ */
+export function subscribeToUnreadCount(userEmail, callback) {
+  if (!userEmail) {
+    callback(0);
+    return () => {};
+  }
+
+  const cleanEmail = userEmail.toLowerCase().trim();
+
+  const emit = () => {
+    const count = getTotalUnreadMessagesCount(cleanEmail);
+    callback(count);
+  };
+
+  // Disparo inicial imediato
+  emit();
+
+  const handleUpdate = () => emit();
+  window.addEventListener('storage', handleUpdate);
+  window.addEventListener('ivai_chat_updated', handleUpdate);
+
+  if (chatChannel) {
+    chatChannel.addEventListener('message', handleUpdate);
+  }
+
+  // Também assina a lista de conversas para atualizar quando chegarem mensagens remotas
+  const unsubThreads = subscribeToUserThreads(cleanEmail, () => {
+    emit();
+  });
+
+  return () => {
+    window.removeEventListener('storage', handleUpdate);
+    window.removeEventListener('ivai_chat_updated', handleUpdate);
+    if (chatChannel) {
+      chatChannel.removeEventListener('message', handleUpdate);
+    }
+    unsubThreads();
+  };
 }
 
 export function isSameUser(userA, userB) {

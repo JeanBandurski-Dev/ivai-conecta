@@ -8,7 +8,9 @@ import {
   getChatThreads,
   deleteChatThread,
   matchesUserEmail,
-  isSameUser
+  isSameUser,
+  markThreadAsRead,
+  getThreadUnreadCount
 } from '../services/chatService';
 import { getUsersDB } from '../lib/ivaiConecta';
 
@@ -91,6 +93,13 @@ export default function ChatModal({ onClose }) {
 
     return () => unsubscribe();
   }, [activeThreadId]);
+
+  // Marca conversa ativa como lida
+  useEffect(() => {
+    if (activeThreadId && currentUser?.email) {
+      markThreadAsRead(activeThreadId, currentUser.email);
+    }
+  }, [activeThreadId, currentUser?.email, messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -230,6 +239,7 @@ export default function ChatModal({ onClose }) {
                 {threads.map(t => {
                   const other = getOtherParticipant(t, currentUser);
                   const isSelected = t.id === activeThreadId;
+                  const threadUnread = getThreadUnreadCount(t, currentUser?.email);
 
                   return (
                     <div
@@ -246,7 +256,14 @@ export default function ChatModal({ onClose }) {
                     >
                       <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
                       <div className="min-w-0 flex-1 pr-5">
-                        <div className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</span>
+                          {threadUnread > 0 && (
+                            <span className="min-w-[17px] h-[17px] px-1 bg-red-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center shrink-0">
+                              {threadUnread > 99 ? '99+' : threadUnread}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate">{t.contextTitle || 'Chat Direto'}</div>
                         <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">{t.lastMessage || 'Conversa iniciada'}</div>
                       </div>
