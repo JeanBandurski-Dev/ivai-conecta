@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, Building2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   getTalents, getJobs, getServices, getCompanies,

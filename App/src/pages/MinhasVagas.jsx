@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare
+  ArrowLeft, Plus, Users, Eye, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
+  Award, X, Trash2, MessageSquare
 } from 'lucide-react';
 import {
-  getUserApplications, generateWhatsAppLink, getJobs,
-  updateJobStatus, deleteJob, getTalents, getEndorsementRequests,
+  getUserApplications, getJobs,
+  updateJobStatus, deleteJob, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone, safeSkillsArray
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';

@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, X, Sparkles, CheckCircle2, RotateCcw, Building2,
-  GraduationCap, ArrowLeft, Star, Send, ShieldCheck, Mail, Phone,
-  UserCheck, Award, Lock, BookOpen, Check, Eye
+  Search, X, Sparkles, RotateCcw,
+  ArrowLeft, ShieldCheck, Award, Eye
 } from 'lucide-react';
 import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES } from '../lib/ivaiConecta';
 import { subscribeToTalents, subscribeToTeachers } from '../services/talentsService.js';
@@ -20,17 +19,9 @@ const AREAS = [
   { label: '📑 Contabilidade & Finanças', value: 'Contábeis' },
 ];
 
-const INSTITUTIONS = [
-  'Todas as Instituições',
-  'IFPR Campus Ivaiporã',
-  'Univale Ivaiporã',
-  'UENP',
-  'Autônomo / Freelancer',
-];
-
 export default function BancoDeTalentos() {
   const navigate = useNavigate();
-  const { currentUser, showToast, selectedCity, setCity: setGlobalCity } = useAppStore();
+  const { currentUser, selectedCity } = useAppStore();
 
   const [activeTab,       setActiveTab]       = useState('talents'); // 'talents' | 'teachers'
   const [query,          setQuery]          = useState('');
@@ -40,7 +31,6 @@ export default function BancoDeTalentos() {
   const [onlyEndorsed,   setOnlyEndorsed]   = useState(false);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [sortBy,         setSortBy]         = useState('endorsements');
-  const [contactTalent,  setContactTalent]  = useState(null);
 
   useEffect(() => {
     if (selectedCity) setCity(selectedCity);

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
-  FolderKanban, Globe, CheckCircle2, Sparkles, Award
+  Globe, CheckCircle2, Sparkles
 } from 'lucide-react';
 import { validateSkill } from '../lib/ivaiConecta';
 

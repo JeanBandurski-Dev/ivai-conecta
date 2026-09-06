@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, Check, Search, AlertCircle, X, ChevronDown, Gift } from 'lucide-react';
+import { Sparkles, Plus, Check, AlertCircle, X, ChevronDown, Gift } from 'lucide-react';
 import { STANDARD_BENEFITS, validateBenefit } from '../../lib/ivaiConecta';
 
 /**
@@ -121,7 +121,9 @@ export default function BenefitCombobox({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={`form-control pl-9 pr-14 text-xs transition-all ${
-              inputValue.trim() && currentValidation && !currentValidation.valid
+              error
+                ? 'border-red-400 dark:border-red-500 bg-red-50/15'
+                : inputValue.trim() && currentValidation && !currentValidation.valid
                 ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
                 : inputValue.trim() && currentValidation && currentValidation.valid
                 ? 'border-teal-400 dark:border-teal-500 bg-teal-50/15'
@@ -173,7 +175,13 @@ export default function BenefitCombobox({
       </div>
 
       {/* Dica / Validação em Tempo Real sob o input */}
-      {inputValue.trim() && (
+      {error && !inputValue.trim() ? (
+        <div className="text-[11px] font-medium px-1">
+          <p className="text-red-500 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle size={12} /> {error}
+          </p>
+        </div>
+      ) : inputValue.trim() ? (
         <div className="text-[11px] font-medium px-1">
           {currentValidation?.valid ? (
             <p className="text-teal-600 dark:text-teal-400 flex items-center gap-1">
@@ -185,7 +193,7 @@ export default function BenefitCombobox({
             </p>
           ) : null}
         </div>
-      )}
+      ) : null}
 
       {/* Menu Flutuante Autocomplete de Benefícios */}
       {isOpen && (

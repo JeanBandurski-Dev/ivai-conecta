@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  Building2, MapPin, Users, Briefcase, Star, ArrowLeft,
+  Building2, MapPin, Users, Briefcase, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, TrendingUp, Eye, Target, Award, Sparkles, Camera, MessageSquare,
-  Share2, Globe, Phone, Mail, Image as ImageIcon, Check, Loader2
+  BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Image as ImageIcon, Check, Loader2
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';

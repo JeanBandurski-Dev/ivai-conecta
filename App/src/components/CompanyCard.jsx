@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, MapPin, ShieldCheck, Briefcase, Star, MessageSquare, ArrowRight } from 'lucide-react';
+import { MapPin, ShieldCheck, Briefcase, Star, MessageSquare, ArrowRight } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 
 export default function CompanyCard({ company }) {

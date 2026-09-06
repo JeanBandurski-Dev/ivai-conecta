@@ -120,7 +120,9 @@ export default function JobTitleCombobox({
           placeholder={placeholder}
           required={required}
           className={`form-control pl-10 pr-20 text-sm font-semibold transition-all ${
-            value && !isValid
+            error
+              ? 'border-red-400 dark:border-red-500 bg-red-50/15'
+              : value && !isValid
               ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
               : value && isValid
               ? 'border-green-400 dark:border-green-500 bg-green-50/10'
@@ -161,6 +163,12 @@ export default function JobTitleCombobox({
           </button>
         </div>
       </div>
+
+      {error && !value && (
+        <p className="text-red-500 dark:text-red-400 text-[11px] font-medium px-1 mt-1">
+          {error}
+        </p>
+      )}
 
       {/* Painel Flutuante de Autocomplete CBO */}
       {isOpen && (

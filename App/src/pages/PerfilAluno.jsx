@@ -1,23 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
-  GraduationCap, Building2, MapPin, Award, CheckCircle, ShieldCheck,
-  Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
-  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
+  GraduationCap, Building2, MapPin, Award, ShieldCheck,
+  Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture, validateSkill } from '../lib/ivaiConecta';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
-
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
-];
 
 export default function PerfilAluno() {
   const { id } = useParams();
@@ -150,7 +141,7 @@ export default function PerfilAluno() {
 
   const handleSaveProfile = (e) => {
     if (e) e.preventDefault();
-    const updated = updateTalentProfile(talent.id, editData);
+    updateTalentProfile(talent.id, editData);
 
     // If owner is currently logged in, update app store state
     if (isOwner && currentUser) {
@@ -195,33 +186,6 @@ export default function PerfilAluno() {
 
   const removeEducation = (eduId) => {
     setEditData(prev => ({ ...prev, education: (prev.education || []).filter(e => e.id !== eduId && String(e.id) !== String(eduId)) }));
-  };
-
-  const addSkill = () => {
-    const sk = (editData.newSkill || '').trim();
-    if (sk) {
-      const val = validateSkill(sk);
-      if (!val.valid) {
-        showToast(`⚠️ ${val.error}`);
-        return;
-      }
-      if (!editData.skills.some(s => s.toLowerCase() === sk.toLowerCase())) {
-        setEditData(prev => ({
-          ...prev,
-          skills: [...prev.skills, sk],
-          newSkill: ''
-        }));
-      } else {
-        showToast('Esta habilidade já foi adicionada.');
-      }
-    }
-  };
-
-  const removeSkill = (sk) => {
-    setEditData(prev => ({
-      ...prev,
-      skills: prev.skills.filter(s => s !== sk)
-    }));
   };
 
   const addExperience = (e) => {

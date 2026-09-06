@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
-import { Building2, ShieldCheck, CheckCircle2, AlertCircle, Loader2, Search } from 'lucide-react';
+import { Building2, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: '🎓' },

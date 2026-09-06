@@ -75,7 +75,7 @@ export function normalizeSkill(str = '') {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .replace(/[\.\-\/&]/g, ' ')       // substitui pontuações por espaço
+    .replace(/[.\-/&]/g, ' ')       // substitui pontuações por espaço
     .replace(/\s+/g, ' ')            // colapsa múltiplos espaços
     .trim();
 }

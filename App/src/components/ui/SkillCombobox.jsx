@@ -121,7 +121,9 @@ export default function SkillCombobox({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={`form-control pl-9 pr-14 text-xs transition-all ${
-              inputValue.trim() && currentValidation && !currentValidation.valid
+              error
+                ? 'border-red-400 dark:border-red-500 bg-red-50/15'
+                : inputValue.trim() && currentValidation && !currentValidation.valid
                 ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
                 : inputValue.trim() && currentValidation && currentValidation.valid
                 ? 'border-green-400 dark:border-green-500 bg-green-50/15'
@@ -173,7 +175,13 @@ export default function SkillCombobox({
       </div>
 
       {/* Dica / Validação em Tempo Real sob o input */}
-      {inputValue.trim() && (
+      {error && !inputValue.trim() ? (
+        <div className="text-[11px] font-medium px-1">
+          <p className="text-red-500 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle size={12} /> {error}
+          </p>
+        </div>
+      ) : inputValue.trim() ? (
         <div className="text-[11px] font-medium px-1">
           {currentValidation?.valid ? (
             <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
@@ -185,7 +193,7 @@ export default function SkillCombobox({
             </p>
           ) : null}
         </div>
-      )}
+      ) : null}
 
       {/* Menu Flutuante Autocomplete de Competências */}
       {isOpen && (

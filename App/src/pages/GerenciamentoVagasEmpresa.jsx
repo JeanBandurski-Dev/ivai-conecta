@@ -1,76 +1,26 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
-  Briefcase, Building2, MapPin, CheckCircle, CheckCircle2, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck,
-  Award, Send, Check, X, FileText, Calendar, Sparkles, Star, Copy, Share2,
-  Search, Filter, ExternalLink, ChevronRight, Download, Trash2,
+  Briefcase, Building2, MapPin, CheckCircle2, Clock,
+  ArrowLeft, Plus, Eye, Edit3, RotateCcw, ShieldCheck,
+  Award, Check, X, FileText, Calendar, Sparkles, Star, Copy,
+  Search, Filter, ChevronRight, Trash2,
   SlidersHorizontal, Video, AlertCircle, GraduationCap, LayoutGrid,
-  ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
-  Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
-  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History
+  ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown,
+  Inbox, Settings, BarChart3, Layers, CheckSquare, Save,
+  ChevronLeft, UserPlus, History
 } from 'lucide-react';
 import {
   getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
   getJobCandidates, updateCandidateStage, updateCandidateData,
-  scheduleCandidateInterview, SELECTION_STAGES, calculateMatchScore,
+  scheduleCandidateInterview, SELECTION_STAGES,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem, sanitizeMojibake
+  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
 import JobFormModal from '../components/JobFormModal';
 import JobActionModal from '../components/JobActionModal';
-
-let isDraggingLock = false;
-
-const DEMO_COMPANY_JOBS = [
-  {
-    id: 101,
-    title: 'Desenvolvedor Front-end React',
-    company: 'ValeTech Soluções Digitais',
-    city: 'Ivaiporã',
-    type: 'Tempo Integral',
-    modality: 'Híbrido',
-    salary: 'R$ 3.500 - R$ 4.800',
-    experienceLevel: 'Júnior',
-    status: 'Ativa',
-    requiredSkills: ['React', 'JavaScript', 'TailwindCSS', 'Git', 'HTML5/CSS3'],
-    description: 'Desenvolvimento de interfaces modernas e responsivas para soluções corporativas da região do Vale do Ivaí.',
-    createdAt: '15/08/2026',
-    applicantsCount: 5
-  },
-  {
-    id: 102,
-    title: 'Assistente Administrativo & Comercial',
-    company: 'ValeTech Soluções Digitais',
-    city: 'Ivaiporã',
-    type: 'Tempo Integral',
-    modality: 'Presencial',
-    salary: 'R$ 2.400 - R$ 3.000',
-    experienceLevel: 'Júnior',
-    status: 'Ativa',
-    requiredSkills: ['Atendimento ao Cliente', 'Excel', 'Faturamento', 'Organização'],
-    description: 'Suporte à rotina administrativa e comercial, atendimento aos clientes e emissão de relatórios.',
-    createdAt: '18/08/2026',
-    applicantsCount: 3
-  },
-  {
-    id: 103,
-    title: 'Técnico de Suporte & Infraestrutura',
-    company: 'ValeTech Soluções Digitais',
-    city: 'Ivaiporã',
-    type: 'Tempo Integral',
-    modality: 'Presencial',
-    salary: 'R$ 2.200 - R$ 2.900',
-    experienceLevel: 'Júnior',
-    status: 'Ativa',
-    requiredSkills: ['Redes de Computadores', 'Hardware', 'Suporte Técnico', 'Windows'],
-    description: 'Manutenção de computadores, suporte técnico a usuários e monitoramento de redes locais.',
-    createdAt: '20/08/2026',
-    applicantsCount: 2
-  }
-];
 
 
 export default function GerenciamentoVagasEmpresa() {
@@ -345,17 +295,6 @@ export default function GerenciamentoVagasEmpresa() {
   const [editingJob, setEditingJob] = useState(null);
   const [jobActionModalTarget, setJobActionModalTarget] = useState(null);
 
-  const [newJobForm, setNewJobForm] = useState({
-    title: '',
-    type: 'Tempo Integral',
-    modality: 'Presencial',
-    city: currentUser?.city || 'Ivaiporã',
-    salary: 'R$ 2.500 - R$ 3.800',
-    requiredSkills: 'React, JavaScript, HTML5/CSS3, Git',
-    benefits: 'Vale Alimentação, Vale Transporte, Plano de Saúde',
-    description: ''
-  });
-
   // Candidates for selected job
   const jobCandidates = useMemo(() => {
     if (!currentJob) return [];
@@ -509,30 +448,8 @@ export default function GerenciamentoVagasEmpresa() {
       });
   }, [allCompanyJobs, jobSearch, jobStatusFilter, jobModalityFilter, jobCityFilter, jobSortBy, updateCount]);
 
-  // Stats calculation
-  const stats = useMemo(() => {
-    const totalJobs = allCompanyJobs.length;
-    const activeJobs = allCompanyJobs.filter(j => j.status === 'Ativa').length;
-    let totalApplicants = 0;
-    let inReview = 0;
-    let inInterview = 0;
-    let approved = 0;
-    let talentPool = 0;
-
-    allCompanyJobs.forEach(j => {
-      const cands = getJobCandidates(j.id);
-      totalApplicants += cands.length;
-      inReview += cands.filter(c => c.stage === 'analise' || c.stage === 'desafio').length;
-      inInterview += cands.filter(c => c.stage === 'entrevista').length;
-      approved += cands.filter(c => c.stage === 'aprovado').length;
-      talentPool += cands.filter(c => c.stage === 'reprovado').length;
-    });
-
-    return { totalJobs, activeJobs, totalApplicants, inReview, inInterview, approved, talentPool };
-  }, [allCompanyJobs, updateCount]);
-
   // ── Stage Color Helper ──
-  const getStageStyle = (stageId, colorKey) => {
+  const getStageStyle = (stageId) => {
     const styles = {
       triagem: {
         dot: 'bg-sky-500',
@@ -639,7 +556,6 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Drag & Drop Handlers
   const handleDragStart = (e, cand) => {
-    isDraggingLock = true;
     setDraggedCandidate(cand);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(cand.id));
@@ -649,9 +565,6 @@ export default function GerenciamentoVagasEmpresa() {
     setDragOverStageId(null);
     setDragOverCandidateId(null);
     setDraggedCandidate(null);
-    setTimeout(() => {
-      isDraggingLock = false;
-    }, 500);
   };
 
   const handleDragOver = (e, stageId) => {
@@ -686,7 +599,6 @@ export default function GerenciamentoVagasEmpresa() {
       handleReorderCandidate(activeId, null, stageId);
     }
     setDraggedCandidate(null);
-    setTimeout(() => { isDraggingLock = false; }, 500);
   };
 
   const handleCardDrop = (e, targetCand) => {
@@ -703,7 +615,6 @@ export default function GerenciamentoVagasEmpresa() {
       handleReorderCandidate(activeId, targetCand.id, targetCand.stage);
     }
     setDraggedCandidate(null);
-    setTimeout(() => { isDraggingLock = false; }, 500);
   };
 
   const handleRatingChange = (candidateId, rating) => {
@@ -1381,7 +1292,7 @@ export default function GerenciamentoVagasEmpresa() {
                 >
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={() => {
                       if (hasDragged.current) return;
                       setSelectedStageFilter('todos');
                     }}
@@ -1404,13 +1315,13 @@ export default function GerenciamentoVagasEmpresa() {
                   {customStages.map(stage => {
                     const count = jobCandidates.filter(c => c.stage === stage.id).length;
                     const isSelected = selectedStageFilter === stage.id;
-                    const style = getStageStyle(stage.id, stage.color);
+                    const style = getStageStyle(stage.id);
 
                     return (
                       <button
                         key={stage.id}
                         type="button"
-                        onClick={(e) => {
+                        onClick={() => {
                           if (hasDragged.current) return;
                           setSelectedStageFilter(isSelected ? 'todos' : stage.id);
                         }}

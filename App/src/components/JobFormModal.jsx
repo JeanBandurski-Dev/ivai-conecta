@@ -4,7 +4,6 @@ import {
 } from 'lucide-react';
 import {
   CITIES,
-  STANDARD_JOB_TITLES,
   STANDARD_SKILLS,
   SALARY_RANGES,
   WORK_SCHEDULES,
