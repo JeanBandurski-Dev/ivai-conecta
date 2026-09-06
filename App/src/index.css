@@ -184,10 +184,10 @@
   /* ── Cards (Largura ligeiramente ajustada e compacta) ── */
   .card {
     background: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgba(226, 232, 240, 0.95);
     border-radius: 1.25rem;
     padding: 1.4rem;
-    box-shadow: var(--shadow-brand-sm);
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
     display: flex;
     flex-direction: column;
     transition: background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
@@ -198,8 +198,8 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   }
   .card:hover { 
-    box-shadow: var(--shadow-brand-lg); 
-    border-color: #cbd5e1;
+    box-shadow: 0 16px 28px -4px rgba(0, 82, 255, 0.12), 0 6px 12px -2px rgba(0, 82, 255, 0.05); 
+    border-color: #93c5fd;
     transform: translateY(-3px);
   }
   .dark .card:hover {
