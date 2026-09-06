@@ -1291,19 +1291,26 @@ export default function GerenciamentoVagasEmpresa() {
             </div>
 
             {/* ── BARRA DE ABAS DO FUNIL & ORDENAÇÃO ── */}
-            <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-800 flex items-center justify-between gap-4 shadow-2xs overflow-hidden">
-              {/* Lado Esquerdo: Etapas (Scrollable) */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-gray-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3 shadow-2xs">
+              {/* Lado Esquerdo: Etapas (Scrollable com min-w-0 e botões shrink-0 para nunca cortar texto) */}
+              <div
+                className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 min-w-0 flex-1"
+                onWheel={(e) => {
+                  if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                    e.currentTarget.scrollLeft += e.deltaY;
+                  }
+                }}
+              >
                 <button
                   onClick={() => setSelectedStageFilter('todos')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
                     selectedStageFilter === 'todos'
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs'
                       : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   <span>Todas as Etapas</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
                     selectedStageFilter === 'todos'
                       ? 'bg-white/20 dark:bg-gray-900/20 text-current'
                       : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
@@ -1321,15 +1328,15 @@ export default function GerenciamentoVagasEmpresa() {
                     <button
                       key={stage.id}
                       onClick={() => setSelectedStageFilter(isSelected ? 'todos' : stage.id)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all flex items-center gap-2 cursor-pointer ${
                         isSelected
                           ? 'bg-primary-blue text-white shadow-xs'
                           : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
-                      <span>{sanitizeStageItem(stage).name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                      <span className="whitespace-nowrap">{sanitizeStageItem(stage).name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
                         isSelected
                           ? 'bg-white/25 text-white'
                           : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
@@ -1342,14 +1349,14 @@ export default function GerenciamentoVagasEmpresa() {
               </div>
 
               {/* Lado Direito: Ordenação e Contagem */}
-              <div className="flex items-center gap-3 text-xs pr-2 shrink-0">
-                <div className="flex items-center gap-1.5 text-gray-600 dark:text-slate-300 border-l border-gray-200 dark:border-slate-700 pl-4">
-                  <ArrowUpDown size={13} className="text-gray-400" />
-                  <span className="font-semibold hidden lg:inline">Ordenar:</span>
+              <div className="flex items-center justify-between xl:justify-end gap-3 text-xs pt-2 xl:pt-0 border-t xl:border-t-0 border-gray-100 dark:border-slate-800/80 shrink-0 px-1">
+                <div className="flex items-center gap-1.5 text-gray-600 dark:text-slate-300 xl:border-l xl:border-gray-200 xl:dark:border-slate-700 xl:pl-4">
+                  <ArrowUpDown size={13} className="text-gray-400 shrink-0" />
+                  <span className="font-semibold text-gray-500 dark:text-slate-400">Ordenar:</span>
                   <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="bg-transparent border-none text-xs font-bold text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-0"
+                    className="bg-transparent border-none text-xs font-bold text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-0 py-0.5"
                   >
                     <option value="match_desc">Maior Match</option>
                     <option value="match_asc">Menor Match</option>
@@ -1361,7 +1368,7 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
 
                 <div className="border-l border-gray-200 dark:border-slate-700 pl-4 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
-                  Mostrando <strong className="text-gray-900 dark:text-white">{filteredCandidates.length}</strong> <span className="hidden sm:inline">de {jobCandidates.length}</span>
+                  Mostrando <strong className="text-gray-900 dark:text-white">{filteredCandidates.length}</strong> <span>de {jobCandidates.length}</span>
                 </div>
               </div>
             </div>
