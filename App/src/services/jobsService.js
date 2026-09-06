@@ -184,7 +184,7 @@ export function applyToJob(jobId, user) {
     return {
       success: false,
       requiresVerification: true,
-      message: '🔒 Para sua segurança e das empresas contratantes, envie sua Declaração de Matrícula nas Configurações para liberar candidaturas!'
+      message: 'Para sua segurança e das empresas contratantes, envie sua Declaração de Matrícula nas Configurações para liberar candidaturas!'
     };
   }
 
@@ -703,22 +703,25 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
   const map = { ...getAllJobCandidatesMap() };
   const currentList = map[jobId] || map[Number(jobId)] || INITIAL_JOB_CANDIDATES[jobId] || [];
   
+  const normalizedStage = newStage === 'banco_talentos' ? 'reprovado' : newStage;
+
   const stageNameMap = {
     triagem: 'Triagem / Novos',
     analise: 'Em Análise',
     entrevista: 'Entrevista Agendada',
     desafio: 'Desafio Técnico',
     aprovado: 'Aprovados',
-    reprovado: 'Banco de Talentos'
+    reprovado: 'Banco de Talentos',
+    banco_talentos: 'Banco de Talentos'
   };
 
   const updatedList = currentList.map(cand => {
     if (cand.id === candidateId || String(cand.id) === String(candidateId)) {
       const newActivity = [
         ...(cand.activity || []),
-        { date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), text: `Candidato movido para a etapa: ${stageNameMap[newStage] || newStage}` }
+        { date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), text: `Candidato movido para a etapa: ${stageNameMap[normalizedStage] || normalizedStage}` }
       ];
-      return { ...cand, stage: newStage, activity: newActivity };
+      return { ...cand, stage: normalizedStage, activity: newActivity };
     }
     return cand;
   });

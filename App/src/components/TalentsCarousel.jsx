@@ -109,8 +109,9 @@ export default function TalentsCarousel({ talents = [] }) {
 
         {/* Botão Play/Pausa e Dica */}
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400 dark:text-slate-400 hidden sm:inline">
-            {isPaused ? '⏸️ Carrossel pausado' : '▶️ Girando automaticamente'}
+          <span className="text-xs text-gray-400 dark:text-slate-400 hidden sm:inline-flex items-center gap-1">
+            {isPaused ? <Pause size={11} className="text-amber-500" /> : <Play size={11} className="text-emerald-500" />}
+            {isPaused ? 'Carrossel pausado' : 'Girando automaticamente'}
           </span>
           <button
             onClick={() => setIsPaused(!isPaused)}

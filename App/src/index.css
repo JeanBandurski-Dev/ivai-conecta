@@ -350,12 +350,18 @@
     letter-spacing: 0.08em;
     margin-bottom: 0.25rem;
   }
+  .dark .section-subtitle {
+    color: #38bdf8;
+  }
   .section-title {
     font-size: clamp(1.6rem, 2.75vw, 2.25rem);
     font-family: var(--font-heading);
     font-weight: 700;
     color: var(--color-primary-dark);
     letter-spacing: -0.02em;
+  }
+  .dark .section-title {
+    color: #ffffff;
   }
 
   /* ── Grid layouts (Espaçamento e proporções refinadas) ── */

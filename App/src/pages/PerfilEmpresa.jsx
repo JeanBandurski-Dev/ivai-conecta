@@ -51,7 +51,7 @@ export default function PerfilEmpresa() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true);
-    showToast('⏳ Enviando logotipo para o Firebase Storage...');
+    showToast('Enviando logotipo para o Firebase Storage...');
     const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id || 'empresa_1');
     setUploadingLogo(false);
     if (res.success) {
@@ -59,9 +59,9 @@ export default function PerfilEmpresa() {
       if (currentUser) {
         setCurrentUser({ ...currentUser, avatar: res.url });
       }
-      showToast('📸 Logotipo atualizado e salvo no Storage com sucesso!');
+      showToast('Logotipo atualizado e salvo no Storage com sucesso!');
     } else {
-      showToast(`⚠️ ${res.error || 'Erro ao enviar logotipo.'}`);
+      showToast(res.error || 'Erro ao enviar logotipo.');
     }
   };
 
@@ -104,7 +104,7 @@ export default function PerfilEmpresa() {
               <img
                 src={company.logo}
                 alt={company.name}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-white/30 shadow-brand-lg shrink-0 bg-white"
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-white/30 shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
               />
 
               <div>
@@ -132,7 +132,7 @@ export default function PerfilEmpresa() {
                 <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
                   <Edit3 size={15} /> Editar Perfil da Empresa
                 </button>
-                <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
+                <Link to="/gerenciamento-vagas" className="btn btn-teal btn-sm font-bold shadow-md">
                   <Building2 size={15} /> Gerenciar Minhas Vagas
                 </Link>
               </div>
@@ -150,9 +150,9 @@ export default function PerfilEmpresa() {
                       avatar: company.logo
                     }, `Contato com Empresa: ${company.name}`);
                   }}
-                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                  className="btn bg-white dark:bg-slate-800 text-primary-dark dark:text-white font-bold btn-sm shadow-md hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 cursor-pointer border border-white/20"
                 >
-                  <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                  <MessageSquare size={15} /> Conversar com a Empresa
                 </button>
               </div>
             )}
@@ -361,7 +361,7 @@ export default function PerfilEmpresa() {
                   <img
                     src={company.logo}
                     alt={company.name}
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
                   />
                   {uploadingLogo && (
                     <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">

@@ -51,10 +51,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
         <Navbar />
 
-        <main className="flex-1">
+        <main className="flex-1 bg-slate-50 dark:bg-slate-950">
           <Suspense fallback={
             <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
               <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
@@ -119,10 +119,14 @@ export default function App() {
   );
 }
 
+import { Compass } from 'lucide-react';
+
 function NotFound() {
   return (
     <div className="container section text-center py-24">
-      <div className="text-7xl mb-6">🗺️</div>
+      <div className="flex justify-center mb-6">
+        <Compass size={64} className="text-primary-blue animate-pulse" />
+      </div>
       <h1 className="text-4xl font-heading font-bold text-primary-dark dark:text-white mb-3">
         Página não encontrada
       </h1>

@@ -185,7 +185,7 @@ export default function ChatModal({ onClose }) {
               onClick={() => setShowNewChat(!showNewChat)}
               className="w-full btn btn-sm bg-primary-blue text-white hover:bg-blue-700 font-bold flex items-center justify-center gap-1.5 rounded-xl transition-all shadow-xs cursor-pointer text-xs py-2"
             >
-              <Plus size={14} /> {showNewChat ? 'Fechar Contatos' : '➕ Nova Conversa'}
+              <Plus size={14} /> {showNewChat ? 'Fechar Contatos' : 'Nova Conversa'}
             </button>
 
             {/* Modal/Menu para selecionar usuário */}
@@ -242,7 +242,7 @@ export default function ChatModal({ onClose }) {
                           : 'hover:bg-gray-100 dark:hover:bg-slate-800/60'
                       }`}
                     >
-                      <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                      <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
                       <div className="min-w-0 flex-1 pr-5">
                         <div className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</div>
                         <div className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate">{t.contextTitle || 'Chat Direto'}</div>
@@ -270,7 +270,7 @@ export default function ChatModal({ onClose }) {
                 {/* Header do Chat Ativo */}
                 <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/30 dark:bg-slate-800/30 shrink-0">
                   <div className="flex items-center gap-3">
-                    <img src={otherPerson.avatar} alt={otherPerson.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                    <img src={otherPerson.avatar} alt={otherPerson.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
                     <div>
                       <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
                         {otherPerson.name}

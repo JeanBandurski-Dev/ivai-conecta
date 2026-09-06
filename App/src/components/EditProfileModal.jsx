@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
-  FolderKanban, Globe, CheckCircle2, Sparkles, Award
+  FolderKanban, Globe, CheckCircle2, Sparkles, Award, Save
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -94,7 +94,7 @@ export default function EditProfileModal({
               <img
                 src={editData.avatar}
                 alt="Pré-visualização da foto"
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white shrink-0"
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800 shrink-0"
               />
 
               <div className="flex-1 min-w-[240px] space-y-2">
@@ -369,7 +369,7 @@ export default function EditProfileModal({
               type="submit"
               className="btn btn-primary btn-sm font-extrabold text-xs px-6 py-2.5 flex items-center gap-2 shadow-lg cursor-pointer"
             >
-              <CheckCircle2 size={16} /> 💾 Salvar Perfil &amp; Currículo Agora
+              <Save size={16} /> Salvar Perfil &amp; Currículo Agora
             </button>
           </div>
         </form>

@@ -1,4 +1,4 @@
-import { MapPin, Building2, Eye, ShieldCheck, Bookmark } from 'lucide-react';
+import { MapPin, Building2, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { calculateMatchScore } from '../lib/ivaiConecta';
@@ -31,7 +31,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
     e.preventDefault();
     e.stopPropagation();
     const added = toggleFavoriteJob(id);
-    showToast(added ? '★ Vaga salva nos seus Favoritos!' : 'Vaga removida dos Favoritos.');
+    showToast(added ? 'Vaga salva nos seus Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 
   return (
@@ -42,7 +42,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
           <img
             src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
             alt={company}
-            className="w-10 h-10 rounded-xl object-cover border border-gray-200 shrink-0 bg-white"
+            className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
           />
           <div className="min-w-0">
             <div className="font-bold text-gray-900 dark:text-white text-sm leading-tight group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors truncate">
@@ -93,8 +93,8 @@ export default function JobCard({ job, matchScore, onSelect }) {
       {benefits.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {benefits.slice(0, 2).map((b, i) => (
-            <span key={i} className="text-[11px] font-semibold bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-2 py-0.5 rounded-md">
-              ✓ {b}
+            <span key={i} className="text-[11px] font-semibold bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+              <Check size={11} strokeWidth={3} /> {b}
             </span>
           ))}
           {benefits.length > 2 && (

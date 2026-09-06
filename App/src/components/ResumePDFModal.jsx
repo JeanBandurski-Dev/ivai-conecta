@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Printer, X, ShieldCheck, Download, GraduationCap, Building2, MapPin, Award } from 'lucide-react';
+import { Printer, X, ShieldCheck, Download, GraduationCap, Building2, MapPin, Award, Lightbulb, CheckCircle2, Globe, Code } from 'lucide-react';
 
 export default function ResumePDFModal({ talent, onClose }) {
   if (!talent) return null;
@@ -19,19 +19,21 @@ export default function ResumePDFModal({ talent, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static print:block cursor-pointer"
+      className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-brand-xl w-full max-w-3xl overflow-hidden my-6 border border-gray-200 cursor-default print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none print:my-0 flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:max-h-none print:shadow-none print:rounded-none print:w-full border border-gray-200 dark:border-slate-800"
+        onClick={e => e.stopPropagation()}
       >
         
-        {/* ── TOPO FIXO: AÇÕES E BOTÃO DE SAÍDA (Oculto na Impressão) ── */}
-        <div className="p-4 sm:p-5 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-3 shrink-0 print:hidden">
+        {/* ── BARRA SUPERIOR FIXA (Oculta na Impressão) ── */}
+        <div className="p-4 sm:px-6 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 print:hidden border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <Printer size={20} className="text-primary-blue" />
-            <h3 className="font-heading font-bold text-base text-gray-900">
+            <span className="w-8 h-8 rounded-lg bg-primary-blue flex items-center justify-center">
+              <Printer size={16} />
+            </span>
+            <h3 className="font-heading font-bold text-sm sm:text-base">
               Currículo de {talent.name} (Folha A4 / PDF)
             </h3>
           </div>
@@ -40,11 +42,11 @@ export default function ResumePDFModal({ talent, onClose }) {
               onClick={handlePrint}
               className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
             >
-              <Printer size={15} /> 📄 Baixar / Imprimir PDF Agora
+              <Printer size={15} /> Baixar / Imprimir PDF Agora
             </button>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors border border-slate-700"
               title="Fechar e Voltar ao Perfil"
             >
               <X size={18} /> Fechar
@@ -53,7 +55,7 @@ export default function ResumePDFModal({ talent, onClose }) {
         </div>
 
         {/* ── CORPO DO DOCUMENTO (FORÇADO EM ESTILO CLARO / FOLHA BRANCA A4) ── */}
-        <div className="overflow-y-auto flex-1 bg-gray-200 p-4 sm:p-8 print:p-0 print:bg-white print:overflow-visible">
+        <div className="overflow-y-auto flex-1 bg-slate-200 dark:bg-slate-950 p-4 sm:p-8 print:p-0 print:bg-white print:overflow-visible">
           <div
             id="printable-cv"
             className="bg-white p-8 sm:p-12 space-y-6 text-gray-900 border border-gray-300 shadow-md rounded-2xl print:shadow-none print:border-none print:rounded-none print:p-8 print:text-black max-w-2xl mx-auto"
@@ -76,12 +78,12 @@ export default function ResumePDFModal({ talent, onClose }) {
                   <div className="text-xs text-blue-800 print:text-blue-900 mt-2 flex items-center gap-3 flex-wrap font-medium">
                     {talent.linkedin && (
                       <a href={talent.linkedin} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
-                        🔗 LinkedIn: {talent.linkedin.replace('https://', '')}
+                        <Globe size={12} className="inline" /> LinkedIn: {talent.linkedin.replace('https://', '')}
                       </a>
                     )}
                     {talent.github && (
                       <a href={talent.github} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
-                        💻 GitHub: {talent.github.replace('https://', '')}
+                        <Code size={12} className="inline" /> GitHub: {talent.github.replace('https://', '')}
                       </a>
                     )}
                   </div>
@@ -197,7 +199,9 @@ export default function ResumePDFModal({ talent, onClose }) {
                     <div key={e.id || i} className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs space-y-1 print:border-gray-300 print:bg-gray-50">
                       <div className="flex items-center justify-between font-bold text-gray-900 print:text-black">
                         <span>{e.profName} ({e.discipline})</span>
-                        <span className="text-emerald-700 print:text-emerald-800 font-semibold text-[10px]">✓ Parecer Autenticado</span>
+                        <span className="text-emerald-700 print:text-emerald-800 font-semibold text-[10px] inline-flex items-center gap-1">
+                          <CheckCircle2 size={11} /> Parecer Autenticado
+                        </span>
                       </div>
                       <p className="italic text-gray-800 print:text-black">"{e.quote}"</p>
                     </div>
@@ -216,20 +220,20 @@ export default function ResumePDFModal({ talent, onClose }) {
         </div>
 
         {/* ── RODAPÉ FIXO COM OPÇÕES DE FECHAR E IMPRIMIR (Oculto na Impressão) ── */}
-        <div className="p-4 bg-gray-100 border-t border-gray-200 flex items-center justify-between gap-3 shrink-0 print:hidden">
-          <span className="text-xs font-semibold text-gray-600 hidden sm:inline">
-            💡 Dica: Você pode salvar diretamente como PDF selecionando "Salvar como PDF" no navegador.
+        <div className="p-4 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0 print:hidden">
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 hidden sm:inline flex items-center gap-1">
+            <Lightbulb size={13} className="text-amber-500 inline" /> Dica: Você pode salvar diretamente como PDF selecionando "Salvar como PDF" no navegador.
           </span>
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={handlePrint}
-              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5"
+              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
             >
               <Download size={15} /> Baixar PDF
             </button>
             <button
               onClick={onClose}
-              className="btn btn-outline border-gray-300 text-gray-700 hover:bg-gray-200 btn-sm text-xs font-bold flex items-center gap-1.5"
+              className="btn btn-outline border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 btn-sm text-xs font-bold flex items-center gap-1.5"
             >
               <X size={15} /> Fechar e Voltar
             </button>

@@ -214,7 +214,7 @@ export function submitStudentVerification(raNumber, fileData) {
 
   return {
     success: true,
-    message: `✅ Comprovante "${filename}" (${filesizeMB}MB) enviado com sucesso! Matrícula autenticada.`,
+    message: `Comprovante "${filename}" (${filesizeMB}MB) enviado com sucesso! Matrícula autenticada.`,
     verificationRecord
   };
 }

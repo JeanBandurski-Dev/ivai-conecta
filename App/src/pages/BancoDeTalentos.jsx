@@ -12,12 +12,12 @@ import useAppStore from '../store/useAppStore';
 
 const AREAS = [
   { label: 'Todas as Áreas', value: 'Todas' },
-  { label: '💻 Tecnologia & ADS', value: 'Sistemas' },
-  { label: '📊 Administração & Negócios', value: 'Administração' },
-  { label: '⚡ Elétrica & Automação', value: 'Eletrotécnica' },
-  { label: '🎨 Design & Criação Digital', value: 'Design' },
-  { label: '📚 Pedagogia & Treinamento', value: 'Pedagogia' },
-  { label: '📑 Contabilidade & Finanças', value: 'Contábeis' },
+  { label: 'Tecnologia & ADS', value: 'Sistemas' },
+  { label: 'Administração & Negócios', value: 'Administração' },
+  { label: 'Elétrica & Automação', value: 'Eletrotécnica' },
+  { label: 'Design & Criação Digital', value: 'Design' },
+  { label: 'Pedagogia & Treinamento', value: 'Pedagogia' },
+  { label: 'Contabilidade & Finanças', value: 'Contábeis' },
 ];
 
 const INSTITUTIONS = [
@@ -197,7 +197,7 @@ export default function BancoDeTalentos() {
                 <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
                   <div className="space-y-3">
                     <div className="flex items-start gap-4">
-                      <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white" />
+                      <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white dark:bg-slate-800" />
                       <div>
                         <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
                         <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Doutor / Mestre em Ciência da Computação'}</div>
@@ -333,9 +333,9 @@ export default function BancoDeTalentos() {
                     onChange={e => setSortBy(e.target.value)}
                     className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium"
                   >
-                    <option value="endorsements" className="dark:bg-slate-800 dark:text-white">⭐ Mais Recomendados</option>
-                    <option value="name" className="dark:bg-slate-800 dark:text-white">🔤 Nome (A-Z)</option>
-                    <option value="city" className="dark:bg-slate-800 dark:text-white">📍 Cidade</option>
+                    <option value="endorsements" className="dark:bg-slate-800 dark:text-white">Mais Recomendados</option>
+                    <option value="name" className="dark:bg-slate-800 dark:text-white">Nome (A-Z)</option>
+                    <option value="city" className="dark:bg-slate-800 dark:text-white">Cidade</option>
                   </select>
                 </div>
               </div>
@@ -344,7 +344,9 @@ export default function BancoDeTalentos() {
             {/* ── GRID DE TALENTOS ── */}
             {filtered.length === 0 ? (
               <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
-                <div className="text-5xl mb-4">🔍</div>
+                <div className="flex justify-center mb-4">
+                  <Search size={48} className="text-gray-300 dark:text-slate-600" />
+                </div>
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhum talento encontrado com os filtros selecionados.</p>
                 <p className="text-sm text-gray-400 dark:text-slate-400 mb-5">Estudantes pendentes de verificação de matrícula ficam ocultos até realizarem a autenticação.</p>
                 <button onClick={resetFilters} className="btn btn-outline btn-sm">
@@ -380,7 +382,7 @@ export default function BancoDeTalentos() {
               {getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
                 <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
-                    <img src={student.avatar} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                    <img src={student.avatar} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
                     <div>
                       <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
                       <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>

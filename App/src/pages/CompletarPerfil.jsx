@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { CITIES, completeUserProfile } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
-import { User, MapPin, CheckCircle2, ArrowRight } from 'lucide-react';
+import { User, MapPin, CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles } from 'lucide-react';
 
 const ROLES = [
-  { id: 'aluno',      label: 'Aluno / Estudante',       icon: '🎓', desc: 'Acesse vagas de estágio e endossos acadêmicos' },
-  { id: 'professor',  label: 'Professor / Docente',     icon: '👨‍🏫', desc: 'Emita pareceres pedagógicos para seus alunos' },
-  { id: 'freelancer', label: 'Freelancer / Autônomo',    icon: '🔧', desc: 'Divulgue seus serviços no marketplace local' },
-  { id: 'candidato',  label: 'Candidato Geral',          icon: '💼', desc: 'Encontre vagas com cálculo de matching' },
-  { id: 'empresa',    label: 'Empresa / Recrutador',     icon: '🏢', desc: 'Publique vagas e encontre talentos qualificados' },
+  { id: 'aluno',      label: 'Aluno / Estudante',       icon: GraduationCap, desc: 'Acesse vagas de estágio e endossos acadêmicos' },
+  { id: 'professor',  label: 'Professor / Docente',     icon: UserCheck,     desc: 'Emita pareceres pedagógicos para seus alunos' },
+  { id: 'freelancer', label: 'Freelancer / Autônomo',    icon: Wrench,        desc: 'Divulgue seus serviços no marketplace local' },
+  { id: 'candidato',  label: 'Candidato Geral',          icon: Briefcase,     desc: 'Encontre vagas com cálculo de matching' },
+  { id: 'empresa',    label: 'Empresa / Recrutador',     icon: Building2,     desc: 'Publique vagas e encontre talentos qualificados' },
 ];
 
 export default function CompletarPerfil() {
@@ -71,7 +71,7 @@ export default function CompletarPerfil() {
       setCurrentUser(res.user);
     }
 
-    showToast(`🎉 Cadastro finalizado com sucesso! Bem-vindo(a) ao Ivaí Conecta, ${name}!`);
+    showToast(`Cadastro finalizado com sucesso! Bem-vindo(a) ao Ivaí Conecta, ${name}!`);
     navigate('/');
   };
 
@@ -88,7 +88,7 @@ export default function CompletarPerfil() {
                 alt="Foto do Google"
                 className="w-20 h-20 rounded-full border-3 border-primary-blue shadow-lg object-cover"
               />
-              <span className="absolute bottom-0 right-0 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-xs text-xs border border-gray-200" title="Autenticado com Google">
+              <span className="absolute bottom-0 right-0 w-6 h-6 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-xs text-xs border border-gray-200 dark:border-slate-700" title="Autenticado com Google">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -99,7 +99,7 @@ export default function CompletarPerfil() {
             </div>
           ) : (
             <div className="w-16 h-16 bg-gradient-to-tr from-primary-blue to-accent-sky text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-3xl">✨</span>
+              <Sparkles size={28} />
             </div>
           )}
           <span className="inline-flex px-3.5 py-1 rounded-full text-xs font-bold bg-primary-light dark:bg-blue-950/70 text-primary-blue dark:text-blue-300 mb-2 border border-primary-blue/20">
@@ -114,7 +114,7 @@ export default function CompletarPerfil() {
         </div>
 
         {alert && (
-          <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm font-semibold rounded-xl">
+          <div className="mb-6 p-4 rounded-xl text-sm font-semibold bg-red-50 text-red-700 border border-red-200">
             {alert}
           </div>
         )}
@@ -127,24 +127,29 @@ export default function CompletarPerfil() {
               1. Selecione o seu Perfil de Acesso:
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {ROLES.map(r => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => setSelectedRole(r.id)}
-                  className={`p-3 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex items-center gap-3 ${
-                    selectedRole === r.id
-                      ? 'border-primary-blue bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-300 shadow-xs'
-                      : 'border-gray-200 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-800/60 text-gray-700 dark:text-slate-300 hover:border-primary-blue/40'
-                  }`}
-                >
-                  <span className="text-2xl shrink-0">{r.icon}</span>
-                  <div>
-                    <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">{r.label}</div>
-                    <div className="text-[10px] text-gray-500 dark:text-slate-400 line-clamp-1">{r.desc}</div>
-                  </div>
-                </button>
-              ))}
+              {ROLES.map(r => {
+                const RoleIcon = r.icon;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedRole(r.id)}
+                    className={`p-3 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex items-center gap-3 ${
+                      selectedRole === r.id
+                        ? 'border-primary-blue bg-primary-light dark:bg-blue-950/60 text-primary-blue dark:text-blue-300 shadow-xs'
+                        : 'border-gray-200 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-800/60 text-gray-700 dark:text-slate-300 hover:border-primary-blue/40'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center text-primary-blue dark:text-sky-400 shrink-0 shadow-xs border border-gray-100 dark:border-slate-600">
+                      <RoleIcon size={18} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">{r.label}</div>
+                      <div className="text-[10px] text-gray-500 dark:text-slate-400 line-clamp-1">{r.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -12,7 +12,7 @@ export default function TalentCard({ talent }) {
     e.preventDefault();
     e.stopPropagation();
     const added = toggleFavoriteTalent(id);
-    showToast(added ? '★ Talent salvo nos seus Favoritos!' : 'Talento removido dos Favoritos.');
+    showToast(added ? 'Talento salvo nos seus Favoritos!' : 'Talento removido dos Favoritos.');
   };
 
   return (
@@ -23,7 +23,7 @@ export default function TalentCard({ talent }) {
           <img
             src={avatar}
             alt={name}
-            className="w-11 h-11 rounded-full object-cover border border-gray-200 shrink-0 bg-white"
+            className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
           />
           <div className="min-w-0">
             <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">{name}</h3>
@@ -52,7 +52,7 @@ export default function TalentCard({ talent }) {
         <div className="flex items-center gap-1.5 flex-wrap">
           {talent.isVerifiedStudent && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-full">
-              ✓ Matrícula Verificada
+              <CheckCircle size={11} /> Matrícula Verificada
             </span>
           )}
           {endorsements.length > 0 && (

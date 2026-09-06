@@ -211,7 +211,7 @@ export async function register(data) {
     // Mensagens explicativas para erros comuns do Firebase Auth
     let userFriendlyError = null;
     if (error.code === 'auth/operation-not-allowed') {
-      userFriendlyError = '⚠️ O método E-mail/Senha não está ativado no Firebase Console (Vá em Authentication > Sign-in method e ative E-mail/senha).';
+      userFriendlyError = 'O método E-mail/Senha não está ativado no Firebase Console (Vá em Authentication > Sign-in method e ative E-mail/senha).';
     } else if (error.code === 'auth/email-already-in-use') {
       userFriendlyError = 'Este e-mail já está cadastrado no Firebase.';
     } else if (error.code === 'auth/weak-password') {
@@ -400,7 +400,7 @@ export function submitCompanyVerification(cnpj, fileData) {
 
   return {
     success: true,
-    message: `✅ CNPJ ${cnpj} e documento "${filename}" (${filesizeMB}MB) autenticados! Selo de Empresa Verificada concedido.`,
+    message: `CNPJ ${cnpj} e documento "${filename}" (${filesizeMB}MB) autenticados! Selo de Empresa Verificada concedido.`,
     user: updated
   };
 }

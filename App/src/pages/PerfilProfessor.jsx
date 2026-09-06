@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Award, Building2, MapPin, CheckCircle2, ShieldCheck,
-  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare
+  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare, Calendar
 } from 'lucide-react';
 import { getTeacherById, getTeacherEndorsedStudents, updateTeacherProfile } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
@@ -49,7 +49,7 @@ export default function PerfilProfessor() {
   const handleSaveProfile = (e) => {
     e.preventDefault();
     updateTeacherProfile(teacher.id, editData);
-    showToast('🎉 Perfil acadêmico e formações atualizados com sucesso!');
+    showToast('Perfil acadêmico e formações atualizados com sucesso!');
     setEditModal(false);
   };
 
@@ -113,7 +113,7 @@ export default function PerfilProfessor() {
               <img
                 src={teacher.avatar}
                 alt={teacher.name}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white"
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
               />
 
               <div>
@@ -153,9 +153,9 @@ export default function PerfilProfessor() {
                       avatar: teacher.avatar || ''
                     }, `Orientação Acadêmica: ${teacher.discipline}`);
                   }}
-                  className="btn bg-white text-primary-dark font-bold btn-sm shadow-md hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                  className="btn bg-white dark:bg-slate-800 text-primary-dark dark:text-white font-bold btn-sm shadow-md hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 cursor-pointer border border-white/20"
                 >
-                  <MessageSquare size={15} /> 💬 Falar com o Docente
+                  <MessageSquare size={15} /> Falar com o Docente
                 </button>
               </div>
             )}
@@ -208,8 +208,8 @@ export default function PerfilProfessor() {
                   <div><strong className="text-gray-800 dark:text-white">Instituição:</strong> {teacher.institution}</div>
                   <div><strong className="text-gray-800 dark:text-white">Área / Disciplina:</strong> {teacher.discipline}</div>
                   <div><strong className="text-gray-800 dark:text-white">E-mail Educacional:</strong> {teacher.email}</div>
-                  <div className="text-xs bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 p-2 rounded-lg border border-green-200 dark:border-green-800 mt-2 font-medium">
-                    ✓ E-mail Educacional Autenticado pelo Sistema
+                  <div className="text-xs bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 p-2 rounded-lg border border-green-200 dark:border-green-800 mt-2 font-medium flex items-center gap-1">
+                    <ShieldCheck size={13} /> E-mail Educacional Autenticado pelo Sistema
                   </div>
                 </div>
               </div>
@@ -232,9 +232,9 @@ export default function PerfilProfessor() {
                     <div key={idx} className="border-l-3 border-primary-blue pl-4 py-1.5 space-y-1 bg-gray-50/50 dark:bg-slate-800/40 p-3 rounded-r-2xl border-y border-r border-gray-100 dark:border-slate-800">
                       <div className="font-extrabold text-gray-900 dark:text-white text-base">{edu.degree}</div>
                       <div className="text-xs font-bold text-primary-blue dark:text-blue-400 flex items-center justify-between">
-                        <span>🏛️ {edu.institution}</span>
-                        <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold">
-                          🗓️ {edu.period || edu.year || '2026 à 2030'}
+                        <span className="flex items-center gap-1"><Building2 size={12} /> {edu.institution}</span>
+                        <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                          <Calendar size={11} /> {edu.period || edu.year || '2026 à 2030'}
                         </span>
                       </div>
                     </div>
@@ -249,8 +249,8 @@ export default function PerfilProfessor() {
 
                 <div className="flex flex-wrap gap-2">
                   {(teacher.classes || ['Programação de Computadores', 'Redes de Computadores']).map((cls, idx) => (
-                    <span key={idx} className="tag tag-blue text-xs py-1.5 px-3">
-                      📚 {cls}
+                    <span key={idx} className="tag tag-blue text-xs py-1.5 px-3 flex items-center gap-1.5">
+                      <BookOpen size={12} /> {cls}
                     </span>
                   ))}
                 </div>

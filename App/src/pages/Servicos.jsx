@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, ShieldCheck, Award, RotateCcw, Filter,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, Sparkles
+  BarChart3, CheckCircle2, AlertCircle, Sparkles, HelpCircle
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getServices, addService, updateService, CITIES } from '../lib/ivaiConecta';
@@ -29,10 +29,10 @@ const BADGE_FILTERS = [
 
 const RATING_FILTERS = [
   { label: 'Todas as Avaliações', value: 0 },
-  { label: '⭐ 4.0 ou mais', value: 4.0 },
-  { label: '⭐ 4.5 ou mais', value: 4.5 },
-  { label: '⭐ 4.8 ou mais', value: 4.8 },
-  { label: '⭐ 5.0 (Excelente)', value: 5.0 },
+  { label: '4.0 ou mais', value: 4.0 },
+  { label: '4.5 ou mais', value: 4.5 },
+  { label: '4.8 ou mais', value: 4.8 },
+  { label: '5.0 (Excelente)', value: 5.0 },
 ];
 
 export default function Servicos() {
@@ -182,11 +182,11 @@ export default function Servicos() {
               </button>
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
                   activeTab === 'dashboard' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
                 }`}
               >
-                📊 Minha Dashboard &amp; Avaliações
+                <BarChart3 size={15} /> Minha Dashboard &amp; Avaliações
               </button>
             </div>
           )}
@@ -200,18 +200,18 @@ export default function Servicos() {
           <div className="space-y-8 max-w-5xl mx-auto">
             
             {/* Header do Serviço Cadastrado */}
-            <div className="card p-6 bg-white flex flex-wrap items-center justify-between gap-4">
+            <div className="card p-6 flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-primary-blue bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                  <span className="text-xs font-bold text-primary-blue bg-blue-50 dark:bg-blue-950/70 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
                     {currentService.category}
                   </span>
-                  <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
+                  <span className="text-xs font-bold text-green-700 bg-green-50 dark:bg-emerald-950/70 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-green-200 dark:border-emerald-800">
                     {currentService.badge}
                   </span>
                 </div>
-                <h2 className="font-heading text-2xl font-bold text-primary-dark">{currentService.providerName}</h2>
-                <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 mt-1 flex-wrap">
+                <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white">{currentService.providerName}</h2>
+                <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
                   <span className="flex items-center gap-1"><MapPin size={14} className="text-primary-blue" />{currentService.address || `${currentService.city}, PR`}</span>
                   <span>·</span>
                   <span className="flex items-center gap-1"><Phone size={14} className="text-green-600" />{currentService.phone}</span>
@@ -225,50 +225,50 @@ export default function Servicos() {
 
             {/* CARDS DE ANALYTICS / DESEMPENHO DE VENDAS */}
             <div>
-              <h3 className="font-heading text-xl font-bold text-primary-dark mb-4 flex items-center gap-2">
+              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
                 <TrendingUp size={20} className="text-primary-blue" /> Métrica &amp; Conversão de Vendas
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
                 {/* Visualizações */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
+                <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
                     <span>Acessos ao Perfil</span>
                     <Users size={18} className="text-primary-blue" />
                   </div>
-                  <div className="text-3xl font-extrabold text-primary-dark">{currentService.analytics?.views || 412}</div>
-                  <div className="text-xs text-green-600 font-semibold">+18% esta semana</div>
+                  <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{currentService.analytics?.views || 412}</div>
+                  <div className="text-xs text-green-600 dark:text-emerald-400 font-semibold">+18% esta semana</div>
                 </div>
 
                 {/* Contatos via Chat */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
+                <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
                     <span>Leads / Contatos</span>
                     <MessageSquare size={18} className="text-primary-blue" />
                   </div>
-                  <div className="text-3xl font-extrabold text-primary-dark">{currentService.analytics?.contacts || 58}</div>
-                  <div className="text-xs text-gray-500 font-medium">Pessoas que iniciaram conversa no chat</div>
+                  <div className="text-3xl font-extrabold text-primary-dark dark:text-white">{currentService.analytics?.contacts || 58}</div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Pessoas que iniciaram conversa no chat</div>
                 </div>
 
                 {/* Vendas Fechadas */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
+                <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
                     <span>Serviços Prestados</span>
-                    <CheckCircle2 size={18} className="text-teal-600" />
+                    <CheckCircle2 size={18} className="text-teal-600 dark:text-teal-400" />
                   </div>
-                  <div className="text-3xl font-extrabold text-teal-600">{currentService.analytics?.closedDeals || 49}</div>
-                  <div className="text-xs font-bold text-teal-700">Taxa: {currentService.analytics?.conversionRate || '84.4%'}</div>
+                  <div className="text-3xl font-extrabold text-teal-600 dark:text-teal-400">{currentService.analytics?.closedDeals || 49}</div>
+                  <div className="text-xs font-bold text-teal-700 dark:text-teal-300">Taxa: {currentService.analytics?.conversionRate || '84.4%'}</div>
                 </div>
 
                 {/* Não Compraram */}
-                <div className="card p-5 bg-white border border-gray-200 space-y-1">
-                  <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider">
+                <div className="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
                     <span>Desistências</span>
                     <AlertCircle size={18} className="text-amber-500" />
                   </div>
-                  <div className="text-3xl font-extrabold text-gray-700">{currentService.analytics?.nonBuyers || 9}</div>
-                  <div className="text-xs text-amber-600 font-semibold">Contataram e não compraram</div>
+                  <div className="text-3xl font-extrabold text-gray-700 dark:text-slate-200">{currentService.analytics?.nonBuyers || 9}</div>
+                  <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold">Contataram e não compraram</div>
                 </div>
 
               </div>
@@ -278,28 +278,32 @@ export default function Servicos() {
             <div className="grid lg:grid-cols-2 gap-6">
               
               {/* Avaliações dos Clientes */}
-              <div className="card space-y-4">
+              <div className="card space-y-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-heading text-lg font-bold text-primary-dark flex items-center gap-2">
+                  <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
                     <Star size={18} className="fill-amber-400 text-amber-400" /> Avaliações ({currentService.reviewsCount})
                   </h3>
-                  <span className="text-sm font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200">
-                    ⭐ {currentService.rating} / 5.0
+                  <span className="text-sm font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                    <Star size={13} className="fill-amber-500 text-amber-500" /> {currentService.rating} / 5.0
                   </span>
                 </div>
 
                 {(!currentService.reviews || currentService.reviews.length === 0) ? (
-                  <p className="text-sm text-gray-400">Nenhuma avaliação detalhada recebida ainda.</p>
+                  <p className="text-sm text-gray-400 dark:text-slate-500">Nenhuma avaliação detalhada recebida ainda.</p>
                 ) : (
                   <div className="space-y-3">
                     {currentService.reviews.map(r => (
-                      <div key={r.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-1">
+                      <div key={r.id} className="bg-gray-50 dark:bg-slate-800/70 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-gray-800">{r.client}</span>
-                          <span className="text-xs text-amber-500 font-bold">{'⭐'.repeat(r.stars)}</span>
+                          <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{r.client}</span>
+                          <div className="flex items-center gap-0.5">
+                            {Array.from({ length: r.stars || 5 }).map((_, idx) => (
+                              <Star key={idx} size={13} className="fill-amber-400 text-amber-400" />
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-600 italic">"{r.comment}"</p>
-                        <span className="text-[10px] text-gray-400 block pt-1">{r.date}</span>
+                        <p className="text-xs text-gray-600 dark:text-slate-300 italic">"{r.comment}"</p>
+                        <span className="text-[10px] text-gray-400 dark:text-slate-500 block pt-1">{r.date}</span>
                       </div>
                     ))}
                   </div>
@@ -307,24 +311,24 @@ export default function Servicos() {
               </div>
 
               {/* Fórum de Perguntas & Dúvidas dos Clientes */}
-              <div className="card space-y-4">
-                <h3 className="font-heading text-lg font-bold text-primary-dark flex items-center gap-2">
+              <div className="card space-y-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
+                <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
                   <MessageSquare size={18} className="text-primary-blue" /> Fórum de Dúvidas &amp; Sugestões
                 </h3>
 
                 {(!currentService.forumTopics || currentService.forumTopics.length === 0) ? (
-                  <div className="bg-gray-50 rounded-2xl p-6 text-center text-gray-400">
-                    <MessageSquare size={32} className="mx-auto mb-2 text-gray-300" />
+                  <div className="bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 text-center text-gray-400 dark:text-slate-400">
+                    <MessageSquare size={32} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
                     <p className="text-sm font-semibold">Nenhuma pergunta aberta no momento.</p>
                     <p className="text-xs mt-1">Quando clientes tiverem dúvidas sobre seus serviços, elas aparecerão aqui.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {currentService.forumTopics.map(f => (
-                      <div key={f.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
-                        <div className="font-bold text-sm text-gray-800">❓ {f.title}</div>
-                        <div className="text-xs text-gray-600">Cliente perguntou: "{f.question}"</div>
-                        <div className="text-xs font-semibold text-primary-blue bg-white p-2.5 rounded-xl border border-gray-200">
+                      <div key={f.id} className="bg-gray-50 dark:bg-slate-800/70 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 space-y-2">
+                        <div className="font-bold text-sm text-gray-800 dark:text-slate-100 flex items-center gap-1.5"><HelpCircle size={15} className="text-primary-blue" /> {f.title}</div>
+                        <div className="text-xs text-gray-600 dark:text-slate-300">Cliente perguntou: "{f.question}"</div>
+                        <div className="text-xs font-semibold text-primary-blue dark:text-blue-300 bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-gray-200 dark:border-slate-700">
                           <strong>Sua Resposta:</strong> {f.answer}
                         </div>
                       </div>
@@ -391,9 +395,9 @@ export default function Servicos() {
                     onChange={e => setSortBy(e.target.value)}
                     className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 outline-none bg-white dark:bg-slate-800 cursor-pointer font-medium hover:border-gray-400 focus:border-primary-blue"
                   >
-                    <option value="rating" className="dark:bg-slate-800 dark:text-white">⭐ Melhor Avaliados</option>
-                    <option value="reviews" className="dark:bg-slate-800 dark:text-white">💬 Mais Avaliações</option>
-                    <option value="name" className="dark:bg-slate-800 dark:text-white">🔤 Nome (A-Z)</option>
+                    <option value="rating" className="dark:bg-slate-800 dark:text-white">Melhor Avaliados</option>
+                    <option value="reviews" className="dark:bg-slate-800 dark:text-white">Mais Avaliações</option>
+                    <option value="name" className="dark:bg-slate-800 dark:text-white">Nome (A-Z)</option>
                   </select>
                 </div>
 
@@ -447,7 +451,9 @@ export default function Servicos() {
             {/* ── GRID DE SERVIÇOS ── */}
             {filtered.length === 0 ? (
               <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
-                <div className="text-5xl mb-4">🔍</div>
+                <div className="flex justify-center mb-4">
+                  <Search size={48} className="text-gray-300 dark:text-slate-600" />
+                </div>
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhum prestador encontrado com os filtros selecionados.</p>
                 <p className="text-sm text-gray-400 dark:text-slate-400 mb-5">Tente remover alguns filtros ou buscar por outra categoria.</p>
                 <button onClick={resetFilters} className="btn btn-outline btn-sm">
@@ -468,10 +474,10 @@ export default function Servicos() {
       {editModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setEditModal(false)}>
-          <div className="bg-white rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-xl font-bold text-primary-dark">Editar Dados &amp; Localização do Negócio</h3>
-              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Editar Dados &amp; Localização do Negócio</h3>
+              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
             </div>
 
             <form onSubmit={handleUpdateService} className="space-y-4">
@@ -563,7 +569,7 @@ export default function Servicos() {
                 forumTopics: []
               };
               addService(servicePayload);
-              showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
+              showToast('Serviço cadastrado com sucesso no Marketplace!');
               setModal(false);
             }} className="space-y-4">
               <div className="form-group">

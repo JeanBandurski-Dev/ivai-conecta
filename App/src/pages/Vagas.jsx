@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
@@ -117,7 +117,7 @@ export default function Vagas() {
     };
 
     addJob(jobPayload);
-    showToast('🎉 Vaga publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
+    showToast('Vaga publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
     setShowModal(false);
     setNewTitle('');
     setNewDesc('');
@@ -239,7 +239,7 @@ export default function Vagas() {
                 className="text-sm text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full"
               />
               {query && (
-                <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 rounded-full">
+                <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full">
                   <X size={14} className="text-gray-400" />
                 </button>
               )}
@@ -340,13 +340,14 @@ export default function Vagas() {
                       <button
                         key={skill}
                         onClick={() => toggleSkill(skill)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1 ${
                           isSelected
                             ? 'bg-primary-blue text-white border-primary-blue shadow-xs'
                             : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue'
                         }`}
                       >
-                        {skill} {isSelected && '✓'}
+                        <span>{skill}</span>
+                        {isSelected && <Check size={12} strokeWidth={3} />}
                       </button>
                     );
                   })}
@@ -361,7 +362,9 @@ export default function Vagas() {
         {/* ── GRID DE VAGAS ── */}
         {filtered.length === 0 ? (
           <div className="py-20 text-center text-gray-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
-            <div className="text-5xl mb-4">🔍</div>
+            <div className="flex justify-center mb-4">
+              <Search size={48} className="text-gray-300 dark:text-slate-600" />
+            </div>
             <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga encontrada com os filtros selecionados.</p>
             <p className="text-sm text-gray-400 mb-5">Tente remover alguns filtros ou buscar por outro termo.</p>
             <button onClick={resetFilters} className="btn btn-outline btn-sm">

@@ -1,4 +1,5 @@
 import { Navigate, useLocation, Link } from 'react-router-dom';
+import { Shield, ShieldAlert } from 'lucide-react';
 import useAppStore from '../../store/useAppStore';
 
 /**
@@ -17,7 +18,9 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
         <div className="relative flex items-center justify-center mb-4">
           <div className="w-16 h-16 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin"></div>
-          <div className="absolute text-xl">🛡️</div>
+          <div className="absolute text-primary-blue">
+            <Shield size={24} />
+          </div>
         </div>
         <p className="text-gray-600 dark:text-slate-300 font-medium animate-pulse text-sm">
           Autenticando sessão segura...
@@ -46,8 +49,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-16 text-center">
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 dark:border-slate-700/60 relative overflow-hidden">
-          <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
-            🚫
+          <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 text-amber-600 dark:text-amber-400 shadow-inner">
+            <ShieldAlert size={36} />
           </div>
 
           <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 mb-4">

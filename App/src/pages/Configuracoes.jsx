@@ -72,15 +72,15 @@ export default function Configuracoes() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
-    showToast('⏳ Processando foto de perfil...');
+    showToast('Processando foto de perfil...');
     try {
       const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
       if (res.success) {
         setAvatar(res.url);
         setCurrentUser({ ...currentUser, avatar: res.url });
-        showToast('📸 Foto de perfil salva com sucesso!');
+        showToast('Foto de perfil salva com sucesso!');
       } else {
-        showToast(`⚠️ ${res.error || 'Erro ao enviar imagem.'}`);
+        showToast(res.error || 'Erro ao enviar imagem.');
       }
     } finally {
       setUploadingAvatar(false);
@@ -103,16 +103,16 @@ export default function Configuracoes() {
   const processStudentFile = (file) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      showToast('⚠️ O arquivo selecionado excede o limite máximo de 5MB.');
+      showToast('O arquivo selecionado excede o limite máximo de 5MB.');
       return;
     }
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
-      showToast('⚠️ Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
+      showToast('Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
       return;
     }
     setSelectedFile(file);
-    showToast(`📄 Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
+    showToast(`Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
   };
 
   const handleDrag = (e) => {
@@ -143,7 +143,7 @@ export default function Configuracoes() {
     }
 
     setSubmittingStudent(true);
-    showToast('⏳ Processando e autenticando declaração...');
+    showToast('Processando e autenticando declaração...');
 
     try {
       let uploadedDocUrl = null;
@@ -166,7 +166,7 @@ export default function Configuracoes() {
         if (updated) {
           setCurrentUser(updated);
         }
-        showToast('🎉 Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
+        showToast('Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
       }
     } finally {
       setSubmittingStudent(false);
@@ -182,7 +182,7 @@ export default function Configuracoes() {
     }
 
     setSubmittingCompany(true);
-    showToast('⏳ Validando e processando CNPJ...');
+    showToast('Validando e processando CNPJ...');
 
     try {
       let uploadedCnpjUrl = null;
@@ -205,7 +205,7 @@ export default function Configuracoes() {
         if (updated) {
           setCurrentUser(updated);
         }
-        showToast('🎉 CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
+        showToast('CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
       } else {
         showToast(res.error);
       }
@@ -282,7 +282,7 @@ export default function Configuracoes() {
                 }`}
               >
                 <FileCheck size={16} /> Verificação de Estudante
-                {verificationSubmitted && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">Verificado ✓</span>}
+                {verificationSubmitted && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1"><Check size={10} /> Verificado</span>}
               </button>
             )}
 
@@ -294,7 +294,7 @@ export default function Configuracoes() {
                 }`}
               >
                 <Building2 size={16} /> Verificação de CNPJ
-                {companyVerified && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">CNPJ Ok ✓</span>}
+                {companyVerified && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1"><Check size={10} /> CNPJ Ok</span>}
               </button>
             )}
 
@@ -337,7 +337,7 @@ export default function Configuracoes() {
                     <img
                       src={avatar}
                       alt={name}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white"
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
                     />
                     {uploadingAvatar && (
                       <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
@@ -577,8 +577,15 @@ export default function Configuracoes() {
                       className="border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-6 text-center bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 cursor-pointer"
                     >
                       <Upload size={32} className="mx-auto mb-2 text-gray-400 dark:text-slate-500" />
-                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                        {companyFile ? `📄 ${companyFile.name}` : 'Clique para selecionar o Cartão CNPJ ou Contrato Social (PDF/Imagem)'}
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 flex items-center justify-center gap-1.5">
+                        {companyFile ? (
+                          <>
+                            <FileText size={14} className="text-primary-blue" />
+                            <span>{companyFile.name}</span>
+                          </>
+                        ) : (
+                          'Clique para selecionar o Cartão CNPJ ou Contrato Social (PDF/Imagem)'
+                        )}
                       </p>
                     </div>
                   </div>

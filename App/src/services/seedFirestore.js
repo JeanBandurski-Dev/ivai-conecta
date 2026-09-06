@@ -38,10 +38,10 @@ export async function forceSeedAllCollections() {
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       }
-      console.log(`✅ Coleção '${item.name}' gravada no Firestore com sucesso!`);
+      console.log(`[Firestore Seed] Coleção '${item.name}' gravada no Firestore com sucesso.`);
       logResults.push({ col: item.name, success: true });
     } catch (err) {
-      console.warn(`⚠️ O Firestore recusou a gravação da coleção '${item.name}':`, err.code, err.message);
+      console.warn(`[Firestore Seed] O Firestore recusou a gravação da coleção '${item.name}':`, err.code, err.message);
       logResults.push({ col: item.name, success: false, error: err.message, code: err.code });
     }
   }

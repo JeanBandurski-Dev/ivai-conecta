@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, CheckCircle, ShieldCheck,
   Send, Edit3, ArrowLeft, Plus, X, Sparkles, BookOpen, Briefcase, FolderKanban,
-  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare
+  Lock, AlertCircle, Globe, Printer, Trash2, ExternalLink, Camera, Upload, MessageSquare, Check
 } from 'lucide-react';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
@@ -134,7 +134,7 @@ export default function PerfilAluno() {
     e.preventDefault();
     const res = proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
     if (res.success) {
-      showToast(`🎉 Recomendação concedida com sucesso para ${talent.name}!`);
+      showToast(`Recomendação concedida com sucesso para ${talent.name}!`);
       setProactiveEndorseModal(false);
       setProactiveQuote('');
     } else {
@@ -145,13 +145,13 @@ export default function PerfilAluno() {
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      showToast('⏳ Enviando foto para o Firebase Storage...');
+      showToast('Enviando foto para o Firebase Storage...');
       const res = await uploadUserProfilePicture(file, currentUser?.uid || talent?.id);
       if (res.success) {
         setEditData(d => ({ ...d, avatar: res.url }));
-        showToast('📸 Foto de perfil salva na nuvem com sucesso!');
+        showToast('Foto de perfil salva na nuvem com sucesso!');
       } else {
-        showToast(`⚠️ ${res.error || 'Erro ao enviar foto.'}`);
+        showToast(res.error || 'Erro ao enviar foto.');
       }
     }
   };
@@ -180,7 +180,7 @@ export default function PerfilAluno() {
       });
     }
 
-    showToast('🎉 Foto de perfil, currículo e redes sociais salvos com sucesso!');
+    showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
     handleCloseEditModal();
   };
 
@@ -302,7 +302,7 @@ export default function PerfilAluno() {
                 <img
                   src={talent.avatar}
                   alt={talent.name}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
                 />
                 {isOwner && (
                   <button
@@ -405,7 +405,7 @@ export default function PerfilAluno() {
                   }}
                   className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
                 >
-                  <MessageSquare size={15} /> 💬 Conversar com {talent.name.split(' ')[0]}
+                  <MessageSquare size={15} /> Conversar com {talent.name.split(' ')[0]}
                 </button>
               )}
 
@@ -414,7 +414,7 @@ export default function PerfilAluno() {
                 onClick={() => setPdfModalOpen(true)}
                 className="btn btn-outline border-white/40 text-white btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full"
               >
-                <Printer size={15} /> 📄 Baixar Currículo em PDF
+                <Printer size={15} /> Baixar Currículo em PDF
               </button>
 
               {/* 2. Editar Meu Perfil (visível apenas para o dono) */}
@@ -424,7 +424,7 @@ export default function PerfilAluno() {
                   className="btn bg-amber-400 hover:bg-amber-500 text-slate-950 btn-sm font-extrabold shadow-lg flex items-center justify-center gap-2 border border-amber-300 transition-all cursor-pointer w-full"
                   title="Abrir formulário de edição de perfil e currículo"
                 >
-                  <Edit3 size={16} /> ✏️ Editar Meu Perfil &amp; Currículo
+                  <Edit3 size={16} /> Editar Meu Perfil &amp; Currículo
                 </button>
               )}
 
@@ -443,7 +443,7 @@ export default function PerfilAluno() {
                   onClick={() => setProactiveEndorseModal(true)}
                   className="btn btn-teal btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full"
                 >
-                  <Award size={16} /> ⭐ Recomendar Este Aluno
+                  <Award size={16} /> Recomendar Este Aluno
                 </button>
               )}
             </div>
@@ -539,8 +539,8 @@ export default function PerfilAluno() {
                     <Award size={18} className="text-primary-blue dark:text-blue-400" /> Parecer Pedagógico &amp; Recomendações
                   </h3>
                   {isProfessor ? (
-                    <button onClick={() => setProactiveEndorseModal(true)} className="btn btn-teal btn-sm text-xs font-bold">
-                      <Award size={13} /> ⭐ Recomendar Aluno
+                    <button onClick={() => setProactiveEndorseModal(true)} className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5">
+                      <Award size={13} /> Recomendar Aluno
                     </button>
                   ) : null}
                 </div>
@@ -558,8 +558,8 @@ export default function PerfilAluno() {
                             <div className="font-bold text-gray-800 dark:text-white text-sm">{e.profName}</div>
                             <div className="text-xs text-primary-blue dark:text-blue-400 font-medium">{e.discipline} · {e.institution}</div>
                           </div>
-                          <span className="text-xs font-bold text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
-                            ✓ Verificado
+                          <span className="text-xs font-bold text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Check size={11} /> Verificado
                           </span>
                         </div>
                         <blockquote className="text-sm text-gray-600 dark:text-slate-300 italic mt-2">

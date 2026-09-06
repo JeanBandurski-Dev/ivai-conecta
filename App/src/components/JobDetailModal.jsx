@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, Lightbulb
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB } from '../lib/ivaiConecta';
@@ -29,7 +29,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     const res = applyToJob(job.id, currentUser);
     if (res.success) {
       setApplied(true);
-      showToast('🎉 Candidatura realizada com sucesso!');
+      showToast('Candidatura realizada com sucesso!');
     } else {
       showToast(res.message);
     }
@@ -84,7 +84,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <img
               src={job.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
               alt={job.company}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white dark:bg-slate-800"
             />
             <div className="pr-8">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -126,7 +126,8 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             </div>
           ) : (
             <div className="mt-6 pt-3 border-t border-white/15 text-xs text-gray-300 flex items-center gap-2">
-              <span>💡</span> Entre como Aluno ou Candidato para ver seu cálculo de compatibilidade com esta vaga.
+              <Lightbulb size={14} className="text-amber-300 shrink-0" />
+              <span>Entre como Aluno ou Candidato para ver seu cálculo de compatibilidade com esta vaga.</span>
             </div>
           )}
         </div>
