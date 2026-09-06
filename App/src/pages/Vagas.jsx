@@ -1,12 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft, Clock, DollarSign, ShieldCheck } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getJobs, addJob, getTalents, calculateMatchScore, CITIES, getJobById, safeSkillsArray,
-  STANDARD_JOB_TITLES, STANDARD_SKILLS, SALARY_RANGES, WORK_SCHEDULES,
-  STANDARD_BENEFITS, validateProfessionalText, getJobDescriptionTemplate,
-  validateJobTitle, validateSkill, JOB_CATEGORIES
+  getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
@@ -44,7 +41,6 @@ const POPULAR_SKILLS = [
 export default function Vagas() {
   const { selectedCity, currentUser, showToast } = useAppStore();
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const [query,         setQuery]         = useState(params.get('q') || '');
   const [filterCity,    setFilterCity]    = useState(selectedCity);
@@ -56,8 +52,6 @@ export default function Vagas() {
   const [showNewModal,  setShowModal]     = useState(params.get('action') === 'new');
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
-
-  const [refreshKey,    setRefreshKey]    = useState(0);
 
 
 

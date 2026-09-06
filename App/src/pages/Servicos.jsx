@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  Search, X, Plus, Star, ShieldCheck, Award, RotateCcw, Filter,
+  Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, Sparkles
+  BarChart3, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getServices, addService, updateService, CITIES, maskPhone, sanitizeWhatsAppPhone } from '../lib/ivaiConecta';

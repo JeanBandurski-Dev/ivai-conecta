@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
   Globe, CheckCircle2, Sparkles

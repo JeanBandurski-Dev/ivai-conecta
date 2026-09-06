@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
-  AlertTriangle, Clock, Trash2, X, Check, Loader2,
-  Briefcase, MapPin, Users, ShieldAlert, Archive
+  Clock, Trash2, X, Loader2, ShieldAlert, Archive
 } from 'lucide-react';
 
 /**

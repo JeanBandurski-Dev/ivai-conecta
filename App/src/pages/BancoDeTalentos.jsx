@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Sparkles, RotateCcw,
-  ArrowLeft, ShieldCheck, Award, Eye
+  ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap
 } from 'lucide-react';
 import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES } from '../lib/ivaiConecta';
 import { subscribeToTalents, subscribeToTeachers } from '../services/talentsService.js';
