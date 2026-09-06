@@ -20,6 +20,7 @@ import {
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
 import JobFormModal from '../components/JobFormModal';
+import JobActionModal from '../components/JobActionModal';
 
 let isDraggingLock = false;
 
@@ -104,9 +105,10 @@ export default function GerenciamentoVagasEmpresa() {
       j.createdBy === currentUser?.email ||
       (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
       (currentUser?.name && j.company?.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
-      j.company?.toLowerCase().includes('valetech')
+      (currentUser?.razaoSocial && j.company?.toLowerCase().includes(currentUser.razaoSocial.toLowerCase().split(' ')[0])) ||
+      (currentUser?.nomeFantasia && j.company?.toLowerCase().includes(currentUser.nomeFantasia.toLowerCase().split(' ')[0]))
     );
-    return userCompanyMatch.length > 0 ? userCompanyMatch : jobs.slice(0, 4);
+    return userCompanyMatch;
   }, [liveJobs, currentUser]);
 
   // Selected Job for Pipeline
@@ -191,6 +193,7 @@ export default function GerenciamentoVagasEmpresa() {
   // Edit / New Job Modal State
   const [showNewJobModal, setShowNewJobModal] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [jobActionModalTarget, setJobActionModalTarget] = useState(null);
 
   const [newJobForm, setNewJobForm] = useState({
     title: '',
@@ -672,16 +675,49 @@ export default function GerenciamentoVagasEmpresa() {
   };
 
   // ── Job Actions ──
-  const handleToggleJobStatus = async (jobId, currentStatus) => {
-    const newStatus = currentStatus === 'Ativa' ? 'close' : 'reopen';
-    await updateJobStatus(jobId, newStatus);
-    showToast(newStatus === 'close' ? 'Vaga pausada/encerrada.' : 'Vaga reaberta e ativada com sucesso!');
+  const handleCloseJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : allCompanyJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    // 1. Atualização Otimista Imediata no React (sem F5!)
+    setLiveJobs(prev => prev.map(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      const isTarget = jId === idStr || (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) || (jFId && jFId === idStr);
+      if (isTarget) {
+        return { ...j, status: 'Encerrada' };
+      }
+      return j;
+    }));
+
+    // 2. Persiste a alteração
+    try {
+      await updateJobStatus(firestoreIdStr || idStr, 'close');
+      showToast('🔒 Processo seletivo encerrado com sucesso!');
+    } catch (err) {
+      console.error('Erro ao encerrar vaga:', err);
+      showToast('⚠️ Erro ao sincronizar encerramento da vaga.');
+    }
     forceUpdate(n => n + 1);
   };
-  const _skipOldToggle = () => {
+
+  const handleToggleJobStatus = async (jobId, currentStatus) => {
     const newStatus = currentStatus === 'Ativa' ? 'close' : 'reopen';
-    updateJobStatus(jobId, newStatus);
-    showToast(newStatus === 'close' ? 'Vaga pausada/encerrada.' : 'Vaga reaberta e ativada com sucesso!');
+    const idStr = String(jobId);
+
+    // Atualização otimista imediata
+    setLiveJobs(prev => prev.map(j => {
+      if (String(j.id) === idStr || String(j.firestoreId) === idStr) {
+        return { ...j, status: newStatus === 'close' ? 'Encerrada' : 'Ativa' };
+      }
+      return j;
+    }));
+
+    await updateJobStatus(jobId, newStatus);
+    showToast(newStatus === 'close' ? 'Vaga encerrada.' : 'Vaga reaberta e ativada com sucesso!');
     forceUpdate(n => n + 1);
   };
 
@@ -691,12 +727,46 @@ export default function GerenciamentoVagasEmpresa() {
     forceUpdate(n => n + 1);
   };
 
-  const handleDeleteJob = async (jobId) => {
-    if (confirm('Tem certeza que deseja excluir esta vaga e todas as suas candidaturas?')) {
-      await deleteJob(jobId);
-      showToast('Vaga excluída com sucesso.');
-      forceUpdate(n => n + 1);
+  const handleDeleteJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : allCompanyJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    // 1. Atualização Otimista Imediata no React (some da tela instantaneamente sem F5!)
+    setLiveJobs(prev => prev.filter(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      if (jId === idStr) return false;
+      if (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) return false;
+      if (jFId && jFId === idStr) return false;
+      return true;
+    }));
+
+    // 2. Se a vaga excluída era a atualmente selecionada no pipeline, seleciona a próxima vaga disponível
+    setSelectedJobId(prevId => {
+      const prevIdStr = String(prevId);
+      if (prevIdStr === idStr || (firestoreIdStr && prevIdStr === firestoreIdStr)) {
+        const remaining = allCompanyJobs.filter(j => {
+          const jId = String(j.id);
+          const jFId = j.firestoreId ? String(j.firestoreId) : null;
+          return jId !== idStr && (!firestoreIdStr || (jId !== firestoreIdStr && jFId !== firestoreIdStr));
+        });
+        return remaining[0]?.id || null;
+      }
+      return prevId;
+    });
+
+    // 3. Persiste no storage local e Firestore
+    try {
+      await deleteJob(firestoreIdStr || idStr);
+      showToast('🗑️ Vaga excluída permanentemente.');
+    } catch (err) {
+      console.error('Erro ao excluir vaga:', err);
+      showToast('⚠️ Erro ao processar exclusão no servidor.');
     }
+    forceUpdate(n => n + 1);
   };
 
   const handleSaveJob = async (jobPayload, isEditing) => {
@@ -1005,6 +1075,26 @@ export default function GerenciamentoVagasEmpresa() {
             TAB 1: FUNIL DE RECRUTAMENTO & PIPELINE (KANBAN ATS REVAMP)
         ═════════════════════════════════════════════════════════════════ */}
         {activeTab === 'pipeline' && (
+          allCompanyJobs.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-12 text-center space-y-4 max-w-xl mx-auto my-8">
+              <div className="w-14 h-14 rounded-2xl bg-primary-blue/10 text-primary-blue mx-auto flex items-center justify-center">
+                <Briefcase size={26} />
+              </div>
+              <h4 className="font-heading text-lg font-bold text-gray-900 dark:text-white">
+                Nenhuma vaga ativa no momento
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                Sua empresa não possui processos seletivos em andamento. Crie uma nova vaga para acompanhar candidatos pelo funil Kanban.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNewJobModal(true)}
+                className="btn btn-primary btn-md font-bold rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-brand-sm"
+              >
+                <Plus size={16} /> Publicar Primeira Vaga
+              </button>
+            </div>
+          ) : (
           <div className="space-y-6">
             
             {/* ── BARRA SUPERIOR: SELEÇÃO DA VAGA & VISUALIZAÇÃO ── */}
@@ -1820,6 +1910,7 @@ export default function GerenciamentoVagasEmpresa() {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* ═════════════════════════════════════════════════════════════════
@@ -1947,22 +2038,35 @@ export default function GerenciamentoVagasEmpresa() {
                   <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
                     <Filter size={20} />
                   </div>
-                  <h4 className="font-bold text-base text-gray-900 dark:text-white">Nenhuma vaga encontrada</h4>
+                  <h4 className="font-bold text-base text-gray-900 dark:text-white">
+                    {allCompanyJobs.length === 0 ? 'Nenhuma vaga cadastrada' : 'Nenhuma vaga encontrada'}
+                  </h4>
                   <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
-                    Nenhuma vaga da sua empresa corresponde aos filtros selecionados. Tente ajustar os termos de pesquisa ou filtros.
+                    {allCompanyJobs.length === 0
+                      ? 'Sua empresa ainda não possui nenhuma vaga publicada no momento.'
+                      : 'Nenhuma vaga da sua empresa corresponde aos filtros selecionados. Tente ajustar os termos de pesquisa ou filtros.'}
                   </p>
-                  <button
-                    onClick={() => {
-                      setJobSearch('');
-                      setJobStatusFilter('todos');
-                      setJobModalityFilter('todos');
-                      setJobCityFilter('todas');
-                      setJobSortBy('recent');
-                    }}
-                    className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <RotateCcw size={13} /> Limpar Filtros
-                  </button>
+                  {allCompanyJobs.length === 0 ? (
+                    <button
+                      onClick={() => setShowNewJobModal(true)}
+                      className="btn btn-primary btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus size={13} /> Publicar Primeira Vaga
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setJobSearch('');
+                        setJobStatusFilter('todos');
+                        setJobModalityFilter('todos');
+                        setJobCityFilter('todas');
+                        setJobSortBy('recent');
+                      }}
+                      className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCcw size={13} /> Limpar Filtros
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredCompanyJobs.map(job => {
@@ -2039,21 +2143,27 @@ export default function GerenciamentoVagasEmpresa() {
                         </button>
 
                         <button
-                          onClick={() => handleToggleJobStatus(job.id, job.status)}
+                          onClick={() => {
+                            if (isActive) {
+                              setJobActionModalTarget(job);
+                            } else {
+                              handleToggleJobStatus(job.id, job.status);
+                            }
+                          }}
                           className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                             isActive
                               ? 'border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400'
                               : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400'
                           }`}
-                          title={isActive ? 'Pausar / Encerrar Vaga' : 'Reabrir Vaga'}
+                          title={isActive ? 'Encerrar / Gerenciar Vaga' : 'Reabrir Vaga'}
                         >
                           {isActive ? <Clock size={14} /> : <RotateCcw size={14} />}
                         </button>
 
                         <button
-                          onClick={() => handleDeleteJob(job.id)}
+                          onClick={() => setJobActionModalTarget(job)}
                           className="p-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/40 cursor-pointer"
-                          title="Excluir Vaga"
+                          title="Encerrar ou Excluir Vaga"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -2804,6 +2914,15 @@ export default function GerenciamentoVagasEmpresa() {
           setEditingJob(null);
         }}
         onSave={handleSaveJob}
+      />
+
+      {/* Modal Moderno para Encerrar ou Excluir Vaga (Substitui confirm nativo) */}
+      <JobActionModal
+        isOpen={Boolean(jobActionModalTarget)}
+        onClose={() => setJobActionModalTarget(null)}
+        job={jobActionModalTarget}
+        onCloseJob={handleCloseJob}
+        onDeleteJob={handleDeleteJob}
       />
 
     </div>

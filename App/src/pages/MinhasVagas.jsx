@@ -12,6 +12,7 @@ import {
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
+import JobActionModal from '../components/JobActionModal';
 
 export default function MinhasVagas() {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -23,6 +24,7 @@ export default function MinhasVagas() {
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
   const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
+  const [jobActionModalTarget, setJobActionModalTarget] = useState(null);
 
   useEffect(() => {
     const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => {
@@ -95,18 +97,57 @@ export default function MinhasVagas() {
     }
   };
 
-  const handleDeleteJob = async (jobId) => {
-    if (window.confirm('Tem certeza que deseja remover esta vaga permanentemente?')) {
-      try {
-        const updated = await deleteJob(jobId);
-        if (Array.isArray(updated)) setLiveJobs(updated);
-        showToast('🗑️ Vaga excluída permanentemente.');
-        forceUpdate(n => n + 1);
-      } catch (err) {
-        console.error('Erro ao excluir vaga:', err);
-        showToast('Erro ao excluir vaga.');
+  const handleCloseJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : liveJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    setLiveJobs(prev => prev.map(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      if (jId === idStr || (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) || (jFId && jFId === idStr)) {
+        return { ...j, status: 'Encerrada' };
       }
+      return j;
+    }));
+
+    try {
+      await updateJobStatus(firestoreIdStr || idStr, 'close');
+      showToast('🔒 Vaga encerrada com sucesso.');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao encerrar vaga.');
     }
+    forceUpdate(n => n + 1);
+  };
+
+  const handleDeleteJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : liveJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    // Atualização otimista imediata
+    setLiveJobs(prev => prev.filter(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      if (jId === idStr) return false;
+      if (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) return false;
+      if (jFId && jFId === idStr) return false;
+      return true;
+    }));
+
+    try {
+      await deleteJob(firestoreIdStr || idStr);
+      showToast('🗑️ Vaga excluída permanentemente.');
+    } catch (err) {
+      console.error('Erro ao excluir vaga:', err);
+      showToast('Erro ao excluir vaga.');
+    }
+    forceUpdate(n => n + 1);
   };
 
   const handleApproveTeacherRequest = (reqId) => {
@@ -329,23 +370,23 @@ export default function MinhasVagas() {
                         {job.status === 'Encerrada' ? (
                           <button
                             onClick={() => handleJobAction(job.id, 'reopen')}
-                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1.5"
+                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                           >
                             <RotateCcw size={14} /> Reabrir Vaga
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleJobAction(job.id, 'close')}
-                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1.5"
+                            onClick={() => setJobActionModalTarget(job)}
+                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                           >
                             <XCircle size={14} /> Encerrar Vaga
                           </button>
                         )}
 
                         <button
-                          onClick={() => handleDeleteJob(job.id)}
+                          onClick={() => setJobActionModalTarget(job)}
                           className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900/40 transition-colors cursor-pointer"
-                          title="Excluir Vaga Permanentemente"
+                          title="Encerrar ou Excluir Vaga"
                           aria-label="Excluir vaga"
                         >
                           <Trash2 size={16} />
@@ -544,6 +585,15 @@ export default function MinhasVagas() {
           </div>
         </div>
       )}
+
+      {/* Modal Moderno para Encerrar ou Excluir Vaga */}
+      <JobActionModal
+        isOpen={Boolean(jobActionModalTarget)}
+        onClose={() => setJobActionModalTarget(null)}
+        job={jobActionModalTarget}
+        onCloseJob={handleCloseJob}
+        onDeleteJob={handleDeleteJob}
+      />
     </>
   );
 }

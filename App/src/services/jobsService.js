@@ -344,32 +344,39 @@ export async function updateJobStatus(jobId, action) {
 export async function deleteJob(jobId) {
   const idStr = String(jobId);
 
-  // 1. Registra no banco de IDs deletados
+  // 1. Busca vaga para identificar tanto o ID numérico quanto o firestoreId
+  const jobs = getJobs('Todas as Cidades');
+  const target = jobs.find(j => j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr));
+  const targetFirestoreId = target?.firestoreId || (isNaN(Number(jobId)) ? idStr : null);
+  const targetNumericId = target?.id ? String(target.id) : (!isNaN(Number(jobId)) ? idStr : null);
+
+  // 2. Registra no banco de IDs deletados para não ressurgir em cache
   if (typeof localStorage !== 'undefined') {
     const deletedIds = getDeletedJobIds();
-    if (!deletedIds.includes(idStr)) {
-      deletedIds.push(idStr);
-      localStorage.setItem(STORAGE_KEY_DELETED_JOBS, JSON.stringify(deletedIds));
-    }
+    if (!deletedIds.includes(idStr)) deletedIds.push(idStr);
+    if (targetFirestoreId && !deletedIds.includes(targetFirestoreId)) deletedIds.push(targetFirestoreId);
+    if (targetNumericId && !deletedIds.includes(targetNumericId)) deletedIds.push(targetNumericId);
+    localStorage.setItem(STORAGE_KEY_DELETED_JOBS, JSON.stringify(deletedIds));
   }
 
-  // 2. Remove da lista local
-  const jobs = getJobs('Todas as Cidades');
-  let targetFirestoreId = null;
-  const target = jobs.find(j => j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr));
-  if (target?.firestoreId) targetFirestoreId = target.firestoreId;
+  // 3. Remove da lista local imediatamente
+  const updated = jobs.filter(j => !(
+    j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr ||
+    (targetFirestoreId && (String(j.id) === targetFirestoreId || String(j.firestoreId) === targetFirestoreId)) ||
+    (targetNumericId && String(j.id) === targetNumericId)
+  ));
 
-  const updated = jobs.filter(j => !(j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr)));
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
   }
 
-  // 3. Exclui do Cloud Firestore
+  // 4. Exclui do Cloud Firestore
   try {
     if (targetFirestoreId) {
       await deleteDoc(doc(db, 'jobs', targetFirestoreId));
-    } else {
-      const qNum = query(collection(db, 'jobs'), where('id', '==', Number(jobId)));
+    }
+    if (targetNumericId) {
+      const qNum = query(collection(db, 'jobs'), where('id', '==', Number(targetNumericId)));
       const snap = await getDocs(qNum);
       snap.forEach(d => deleteDoc(doc(db, 'jobs', d.id)).catch(() => {}));
     }
