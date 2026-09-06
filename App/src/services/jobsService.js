@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
 import { validateProfessionalText, validateJobTitle, validateSkill } from './jobTaxonomy.js';
+import { calculateMatchScore, safeSkillsArray } from './matchService.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
@@ -445,6 +446,16 @@ export async function applyToJob(jobId, user) {
     return { success: false, message: 'Você já se candidatou a esta vaga!' };
   }
 
+  const candidateSkills = safeSkillsArray(user.skills);
+  const requiredSkills = safeSkillsArray(job ? job.requiredSkills : []);
+  const calculatedScore = calculateMatchScore(candidateSkills, requiredSkills, {
+    userCity: user.city,
+    jobCity: job?.city,
+    isVerifiedStudent: user.isVerifiedStudent,
+    endorsementsCount: (user.endorsements?.length || user.endorsementCount || 0),
+    modality: job?.modality
+  });
+
   const newApp = {
     jobId: String(jobId),
     candidateUid: userUid,
@@ -454,6 +465,7 @@ export async function applyToJob(jobId, user) {
     candidateCourse: user.course || (user.role === 'aluno' ? 'Estudante' : 'Profissional'),
     candidateCity: user.city || 'Ivaiporã',
     candidatePhone: user.phone || '',
+    skills: candidateSkills,
     title: job ? job.title : 'Vaga de Emprego',
     company: job ? job.company : 'Empresa do Vale do Ivaí',
     companyLogo: job ? (job.companyLogo || '') : '',
@@ -463,9 +475,9 @@ export async function applyToJob(jobId, user) {
     type: job ? job.type : 'Tempo Integral',
     appliedAt: new Date().toLocaleDateString('pt-BR'),
     appliedTimestamp: Date.now(),
-    matchScore: 90,
+    matchScore: calculatedScore,
     status: 'Candidatura Enviada',
-    statusClass: 'badge-match-high',
+    statusClass: calculatedScore >= 75 ? 'badge-match-high' : calculatedScore >= 50 ? 'badge-match-med' : 'badge-match-low',
     currentStageIndex: 0,
     nextStepNote: 'Sua candidatura foi recebida com sucesso e aguarda análise do recrutador.',
     stages: [
@@ -1042,6 +1054,16 @@ export function getJobCandidates(jobId) {
             'Proposta / Admissão': 'aprovado',
             'Banco de Talentos': 'reprovado'
           };
+          const candSkills = safeSkillsArray(app.skills || app.candidateSkills || ['React', 'JavaScript']);
+          const targetJob = getJobById(jobId);
+          const computedScore = typeof app.matchScore === 'number' && app.matchScore > 0
+            ? app.matchScore
+            : calculateMatchScore(candSkills, targetJob ? targetJob.requiredSkills : [], {
+                userCity: app.candidateCity,
+                jobCity: targetJob ? targetJob.city : 'Ivaiporã',
+                isVerifiedStudent: app.isVerifiedStudent ?? true
+              });
+
           merged.push({
             id: candId,
             firestoreApplicationId: app.firestoreId || app.id,
@@ -1050,7 +1072,7 @@ export function getJobCandidates(jobId) {
             institution: app.candidateInstitution || 'IFPR Campus Ivaiporã',
             city: app.candidateCity || 'Ivaiporã',
             avatar: app.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-            matchScore: app.matchScore || 90,
+            matchScore: computedScore,
             stage: app.stage || stageMap[app.status] || 'triagem',
             appliedAt: app.appliedAt || new Date().toLocaleDateString('pt-BR'),
             phone: app.candidatePhone || '5543999887766',
@@ -1058,7 +1080,7 @@ export function getJobCandidates(jobId) {
             isVerifiedStudent: app.isVerifiedStudent ?? true,
             rating: app.rating || 4,
             notes: app.notes || app.nextStepNote || 'Candidatura realizada através do portal.',
-            skills: Array.isArray(app.skills) && app.skills.length > 0 ? app.skills : ['React', 'JavaScript', 'Git'],
+            skills: candSkills.length > 0 ? candSkills : ['React', 'JavaScript', 'Git'],
             activity: app.activity || [
               { date: app.appliedAt || 'Hoje', text: 'Candidatura submetida via Ivaí Conecta' }
             ],
