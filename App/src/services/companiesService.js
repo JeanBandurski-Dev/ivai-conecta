@@ -7,6 +7,8 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { getJobs, subscribeToJobs } from './jobsService.js';
+import { subscribeToTalents } from './talentsService.js';
+import { subscribeToServices } from './servicesService.js';
 import { getUsersDB } from './authService.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
