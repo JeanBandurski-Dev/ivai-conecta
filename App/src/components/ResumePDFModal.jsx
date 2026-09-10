@@ -2,12 +2,6 @@ import { useEffect } from 'react';
 import { Printer, X, ShieldCheck, Download, GraduationCap, Building2, MapPin, Award, Lightbulb, CheckCircle2, Globe, Code } from 'lucide-react';
 
 export default function ResumePDFModal({ talent, onClose }) {
-  if (!talent) return null;
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   // Suporte a tecla ESC para fechar
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -16,6 +10,12 @@ export default function ResumePDFModal({ talent, onClose }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  if (!talent) return null;
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div

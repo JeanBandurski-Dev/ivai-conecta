@@ -7,7 +7,10 @@ import {
   sendChatMessage,
   getChatThreads,
   deleteChatThread,
-  matchesUserEmail
+  matchesUserEmail,
+  isSameUser,
+  markThreadAsRead,
+  getThreadUnreadCount
 } from '../services/chatService';
 import { getUsersDB } from '../lib/ivaiConecta';
 
@@ -34,6 +37,7 @@ export default function ChatModal({ onClose }) {
   const [mobileShowChat, setMobileShowChat] = useState(Boolean(activeChatThreadId));
 
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
     if (activeChatThreadId) {
@@ -90,11 +94,16 @@ export default function ChatModal({ onClose }) {
     return () => unsubscribe();
   }, [activeThreadId]);
 
+  // Marca conversa ativa como lida
+  useEffect(() => {
+    if (activeThreadId && currentUser?.email) {
+      markThreadAsRead(activeThreadId, currentUser.email);
+    }
+  }, [activeThreadId, currentUser?.email, messages]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const textareaRef = useRef(null);
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
@@ -127,13 +136,15 @@ export default function ChatModal({ onClose }) {
       if (remaining.length === 0) setMobileShowChat(false);
     }
   };
-
   const activeThread = threads.find(t => t.id === activeThreadId);
   const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
-  const allUsers = getUsersDB();
+  const allUsers = getUsersDB() || [];
   const myEmail = currentUser?.email?.toLowerCase().trim();
-  const availableContacts = allUsers.filter(u => !matchesUserEmail(u.email, myEmail));
+  const availableContacts = allUsers.filter(u => 
+    !isSameUser(currentUser, u) && 
+    !matchesUserEmail(u.email, myEmail)
+  );
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
@@ -228,6 +239,7 @@ export default function ChatModal({ onClose }) {
                 {threads.map(t => {
                   const other = getOtherParticipant(t, currentUser);
                   const isSelected = t.id === activeThreadId;
+                  const threadUnread = getThreadUnreadCount(t, currentUser?.email);
 
                   return (
                     <div
@@ -244,7 +256,14 @@ export default function ChatModal({ onClose }) {
                     >
                       <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
                       <div className="min-w-0 flex-1 pr-5">
-                        <div className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</span>
+                          {threadUnread > 0 && (
+                            <span className="min-w-[17px] h-[17px] px-1 bg-red-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center shrink-0">
+                              {threadUnread > 99 ? '99+' : threadUnread}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate">{t.contextTitle || 'Chat Direto'}</div>
                         <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">{t.lastMessage || 'Conversa iniciada'}</div>
                       </div>

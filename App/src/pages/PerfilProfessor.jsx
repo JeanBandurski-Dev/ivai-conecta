@@ -13,12 +13,26 @@ export default function PerfilProfessor() {
   const navigate = useNavigate();
   const { currentUser, showToast, startChatWith } = useAppStore();
 
-  const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id || 'prof_1') : 'prof_1');
-  const teacher = getTeacherById(teacherId) || {};
+  const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id) : null);
+  const teacher = getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
+    id: currentUser.uid || currentUser.id,
+    firestoreId: currentUser.uid || currentUser.id,
+    name: currentUser.name || 'Professor Docente',
+    email: currentUser.email || '',
+    degree: currentUser.degree || 'Docente / Pesquisador',
+    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+    discipline: currentUser.discipline || 'Ensino Superior & Técnico',
+    endorsementCount: currentUser.endorsementCount || 0,
+    avatar: currentUser.avatar || '',
+    bio: currentUser.bio || '',
+    classes: currentUser.classes || [],
+    education: currentUser.education || [],
+  } : null);
+
   const endorsedStudents = getTeacherEndorsedStudents(teacher?.email);
 
   const isOwner = Boolean(
-    currentUser && (
+    currentUser && teacher && (
       (currentUser.email && teacher?.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
       (currentUser.uid != null && (String(currentUser.uid) === String(teacher?.id) || String(currentUser.uid) === String(teacher?.firestoreId))) ||
       (currentUser.id != null && String(currentUser.id) === String(teacher?.id))
@@ -30,26 +44,23 @@ export default function PerfilProfessor() {
 
   // Edit form state
   const [editData, setEditData] = useState({
-    name: teacher?.name || 'Prof. Dr. Ronan Silva',
-    avatar: teacher?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-    degree: teacher?.degree || 'Doutor em Ciência da Computação (UFPR)',
+    name: teacher?.name || '',
+    avatar: teacher?.avatar || '',
+    degree: teacher?.degree || '',
     institution: teacher?.institution || 'IFPR Campus Ivaiporã',
-    discipline: teacher?.discipline || 'Programação de Computadores & Redes',
+    discipline: teacher?.discipline || '',
     bio: teacher?.bio || '',
     classes: [...(teacher?.classes || [])],
-    education: [...(teacher?.education || [
-      { degree: 'Doutorado em Ciência da Computação', institution: 'Universidade Federal do Paraná (UFPR)', period: '2026 à 2030' },
-      { degree: 'Mestrado em Engenharia Elétrica & Computação', institution: 'Universidade Estadual de Londrina (UEL)', period: '2022 à 2025' },
-      { degree: 'Bacharelado em Ciência da Computação', institution: 'Universidade Estadual de Maringá (UEM)', period: '2017 à 2021' }
-    ])],
+    education: [...(teacher?.education || [])],
     newClass: '',
     newEdu: { degree: '', institution: '', period: '' }
   });
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    updateTeacherProfile(teacher.id, editData);
-    showToast('Perfil acadêmico e formações atualizados com sucesso!');
+    if (!teacher) return;
+    await updateTeacherProfile(teacher.firestoreId || teacher.id, editData);
+    showToast('🎉 Perfil acadêmico e formações atualizados com sucesso!');
     setEditModal(false);
   };
 
@@ -96,6 +107,19 @@ export default function PerfilProfessor() {
     }));
   };
 
+  if (!teacher) {
+    return (
+      <main className="container section text-center py-24">
+        <GraduationCap size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
+        <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Perfil de Docente não encontrado</h2>
+        <p className="text-gray-500 dark:text-slate-300 mb-6">O perfil do professor solicitado não foi localizado.</p>
+        <button onClick={() => navigate('/talentos')} className="btn btn-primary px-6 py-2.5 font-bold">
+          Ver Banco de Talentos &amp; Professores
+        </button>
+      </main>
+    );
+  }
+
   return (
     <>
       {/* Hero Header */}
@@ -131,7 +155,7 @@ export default function PerfilProfessor() {
                   <span>·</span>
                   <span className="flex items-center gap-1.5"><BookOpen size={14} />{teacher.discipline}</span>
                   <span>·</span>
-                  <span className="flex items-center gap-1.5"><Award size={14} className="text-amber-400" />{teacher.endorsementCount || 18} Indicações Concedidas</span>
+                  <span className="flex items-center gap-1.5"><Award size={14} className="text-amber-400" />{teacher.endorsementCount || 0} Indicações Concedidas</span>
                 </div>
               </div>
             </div>

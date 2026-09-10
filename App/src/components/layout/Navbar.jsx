@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
+import { subscribeToUnreadCount } from '../../services/chatService';
 
 export default function Navbar() {
   const { currentUser, theme, toggleTheme, logout, showToast, openChat } = useAppStore();
@@ -14,6 +15,19 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Escuta contagem real de mensagens não lidas
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setUnreadCount(0);
+      return;
+    }
+    const unsubscribe = subscribeToUnreadCount(currentUser.email, (count) => {
+      setUnreadCount(count || 0);
+    });
+    return () => unsubscribe();
+  }, [currentUser?.email]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -49,12 +63,12 @@ export default function Navbar() {
     }`;
 
   const getProfileLink = () => {
-    if (!currentUser) return '/perfil/1';
-    if (currentUser.role === 'empresa') return '/empresa/1';
-    if (currentUser.role === 'professor') return `/professor/${currentUser.id || 'prof_1'}`;
+    if (!currentUser) return '/login';
+    const userIdentifier = currentUser.uid || currentUser.id;
+    if (currentUser.role === 'empresa') return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
+    if (currentUser.role === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
     if (currentUser.role === 'freelancer') return '/servicos?view=dashboard';
-    if (currentUser.role === 'candidato') return `/perfil/${currentUser.id || '2'}`;
-    return `/perfil/${currentUser.id || '1'}`;
+    return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
   return (
@@ -83,16 +97,20 @@ export default function Navbar() {
             {/* Right actions: Theme Switcher & User / Auth */}
             <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-auto md:ml-0">
 
-              {/* Chat Button com indicador */}
+              {/* Chat Button com contador dinâmico de mensagens */}
               {currentUser && (
                 <button
                   onClick={() => openChat()}
                   className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative"
-                  title="Mensagens & Chat"
+                  title={unreadCount > 0 ? `${unreadCount} ${unreadCount === 1 ? 'mensagem não lida' : 'mensagens não lidas'}` : 'Mensagens & Chat'}
                   aria-label="Abrir chat"
                 >
                   <MessageSquare size={18} />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-blue rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center shadow-sm animate-in zoom-in-75 duration-150">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </button>
               )}
 
@@ -268,12 +286,17 @@ export default function Navbar() {
 
                   <button
                     onClick={() => { closeMobile(); openChat(); }}
-                    className={mobileNavLinkClass}
-                    >
-                      <span className='flex items-center gap-2.5'>
-                        <MessageSquare size={16} /> Mensagens &amp; Chat
+                    className={`${mobileNavLinkClass} flex items-center justify-between w-full`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <MessageSquare size={16} /> Mensagens &amp; Chat
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
-                    </button>
+                    )}
+                  </button>
 
                   {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
                     <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>

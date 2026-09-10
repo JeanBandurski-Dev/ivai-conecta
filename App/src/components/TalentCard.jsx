@@ -8,6 +8,15 @@ export default function TalentCard({ talent }) {
 
   const isFavorite = favoriteTalents.includes(id);
 
+  const isSelf = currentUser && (
+    (currentUser.uid && talent.uid && String(currentUser.uid) === String(talent.uid)) ||
+    (currentUser.id && talent.id && String(currentUser.id) === String(talent.id)) ||
+    (currentUser.uid && talent.id && String(currentUser.uid) === String(talent.id)) ||
+    (currentUser.id && talent.uid && String(currentUser.id) === String(talent.uid)) ||
+    (currentUser.email && talent.email && currentUser.email.toLowerCase().trim() === talent.email.toLowerCase().trim()) ||
+    (currentUser.name && name && currentUser.name.toLowerCase().trim() === name.toLowerCase().trim())
+  );
+
   const handleFavoriteToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -27,8 +36,8 @@ export default function TalentCard({ talent }) {
           />
           <div className="min-w-0">
             <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">{name}</h3>
-            <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5">{course}</div>
-            <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 truncate">{institution} · {city}</div>
+            <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5">{course || 'Perfil em formação'}</div>
+            <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 truncate">{institution ? `${institution} · ` : ''}{city}</div>
           </div>
         </div>
 
@@ -93,14 +102,20 @@ export default function TalentCard({ talent }) {
       </div>
 
       {/* Skills */}
-      <div className="flex flex-wrap gap-1.5">
-        {skills.slice(0, 4).map(skill => (
-          <span key={skill} className="tag">{skill}</span>
-        ))}
-        {skills.length > 4 && (
-          <span className="tag">+{skills.length - 4}</span>
-        )}
-      </div>
+      {skills.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {skills.slice(0, 4).map(skill => (
+            <span key={skill} className="tag">{skill}</span>
+          ))}
+          {skills.length > 4 && (
+            <span className="tag">+{skills.length - 4}</span>
+          )}
+        </div>
+      ) : (
+        <div className="text-[11px] text-gray-400 dark:text-slate-500 italic">
+          Competências em atualização
+        </div>
+      )}
 
       {/* Action & Direct Social Links */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
@@ -112,7 +127,7 @@ export default function TalentCard({ talent }) {
         </Link>
 
         {/* Botão de Chat Direto com o Talento */}
-        {currentUser?.email?.toLowerCase().trim() !== talent.email?.toLowerCase().trim() && (
+        {!isSelf && (
           <button
             onClick={(e) => {
               e.preventDefault();

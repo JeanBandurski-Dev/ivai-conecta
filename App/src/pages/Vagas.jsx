@@ -1,12 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Filter, Plus, ChevronDown, X, Sparkles, SlidersHorizontal, RotateCcw, Briefcase, CheckCircle2, ArrowLeft, Check } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getJobs, getTalents, calculateMatchScore, CITIES, getJobById } from '../lib/ivaiConecta';
+import {
+  getJobs, addJob, calculateMatchScore, CITIES, getJobById, safeSkillsArray
+} from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
-import PublishJobModal from '../components/PublishJobModal';
+import JobFormModal from '../components/JobFormModal';
+import CustomSelect from '../components/ui/CustomSelect';
 
 const TYPES = [
   { label: 'Todos os Tipos', value: 'Todos' },
@@ -38,7 +41,6 @@ const POPULAR_SKILLS = [
 export default function Vagas() {
   const { selectedCity, currentUser, showToast } = useAppStore();
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const [query,         setQuery]         = useState(params.get('q') || '');
   const [filterCity,    setFilterCity]    = useState(selectedCity);
@@ -51,19 +53,18 @@ export default function Vagas() {
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
 
-  const [refreshKey,    setRefreshKey]    = useState(0);
+
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
 
   useEffect(() => {
     const unsub = subscribeToJobs('Todas as Cidades', (data) => {
-      setLiveJobs(data);
+      if (Array.isArray(data)) setLiveJobs(data);
     });
     return () => unsub();
   }, [refreshKey]);
 
-  const allJobs = liveJobs;
-  const demoSkills = getTalents('Todas as Cidades')[0]?.skills || ['JavaScript', 'HTML5/CSS3', 'React'];
+  const allJobs = Array.isArray(liveJobs) ? liveJobs : [];
 
   // Check jobId param in URL
   useEffect(() => {
@@ -76,9 +77,14 @@ export default function Vagas() {
 
   useEffect(() => {
     if (params.get('action') === 'new') {
-      setShowModal(true);
+      if (currentUser?.role === 'empresa') {
+        setShowModal(true);
+      } else {
+        showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
+        setParams({});
+      }
     }
-  }, [params]);
+  }, [params, currentUser]);
 
   useEffect(() => {
     if (selectedCity) {
@@ -86,6 +92,17 @@ export default function Vagas() {
     }
   }, [selectedCity]);
 
+  const handleSaveJob = async (jobPayload) => {
+    if (!currentUser || currentUser.role !== 'empresa') {
+      showToast('⚠️ Apenas empresas cadastradas podem cadastrar e publicar vagas.');
+      return;
+    }
+    await addJob(jobPayload);
+    showToast('🎉 Vaga homologada e publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
+    setShowModal(false);
+    setParams({});
+    setRefreshKey(k => k + 1);
+  };
   const toggleSkill = (skill) => {
     setSelectedSkills(prev =>
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
@@ -105,46 +122,65 @@ export default function Vagas() {
   };
 
   const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
-  const userSkills = currentUser?.skills || [];
+  const userSkills = useMemo(() => safeSkillsArray(currentUser?.skills), [currentUser?.skills]);
 
   const filtered = useMemo(() => {
+    if (!Array.isArray(allJobs)) return [];
+
     return allJobs
+      .filter(j => j && typeof j === 'object')
       .map(job => {
+        const reqSkills = safeSkillsArray(job.requiredSkills);
         const score = canSeeMatch
-          ? calculateMatchScore(userSkills, job.requiredSkills || [], {
+          ? calculateMatchScore(userSkills, reqSkills, {
               userCity: currentUser?.city,
               jobCity: job.city,
               isVerifiedStudent: currentUser?.isVerifiedStudent,
               endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
             })
           : null;
-        return { ...job, calculatedScore: score };
+        return { ...job, requiredSkills: reqSkills, calculatedScore: score };
       })
       .filter(j => {
         // Cidade
-        const matchCity = !filterCity || filterCity === 'Todas as Cidades' || j.city === filterCity;
+        const filterCityClean = String(filterCity || '').trim().toLowerCase();
+        const jCityClean = String(j.city || '').trim().toLowerCase();
+        const matchCity = !filterCity || filterCity === 'Todas as Cidades' || jCityClean === filterCityClean;
         
         // Tipo
-        const matchType = filterType === 'Todos' || j.type.toLowerCase().includes(filterType.toLowerCase());
+        const matchType = filterType === 'Todos' || (j.type && String(j.type).toLowerCase().includes(filterType.toLowerCase()));
         
         // Modalidade
-        const matchModality = filterModality === 'Todas' || (j.modality && j.modality.toLowerCase().includes(filterModality.toLowerCase()));
+        const matchModality = filterModality === 'Todas' || (j.modality && String(j.modality).toLowerCase().includes(filterModality.toLowerCase()));
         
         // Match Mínimo
-        const matchScoreOk = !canSeeMatch || minMatch === 0 || (j.calculatedScore && j.calculatedScore >= minMatch);
+        const matchScoreOk = !canSeeMatch || minMatch === 0 || (typeof j.calculatedScore === 'number' && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => (j.requiredSkills || []).some(r => r.toLowerCase().includes(sk.toLowerCase())));
+        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => 
+          (j.requiredSkills || []).some(r => r && String(r).toLowerCase().includes(String(sk).toLowerCase()))
+        );
 
         // Busca Textual
-        const text = (j.title + ' ' + j.company + ' ' + (j.description || '') + ' ' + (j.requiredSkills || []).join(' ')).toLowerCase();
+        const text = (
+          String(j.title || '') + ' ' + 
+          String(j.company || '') + ' ' + 
+          String(j.description || '') + ' ' + 
+          (j.requiredSkills || []).join(' ')
+        ).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
         return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
-        if (sortBy === 'match' && canSeeMatch) return (b.calculatedScore || 0) - (a.calculatedScore || 0);
-        if (sortBy === 'recent') return (b.id || 0) - (a.id || 0);
+        if (sortBy === 'match' && canSeeMatch) {
+          return (Number(b.calculatedScore) || 0) - (Number(a.calculatedScore) || 0);
+        }
+        if (sortBy === 'recent') {
+          const timeA = a.createdAtTimestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0) || 0;
+          const timeB = b.createdAtTimestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0) || 0;
+          return timeB - timeA;
+        }
         return 0;
       });
   }, [allJobs, filterCity, filterType, filterModality, minMatch, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser]);
@@ -205,24 +241,23 @@ export default function Vagas() {
 
             {/* Cidade */}
             <div className="lg:col-span-3">
-              <select
+              <CustomSelect
                 value={filterCity}
-                onChange={e => setFilterCity(e.target.value)}
-                className="form-control text-sm py-2.5 cursor-pointer"
-              >
-                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+                onChange={setFilterCity}
+                options={CITIES}
+                searchable={true}
+                placeholder="Cidade"
+              />
             </div>
 
             {/* Tipo */}
             <div className="lg:col-span-3">
-              <select
+              <CustomSelect
                 value={filterType}
-                onChange={e => setFilterType(e.target.value)}
-                className="form-control text-sm py-2.5 cursor-pointer"
-              >
-                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+                onChange={setFilterType}
+                options={TYPES}
+                placeholder="Tipo de Contrato"
+              />
             </div>
 
             {/* Botão Filtros Avançados */}
@@ -249,41 +284,40 @@ export default function Vagas() {
                 
                 {/* Modalidade */}
                 <div>
-                  <label className="form-label text-xs mb-1.5 block">Modalidade de Trabalho</label>
-                  <select
+                  <label className="form-label text-xs mb-1.5 block font-bold">Modalidade de Trabalho</label>
+                  <CustomSelect
                     value={filterModality}
-                    onChange={e => setFilterModality(e.target.value)}
-                    className="form-control text-xs py-2"
-                  >
-                    {MODALITIES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
+                    onChange={setFilterModality}
+                    options={MODALITIES}
+                    size="sm"
+                  />
                 </div>
 
                 {/* Match Mínimo (Alunos / Candidatos) */}
                 {canSeeMatch && (
                   <div>
-                    <label className="form-label text-xs mb-1.5 block">Nível de Match de Habilidades</label>
-                    <select
+                    <label className="form-label text-xs mb-1.5 block font-bold">Nível de Match de Habilidades</label>
+                    <CustomSelect
                       value={minMatch}
-                      onChange={e => setMinMatch(Number(e.target.value))}
-                      className="form-control text-xs py-2"
-                    >
-                      {MATCH_RANGES.map(mr => <option key={mr.value} value={mr.value}>{mr.label}</option>)}
-                    </select>
+                      onChange={val => setMinMatch(Number(val))}
+                      options={MATCH_RANGES}
+                      size="sm"
+                    />
                   </div>
                 )}
 
                 {/* Ordenação */}
                 <div>
-                  <label className="form-label text-xs mb-1.5 block">Ordenar Vagas por</label>
-                  <select
+                  <label className="form-label text-xs mb-1.5 block font-bold">Ordenar Vagas por</label>
+                  <CustomSelect
                     value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="form-control text-xs py-2"
-                  >
-                    {canSeeMatch && <option value="match">Maior Match com Meu Perfil</option>}
-                    <option value="recent">Mais Recentes Primeiro</option>
-                  </select>
+                    onChange={setSortBy}
+                    options={[
+                      ...(canSeeMatch ? [{ value: 'match', label: 'Maior Match com Meu Perfil' }] : []),
+                      { value: 'recent', label: 'Mais Recentes Primeiro' }
+                    ]}
+                    size="sm"
+                  />
                 </div>
 
               </div>
@@ -355,24 +389,15 @@ export default function Vagas() {
         />
       )}
 
-      {/* New Job Modal */}
-      <PublishJobModal
+      {/* New Job Modal (Padrão LinkedIn / Gupy Profissional) */}
+      <JobFormModal
         isOpen={showNewModal}
         onClose={() => {
           setShowModal(false);
           setParams({});
         }}
-        onJobCreated={(created) => {
-          setQuery('');
-          setFilterCity('Todas as Cidades');
-          setFilterType('Todos');
-          setFilterModality('Todas');
-          setMinMatch(0);
-          setSelectedSkills([]);
-          setSortBy('recent');
-          setLiveJobs(getJobs('Todas as Cidades'));
-          setRefreshKey(k => k + 1);
-        }}
+        onSave={handleSaveJob}
+        currentUser={currentUser}
       />
     </>
   );

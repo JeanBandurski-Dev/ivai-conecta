@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { GraduationCap, UserCheck, Wrench, Briefcase, Building2, Lock } from 'lucide-react';
+import { GraduationCap, UserCheck, Wrench, Briefcase, Building2, Lock, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { CITIES } from '../lib/ivaiConecta';
+import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: GraduationCap },
@@ -10,14 +10,6 @@ const ROLES = [
   { id: 'freelancer', label: 'Freelancer / Autônomo',    icon: Wrench },
   { id: 'candidato',  label: 'Candidato Geral',          icon: Briefcase },
   { id: 'empresa',    label: 'Empresa / Recrutador',     icon: Building2 },
-];
-
-const DEMO_ROLES = [
-  { role: 'aluno',      label: 'Entrar como Aluno' },
-  { role: 'professor',  label: 'Entrar como Professor' },
-  { role: 'freelancer', label: 'Entrar como Freelancer' },
-  { role: 'candidato',  label: 'Entrar como Candidato' },
-  { role: 'empresa',    label: 'Entrar como Empresa' },
 ];
 
 export default function Login() {
@@ -41,6 +33,60 @@ export default function Login() {
   const [regCity,  setRegCity]  = useState('Ivaiporã');
   const [regPass,  setRegPass]  = useState('');
 
+  // Register CNPJ (Empresa)
+  const [regCnpj, setRegCnpj]       = useState('');
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjData, setCnpjData]     = useState(null);
+  const [cnpjError, setCnpjError]   = useState('');
+
+  const handleCnpjChange = (e) => {
+    const rawValue = e.target.value;
+    const masked = maskCNPJ(rawValue);
+    setRegCnpj(masked);
+    setCnpjError('');
+
+    const digits = cleanCNPJ(rawValue);
+    if (digits.length === 14) {
+      consultarCnpj(digits);
+    } else {
+      setCnpjData(null);
+    }
+  };
+
+  const consultarCnpj = async (digitsToConsult) => {
+    const digits = digitsToConsult || cleanCNPJ(regCnpj);
+    if (digits.length !== 14) {
+      setCnpjError('O CNPJ deve conter 14 dígitos numéricos.');
+      return;
+    }
+
+    if (!validateCNPJ(digits)) {
+      setCnpjError('Dígitos verificadores do CNPJ inválidos (Módulo 11 da Receita Federal).');
+      return;
+    }
+
+    setCnpjLoading(true);
+    setCnpjError('');
+
+    const res = await fetchCNPJData(digits);
+    setCnpjLoading(false);
+
+    if (res.success && res.data) {
+      setCnpjData(res.data);
+      if (res.data.nomeFantasia || res.data.razaoSocial) {
+        setRegName(res.data.nomeFantasia || res.data.razaoSocial);
+      }
+      if (res.data.cidade) {
+        const matchedCity = CITIES.find(c => c.toLowerCase() === res.data.cidade.toLowerCase());
+        if (matchedCity) {
+          setRegCity(matchedCity);
+        }
+      }
+    } else {
+      setCnpjError(res.error || 'Não foi possível validar os dados do CNPJ na Receita Federal.');
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setAlert('');
@@ -61,13 +107,33 @@ export default function Login() {
       setAlert('Preencha todos os campos obrigatórios.');
       return;
     }
+
+    if (selectedRole === 'empresa') {
+      const cleanDigits = cleanCNPJ(regCnpj);
+      if (!cleanDigits || cleanDigits.length !== 14) {
+        setAlert('Para criar conta de Empresa, é obrigatório informar um CNPJ com 14 dígitos válidos.');
+        return;
+      }
+      if (!validateCNPJ(cleanDigits)) {
+        setAlert('O CNPJ informado possui dígitos verificadores inválidos pelo cálculo oficial da Receita Federal.');
+        return;
+      }
+    }
+
     setLoading(true);
     const res = await register({
       name: regName.trim(),
       email: regEmail.trim(),
-      password: regPass,
       city: regCity,
       role: selectedRole,
+      password: regPass,
+      ...(selectedRole === 'empresa' && {
+        cnpj: maskCNPJ(regCnpj),
+        razaoSocial: cnpjData?.razaoSocial || regName.trim(),
+        nomeFantasia: cnpjData?.nomeFantasia || regName.trim(),
+        situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
+        isVerifiedCompany: true
+      })
     });
     setLoading(false);
     if (res.success) {
@@ -94,17 +160,6 @@ export default function Login() {
       }
     } else {
       setAlert(res.error || 'Falha ao autenticar com o Google.');
-    }
-  };
-
-  const handleDemo = async (role) => {
-    setAlert('');
-    setLoading(true);
-    const res = await login(`${role}@ivaiconecta.com.br`, '123456');
-    setLoading(false);
-    if (res.success) {
-      showToast(`Conectado no modo demonstração: ${res.user.name}`);
-      setTimeout(() => navigate(redirectTarget, { replace: true }), 500);
     }
   };
 
@@ -240,11 +295,68 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Nome Completo ou Razão Social</label>
-              <input type="text" value={regName} onChange={e => setRegName(e.target.value)}
-                className="form-control" placeholder="Ex: Prof. Dr. Ronan Silva ou Lucas Silva" required />
-            </div>
+              {/* CNPJ da Empresa com Validação & BrasilAPI */}
+              {selectedRole === 'empresa' && (
+                <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="form-label text-gray-900 dark:text-white font-bold text-xs flex items-center gap-1.5 mb-0">
+                      <Building2 size={15} className="text-primary-blue dark:text-blue-400" />
+                      CNPJ da Empresa (14 dígitos)
+                    </label>
+                    <span className="text-[10px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                      Receita Federal
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={regCnpj}
+                      onChange={handleCnpjChange}
+                      className="form-control pr-10 font-mono text-sm"
+                      placeholder="00.000.000/0000-00"
+                      maxLength={18}
+                      required
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {cnpjLoading && <Loader2 size={16} className="animate-spin text-primary-blue" />}
+                      {!cnpjLoading && cnpjData && <CheckCircle2 size={16} className="text-green-500" />}
+                    </div>
+                  </div>
+
+                  {cnpjError && (
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
+                      <AlertCircle size={13} className="shrink-0" />
+                      {cnpjError}
+                    </div>
+                  )}
+
+                  {cnpjData && (
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-green-200 dark:border-green-800/80 text-[11px] space-y-1 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-green-700 dark:text-green-300 flex items-center gap-1">
+                          <ShieldCheck size={13} /> Empresa Autenticada
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-200">
+                          {cnpjData.situacaoCadastral}
+                        </span>
+                      </div>
+                      <div className="text-gray-800 dark:text-slate-200 truncate">
+                        <strong>Razão:</strong> {cnpjData.razaoSocial}
+                      </div>
+                      <div className="text-gray-500 dark:text-slate-400">
+                        <strong>Local:</strong> {cnpjData.cidade} / {cnpjData.uf}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">{selectedRole === 'empresa' ? 'Razão Social / Nome Fantasia' : 'Nome Completo ou Razão Social'}</label>
+                <input type="text" value={regName} onChange={e => setRegName(e.target.value)}
+                  className="form-control" placeholder={selectedRole === 'empresa' ? 'Ex: ValeTech Soluções Digitais' : 'Ex: Lucas Silva ou Prof. Dr. Ronan'} required />
+              </div>
               <div className="form-group">
                 <label className="form-label">E-mail {selectedRole === 'professor' ? 'Educacional (@ifpr, @uenp, @univale)' : ''}</label>
                 <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)}
@@ -267,21 +379,7 @@ export default function Login() {
             </form>
           )}
 
-          {/* ── DEMO ── */}
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-800 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
-            <div className="text-xs font-bold text-gray-600 dark:text-slate-300 mb-3">Teste Rápido (Demonstração 1-Clique):</div>
-            <div className="flex flex-wrap gap-1.5">
-              {DEMO_ROLES.map(d => (
-                <button
-                  key={d.role}
-                  onClick={() => handleDemo(d.role)}
-                  className="btn btn-outline btn-sm text-[11px] font-bold py-1 px-2.5"
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
+
 
         </div>
       </main>

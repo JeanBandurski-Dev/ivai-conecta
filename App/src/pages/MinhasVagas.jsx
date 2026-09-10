@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText, MessageSquare, Layers, Share2, Sparkles, ExternalLink
+  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
+  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare, Layers, Share2, Sparkles, ExternalLink
 } from 'lucide-react';
 import {
   getUserApplications, getJobs,
-  updateJobStatus, getTalents, getEndorsementRequests,
-  approveEndorsementRequest, rejectEndorsementRequest
+  updateJobStatus, deleteJob, getEndorsementRequests,
+  approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone, safeSkillsArray
 } from '../lib/ivaiConecta';
-import { subscribeToJobs, subscribeToApplications } from '../services/jobsService.js';
+import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
+import JobActionModal from '../components/JobActionModal';
 
 export default function MinhasVagas() {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -24,24 +25,34 @@ export default function MinhasVagas() {
   const isProfessor = currentUser?.role === 'professor';
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
-  const [liveApps, setLiveApps] = useState(() => getUserApplications());
+  const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
+  const [jobActionModalTarget, setJobActionModalTarget] = useState(null);
 
   useEffect(() => {
-    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
-    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => setLiveApps(data));
+    const unsubJobs = subscribeToJobs('Todas as Cidades', (data) => {
+      if (Array.isArray(data)) setLiveJobs(data);
+    });
+    const unsubApps = subscribeToApplications(currentUser?.uid, (data) => {
+      if (Array.isArray(data)) setLiveApps(data);
+    });
     return () => {
       unsubJobs();
       unsubApps();
     };
   }, [currentUser]);
 
-  const apps = liveApps;
-  const companyJobs = liveJobs.filter(j => 
-    j.createdBy === currentUser?.uid ||
-    j.createdBy === currentUser?.email ||
-    (currentUser?.email && j.createdBy?.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser?.name && j.company?.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0])) ||
-    j.company?.toLowerCase().includes('valetech')
+  const apps = Array.isArray(liveApps) ? liveApps : [];
+  const safeLiveJobs = Array.isArray(liveJobs) ? liveJobs : [];
+  const companyJobs = safeLiveJobs.filter(j => 
+    j && (
+      (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
+      (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
+      (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
+      (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
+      (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+      (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+      (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+    )
   );
   
   // Teacher endorsement requests state
@@ -51,6 +62,19 @@ export default function MinhasVagas() {
 
   // Selected job to view applicants (for company view)
   const [selectedJobApplicants, setSelectedJobApplicants] = useState(null);
+  const [jobApplicants, setJobApplicants] = useState([]);
+
+  useEffect(() => {
+    if (!selectedJobApplicants) {
+      setJobApplicants([]);
+      return;
+    }
+    const targetId = selectedJobApplicants.firestoreId || selectedJobApplicants.id;
+    const unsub = subscribeToJobApplicants(targetId, (data) => {
+      setJobApplicants(data);
+    });
+    return () => unsub();
+  }, [selectedJobApplicants]);
 
   if (!currentUser) {
     return (
@@ -63,9 +87,68 @@ export default function MinhasVagas() {
     );
   }
 
-  const handleJobAction = (jobId, action) => {
-    updateJobStatus(jobId, action);
-    showToast(action === 'close' ? 'Vaga encerrada com sucesso.' : 'Prazo da vaga prolongado por mais 30 dias!');
+  const handleJobAction = async (jobId, action) => {
+    try {
+      const updated = await updateJobStatus(jobId, action);
+      if (Array.isArray(updated)) setLiveJobs(updated);
+      showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso.' : '🔓 Vaga reaberta com sucesso!');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao atualizar status da vaga:', err);
+      showToast('Erro ao atualizar status da vaga.');
+    }
+  };
+
+  const handleCloseJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : liveJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    setLiveJobs(prev => prev.map(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      if (jId === idStr || (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) || (jFId && jFId === idStr)) {
+        return { ...j, status: 'Encerrada' };
+      }
+      return j;
+    }));
+
+    try {
+      await updateJobStatus(firestoreIdStr || idStr, 'close');
+      showToast('🔒 Vaga encerrada com sucesso.');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao encerrar vaga.');
+    }
+    forceUpdate(n => n + 1);
+  };
+
+  const handleDeleteJob = async (jobOrId) => {
+    const targetJob = typeof jobOrId === 'object' && jobOrId !== null
+      ? jobOrId
+      : liveJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
+    const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
+    const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
+
+    // Atualização otimista imediata
+    setLiveJobs(prev => prev.filter(j => {
+      const jId = String(j.id);
+      const jFId = j.firestoreId ? String(j.firestoreId) : null;
+      if (jId === idStr) return false;
+      if (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) return false;
+      if (jFId && jFId === idStr) return false;
+      return true;
+    }));
+
+    try {
+      await deleteJob(firestoreIdStr || idStr);
+      showToast('🗑️ Vaga excluída permanentemente.');
+    } catch (err) {
+      console.error('Erro ao excluir vaga:', err);
+      showToast('Erro ao excluir vaga.');
+    }
     forceUpdate(n => n + 1);
   };
 
@@ -85,13 +168,6 @@ export default function MinhasVagas() {
     showToast('Solicitação recusada.');
     forceUpdate(n => n + 1);
   };
-
-  // Demo candidates list for company view
-  const demoApplicants = [
-    { id: 1, name: 'Lucas Eduardo Silva', email: 'aluno@ivaiconecta.com.br', course: 'ADS (IFPR)', matchScore: 92, appliedAt: '16/08/2026', status: 'Entrevista Agendada', phone: '5543999887766' },
-    { id: 2, name: 'Juliana Aparecida Melo', email: 'juliana.melo@ifpr.edu.br', course: 'ADS (IFPR)', matchScore: 88, appliedAt: '17/08/2026', status: 'Triagem de Currículo', phone: '5543999112233' },
-    { id: 3, name: 'Rafael Gomes Costa', email: 'rafael.costa@uenp.br', course: 'Eng. Software (UENP)', matchScore: 85, appliedAt: '18/08/2026', status: 'Em Análise', phone: '5543999445566' }
-  ];
 
   return (
     <>
@@ -295,14 +371,16 @@ export default function MinhasVagas() {
                       <div>
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 border ${
-                            job.status === 'Ativa'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                            job.status === 'Encerrada'
+                              ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                           }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'Ativa' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                            {job.status || 'Ativa'}
+                            <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'Encerrada' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                            {job.status === 'Encerrada' ? 'Vaga Encerrada' : 'Vaga Ativa'}
                           </span>
-                          <span className="text-xs text-gray-400 dark:text-slate-400">Publicada em {job.createdAt || '15/08/2026'}</span>
+                          <span className="text-xs text-gray-400 dark:text-slate-400">
+                            Criada em: {job.createdAt ? (typeof job.createdAt === 'string' && job.createdAt.includes('/') ? job.createdAt : new Date(job.createdAt).toLocaleDateString('pt-BR')) : 'Recentemente'}
+                          </span>
                         </div>
                         <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">{job.title}</h3>
                         <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
@@ -310,7 +388,10 @@ export default function MinhasVagas() {
                           <span>·</span>
                           <span>{job.type} ({job.modality || 'Presencial'})</span>
                           <span>·</span>
-                          <span className="font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1"><Users size={14} /> {job.applicantsCount || 3} Candidatos</span>
+                          <span className="font-semibold text-primary-blue dark:text-blue-400">
+                            <Users size={14} className="inline mr-1" />
+                            {job.applicantsCount || 0} {(job.applicantsCount || 0) === 1 ? 'Candidato Inscrito' : 'Candidatos Inscritos'}
+                          </span>
                         </div>
                       </div>
 
@@ -320,32 +401,41 @@ export default function MinhasVagas() {
                           to={`/gerenciamento-vagas`}
                           className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 rounded-xl shadow-xs"
                         >
-                          <Layers size={14} /> Funil Kanban ({job.applicantsCount || 3})
+                          <Layers size={14} /> Funil Kanban ({job.applicantsCount || 0})
                         </Link>
 
-                        {job.status === 'Ativa' ? (
+                        {job.status === 'Encerrada' ? (
                           <button
-                            onClick={() => handleJobAction(job.id, 'close')}
-                            className="btn btn-outline border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 btn-sm text-xs font-semibold rounded-xl"
-                          >
-                            <XCircle size={14} /> Encerrar
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleJobAction(job.id, 'extend')}
-                            className="btn btn-outline border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 btn-sm text-xs font-semibold rounded-xl"
+                            onClick={() => handleJobAction(job.id, 'reopen')}
+                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                           >
                             <RotateCcw size={14} /> Reabrir
                           </button>
+                        ) : (
+                          <button
+                            onClick={() => setJobActionModalTarget(job)}
+                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <XCircle size={14} /> Encerrar Vaga
+                          </button>
                         )}
+
+                        <button
+                          onClick={() => setJobActionModalTarget(job)}
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900/40 transition-colors cursor-pointer"
+                          title="Encerrar ou Excluir Vaga"
+                          aria-label="Excluir vaga"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
 
                     {/* Vales e Requisitos */}
                     <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap gap-2 text-xs">
                       <span className="font-semibold text-gray-500 dark:text-slate-400">Habilidades Exigidas:</span>
-                      {(job.requiredSkills || []).map(s => (
-                        <span key={s} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-md font-semibold text-[11px] border border-gray-200 dark:border-slate-700">{s}</span>
+                      {safeSkillsArray(job.requiredSkills).map(s => (
+                        <span key={s} className="tag tag-blue text-[11px]">{s}</span>
                       ))}
                     </div>
                   </div>
@@ -381,37 +471,37 @@ export default function MinhasVagas() {
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            app.matchScore >= 85
+                            (Number(app.matchScore) || 0) >= 85
                               ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                               : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
                           }`}>
-                            {app.matchScore}% Match
+                            {app.matchScore || 0}% Match
                           </span>
                           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            app.status.includes('Entrevista')
+                            String(app.status || '').includes('Entrevista')
                               ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                               : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
                           }`}>
-                            {app.status}
+                            {app.status || 'Candidatura Enviada'}
                           </span>
                         </div>
                       </div>
 
                       {/* Progress stages (Linha do Tempo Gupy) */}
                       <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-                        {app.stages.map((stage, i) => (
+                        {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
                           <div key={i} className="flex items-center gap-2 shrink-0">
                             <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                              stage.completed
+                              stage?.completed
                                 ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
-                                : stage.active
+                                : stage?.active
                                 ? 'bg-primary-blue text-white shadow-xs font-bold'
                                 : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
                             }`}>
-                              {stage.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
-                              {stage.name}
+                              {stage?.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
+                              {stage?.name || 'Etapa'}
                             </div>
-                            {i < app.stages.length - 1 && (
+                            {i < arr.length - 1 && (
                               <ArrowRight size={13} className="text-gray-300 dark:text-slate-700 shrink-0" />
                             )}
                           </div>
@@ -432,15 +522,13 @@ export default function MinhasVagas() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              const targetEmail = app.company?.toLowerCase().includes('simas')
-                                ? 'turbosimas@gmail.com'
-                                : 'empresa@ivaiconecta.com.br';
+                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
 
                               startChatWith({
                                 name: app.company,
                                 email: targetEmail,
                                 role: 'empresa',
-                                avatar: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
                               }, `Candidatura: ${app.title}`);
                             }}
                             className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -469,49 +557,69 @@ export default function MinhasVagas() {
                 <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">
                   Candidatos Inscritos: {selectedJobApplicants.title}
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Alunos e profissionais ordenados por compatibilidade de qualificações.</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Candidatos reais que se inscreveram nesta vaga no Vale do Ivaí.</p>
               </div>
               <button onClick={() => setSelectedJobApplicants(null)}><XCircle size={22} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
 
-            <div className="space-y-3">
-              {demoApplicants.map(cand => (
-                <div key={cand.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
-                      {cand.name}
-                      <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
-                        {cand.matchScore}% Match
-                      </span>
+            {jobApplicants.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 border border-gray-100 dark:border-slate-800">
+                <Users size={36} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                <p className="font-bold text-gray-700 dark:text-white text-sm">Nenhum candidato se inscreveu nesta vaga ainda.</p>
+                <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Assim que um estudante ou profissional clicar em "Candidatar-se", ele aparecerá aqui instantaneamente.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {jobApplicants.map(cand => (
+                  <div key={cand.id || cand.firestoreId} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="font-bold text-gray-800 dark:text-white text-base flex items-center gap-2">
+                        {cand.candidateName || cand.name || 'Candidato'}
+                        <span className="text-xs font-extrabold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-0.5 rounded-full">
+                          {cand.matchScore || 90}% Match
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">
+                        {cand.candidateCourse || 'Estudante / Profissional'} · Inscrito em {cand.appliedAt || 'Hoje'}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mt-0.5">{cand.course} · Inscrito em {cand.appliedAt}</div>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        startChatWith({
-                          name: cand.name,
-                          email: cand.email || 'aluno@ivaiconecta.com.br',
-                          role: 'aluno',
-                          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-                        }, `Processo Seletivo: ${selectedJobApplicants.title}`);
-                        setSelectedJobApplicants(null);
-                      }}
-                      className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <MessageSquare size={13} /> Chat com o Candidato
-                    </button>
-                    <button
-                      onClick={() => navigate(`/perfil/${cand.id}`)}
-                      className="btn btn-outline btn-sm text-xs font-bold"
-                    >
-                      <Eye size={13} /> Ver Currículo
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          startChatWith({
+                            name: cand.candidateName || cand.name || 'Candidato',
+                            email: cand.candidateEmail || cand.email,
+                            role: 'aluno',
+                            avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                          }, `Processo Seletivo: ${selectedJobApplicants.title}`);
+                          setSelectedJobApplicants(null);
+                        }}
+                        className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <MessageSquare size={13} /> Chat com o Candidato
+                      </button>
+                      <button
+                        onClick={() => navigate(`/perfil/${cand.candidateUid || cand.candidateId || cand.id}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold"
+                      >
+                        <Eye size={13} /> Ver Currículo
+                      </button>
+                      {(cand.candidatePhone || cand.phone) && (
+                        <a
+                          href={`https://wa.me/${sanitizeWhatsAppPhone(cand.candidatePhone || cand.phone)}?text=${encodeURIComponent(`Olá ${cand.candidateName || cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-whatsapp btn-sm text-xs font-bold"
+                        >
+                          <Phone size={13} /> WhatsApp
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -523,6 +631,15 @@ export default function MinhasVagas() {
           setLiveJobs(getJobs('Todas as Cidades'));
           forceUpdate(n => n + 1);
         }}
+      />
+
+      {/* Modal Moderno para Encerrar ou Excluir Vaga */}
+      <JobActionModal
+        isOpen={Boolean(jobActionModalTarget)}
+        onClose={() => setJobActionModalTarget(null)}
+        job={jobActionModalTarget}
+        onCloseJob={handleCloseJob}
+        onDeleteJob={handleDeleteJob}
       />
     </>
   );

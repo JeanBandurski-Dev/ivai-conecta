@@ -41,7 +41,7 @@
   }
   body {
     font-family: var(--font-body);
-    background-color: #f8fafc;
+    background-color: #ffffff;
     color: #1e293b;
     line-height: 1.6;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -148,7 +148,8 @@
   }
   .dark .btn-outline {
     border-color: #475569;
-    color: #cbd5e1;
+    color: #f1f5f9;
+    background-color: rgba(30, 41, 59, 0.45);
   }
   .btn-outline:hover { 
     border-color: var(--color-primary-blue); 
@@ -156,9 +157,9 @@
     background-color: var(--color-primary-light); 
   }
   .dark .btn-outline:hover {
-    border-color: var(--color-primary-blue);
-    color: #60a5fa;
-    background-color: rgba(30, 58, 138, 0.4);
+    border-color: #60a5fa;
+    color: #ffffff;
+    background-color: rgba(30, 58, 138, 0.5);
   }
 
   .btn-outline-white {
@@ -183,10 +184,10 @@
   /* ── Cards (Largura ligeiramente ajustada e compacta) ── */
   .card {
     background: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgba(226, 232, 240, 0.95);
     border-radius: 1.25rem;
     padding: 1.4rem;
-    box-shadow: var(--shadow-brand-sm);
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
     display: flex;
     flex-direction: column;
     transition: background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
@@ -197,8 +198,8 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   }
   .card:hover { 
-    box-shadow: var(--shadow-brand-lg); 
-    border-color: #cbd5e1;
+    box-shadow: 0 16px 28px -4px rgba(0, 82, 255, 0.12), 0 6px 12px -2px rgba(0, 82, 255, 0.05); 
+    border-color: #93c5fd;
     transform: translateY(-3px);
   }
   .dark .card:hover {
@@ -333,6 +334,30 @@
     color: #475569;
   }
 
+  /* ── Estilização moderna de selects ── */
+  select.form-control {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    padding-right: 2.5rem;
+    cursor: pointer;
+  }
+  .dark select.form-control {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+  select.form-control option {
+    background-color: #ffffff;
+    color: #1e293b;
+    padding: 0.5rem;
+  }
+  .dark select.form-control option {
+    background-color: #0f172a;
+    color: #f8fafc;
+  }
+
   /* ── Section headers ── */
   .section-header {
     display: flex;
@@ -396,6 +421,48 @@
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* ── Barra de Rolagem Horizontal Elegante para Etapas (Barrinha de Arrastar) ── */
+  .stages-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  .dark .stages-scrollbar {
+    scrollbar-color: #475569 #1e293b;
+  }
+  .stages-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+  .stages-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 9999px;
+    margin: 0 4px;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 9999px;
+    cursor: grab;
+    transition: background-color 0.2s ease;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  .stages-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #0052ff;
+    cursor: grabbing;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  .dark .stages-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #3b82f6;
   }
 }
 

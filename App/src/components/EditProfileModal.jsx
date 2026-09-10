@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
-  FolderKanban, Globe, CheckCircle2, Sparkles, Award, Save
+  Globe, CheckCircle2, Sparkles
 } from 'lucide-react';
+import { validateSkill } from '../lib/ivaiConecta';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -45,7 +45,12 @@ export default function EditProfileModal({
     if (e) e.preventDefault();
     if (!editData.newSkill || !editData.newSkill.trim()) return;
     const sk = editData.newSkill.trim();
-    if (!editData.skills.includes(sk)) {
+    const val = validateSkill(sk);
+    if (!val.valid) {
+      alert(val.error);
+      return;
+    }
+    if (!editData.skills.some(s => s.toLowerCase() === sk.toLowerCase())) {
       setEditData(d => ({ ...d, skills: [...d.skills, sk], newSkill: '' }));
     } else {
       setEditData(d => ({ ...d, newSkill: '' }));
@@ -171,20 +176,31 @@ export default function EditProfileModal({
                   value={editData.course}
                   onChange={e => setEditData(d => ({ ...d, course: e.target.value }))}
                   className="form-control"
-                  required
+                  placeholder="Ex: Análise e Desenvolvimento de Sistemas"
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Período / Semestre</label>
+                <label className="form-label">Instituição de Ensino / Escola</label>
                 <input
                   type="text"
-                  value={editData.period}
-                  onChange={e => setEditData(d => ({ ...d, period: e.target.value }))}
+                  value={editData.institution}
+                  onChange={e => setEditData(d => ({ ...d, institution: e.target.value }))}
                   className="form-control"
-                  placeholder="Ex: 7º Semestre (Vespertino)"
+                  placeholder="Ex: IFPR Campus Ivaiporã, Univale, UENP..."
                 />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Período / Semestre</label>
+              <input
+                type="text"
+                value={editData.period}
+                onChange={e => setEditData(d => ({ ...d, period: e.target.value }))}
+                className="form-control"
+                placeholder="Ex: 3º Semestre / Noturno"
+              />
             </div>
 
             <div className="form-group">

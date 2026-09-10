@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, Globe, FileText, Check, AlertTriangle, Trash2, Camera
+  Building2, FileText, Camera,
+  Search, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -11,17 +12,12 @@ import {
   submitStudentVerification,
   submitCompanyVerification,
   uploadUserProfilePicture,
-  uploadUserDocument
+  uploadUserDocument,
+  maskCNPJ,
+  cleanCNPJ,
+  validateCNPJ,
+  fetchCNPJData
 } from '../lib/ivaiConecta';
-
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
-];
 
 export default function Configuracoes() {
   const { currentUser, setCurrentUser, logout, showToast } = useAppStore();
@@ -48,11 +44,18 @@ export default function Configuracoes() {
   const [cnpj, setCnpj] = useState(currentUser?.cnpj || '');
   const [companyFile, setCompanyFile] = useState(null);
   const [companyVerified, setCompanyVerified] = useState(currentUser?.isVerifiedCompany || false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjData, setCnpjData] = useState(null);
+  const [cnpjError, setCnpjError] = useState('');
+  const [isEditingCnpj, setIsEditingCnpj] = useState(false);
   const companyFileInputRef = useRef(null);
 
   // Password form
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [submittingStudent, setSubmittingStudent] = useState(false);
+  const [submittingCompany, setSubmittingCompany] = useState(false);
 
   if (!currentUser) {
     return (
@@ -64,9 +67,6 @@ export default function Configuracoes() {
       </main>
     );
   }
-
-  const [submittingStudent, setSubmittingStudent] = useState(false);
-  const [submittingCompany, setSubmittingCompany] = useState(false);
 
   const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
@@ -173,16 +173,62 @@ export default function Configuracoes() {
     }
   };
 
+  const handleCnpjChange = (e) => {
+    const raw = e.target.value;
+    const masked = maskCNPJ(raw);
+    setCnpj(masked);
+    setCnpjError('');
+
+    const digits = cleanCNPJ(raw);
+    if (digits.length === 14) {
+      consultarCnpjReceita(digits);
+    } else {
+      setCnpjData(null);
+    }
+  };
+
+  const consultarCnpjReceita = async (digitsToConsult) => {
+    const digits = digitsToConsult || cleanCNPJ(cnpj);
+    if (digits.length !== 14) {
+      setCnpjError('O CNPJ deve conter 14 dígitos numéricos.');
+      return;
+    }
+
+    if (!validateCNPJ(digits)) {
+      setCnpjError('Dígitos verificadores do CNPJ incorretos (Módulo 11 da Receita Federal).');
+      return;
+    }
+
+    setCnpjLoading(true);
+    setCnpjError('');
+
+    const res = await fetchCNPJData(digits);
+    setCnpjLoading(false);
+
+    if (res.success && res.data) {
+      setCnpjData(res.data);
+      showToast(`🏢 CNPJ Encontrado: ${res.data.razaoSocial} (${res.data.situacaoCadastral})`);
+    } else {
+      setCnpjError(res.error || 'Não foi possível validar os dados do CNPJ na Receita Federal.');
+    }
+  };
+
   // Company CNPJ Submission
   const handleCompanyVerificationSubmit = async (e) => {
     e.preventDefault();
-    if (!cnpj.trim()) {
-      showToast('Por favor, informe o CNPJ da empresa.');
+    const cleanDigits = cleanCNPJ(cnpj);
+    if (!cleanDigits || cleanDigits.length !== 14) {
+      showToast('Por favor, informe um CNPJ válido com 14 dígitos.');
+      return;
+    }
+
+    if (!validateCNPJ(cleanDigits)) {
+      showToast('⚠️ CNPJ inválido pelos cálculos oficiais da Receita Federal.');
       return;
     }
 
     setSubmittingCompany(true);
-    showToast('Validando e processando CNPJ...');
+    showToast('⏳ Validando e processando CNPJ e documentos...');
 
     try {
       let uploadedCnpjUrl = null;
@@ -193,21 +239,31 @@ export default function Configuracoes() {
         }
       }
 
-      const res = submitCompanyVerification(cnpj, companyFile);
+      const res = submitCompanyVerification(cnpj, companyFile, {
+        razaoSocial: cnpjData?.razaoSocial,
+        nomeFantasia: cnpjData?.nomeFantasia,
+        situacaoCadastral: cnpjData?.situacaoCadastral || 'ATIVA',
+        cnpjProofUrl: uploadedCnpjUrl
+      });
+
       if (res.success) {
         setCompanyVerified(true);
+        setIsEditingCnpj(false);
         const updated = updateAuthUser({
-          cnpj,
+          cnpj: maskCNPJ(cleanDigits),
           isVerifiedCompany: true,
+          razaoSocial: cnpjData?.razaoSocial || currentUser?.razaoSocial || currentUser?.name,
+          nomeFantasia: cnpjData?.nomeFantasia || currentUser?.nomeFantasia || currentUser?.name,
+          situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
           cnpjProofUrl: uploadedCnpjUrl,
-          companyProofFile: companyFile?.name || 'Cartao_CNPJ.pdf'
+          companyProofFile: companyFile?.name || currentUser?.companyProofFile || 'Cartao_CNPJ.pdf'
         });
         if (updated) {
           setCurrentUser(updated);
         }
         showToast('CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
       } else {
-        showToast(res.error);
+        showToast(`⚠️ ${res.error}`);
       }
     } finally {
       setSubmittingCompany(false);
@@ -232,7 +288,7 @@ export default function Configuracoes() {
   const handleLogout = () => {
     logout();
     showToast('Sessão encerrada com sucesso.');
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -528,43 +584,152 @@ export default function Configuracoes() {
           {activeTab === 'company' && currentUser.role === 'empresa' && (
             <div className="card p-6 sm:p-8 space-y-6">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
-                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <Building2 size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação de CNPJ da Empresa
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">
-                  Para garantir a segurança dos candidatos e evitar fraudes, confirme os dados cadastrais do seu CNPJ para receber o selo **"Empresa Verificada"**.
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
+                    <Building2 size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação Oficial de CNPJ da Empresa
+                  </h3>
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5">
+                    <ShieldCheck size={14} /> Módulo 11 + BrasilAPI
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  Confirme o CNPJ da sua organização com validação oficial da Receita Federal para receber o selo **"Empresa Verificada"** e transmitir máxima segurança aos candidatos.
                 </p>
               </div>
 
-              {companyVerified ? (
-                <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-2xl p-6 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/60 text-green-600 dark:text-green-400 mx-auto flex items-center justify-center">
-                    <ShieldCheck size={28} />
+              {companyVerified && !isEditingCnpj ? (
+                <div className="space-y-6">
+                  <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-3xl p-6 sm:p-8 text-center space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-green-100 dark:bg-green-900/60 text-green-600 dark:text-green-400 mx-auto flex items-center justify-center shadow-inner">
+                      <ShieldCheck size={32} />
+                    </div>
+                    <div>
+                      <span className="inline-block px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-green-200 dark:bg-green-900/80 text-green-900 dark:text-green-200 mb-2">
+                        CNPJ Validado · Empresa Oficial
+                      </span>
+                      <h4 className="font-heading font-extrabold text-xl text-green-950 dark:text-green-200">
+                        {currentUser?.razaoSocial || currentUser?.name}
+                      </h4>
+                      <p className="text-sm text-green-800 dark:text-green-300 max-w-lg mx-auto mt-1 leading-relaxed">
+                        Sua organização possui o selo oficial de verificação. Todas as suas vagas publicadas no Vale do Ivaí ganham destaque e credibilidade.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto text-left pt-2">
+                      <div className="p-3 bg-white/90 dark:bg-slate-900/90 rounded-xl border border-green-200 dark:border-green-800/60 text-xs">
+                        <span className="text-gray-500 dark:text-slate-400 block font-medium">CNPJ Cadastrado</span>
+                        <span className="font-bold text-gray-800 dark:text-white font-mono text-sm">{currentUser?.cnpj || cnpj}</span>
+                      </div>
+                      <div className="p-3 bg-white/90 dark:bg-slate-900/90 rounded-xl border border-green-200 dark:border-green-800/60 text-xs">
+                        <span className="text-gray-500 dark:text-slate-400 block font-medium">Situação Cadastral</span>
+                        <span className="font-bold text-green-600 dark:text-green-400 font-mono text-sm">
+                          {currentUser?.situacaoCnpj || 'ATIVA ✓'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {currentUser?.companyProofFile && (
+                      <div className="text-xs text-green-700 dark:text-green-400">
+                        📄 Documento comprobatório: <strong>{currentUser.companyProofFile}</strong>
+                      </div>
+                    )}
                   </div>
-                  <h4 className="font-heading font-bold text-lg text-green-900 dark:text-green-300">Empresa Autenticada com Sucesso!</h4>
-                  <p className="text-sm text-green-800 dark:text-green-200 max-w-md mx-auto leading-relaxed">
-                    Seu CNPJ foi validado no Ivaí Conecta. Todas as vagas publicadas por sua empresa agora exibem o selo **"Empresa Verificada (CNPJ Validado)"**.
-                  </p>
-                  <div className="text-xs font-semibold text-green-700 dark:text-green-300 bg-white/80 dark:bg-slate-900/80 inline-block px-3 py-1.5 rounded-lg border border-green-300 dark:border-green-800">
-                    CNPJ Registrado: {cnpj || '12.345.678/0001-90'}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCnpj(true)}
+                      className="btn btn-outline btn-sm text-xs font-semibold gap-1.5"
+                    >
+                      <RefreshCw size={13} /> Atualizar / Revalidar CNPJ
+                    </button>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleCompanyVerificationSubmit} className="space-y-5">
                   <div className="form-group">
-                    <label className="form-label">CNPJ da Empresa (14 dígitos)</label>
-                    <input
-                      type="text"
-                      value={cnpj}
-                      onChange={e => setCnpj(e.target.value)}
-                      className="form-control"
-                      placeholder="Ex: 12.345.678/0001-90"
-                      required
-                    />
+                    <label className="form-label flex items-center justify-between">
+                      <span>CNPJ da Empresa (14 dígitos)</span>
+                      <span className="text-xs font-normal text-gray-400">Ex: 12.345.678/0001-90</span>
+                    </label>
+                    <div className="flex gap-2.5">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={cnpj}
+                          onChange={handleCnpjChange}
+                          className="form-control pr-10 font-mono text-base font-semibold"
+                          placeholder="00.000.000/0000-00"
+                          maxLength={18}
+                          required
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                          {cnpjLoading && <Loader2 size={18} className="animate-spin text-primary-blue" />}
+                          {!cnpjLoading && cnpjData && <CheckCircle2 size={18} className="text-green-500" />}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => consultarCnpjReceita()}
+                        disabled={cnpjLoading || !cnpj}
+                        className="btn btn-outline btn-sm shrink-0 text-xs font-bold gap-1.5 px-4"
+                      >
+                        {cnpjLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                        Consultar Receita
+                      </button>
+                    </div>
+
+                    {cnpjError && (
+                      <div className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
+                        {cnpjError}
+                      </div>
+                    )}
                   </div>
 
+                  {/* Informações retornadas pela BrasilAPI em Tempo Real */}
+                  {cnpjData && (
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800/80 border border-green-200 dark:border-green-800/80 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-200 dark:border-slate-700 pb-2.5">
+                        <span className="text-xs font-bold text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                          <CheckCircle2 size={15} /> Dados Autenticados na Base da Receita Federal
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                          cnpjData.isAtiva
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-300'
+                        }`}>
+                          {cnpjData.situacaoCadastral}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-gray-500 dark:text-slate-400 block font-medium">Razão Social:</span>
+                          <span className="font-bold text-gray-900 dark:text-white text-sm">{cnpjData.razaoSocial}</span>
+                        </div>
+                        {cnpjData.nomeFantasia && cnpjData.nomeFantasia !== cnpjData.razaoSocial && (
+                          <div>
+                            <span className="text-gray-500 dark:text-slate-400 block font-medium">Nome Fantasia:</span>
+                            <span className="font-bold text-gray-800 dark:text-slate-200">{cnpjData.nomeFantasia}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-gray-500 dark:text-slate-400 block font-medium">Município / Estado:</span>
+                          <span className="font-semibold text-gray-800 dark:text-slate-200">{cnpjData.cidade} / {cnpjData.uf}</span>
+                        </div>
+                        {cnpjData.cnae && (
+                          <div>
+                            <span className="text-gray-500 dark:text-slate-400 block font-medium">Atividade Principal:</span>
+                            <span className="font-semibold text-gray-800 dark:text-slate-200 line-clamp-1">{cnpjData.cnae}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="form-group">
-                    <label className="form-label">Anexar Comprovante de Inscrição / Cartão CNPJ (PDF ou Imagem)</label>
+                    <label className="form-label">Anexar Comprovante / Cartão CNPJ (Opcional - PDF ou Imagem)</label>
                     <input
                       type="file"
                       ref={companyFileInputRef}
@@ -574,25 +739,32 @@ export default function Configuracoes() {
                     />
                     <div
                       onClick={() => companyFileInputRef.current?.click()}
-                      className="border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-6 text-center bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 cursor-pointer"
+                      className="border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-6 text-center bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 dark:hover:bg-slate-800 cursor-pointer transition-colors"
                     >
-                      <Upload size={32} className="mx-auto mb-2 text-gray-400 dark:text-slate-500" />
-                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 flex items-center justify-center gap-1.5">
-                        {companyFile ? (
-                          <>
-                            <FileText size={14} className="text-primary-blue" />
-                            <span>{companyFile.name}</span>
-                          </>
-                        ) : (
-                          'Clique para selecionar o Cartão CNPJ ou Contrato Social (PDF/Imagem)'
-                        )}
+                      <Upload size={32} className="mx-auto mb-2 text-primary-blue dark:text-blue-400" />
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
+                        {companyFile ? `📄 ${companyFile.name} (${(companyFile.size / (1024 * 1024)).toFixed(2)} MB)` : 'Clique para selecionar o Cartão CNPJ da Receita Federal (PDF/Imagem)'}
                       </p>
+                      <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Formatos aceitos: PDF, PNG, JPG (Máx. 5MB)</p>
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-2">
-                    <button type="submit" disabled={submittingCompany} className="btn btn-primary btn-sm font-bold shadow-md">
-                      <ShieldCheck size={16} /> {submittingCompany ? 'Validando...' : 'Validar CNPJ Empresarial'}
+                  <div className="flex items-center justify-between pt-2">
+                    {isEditingCnpj && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingCnpj(false)}
+                        className="btn btn-outline btn-sm font-semibold"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={submittingCompany}
+                      className="btn btn-primary btn-sm font-bold shadow-md ml-auto flex items-center gap-1.5"
+                    >
+                      <ShieldCheck size={16} /> {submittingCompany ? 'Autenticando CNPJ...' : 'Autenticar & Obter Selo Verificado'}
                     </button>
                   </div>
                 </form>

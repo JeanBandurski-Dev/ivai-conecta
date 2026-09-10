@@ -1,4 +1,4 @@
-import { getOrCreateChat } from '../services/chatService';
+import { getOrCreateChat, isSameUser } from '../services/chatService';
 import { create } from 'zustand';
 import {
   getAuthUser,
@@ -161,6 +161,18 @@ const useAppStore = create((set, get) => ({
     const currentUser = get().currentUser;
     if (!currentUser) {
       get().showToast('Faça login para iniciar uma conversa!');
+      return null;
+    }
+
+    if (!targetUser) return null;
+
+    // Bloqueia categoricamente conversa consigo mesmo (empresa, freelancer ou candidato)
+    const isSelf = isSameUser(currentUser, targetUser) ||
+      (currentUser.email && targetUser?.email && currentUser.email.toLowerCase().trim() === targetUser.email.toLowerCase().trim()) ||
+      (currentUser.uid && targetUser?.uid && String(currentUser.uid) === String(targetUser.uid));
+
+    if (isSelf) {
+      get().showToast('⚠️ Você não pode enviar mensagens para si mesmo.');
       return null;
     }
 

@@ -17,6 +17,7 @@ import {
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 export const STORAGE_KEY_DELETED_THREADS = 'ivai_conecta_deleted_threads';
+export const STORAGE_KEY_CHAT_READ_TIMESTAMPS = 'ivai_conecta_chat_read_timestamps';
 
 export function getDeletedThreads() {
   if (typeof localStorage === 'undefined') return [];
@@ -27,89 +28,145 @@ export function getDeletedThreads() {
   }
 }
 
+export function getReadTimestamps() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CHAT_READ_TIMESTAMPS);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveReadTimestamps(map) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_CHAT_READ_TIMESTAMPS, JSON.stringify(map));
+    window.dispatchEvent(new CustomEvent('ivai_chat_updated'));
+  }
+}
+
 // Canal de comunicação instantâneo (0ms) entre abas normais no mesmo navegador
 const chatChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ivai_conecta_chat_bus') : null;
 
-// Helper para mapear apelidos e aliases de empresas/alunos conhecidos
+// Helper para verificar correspondência de e-mail entre participantes
 export function matchesUserEmail(participantEmail, userEmail) {
   if (!participantEmail || !userEmail) return false;
   const p = participantEmail.toLowerCase().trim();
   const u = userEmail.toLowerCase().trim();
-  if (p === u) return true;
+  return p === u;
+}
 
-  // Alias para SimasTurbo (suporta tanto o e-mail real turbosimas@gmail.com quanto simasturbo@ivaiconecta.com.br)
-  if (
-    (u === 'turbosimas@gmail.com' || u === 'simasturbo@ivaiconecta.com.br') &&
-    (p === 'turbosimas@gmail.com' || p === 'simasturbo@ivaiconecta.com.br')
-  ) {
-    return true;
+/**
+ * Marca uma conversa como lida pelo usuário atual
+ */
+export function markThreadAsRead(threadId, userEmail) {
+  if (!threadId || !userEmail) return;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const key = `${threadId}_${cleanEmail}`;
+  const map = getReadTimestamps();
+  map[key] = Date.now();
+  saveReadTimestamps(map);
+}
+
+/**
+ * Calcula a quantidade de mensagens não lidas em uma conversa específica
+ */
+export function getThreadUnreadCount(thread, userEmail) {
+  if (!thread || !userEmail) return 0;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const key = `${thread.id}_${cleanEmail}`;
+  const map = getReadTimestamps();
+  const lastRead = map[key] || 0;
+
+  const messages = thread.messages || [];
+  let unread = 0;
+  for (const m of messages) {
+    const isFromOther = m.senderEmail && !matchesUserEmail(m.senderEmail, cleanEmail);
+    const msgTime = m.createdAt || 0;
+    if (isFromOther && msgTime > lastRead) {
+      unread++;
+    }
+  }
+  return unread;
+}
+
+/**
+ * Retorna o total geral de mensagens não lidas do usuário
+ */
+export function getTotalUnreadMessagesCount(userEmail) {
+  if (!userEmail) return 0;
+  const cleanEmail = userEmail.toLowerCase().trim();
+  const allThreads = getChatThreads();
+  const myThreads = allThreads.filter(t =>
+    t.participants?.some(p => matchesUserEmail(p, cleanEmail))
+  );
+
+  let total = 0;
+  for (const t of myThreads) {
+    total += getThreadUnreadCount(t, cleanEmail);
+  }
+  return total;
+}
+
+/**
+ * Escuta em tempo real o contador de mensagens não lidas
+ */
+export function subscribeToUnreadCount(userEmail, callback) {
+  if (!userEmail) {
+    callback(0);
+    return () => {};
   }
 
-  // Alias para AlunoTeste (suporta tanto emailaluno@gmail.com quanto alunoteste@ivaiconecta.com.br)
-  if (
-    (u === 'emailaluno@gmail.com' || u === 'alunoteste@ivaiconecta.com.br') &&
-    (p === 'emailaluno@gmail.com' || p === 'alunoteste@ivaiconecta.com.br')
-  ) {
-    return true;
+  const cleanEmail = userEmail.toLowerCase().trim();
+
+  const emit = () => {
+    const count = getTotalUnreadMessagesCount(cleanEmail);
+    callback(count);
+  };
+
+  // Disparo inicial imediato
+  emit();
+
+  const handleUpdate = () => emit();
+  window.addEventListener('storage', handleUpdate);
+  window.addEventListener('ivai_chat_updated', handleUpdate);
+
+  if (chatChannel) {
+    chatChannel.addEventListener('message', handleUpdate);
   }
 
+  // Também assina a lista de conversas para atualizar quando chegarem mensagens remotas
+  const unsubThreads = subscribeToUserThreads(cleanEmail, () => {
+    emit();
+  });
+
+  return () => {
+    window.removeEventListener('storage', handleUpdate);
+    window.removeEventListener('ivai_chat_updated', handleUpdate);
+    if (chatChannel) {
+      chatChannel.removeEventListener('message', handleUpdate);
+    }
+    unsubThreads();
+  };
+}
+
+export function isSameUser(userA, userB) {
+  if (!userA || !userB) return false;
+  if (userA.uid && userB.uid && String(userA.uid) === String(userB.uid)) return true;
+  if (userA.id && userB.id && String(userA.id) === String(userB.id)) return true;
+  if (userA.uid && userB.id && String(userA.uid) === String(userB.id)) return true;
+  if (userA.id && userB.uid && String(userA.id) === String(userB.uid)) return true;
+  if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
+  
+  const nameA = (userA.name || userA.razaoSocial || userA.nomeFantasia || userA.company || userA.providerName || '').toLowerCase().trim();
+  const nameB = (userB.name || userB.razaoSocial || userB.nomeFantasia || userB.company || userB.providerName || '').toLowerCase().trim();
+  if (nameA && nameB && nameA === nameB) return true;
+  
   return false;
 }
 
-export const SEED_CHAT_THREADS = [
-  {
-    id: 'thread_101',
-    participants: ['aluno@ivaiconecta.com.br', 'empresa@ivaiconecta.com.br'],
-    participantNames: {
-      'aluno@ivaiconecta.com.br': 'Lucas Eduardo Silva',
-      'empresa@ivaiconecta.com.br': 'ValeTech Soluções Digitais'
-    },
-    participantAvatars: {
-      'aluno@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'empresa@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-    },
-    participantRoles: {
-      'aluno@ivaiconecta.com.br': 'aluno',
-      'empresa@ivaiconecta.com.br': 'empresa'
-    },
-    contextTitle: 'Desenvolvedor Front-end Junior',
-    lastMessage: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.',
-    lastMessageAt: '19/08/2026 - 14:30',
-    updatedAt: Date.now() - 3600000,
-    messages: [
-      { id: 'm1', senderId: 'empresa', sender: 'ValeTech Soluções Digitais', senderName: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Olá Lucas! Analisamos suas qualificações em React e seu parecer docente do IFPR.', timestamp: '19/08/2026 - 14:15', createdAt: Date.now() - 7200000 },
-      { id: 'm2', senderId: 'aluno', sender: 'Lucas Eduardo Silva', senderName: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá! Muito obrigado pela oportunidade. Tenho total interesse na vaga híbrida em Ivaiporã.', timestamp: '19/08/2026 - 14:22', createdAt: Date.now() - 5400000 },
-      { id: 'm3', senderId: 'empresa', sender: 'ValeTech Soluções Digitais', senderName: 'ValeTech Soluções Digitais', senderEmail: 'empresa@ivaiconecta.com.br', text: 'Excelente! Agendamos sua entrevista técnica para Quinta-feira às 14:00.', timestamp: '19/08/2026 - 14:30', createdAt: Date.now() - 3600000 }
-    ]
-  },
-  {
-    id: 'thread_102',
-    participants: ['aluno@ivaiconecta.com.br', 'professor@ivaiconecta.com.br'],
-    participantNames: {
-      'aluno@ivaiconecta.com.br': 'Lucas Eduardo Silva',
-      'professor@ivaiconecta.com.br': 'Prof. Dr. Ronan Silva'
-    },
-    participantAvatars: {
-      'aluno@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'professor@ivaiconecta.com.br': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
-    },
-    participantRoles: {
-      'aluno@ivaiconecta.com.br': 'aluno',
-      'professor@ivaiconecta.com.br': 'professor'
-    },
-    contextTitle: 'Parecer Pedagógico - Programação',
-    lastMessage: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado.',
-    lastMessageAt: '20/08/2026 - 09:10',
-    updatedAt: Date.now() - 1800000,
-    messages: [
-      { id: 'm10', senderId: 'aluno', sender: 'Lucas Eduardo Silva', senderName: 'Lucas Eduardo Silva', senderEmail: 'aluno@ivaiconecta.com.br', text: 'Olá Professor Ronan! Gostaria de solicitar um parecer sobre meu desempenho acadêmico.', timestamp: '20/08/2026 - 08:45', createdAt: Date.now() - 3600000 },
-      { id: 'm11', senderId: 'professor', sender: 'Prof. Dr. Ronan Silva', senderName: 'Prof. Dr. Ronan Silva', senderEmail: 'professor@ivaiconecta.com.br', text: 'Olá Lucas! Recebi sua solicitação e já emiti seu parecer pedagógico verificado com selo do IFPR.', timestamp: '20/08/2026 - 09:10', createdAt: Date.now() - 1800000 }
-    ]
-  }
-];
-
 export function getChatThreads() {
-  if (typeof localStorage === 'undefined') return SEED_CHAT_THREADS;
+  if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY_CHAT_THREADS);
   if (raw !== null) {
     try {
@@ -117,8 +174,7 @@ export function getChatThreads() {
       if (Array.isArray(parsed)) return parsed;
     } catch { }
   }
-  localStorage.setItem(STORAGE_KEY_CHAT_THREADS, JSON.stringify(SEED_CHAT_THREADS));
-  return SEED_CHAT_THREADS;
+  return [];
 }
 
 export function saveChatThreads(threads) {
@@ -224,7 +280,8 @@ export function subscribeToUserThreads(userEmail, callback) {
   const emitLocal = () => {
     const allThreads = getChatThreads();
     const myThreads = allThreads.filter(t =>
-      t.participants?.some(p => matchesUserEmail(p, cleanEmail))
+      t.participants?.some(p => matchesUserEmail(p, cleanEmail)) &&
+      !(t.participants?.length === 2 && matchesUserEmail(t.participants[0], t.participants[1]))
     );
     myThreads.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     callback(myThreads);
@@ -469,10 +526,19 @@ export async function sendChatMessage(chatId, senderUser, text) {
   return messageData;
 }
 
-// 4. Iniciar uma nova conversa (ou recuperar existente)
 export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'Contato Direto') {
-  const user1Email = (currentUser?.email || 'empresa@ivaiconecta.com.br').toLowerCase().trim();
-  const user2Email = (targetUser?.email || 'aluno@ivaiconecta.com.br').toLowerCase().trim();
+  if (!currentUser || !targetUser) {
+    throw new Error('Usuários inválidos para iniciar conversa.');
+  }
+
+  const user1Email = (currentUser?.email || '').toLowerCase().trim();
+  const user2Email = (targetUser?.email || '').toLowerCase().trim();
+
+  // Bloqueio rigoroso: ninguém (empresa, freelancer ou aluno) pode criar chat consigo mesmo
+  if (isSameUser(currentUser, targetUser) || (user1Email && user2Email && user1Email === user2Email)) {
+    console.warn('[Chat] Tentativa de iniciar conversa consigo mesmo bloqueada.');
+    throw new Error('Você não pode iniciar uma conversa consigo mesmo.');
+  }
 
   // Cria o ID determinístico único
   const sortedEmails = [user1Email, user2Email].sort();
