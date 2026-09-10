@@ -805,7 +805,7 @@ export default function PerfilEmpresa() {
 
                 <div className="form-group">
                   <label className="form-label flex items-center gap-1.5">
-                    <Phone size={13} className="text-primary-blue" /> Telefone / WhatsApp
+                    <Phone size={13} className="text-primary-blue" /> Telefone Comercial / Contato
                   </label>
                   <input
                     type="text"

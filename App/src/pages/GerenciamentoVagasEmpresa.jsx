@@ -3911,7 +3911,7 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">WhatsApp / Telefone:</label>
+                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Telefone / Celular de Contato:</label>
                   <input
                     type="text"
                     placeholder="5543999112233"

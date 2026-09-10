@@ -6,7 +6,7 @@ import {
   BarChart3, CheckCircle2, AlertCircle, HelpCircle
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getServices, addService, updateService, CITIES, maskPhone, sanitizeWhatsAppPhone } from '../lib/ivaiConecta';
+import { getServices, addService, updateService, CITIES, maskPhone } from '../lib/ivaiConecta';
 import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
 
@@ -612,7 +612,7 @@ export default function Servicos() {
               const description = e.target.description.value;
               const title = e.target.title.value || category;
 
-              const cleanPhone = sanitizeWhatsAppPhone(rawPhone);
+              const phone = rawPhone || currentUser?.phone || '';
 
               const servicePayload = {
                 title,
@@ -622,7 +622,7 @@ export default function Servicos() {
                 avatar: currentUser?.avatar || '',
                 providerEmail: currentUser?.email || '',
                 city,
-                phone: cleanPhone || rawPhone || currentUser?.phone || '',
+                phone,
                 description,
                 createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
                 rating: 5.0,
@@ -653,7 +653,7 @@ export default function Servicos() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Telefone / WhatsApp para Contato</label>
+                <label className="form-label">Telefone de Contato</label>
                 <input
                   name="phone"
                   type="tel"

@@ -426,7 +426,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
               {/* Recruiter Phone */}
               <div>
                 <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1">
-                  WhatsApp / Telefone de Contato da Empresa
+                  Telefone Comercial / Contato da Empresa
                 </label>
                 <div className="relative">
                   <input

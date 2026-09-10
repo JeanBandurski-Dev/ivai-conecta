@@ -8,7 +8,7 @@ import {
 import {
   getUserApplications, getJobs,
   updateJobStatus, deleteJob, getEndorsementRequests,
-  approveEndorsementRequest, rejectEndorsementRequest, sanitizeWhatsAppPhone, safeSkillsArray
+  approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -605,16 +605,6 @@ export default function MinhasVagas() {
                       >
                         <Eye size={13} /> Ver Currículo
                       </button>
-                      {(cand.candidatePhone || cand.phone) && (
-                        <a
-                          href={`https://wa.me/${sanitizeWhatsAppPhone(cand.candidatePhone || cand.phone)}?text=${encodeURIComponent(`Olá ${cand.candidateName || cand.name}! Vimos sua candidatura para a vaga no Ivaí Conecta.`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-whatsapp btn-sm text-xs font-bold"
-                        >
-                          <Phone size={13} /> WhatsApp
-                        </a>
-                      )}
                     </div>
                   </div>
                 ))}
