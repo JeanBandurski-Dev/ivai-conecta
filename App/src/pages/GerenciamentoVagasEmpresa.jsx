@@ -247,17 +247,6 @@ export default function GerenciamentoVagasEmpresa() {
   const [showNewJobModal, setShowNewJobModal] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
 
-  const [newJobForm, setNewJobForm] = useState({
-    title: '',
-    type: 'Tempo Integral',
-    modality: 'Presencial',
-    city: currentUser?.city || 'Ivaiporã',
-    salary: 'R$ 2.500 - R$ 3.800',
-    requiredSkills: 'React, JavaScript, HTML5/CSS3, Git',
-    benefits: 'Vale Alimentação, Vale Transporte, Plano de Saúde',
-    description: ''
-  });
-
   // Candidates for selected job
   const jobCandidates = useMemo(() => {
     if (!currentJob) return [];
@@ -966,35 +955,6 @@ export default function GerenciamentoVagasEmpresa() {
     updateJob(editingJob.id, editingJob);
     showToast('Vaga atualizada com sucesso!');
     setEditingJob(null);
-    forceUpdate(n => n + 1);
-  };
-
-  const handleCreateNewJob = (e) => {
-    e.preventDefault();
-    if (!newJobForm.title.trim()) {
-      showToast('Por favor, informe o título da vaga.');
-      return;
-    }
-
-    const created = addJob({
-      title: newJobForm.title,
-      company: currentUser?.name || 'ValeTech Soluções Digitais',
-      companyLogo: currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
-      type: newJobForm.type,
-      modality: newJobForm.modality,
-      city: newJobForm.city,
-      salary: newJobForm.salary,
-      requiredSkills: newJobForm.requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
-      benefits: newJobForm.benefits.split(',').map(b => b.trim()).filter(Boolean),
-      description: newJobForm.description || 'Estamos em busca de talentos para compor nossa equipe em Ivaiporã e região.',
-      createdBy: currentUser?.uid || currentUser?.email || 'empresa',
-      isVerifiedCompany: true
-    });
-
-    showToast('🎉 Nova vaga publicada com sucesso no Mural Regional!');
-    setShowNewJobModal(false);
-    setSelectedJobId(created.id);
-    setActiveTab('pipeline');
     forceUpdate(n => n + 1);
   };
 
@@ -4002,125 +3962,6 @@ export default function GerenciamentoVagasEmpresa() {
             }
           }}
         />
-
-        {/* ═════════════════════════════════════════════════════════════════
-          MODAL: PUBLICAR NOVA VAGA
-      ═════════════════════════════════════════════════════════════════ */}
-        {showNewJobModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl w-full max-w-xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="text-primary-blue" size={20} />
-                  <h3 className="font-heading text-lg font-bold text-gray-900 dark:text-white">Publicar Nova Vaga de Emprego</h3>
-                </div>
-                <button onClick={() => setShowNewJobModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateNewJob} className="p-6 space-y-4 text-xs">
-                <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Título do Cargo / Função:</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Desenvolvedor Front-end React Júnior"
-                    value={newJobForm.title}
-                    onChange={e => setNewJobForm({ ...newJobForm, title: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Tipo de Contrato:</label>
-                    <select
-                      value={newJobForm.type}
-                      onChange={e => setNewJobForm({ ...newJobForm, type: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
-                    >
-                      <option value="Tempo Integral">Tempo Integral (CLT)</option>
-                      <option value="Estágio">Estágio Remunerado</option>
-                      <option value="Prestador de Serviço">Prestador de Serviço (PJ)</option>
-                      <option value="Meio Período">Meio Período</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Modalidade:</label>
-                    <select
-                      value={newJobForm.modality}
-                      onChange={e => setNewJobForm({ ...newJobForm, modality: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
-                    >
-                      <option value="Presencial">Presencial</option>
-                      <option value="Híbrido">Híbrido</option>
-                      <option value="Remoto">100% Remoto</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Cidade:</label>
-                    <select
-                      value={newJobForm.city}
-                      onChange={e => setNewJobForm({ ...newJobForm, city: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
-                    >
-                      {CITIES.filter(c => c !== 'Todas as Cidades').map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Faixa Salarial / Bolsa:</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: R$ 2.500 - R$ 3.500"
-                      value={newJobForm.salary}
-                      onChange={e => setNewJobForm({ ...newJobForm, salary: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Habilidades Exigidas (separadas por vírgula):</label>
-                  <input
-                    type="text"
-                    placeholder="React, JavaScript, HTML5/CSS3, Git, SQL"
-                    value={newJobForm.requiredSkills}
-                    onChange={e => setNewJobForm({ ...newJobForm, requiredSkills: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Descrição e Responsabilidades:</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Descreva o dia a dia, requisitos da vaga e diferenciais..."
-                    value={newJobForm.description}
-                    onChange={e => setNewJobForm({ ...newJobForm, description: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-xs"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
-                  <button type="button" onClick={() => setShowNewJobModal(false)} className="btn btn-outline btn-sm rounded-xl">
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary btn-sm px-5 py-2.5 font-bold rounded-xl shadow-brand-sm">
-                    Publicar Vaga
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* ═════════════════════════════════════════════════════════════════
           MODAL: EDITAR VAGA EXISTENTE
