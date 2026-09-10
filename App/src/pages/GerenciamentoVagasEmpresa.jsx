@@ -1283,53 +1283,6 @@ export default function GerenciamentoVagasEmpresa() {
         );
       })()}
 
-      {/* ── SUB-TABS NAVIGATION MINIMALISTA ── */}
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 sticky top-0 lg:top-[74px] z-40">
-        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center overflow-x-auto scrollbar-none gap-6 pt-1">
-            <button
-              onClick={() => setActiveTab('pipeline')}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'pipeline'
-                  ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-                }`}
-            >
-              <Layers size={16} /> Funil Kanban
-            </button>
-
-            <button
-              onClick={() => setActiveTab('jobs_list')}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'jobs_list'
-                  ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-                }`}
-            >
-              <Briefcase size={16} /> Minhas Vagas ({allCompanyJobs.length})
-            </button>
-
-            <button
-              onClick={() => setActiveTab('stage_settings')}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'stage_settings'
-                  ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-                }`}
-            >
-              <Settings size={16} /> Configurar Etapas
-            </button>
-
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'analytics'
-                  ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-                }`}
-            >
-              <BarChart3 size={16} /> Indicadores
-            </button>
-          </div>
-        </div>
-      </div>
-
       <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* ═════════════════════════════════════════════════════════════════
