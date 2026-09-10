@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   getJobs, addJob, calculateMatchScore, CITIES, getJobById, safeSkillsArray
@@ -52,8 +52,7 @@ export default function Vagas() {
   const [showNewModal,  setShowModal]     = useState(params.get('action') === 'new');
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
-
-
+  const [refreshKey,    setRefreshKey]    = useState(0);
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
 

@@ -8,7 +8,8 @@ import {
   SlidersHorizontal, Video, AlertCircle, GraduationCap, LayoutGrid,
   ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
   Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
-  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History
+  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History,
+  Users, DollarSign, Share2, Download, Phone, PhoneCall
 } from 'lucide-react';
 import {
   getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
@@ -19,6 +20,7 @@ import {
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
+import PublishJobModal from '../components/PublishJobModal';
 
 
 export default function GerenciamentoVagasEmpresa() {
@@ -171,6 +173,9 @@ export default function GerenciamentoVagasEmpresa() {
   const [candidateSearch, setCandidateSearch] = useState('');
   const [selectedStageFilter, setSelectedStageFilter] = useState('todos');
   const [minMatchFilter, setMinMatchFilter] = useState(0);
+  const [selectedCityFilter, setSelectedCityFilter] = useState('todas');
+  const [selectedInstitutionFilter, setSelectedInstitutionFilter] = useState('todas');
+  const [selectedRatingFilter, setSelectedRatingFilter] = useState(0);
   const [onlyVerified, setOnlyVerified] = useState(false);
   const [onlyWithInterview, setOnlyWithInterview] = useState(false);
   const [onlyWithEndorsement, setOnlyWithEndorsement] = useState(false);
@@ -278,22 +283,39 @@ export default function GerenciamentoVagasEmpresa() {
     }).filter(Boolean);
   }, [jobCandidates, now]);
 
+  // Available dynamic filters for current candidates
+  const availableCandidateCities = useMemo(() => {
+    const cities = new Set();
+    jobCandidates.forEach(c => { if (c.city) cities.add(c.city); });
+    return Array.from(cities);
+  }, [jobCandidates]);
+
+  const availableInstitutions = useMemo(() => {
+    const insts = new Set();
+    jobCandidates.forEach(c => { if (c.institution) insts.add(c.institution); });
+    return Array.from(insts);
+  }, [jobCandidates]);
+
   // Filtered Candidates
   const filteredCandidates = useMemo(() => {
-    return jobCandidates.filter(c => {
+    const result = jobCandidates.filter(c => {
       const matchText = !candidateSearch ||
         c.name?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
         c.course?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
         c.institution?.toLowerCase().includes(candidateSearch.toLowerCase()) ||
-        c.skills?.some(s => s?.toLowerCase().includes(candidateSearch.toLowerCase()));
+        (Array.isArray(c.skills) ? c.skills.some(s => s?.toLowerCase().includes(candidateSearch.toLowerCase())) : String(c.skills || '').toLowerCase().includes(candidateSearch.toLowerCase()));
 
       const matchStage = selectedStageFilter === 'todos' || c.stage === selectedStageFilter;
       const matchScore = (c.matchScore || 0) >= minMatchFilter;
+      const matchCity = selectedCityFilter === 'todas' || c.city === selectedCityFilter;
+      const matchInstitution = selectedInstitutionFilter === 'todas' || c.institution === selectedInstitutionFilter;
+      const matchRating = selectedRatingFilter === 0 || (c.rating || 0) >= selectedRatingFilter;
       const matchVerified = !onlyVerified || c.isVerifiedStudent;
       const matchInterview = !onlyWithInterview || !!c.interview;
       const matchEndorsement = !onlyWithEndorsement || (c.endorsements && c.endorsements.length > 0);
+      const matchNotes = !onlyWithNotes || (c.notes && c.notes.length > 0);
 
-      return matchText && matchStage && matchScore && matchVerified && matchInterview && matchEndorsement;
+      return matchText && matchStage && matchScore && matchCity && matchInstitution && matchRating && matchVerified && matchInterview && matchEndorsement && matchNotes;
     });
 
     return [...result].sort((a, b) => {

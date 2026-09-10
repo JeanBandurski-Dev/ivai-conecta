@@ -4,7 +4,7 @@ import {
   Settings, Bell, Lock, Eye, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
   Building2, FileText, Camera,
-  Search, Loader2, AlertCircle, RefreshCw
+  Search, Loader2, AlertCircle, RefreshCw, Check
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {

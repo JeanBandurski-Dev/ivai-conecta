@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus, safeSkillsArray } from '../lib/ivaiConecta';

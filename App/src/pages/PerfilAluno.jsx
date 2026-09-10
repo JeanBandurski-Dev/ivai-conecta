@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
 } from 'lucide-react';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
