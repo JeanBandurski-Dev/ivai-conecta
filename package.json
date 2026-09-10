@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "npm run dev --prefix App",
     "start": "npm run dev --prefix App",
-    "build": "npm run build --prefix App",
+    "check:mocks": "node scripts/check-no-mocks.cjs",
+    "build": "npm run check:mocks && npm run build --prefix App",
     "dev:proto": "npm start --prefix Prototipo",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run check:mocks"
   },
   "repository": {
     "type": "git",
