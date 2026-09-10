@@ -622,7 +622,7 @@ export default function Servicos() {
                 avatar: currentUser?.avatar || '',
                 providerEmail: currentUser?.email || '',
                 city,
-                phone: cleanPhone || phone || currentUser?.phone || '',
+                phone: cleanPhone || rawPhone || currentUser?.phone || '',
                 description,
                 createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
                 rating: 5.0,

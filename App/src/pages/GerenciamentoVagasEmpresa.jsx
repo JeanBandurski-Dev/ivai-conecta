@@ -184,13 +184,23 @@ export default function GerenciamentoVagasEmpresa() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Jobs List Filters (Tab: Minhas Vagas)
-  const [jobSearch, setJobSearch] = useState('');
-  const [jobStatusFilter, setJobStatusFilter] = useState('todos'); // 'todos' | 'Ativa' | 'Encerrada'
-  const [jobModalityFilter, setJobModalityFilter] = useState('todos'); // 'todos' | 'Presencial' | 'Remoto' | 'Híbrido'
-  const [jobCityFilter, setJobCityFilter] = useState('todas');
-  const [jobSortBy, setJobSortBy] = useState('recent'); // 'recent' | 'candidates_desc' | 'title_asc'
+  const [jobListViewMode, setJobListViewMode] = useState('grid'); // 'grid' | 'table'
+  const [jobListSearch, setJobListSearch] = useState('');
+  const [jobListStatusFilter, setJobListStatusFilter] = useState('todos'); // 'todos' | 'Ativa' | 'Encerrada'
+  const [jobListModalityFilter, setJobListModalityFilter] = useState('todos'); // 'todos' | 'Presencial' | 'Remoto' | 'Híbrido'
+  const [jobListTypeFilter, setJobListTypeFilter] = useState('todos');
+  const [jobListSort, setJobListSort] = useState('recent'); // 'recent' | 'applicants_desc' | 'title_asc'
+
+  // Interview History Tab Filters
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyJobFilter, setHistoryJobFilter] = useState('todos');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('todos'); // 'todos' | 'concluida' | 'banco_talentos' | 'andamento' | 'agendada'
+  const [historyFormatFilter, setHistoryFormatFilter] = useState('todos');
+  const [historySort, setHistorySort] = useState('recent'); // 'recent' | 'date_asc' | 'match_desc'
+  const [historyViewMode, setHistoryViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Drag & Drop State
+  const [isDraggingLock, setIsDraggingLock] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState(null);
   const [dragOverStageId, setDragOverStageId] = useState(null);
   const [dragOverCandidateId, setDragOverCandidateId] = useState(null);
@@ -367,35 +377,137 @@ export default function GerenciamentoVagasEmpresa() {
     setSortBy('match_desc');
   };
 
+  // Helper para status da entrevista
+  const getInterviewStatusInfo = (cand) => {
+    if (!cand || !cand.interview) return null;
+    if (cand.stage === 'aprovado' || cand.interview?.concluida) {
+      return { label: 'Concluída / Aprovado', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800', icon: CheckCircle2, pulse: false };
+    }
+    if (cand.stage === 'reprovado' || cand.stage === 'banco_talentos') {
+      return { label: 'Banco de Talentos', badgeColor: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', icon: Users, pulse: false };
+    }
+    if (cand.interview?.roomCreated) {
+      return { label: 'Em Andamento', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800', icon: Video, pulse: true };
+    }
+    return { label: 'Agendada', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800', icon: Calendar, pulse: false };
+  };
+
+  // Coleta todos os candidatos com entrevista de todas as vagas da empresa
+  const allInterviewsList = useMemo(() => {
+    const list = [];
+    allCompanyJobs.forEach(job => {
+      const cands = getJobCandidates(job.id) || [];
+      cands.forEach(cand => {
+        if (cand.interview && (cand.interview.date || cand.interview.time || cand.stage === 'entrevista')) {
+          list.push({
+            ...cand,
+            jobId: job.id,
+            jobTitle: job.title,
+            jobCity: job.city
+          });
+        }
+      });
+    });
+    return list;
+  }, [allCompanyJobs, updateCount]);
+
+  // Estatísticas de Entrevistas
+  const interviewStats = useMemo(() => {
+    const total = allInterviewsList.length;
+    const completed = allInterviewsList.filter(c => c.stage === 'aprovado' || c.interview?.concluida).length;
+    const talentPool = allInterviewsList.filter(c => c.stage === 'reprovado' || c.stage === 'banco_talentos').length;
+    const inProgress = allInterviewsList.filter(c => c.interview?.roomCreated && c.stage !== 'aprovado' && c.stage !== 'reprovado').length;
+    const scheduled = total - completed - talentPool - inProgress;
+    const passRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, talentPool, inProgress, scheduled: Math.max(0, scheduled), passRate };
+  }, [allInterviewsList]);
+
+  // Lista filtrada e ordenada de entrevistas
+  const filteredInterviews = useMemo(() => {
+    return allInterviewsList
+      .filter(c => {
+        const matchesSearch = !historySearch ||
+          c.name?.toLowerCase().includes(historySearch.toLowerCase()) ||
+          c.course?.toLowerCase().includes(historySearch.toLowerCase()) ||
+          c.institution?.toLowerCase().includes(historySearch.toLowerCase()) ||
+          c.jobTitle?.toLowerCase().includes(historySearch.toLowerCase()) ||
+          (c.notes && c.notes.toLowerCase().includes(historySearch.toLowerCase()));
+
+        const matchesJob = historyJobFilter === 'todos' || String(c.jobId) === String(historyJobFilter);
+        const matchesFormat = historyFormatFilter === 'todos' || (c.interview?.format || '').includes(historyFormatFilter);
+
+        let matchesStatus = true;
+        if (historyStatusFilter === 'concluida') {
+          matchesStatus = c.stage === 'aprovado' || !!c.interview?.concluida;
+        } else if (historyStatusFilter === 'banco_talentos') {
+          matchesStatus = c.stage === 'reprovado' || c.stage === 'banco_talentos';
+        } else if (historyStatusFilter === 'andamento') {
+          matchesStatus = !!c.interview?.roomCreated && c.stage !== 'aprovado' && c.stage !== 'reprovado';
+        } else if (historyStatusFilter === 'agendada') {
+          matchesStatus = !c.interview?.concluida && !c.interview?.roomCreated && c.stage !== 'aprovado' && c.stage !== 'reprovado';
+        }
+
+        return matchesSearch && matchesJob && matchesFormat && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (historySort === 'match_desc') return (b.matchScore || 0) - (a.matchScore || 0);
+        if (historySort === 'date_asc') {
+          const dateA = a.interview?.date ? new Date(`${a.interview.date}T${a.interview.time || '00:00'}`) : new Date(0);
+          const dateB = b.interview?.date ? new Date(`${b.interview.date}T${b.interview.time || '00:00'}`) : new Date(0);
+          return dateA - dateB;
+        }
+        // recent
+        const dateA = a.interview?.date ? new Date(`${a.interview.date}T${a.interview.time || '00:00'}`) : new Date(0);
+        const dateB = b.interview?.date ? new Date(`${b.interview.date}T${b.interview.time || '00:00'}`) : new Date(0);
+        return dateB - dateA;
+      });
+  }, [allInterviewsList, historySearch, historyJobFilter, historyFormatFilter, historyStatusFilter, historySort]);
+
+  // Estatísticas de Minhas Vagas
+  const jobListStats = useMemo(() => {
+    const total = allCompanyJobs.length;
+    const active = allCompanyJobs.filter(j => j.status === 'Ativa').length;
+    const paused = total - active;
+    let totalCandidates = 0;
+    allCompanyJobs.forEach(j => {
+      totalCandidates += (getJobCandidates(j.id) || []).length;
+    });
+    const avgCandidates = total > 0 ? (totalCandidates / total).toFixed(1) : '0';
+    return { total, active, paused, totalCandidates, avgCandidates };
+  }, [allCompanyJobs, updateCount]);
+
   // Filtered & Sorted Jobs for "Minhas Vagas" Tab
   const filteredCompanyJobs = useMemo(() => {
     return allCompanyJobs
       .filter(job => {
-        const matchesSearch = !jobSearch ||
-          job.title?.toLowerCase().includes(jobSearch.toLowerCase()) ||
-          job.description?.toLowerCase().includes(jobSearch.toLowerCase()) ||
-          job.requiredSkills?.some(s => s?.toLowerCase().includes(jobSearch.toLowerCase()));
+        const matchesSearch = !jobListSearch ||
+          job.title?.toLowerCase().includes(jobListSearch.toLowerCase()) ||
+          job.description?.toLowerCase().includes(jobListSearch.toLowerCase()) ||
+          (Array.isArray(job.requiredSkills)
+            ? job.requiredSkills.some(s => s?.toLowerCase().includes(jobListSearch.toLowerCase()))
+            : String(job.requiredSkills || '').toLowerCase().includes(jobListSearch.toLowerCase()));
 
-        const matchesStatus = jobStatusFilter === 'todos' ||
-          (jobStatusFilter === 'Ativa' ? job.status === 'Ativa' : job.status !== 'Ativa');
+        const matchesStatus = jobListStatusFilter === 'todos' ||
+          (jobListStatusFilter === 'Ativa' ? job.status === 'Ativa' : job.status !== 'Ativa');
 
-        const matchesModality = jobModalityFilter === 'todos' ||
-          (job.modality?.toLowerCase() === jobModalityFilter.toLowerCase());
+        const matchesModality = jobListModalityFilter === 'todos' ||
+          (job.modality?.toLowerCase() === jobListModalityFilter.toLowerCase());
 
-        const matchesCity = jobCityFilter === 'todas' || job.city === jobCityFilter;
+        const matchesType = jobListTypeFilter === 'todos' ||
+          (job.type?.toLowerCase() === jobListTypeFilter.toLowerCase());
 
-        return matchesSearch && matchesStatus && matchesModality && matchesCity;
+        return matchesSearch && matchesStatus && matchesModality && matchesType;
       })
       .sort((a, b) => {
-        if (jobSortBy === 'candidates_desc') {
-          return getJobCandidates(b.id).length - getJobCandidates(a.id).length;
+        if (jobListSort === 'applicants_desc' || jobListSort === 'candidates_desc') {
+          return (getJobCandidates(b.id) || []).length - (getJobCandidates(a.id) || []).length;
         }
-        if (jobSortBy === 'title_asc') {
+        if (jobListSort === 'title_asc') {
           return (a.title || '').localeCompare(b.title || '');
         }
         return (b.id || 0) - (a.id || 0);
       });
-  }, [allCompanyJobs, jobSearch, jobStatusFilter, jobModalityFilter, jobCityFilter, jobSortBy, updateCount]);
+  }, [allCompanyJobs, jobListSearch, jobListStatusFilter, jobListModalityFilter, jobListTypeFilter, jobListSort, updateCount]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -2233,11 +2345,11 @@ export default function GerenciamentoVagasEmpresa() {
                         </p>
                         <button
                           onClick={() => {
-                            setJobSearch('');
-                            setJobStatusFilter('todos');
-                            setJobModalityFilter('todos');
-                            setJobCityFilter('todas');
-                            setJobSortBy('recent');
+                            setJobListSearch('');
+                            setJobListStatusFilter('todos');
+                            setJobListModalityFilter('todos');
+                            setJobListTypeFilter('todos');
+                            setJobListSort('recent');
                           }}
                           className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
                         >
@@ -2246,8 +2358,16 @@ export default function GerenciamentoVagasEmpresa() {
                       </div>
                     ) : (
                       filteredCompanyJobs.map(job => {
-                        const candidates = getJobCandidates(job.id);
+                        const candidates = getJobCandidates(job.id) || [];
                         const isActive = job.status === 'Ativa';
+                        const skillsArray = Array.isArray(job.requiredSkills) ? job.requiredSkills : (typeof job.requiredSkills === 'string' ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+                        const visibleSkills = skillsArray.slice(0, 3);
+                        const extraSkillsCount = Math.max(0, skillsArray.length - 3);
+                        const triagemCount = candidates.filter(c => c.stage === 'triagem').length;
+                        const desafioCount = candidates.filter(c => c.stage === 'desafio' || c.stage === 'analise').length;
+                        const entrevistaCount = candidates.filter(c => c.stage === 'entrevista').length;
+                        const aprovadosCount = candidates.filter(c => c.stage === 'aprovado').length;
+                        const talentPoolCount = candidates.filter(c => c.stage === 'reprovado' || c.stage === 'banco_talentos').length;
 
                         return (
                           <div
