@@ -2080,7 +2080,7 @@ export default function GerenciamentoVagasEmpresa() {
                         Minhas Vagas &amp; Processos Seletivos
                       </h2>
                       <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1">
-                        Gerencie o ciclo de vida dos processos seletivos, acompanhe a distribuição de candidatos e publique novas oportunidades.
+                        Gerencie o ciclo de vida dos processos seletivos e acompanhe a distribuição de candidatos.
                       </p>
                     </div>
 
@@ -2108,76 +2108,6 @@ export default function GerenciamentoVagasEmpresa() {
                           <ListFilter size={13} /> Tabela
                         </button>
                       </div>
-
-                      {/* Create New Job CTA */}
-                      <button
-                        onClick={() => setShowNewJobModal(true)}
-                        className="bg-primary-blue hover:bg-blue-600 text-white px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-brand-sm hover:shadow-brand-md hover:scale-[1.02] active:scale-95 shrink-0"
-                      >
-                        <Plus size={16} /> Publicar Nova Vaga
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 4 Metric KPI Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* KPI 1: Vagas Ativas */}
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800/80 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Vagas Ativas</span>
-                        <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/50 dark:border-emerald-800/50">
-                          <CheckCircle2 size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                        {jobListStats.active} <span className="text-xs text-gray-400 font-normal">/ {jobListStats.total} total</span>
-                      </div>
-                      <div className="text-[11px] text-emerald-600/90 dark:text-emerald-400/90 font-semibold mt-0.5 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Recebendo inscrições
-                      </div>
-                    </div>
-
-                    {/* KPI 2: Total de Candidatos */}
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-blue-300 dark:hover:border-blue-800/80 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-primary-blue dark:text-blue-400 uppercase tracking-wider">Total de Candidatos</span>
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center border border-blue-200/50 dark:border-blue-800/50">
-                          <Users size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-primary-blue dark:text-blue-400 mt-2">{jobListStats.totalCandidates}</div>
-                      <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
-                        Média de <strong className="text-gray-700 dark:text-slate-300">{jobListStats.avgCandidates}</strong> por vaga
-                      </div>
-                    </div>
-
-                    {/* KPI 3: Novos para Triagem */}
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-amber-300 dark:hover:border-amber-800/80 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Novos para Triagem</span>
-                        <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200/50 dark:border-amber-800/50">
-                          <Sparkles size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-2">{jobListStats.newCandidatesCount}</div>
-                      <div className="text-[11px] text-amber-700/90 dark:text-amber-300/90 font-semibold mt-0.5">
-                        {jobListStats.newCandidatesCount > 0 ? '⚡ Aguardando avaliação' : 'Todas as triagens em dia'}
-                      </div>
-                    </div>
-
-                    {/* KPI 4: Em Entrevista / Aprovados */}
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/80 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Em Entrevista / Aprovados</span>
-                        <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200/50 dark:border-purple-800/50">
-                          <Video size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">
-                        {jobListStats.interviewCandidatesCount} <span className="text-xs text-emerald-600 font-semibold">({jobListStats.approvedCandidatesCount} contratados)</span>
-                      </div>
-                      <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">Fases finais do processo</div>
                     </div>
                   </div>
 
