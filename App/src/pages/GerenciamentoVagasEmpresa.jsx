@@ -458,11 +458,28 @@ export default function GerenciamentoVagasEmpresa() {
     const active = allCompanyJobs.filter(j => j.status === 'Ativa').length;
     const paused = total - active;
     let totalCandidates = 0;
+    let newCandidatesCount = 0;
+    let interviewCandidatesCount = 0;
+    let approvedCandidatesCount = 0;
+
     allCompanyJobs.forEach(j => {
-      totalCandidates += (getJobCandidates(j.id) || []).length;
+      const cands = getJobCandidates(j.id) || [];
+      totalCandidates += cands.length;
+      newCandidatesCount += cands.filter(c => c.stage === 'triagem').length;
+      interviewCandidatesCount += cands.filter(c => c.stage === 'entrevista').length;
+      approvedCandidatesCount += cands.filter(c => c.stage === 'aprovado').length;
     });
     const avgCandidates = total > 0 ? (totalCandidates / total).toFixed(1) : '0';
-    return { total, active, paused, totalCandidates, avgCandidates };
+    return {
+      total,
+      active,
+      paused,
+      totalCandidates,
+      newCandidatesCount,
+      interviewCandidatesCount,
+      approvedCandidatesCount,
+      avgCandidates
+    };
   }, [allCompanyJobs, updateCount]);
 
   // Filtered & Sorted Jobs for "Minhas Vagas" Tab
@@ -2046,30 +2063,30 @@ export default function GerenciamentoVagasEmpresa() {
             TAB 2: LISTA E GESTÃO DE TODAS AS VAGAS DA EMPRESA (MINHAS VAGAS)
         ═════════════════════════════════════════════════════════════════ */}
               {activeTab === 'jobs_list' && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in duration-200">
 
                   {/* Header & Quick Action */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-semibold text-primary-blue dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                           <Briefcase size={13} /> Painel de Recrutamento
                         </span>
                         <span className="bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
-                          {filteredCompanyJobs.length} de {allCompanyJobs.length} vagas
+                          {filteredCompanyJobs.length} de {allCompanyJobs.length} {allCompanyJobs.length === 1 ? 'vaga cadastrada' : 'vagas cadastradas'}
                         </span>
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                         Minhas Vagas &amp; Processos Seletivos
                       </h2>
                       <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1">
-                        Gerencie o ciclo de vida dos processos seletivos, acompanhe o funil de candidatos e publique novas oportunidades.
+                        Gerencie o ciclo de vida dos processos seletivos, acompanhe a distribuição de candidatos e publique novas oportunidades.
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      {/* View Mode Toggle */}
-                      <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex items-center border border-gray-200 dark:border-slate-700">
+                      {/* View Mode Switcher */}
+                      <div className="bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl flex items-center border border-gray-200 dark:border-slate-700 shadow-2xs">
                         <button
                           onClick={() => setJobListViewMode('grid')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${jobListViewMode === 'grid'
@@ -2078,7 +2095,7 @@ export default function GerenciamentoVagasEmpresa() {
                             }`}
                           title="Visualização em Grade / Cards"
                         >
-                          <LayoutGrid size={13} /> Cards
+                          <LayoutGrid size={13} /> Grade
                         </button>
                         <button
                           onClick={() => setJobListViewMode('table')}
@@ -2086,86 +2103,99 @@ export default function GerenciamentoVagasEmpresa() {
                               ? 'bg-white dark:bg-slate-900 text-gray-900 dark:text-white shadow-xs'
                               : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                             }`}
-                          title="Visualização em Tabela Detalhada"
+                          title="Visualização em Tabela Gerencial"
                         >
                           <ListFilter size={13} /> Tabela
                         </button>
                       </div>
 
-                      {/* Create New Job */}
+                      {/* Create New Job CTA */}
                       <button
                         onClick={() => setShowNewJobModal(true)}
-                        className="bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95"
+                        className="bg-primary-blue hover:bg-blue-600 text-white px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-brand-sm hover:shadow-brand-md hover:scale-[1.02] active:scale-95 shrink-0"
                       >
-                        <Plus size={15} /> Publicar Nova Vaga
+                        <Plus size={16} /> Publicar Nova Vaga
                       </button>
                     </div>
                   </div>
 
                   {/* 4 Metric KPI Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
+                    {/* KPI 1: Vagas Ativas */}
+                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800/80 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Vagas Ativas</span>
-                        <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/50 dark:border-emerald-800/50">
                           <CheckCircle2 size={16} />
                         </div>
                       </div>
                       <div className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                        {jobListStats.active} <span className="text-xs text-gray-400 font-normal">/ {jobListStats.total}</span>
+                        {jobListStats.active} <span className="text-xs text-gray-400 font-normal">/ {jobListStats.total} total</span>
                       </div>
-                      <div className="text-[11px] text-emerald-600/80 font-semibold mt-0.5">Recebendo inscrições</div>
+                      <div className="text-[11px] text-emerald-600/90 dark:text-emerald-400/90 font-semibold mt-0.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Recebendo inscrições
+                      </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-blue-300 dark:hover:border-blue-800 transition-all">
+                    {/* KPI 2: Total de Candidatos */}
+                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-blue-300 dark:hover:border-blue-800/80 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-primary-blue dark:text-blue-400 uppercase tracking-wider">Total de Candidatos</span>
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center border border-blue-200/50 dark:border-blue-800/50">
                           <Users size={16} />
                         </div>
                       </div>
                       <div className="text-2xl font-black text-primary-blue dark:text-blue-400 mt-2">{jobListStats.totalCandidates}</div>
-                      <div className="text-[11px] text-blue-500/80 font-semibold mt-0.5">Em todas as vagas</div>
+                      <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                        Média de <strong className="text-gray-700 dark:text-slate-300">{jobListStats.avgCandidates}</strong> por vaga
+                      </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all">
+                    {/* KPI 3: Novos para Triagem */}
+                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-amber-300 dark:hover:border-amber-800/80 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Média por Vaga</span>
-                        <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
+                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Novos para Triagem</span>
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200/50 dark:border-amber-800/50">
                           <Sparkles size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">{jobListStats.avgCandidates}</div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">Candidatos por processo</div>
+                      <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-2">{jobListStats.newCandidatesCount}</div>
+                      <div className="text-[11px] text-amber-700/90 dark:text-amber-300/90 font-semibold mt-0.5">
+                        {jobListStats.newCandidatesCount > 0 ? '⚡ Aguardando avaliação' : 'Todas as triagens em dia'}
+                      </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-slate-400 transition-all">
+                    {/* KPI 4: Em Entrevista / Aprovados */}
+                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/80 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pausadas / Encerradas</span>
-                        <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
-                          <Clock size={16} />
+                        <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Em Entrevista / Aprovados</span>
+                        <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200/50 dark:border-purple-800/50">
+                          <Video size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-2">{jobListStats.paused}</div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">Processos finalizados</div>
+                      <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">
+                        {jobListStats.interviewCandidatesCount} <span className="text-xs text-emerald-600 font-semibold">({jobListStats.approvedCandidatesCount} contratados)</span>
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">Fases finais do processo</div>
                     </div>
                   </div>
 
-                  {/* Filter Toolbar */}
+                  {/* Filter & Search Toolbar */}
                   <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {/* Search */}
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Buscar vaga, skills, cidade..."
+                          placeholder="Buscar por cargo, skills, cidade..."
                           value={jobListSearch}
                           onChange={e => setJobListSearch(e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs font-medium outline-none focus:border-primary-blue text-gray-900 dark:text-white"
+                          className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs font-medium outline-none focus:border-primary-blue text-gray-900 dark:text-white"
                         />
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         {jobListSearch && (
-                          <button onClick={() => setJobListSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <button onClick={() => setJobListSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
                             <X size={12} />
                           </button>
                         )}
@@ -2176,12 +2206,12 @@ export default function GerenciamentoVagasEmpresa() {
                         <select
                           value={jobListModalityFilter}
                           onChange={e => setJobListModalityFilter(e.target.value)}
-                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
                         >
                           <option value="todos">Todas as Modalidades</option>
                           <option value="Presencial">Presencial</option>
                           <option value="Híbrido">Híbrido</option>
-                          <option value="Remoto">Remoto</option>
+                          <option value="Remoto">100% Remoto</option>
                         </select>
                         <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       </div>
@@ -2191,12 +2221,13 @@ export default function GerenciamentoVagasEmpresa() {
                         <select
                           value={jobListTypeFilter}
                           onChange={e => setJobListTypeFilter(e.target.value)}
-                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
                         >
                           <option value="todos">Todos os Tipos de Contrato</option>
                           <option value="Tempo Integral">Tempo Integral (CLT)</option>
-                          <option value="Estágio">Estágio</option>
+                          <option value="Estágio">Estágio Remunerado</option>
                           <option value="Jovem Aprendiz">Jovem Aprendiz</option>
+                          <option value="Prestador de Serviço">Prestador de Serviço (PJ)</option>
                           <option value="Meio Período">Meio Período</option>
                         </select>
                         <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -2207,55 +2238,73 @@ export default function GerenciamentoVagasEmpresa() {
                         <select
                           value={jobListSort}
                           onChange={e => setJobListSort(e.target.value)}
-                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
                         >
                           <option value="recent">Mais Recentes Primeiro</option>
                           <option value="applicants_desc">Mais Candidaturas</option>
-                          <option value="title_asc">Título (A-Z)</option>
+                          <option value="title_asc">Título do Cargo (A-Z)</option>
                         </select>
                         <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       </div>
                     </div>
 
                     {/* Status Chips with Live Counters */}
-                    <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100 dark:border-slate-800 text-xs">
-                      <span className="font-semibold text-gray-400 text-[11px] uppercase tracking-wider mr-1">Status:</span>
-                      {[
-                        { id: 'todos', label: 'Todas as Vagas', count: jobListStats.total },
-                        { id: 'Ativa', label: 'Ativas', count: jobListStats.active, dot: 'bg-emerald-500' },
-                        { id: 'Encerrada', label: 'Pausadas / Encerradas', count: jobListStats.paused, dot: 'bg-slate-400' },
-                      ].map(st => (
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-slate-800 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-400 text-[11px] uppercase tracking-wider mr-1">Status:</span>
+                        {[
+                          { id: 'todos', label: 'Todas as Vagas', count: jobListStats.total },
+                          { id: 'Ativa', label: 'Ativas', count: jobListStats.active, dot: 'bg-emerald-500' },
+                          { id: 'Encerrada', label: 'Pausadas / Encerradas', count: jobListStats.paused, dot: 'bg-slate-400' },
+                        ].map(st => (
+                          <button
+                            key={st.id}
+                            onClick={() => setJobListStatusFilter(st.id)}
+                            className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${jobListStatusFilter === st.id
+                                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-gray-900 dark:border-white shadow-xs'
+                                : 'bg-slate-50 dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800'
+                              }`}
+                          >
+                            {st.dot && <span className={`w-2 h-2 rounded-full ${st.dot}`} />}
+                            <span>{st.label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${jobListStatusFilter === st.id
+                                ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
+                                : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300'
+                              }`}>
+                              {st.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {(jobListSearch || jobListModalityFilter !== 'todos' || jobListTypeFilter !== 'todos' || jobListStatusFilter !== 'todos') && (
                         <button
-                          key={st.id}
-                          onClick={() => setJobListStatusFilter(st.id)}
-                          className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${jobListStatusFilter === st.id
-                              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-gray-900 dark:border-white shadow-xs'
-                              : 'bg-slate-50 dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800'
-                            }`}
+                          onClick={() => {
+                            setJobListSearch('');
+                            setJobListStatusFilter('todos');
+                            setJobListModalityFilter('todos');
+                            setJobListTypeFilter('todos');
+                            setJobListSort('recent');
+                          }}
+                          className="text-xs text-primary-blue hover:underline flex items-center gap-1 cursor-pointer font-semibold"
                         >
-                          {st.dot && <span className={`w-2 h-2 rounded-full ${st.dot}`} />}
-                          <span>{st.label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${jobListStatusFilter === st.id
-                              ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
-                              : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300'
-                            }`}>
-                            {st.count}
-                          </span>
+                          <RotateCcw size={12} /> Limpar Filtros
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
 
-                  <div className="grid gap-4">
-                    {filteredCompanyJobs.length === 0 ? (
-                      <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-12 text-center space-y-3">
-                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
-                          <Filter size={20} />
-                        </div>
-                        <h4 className="font-bold text-base text-gray-900 dark:text-white">Nenhuma vaga encontrada</h4>
-                        <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
-                          Nenhuma vaga da sua empresa corresponde aos filtros selecionados. Tente ajustar os termos de pesquisa ou filtros.
-                        </p>
+                  {/* ── Content View (Grid vs Table) ── */}
+                  {filteredCompanyJobs.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-12 text-center space-y-3 shadow-xs">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center shadow-inner">
+                        <Filter size={24} />
+                      </div>
+                      <h4 className="font-bold text-base text-gray-900 dark:text-white">Nenhuma vaga encontrada</h4>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+                        Nenhum processo seletivo da sua empresa corresponde aos filtros ativos. Tente ajustar os termos de pesquisa ou publicar uma nova oportunidade.
+                      </p>
+                      <div className="flex items-center justify-center gap-3 pt-2">
                         <button
                           onClick={() => {
                             setJobListSearch('');
@@ -2268,14 +2317,26 @@ export default function GerenciamentoVagasEmpresa() {
                         >
                           <RotateCcw size={13} /> Limpar Filtros
                         </button>
+                        <button
+                          onClick={() => setShowNewJobModal(true)}
+                          className="btn btn-primary btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5 shadow-brand-sm"
+                        >
+                          <Plus size={13} /> Publicar Nova Vaga
+                        </button>
                       </div>
-                    ) : (
-                      filteredCompanyJobs.map(job => {
+                    </div>
+                  ) : jobListViewMode === 'grid' ? (
+                    /* ── GRID / CARD VIEW ── */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
+                      {filteredCompanyJobs.map(job => {
                         const candidates = getJobCandidates(job.id) || [];
                         const isActive = job.status === 'Ativa';
-                        const skillsArray = Array.isArray(job.requiredSkills) ? job.requiredSkills : (typeof job.requiredSkills === 'string' ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+                        const skillsArray = Array.isArray(job.requiredSkills)
+                          ? job.requiredSkills
+                          : (typeof job.requiredSkills === 'string' ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
                         const visibleSkills = skillsArray.slice(0, 3);
                         const extraSkillsCount = Math.max(0, skillsArray.length - 3);
+
                         const triagemCount = candidates.filter(c => c.stage === 'triagem').length;
                         const desafioCount = candidates.filter(c => c.stage === 'desafio' || c.stage === 'analise').length;
                         const entrevistaCount = candidates.filter(c => c.stage === 'entrevista').length;
@@ -2285,11 +2346,11 @@ export default function GerenciamentoVagasEmpresa() {
                         return (
                           <div
                             key={job.id}
-                            className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:border-primary-blue/50 dark:hover:border-blue-500/50 rounded-2xl p-4 sm:p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3 group"
+                            className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:border-primary-blue/50 dark:hover:border-blue-500/50 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
                           >
                             {/* Top Bar: Status + City + Modality */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 border shrink-0 ${isActive
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1.5 border shrink-0 ${isActive
                                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                   : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700'
                                 }`}>
@@ -2297,102 +2358,118 @@ export default function GerenciamentoVagasEmpresa() {
                                 {job.status}
                               </span>
 
-                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-slate-400 font-medium truncate">
-                                <span className="flex items-center gap-0.5 text-primary-blue dark:text-blue-400 font-semibold truncate">
-                                  <MapPin size={11} className="shrink-0" /> {job.city}
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 font-medium truncate">
+                                <span className="flex items-center gap-1 text-primary-blue dark:text-blue-400 font-semibold truncate">
+                                  <MapPin size={12} className="shrink-0" /> {job.city || 'Ivaiporã'}
                                 </span>
                                 <span>·</span>
-                                <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md font-semibold text-slate-700 dark:text-slate-300 shrink-0 text-[11px]">
                                   {job.modality || 'Presencial'}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Title, Salary & Contract Type */}
-                            <div className="space-y-1">
+                            {/* Title, Contract & Salary */}
+                            <div className="space-y-1.5">
                               <div className="flex items-start justify-between gap-2">
                                 <h3
                                   onClick={() => {
                                     setSelectedJobId(job.id);
-                                    setActiveTab('pipeline');
+                                    handleTabChange('pipeline');
                                   }}
-                                  className="text-sm sm:text-base font-bold text-gray-900 dark:text-white hover:text-primary-blue dark:hover:text-blue-400 cursor-pointer transition-colors leading-snug truncate"
+                                  className="text-base font-bold text-gray-900 dark:text-white hover:text-primary-blue dark:hover:text-blue-400 cursor-pointer transition-colors leading-snug line-clamp-1"
                                   title={job.title}
                                 >
                                   {job.title}
                                 </h3>
-                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md shrink-0">
-                                  {job.type}
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md shrink-0">
+                                  {job.type || 'Tempo Integral'}
                                 </span>
                               </div>
 
                               {job.salary && (
-                                <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                  <DollarSign size={12} /> {job.salary}
+                                <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                  <DollarSign size={13} /> {job.salary}
                                 </div>
                               )}
 
-                              <p className="text-[11px] text-gray-500 dark:text-slate-400 line-clamp-1 leading-relaxed">
-                                {job.description}
-                              </p>
-                            </div>
-
-                            {/* Required Skills Badges (Compact) */}
-                            <div className="flex flex-wrap gap-1">
-                              {visibleSkills.map(skill => (
-                                <span
-                                  key={skill}
-                                  className="text-[10px] bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-semibold"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
-                              {extraSkillsCount > 0 && (
-                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-md font-medium">
-                                  +{extraSkillsCount}
-                                </span>
+                              {job.description && (
+                                <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                  {job.description}
+                                </p>
                               )}
                             </div>
 
-                            {/* Pipeline Breakdown Box (Compact) */}
-                            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 rounded-xl p-2.5 space-y-1.5">
+                            {/* Required Skills Badges */}
+                            {skillsArray.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {visibleSkills.map(skill => (
+                                  <span
+                                    key={skill}
+                                    className="text-[10px] bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-semibold"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                                {extraSkillsCount > 0 && (
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-md font-medium">
+                                    +{extraSkillsCount}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Mini Pipeline Funnel Tracker */}
+                            <div
+                              onClick={() => {
+                                setSelectedJobId(job.id);
+                                handleTabChange('pipeline');
+                              }}
+                              className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 rounded-xl p-3 space-y-2 cursor-pointer hover:border-primary-blue/40 transition-colors"
+                              title="Clique para abrir o quadro Kanban desta vaga"
+                            >
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  {/* Candidate Avatars Stack */}
+                                <div className="flex items-center gap-2">
                                   <div className="flex -space-x-1.5 overflow-hidden">
                                     {candidates.slice(0, 3).map((c, i) => (
                                       <img
                                         key={c.id || i}
                                         src={c.avatar}
                                         alt={c.name}
-                                        className="inline-block h-5 w-5 rounded-full ring-1.5 ring-white dark:ring-slate-900 object-cover bg-white dark:bg-slate-800"
+                                        className="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover bg-white dark:bg-slate-800"
                                       />
                                     ))}
                                     {candidates.length === 0 && (
-                                      <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] text-gray-400">
+                                      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] text-gray-400 font-bold">
                                         0
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-[11px] font-bold text-gray-900 dark:text-white">
+                                  <span className="text-xs font-bold text-gray-900 dark:text-white">
                                     {candidates.length} {candidates.length === 1 ? 'candidato' : 'candidatos'}
                                   </span>
                                 </div>
 
-                                <span className="text-[10px] font-bold text-primary-blue dark:text-blue-400">
-                                  Funil do Processo
-                                </span>
+                                {triagemCount > 0 ? (
+                                  <span className="text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 border border-amber-300 dark:border-amber-800">
+                                    <Sparkles size={11} /> {triagemCount} novos para avaliar
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-primary-blue dark:text-blue-400 flex items-center gap-0.5">
+                                    Ver Funil <ChevronRight size={12} />
+                                  </span>
+                                )}
                               </div>
 
-                              {/* Visual Stage Distribution Bar */}
+                              {/* Multi-segment Funnel Bar */}
                               {candidates.length > 0 ? (
-                                <div className="space-y-1">
-                                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                                <div className="space-y-1.5">
+                                  <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
                                     {triagemCount > 0 && (
                                       <div style={{ width: `${(triagemCount / candidates.length) * 100}%` }} className="bg-blue-500 h-full" title={`Triagem: ${triagemCount}`} />
                                     )}
                                     {desafioCount > 0 && (
-                                      <div style={{ width: `${(desafioCount / candidates.length) * 100}%` }} className="bg-amber-500 h-full" title={`Desafio: ${desafioCount}`} />
+                                      <div style={{ width: `${(desafioCount / candidates.length) * 100}%` }} className="bg-amber-500 h-full" title={`Desafio / Análise: ${desafioCount}`} />
                                     )}
                                     {entrevistaCount > 0 && (
                                       <div style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }} className="bg-purple-500 h-full" title={`Entrevista: ${entrevistaCount}`} />
@@ -2405,7 +2482,7 @@ export default function GerenciamentoVagasEmpresa() {
                                     )}
                                   </div>
 
-                                  <div className="flex items-center justify-between text-[9px] font-medium text-gray-500 dark:text-slate-400 flex-wrap gap-1">
+                                  <div className="flex items-center justify-between text-[10px] font-medium text-gray-500 dark:text-slate-400 flex-wrap gap-1">
                                     <span>Triagem ({triagemCount})</span>
                                     <span>Desafio ({desafioCount})</span>
                                     <span>Entrevista ({entrevistaCount})</span>
@@ -2413,50 +2490,49 @@ export default function GerenciamentoVagasEmpresa() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="text-[10px] text-gray-400 italic">
-                                  Sem candidaturas registradas
+                                <div className="text-[11px] text-gray-400 italic">
+                                  Nenhum candidato inscrito até o momento
                                 </div>
                               )}
                             </div>
 
-                            {/* Action Footer (Compact) */}
-                            <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-gray-100 dark:border-slate-800">
-
-                              {/* Primary CTA: Funil Kanban */}
+                            {/* Actions Footer */}
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
+                              {/* Primary CTA */}
                               <button
                                 onClick={() => {
                                   setSelectedJobId(job.id);
                                   handleTabChange('pipeline');
                                 }}
-                                className="btn btn-primary btn-sm text-[11px] font-bold px-2.5 py-1.5 flex items-center gap-1.5 rounded-xl cursor-pointer shadow-xs hover:shadow-md transition-all"
+                                className="btn btn-primary btn-sm text-xs font-bold px-3 py-2 flex items-center gap-1.5 rounded-xl cursor-pointer shadow-brand-sm hover:shadow-brand-md transition-all"
                               >
-                                <Layers size={13} /> Funil ({candidates.length})
+                                <Layers size={14} /> Abrir Funil ({candidates.length})
                               </button>
 
-                              {/* Tool Buttons */}
+                              {/* Tool Actions */}
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => setEditingJob(job)}
-                                  className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                  className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
                                   title="Editar Dados da Vaga"
                                 >
-                                  <Edit3 size={13} />
+                                  <Edit3 size={14} />
                                 </button>
 
                                 <button
                                   onClick={() => handleDuplicateJob(job.id)}
-                                  className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                  className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
                                   title="Duplicar Processo Seletivo"
                                 >
-                                  <Copy size={13} />
+                                  <Copy size={14} />
                                 </button>
 
                                 <button
                                   onClick={() => handleShareJob(job)}
-                                  className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                  className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
                                   title="Copiar Link de Divulgação"
                                 >
-                                  <Share2 size={13} />
+                                  <Share2 size={14} />
                                 </button>
 
                                 <button
@@ -2481,8 +2557,175 @@ export default function GerenciamentoVagasEmpresa() {
                             </div>
                           </div>
                         );
-                      }))}
-                  </div>
+                      })}
+                    </div>
+                  ) : (
+                    /* ── DENSE TABLE VIEW ── */
+                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-gray-200 dark:border-slate-800 text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                              <th className="py-3.5 px-4">Cargo &amp; Local</th>
+                              <th className="py-3.5 px-4">Status</th>
+                              <th className="py-3.5 px-4">Contrato &amp; Salário</th>
+                              <th className="py-3.5 px-4">Inscritos</th>
+                              <th className="py-3.5 px-4">Distribuição no Funil</th>
+                              <th className="py-3.5 px-4 text-right">Ações Rápidas</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60 text-xs">
+                            {filteredCompanyJobs.map(job => {
+                              const candidates = getJobCandidates(job.id) || [];
+                              const isActive = job.status === 'Ativa';
+                              const triagemCount = candidates.filter(c => c.stage === 'triagem').length;
+                              const entrevistaCount = candidates.filter(c => c.stage === 'entrevista').length;
+                              const aprovadosCount = candidates.filter(c => c.stage === 'aprovado').length;
+
+                              return (
+                                <tr key={job.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                                  {/* Cargo & Local */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="space-y-0.5">
+                                      <div
+                                        onClick={() => {
+                                          setSelectedJobId(job.id);
+                                          handleTabChange('pipeline');
+                                        }}
+                                        className="font-bold text-gray-900 dark:text-white hover:text-primary-blue dark:hover:text-blue-400 cursor-pointer transition-colors text-sm"
+                                      >
+                                        {job.title}
+                                      </div>
+                                      <div className="text-[11px] text-gray-500 dark:text-slate-400 flex items-center gap-1.5">
+                                        <span className="flex items-center gap-0.5 text-primary-blue dark:text-blue-400">
+                                          <MapPin size={11} /> {job.city || 'Ivaiporã'}
+                                        </span>
+                                        <span>·</span>
+                                        <span>{job.modality || 'Presencial'}</span>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="py-3.5 px-4 whitespace-nowrap">
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1.5 border ${isActive
+                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                                      }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                                      {job.status}
+                                    </span>
+                                  </td>
+
+                                  {/* Contrato & Salário */}
+                                  <td className="py-3.5 px-4 whitespace-nowrap">
+                                    <div className="font-semibold text-gray-800 dark:text-slate-200">{job.type || 'CLT'}</div>
+                                    <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                      {job.salary || 'A combinar'}
+                                    </div>
+                                  </td>
+
+                                  {/* Inscritos */}
+                                  <td className="py-3.5 px-4 whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-gray-900 dark:text-white text-sm">
+                                        {candidates.length}
+                                      </span>
+                                      {triagemCount > 0 && (
+                                        <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded-md">
+                                          +{triagemCount} novos
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Distribuição no Funil */}
+                                  <td className="py-3.5 px-4 max-w-[200px]">
+                                    {candidates.length > 0 ? (
+                                      <div className="space-y-1">
+                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                                          <div style={{ width: `${(triagemCount / candidates.length) * 100}%` }} className="bg-blue-500 h-full" />
+                                          <div style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }} className="bg-purple-500 h-full" />
+                                          <div style={{ width: `${(aprovadosCount / candidates.length) * 100}%` }} className="bg-emerald-500 h-full" />
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 flex items-center justify-between">
+                                          <span>Tri: {triagemCount}</span>
+                                          <span>Ent: {entrevistaCount}</span>
+                                          <span className="text-emerald-500 font-bold">Apr: {aprovadosCount}</span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[11px] text-gray-400 italic">Sem inscritos</span>
+                                    )}
+                                  </td>
+
+                                  {/* Ações Rápidas */}
+                                  <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setSelectedJobId(job.id);
+                                          handleTabChange('pipeline');
+                                        }}
+                                        className="btn btn-primary btn-sm text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shadow-2xs"
+                                        title="Abrir Funil Kanban"
+                                      >
+                                        <Layers size={13} /> Funil
+                                      </button>
+
+                                      <button
+                                        onClick={() => setEditingJob(job)}
+                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                        title="Editar Vaga"
+                                      >
+                                        <Edit3 size={13} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleDuplicateJob(job.id)}
+                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                        title="Duplicar Vaga"
+                                      >
+                                        <Copy size={13} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleShareJob(job)}
+                                        className="p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                        title="Copiar Link"
+                                      >
+                                        <Share2 size={13} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleToggleJobStatus(job.id, job.status)}
+                                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${isActive
+                                            ? 'border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400'
+                                            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400'
+                                          }`}
+                                        title={isActive ? 'Encerrar Vaga' : 'Reabrir Vaga'}
+                                      >
+                                        {isActive ? <Clock size={13} /> : <RotateCcw size={13} />}
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleDeleteJob(job.id)}
+                                        className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/40 cursor-pointer"
+                                        title="Excluir Vaga"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
 
