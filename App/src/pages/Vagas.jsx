@@ -76,7 +76,8 @@ export default function Vagas() {
 
   useEffect(() => {
     if (params.get('action') === 'new') {
-      if (currentUser?.role === 'empresa') {
+      const uRole = String(currentUser?.role || '').toLowerCase().trim();
+      if (uRole === 'empresa' || uRole === 'company' || uRole === 'recrutador') {
         setShowModal(true);
       } else {
         showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
@@ -92,7 +93,8 @@ export default function Vagas() {
   }, [selectedCity]);
 
   const handleSaveJob = async (jobPayload) => {
-    if (!currentUser || currentUser.role !== 'empresa') {
+    const uRole = String(currentUser?.role || '').toLowerCase().trim();
+    if (!currentUser || (uRole !== 'empresa' && uRole !== 'company' && uRole !== 'recrutador')) {
       showToast('⚠️ Apenas empresas cadastradas podem cadastrar e publicar vagas.');
       return;
     }
@@ -120,7 +122,8 @@ export default function Vagas() {
     setSortBy('match');
   };
 
-  const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const canSeeMatch = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
   const userSkills = useMemo(() => safeSkillsArray(currentUser?.skills), [currentUser?.skills]);
 
   const filtered = useMemo(() => {

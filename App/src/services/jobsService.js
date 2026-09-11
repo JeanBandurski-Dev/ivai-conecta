@@ -450,12 +450,17 @@ export async function applyToJob(jobId, user) {
     return { success: false, message: 'Você precisa estar logado para se candidatar.' };
   }
 
-  if (user.role === 'empresa') {
-    return { success: false, message: 'Perfis de empresa não podem se candidatar a vagas de emprego.' };
-  }
+  const role = String(user.role || '').toLowerCase().trim();
+  const isCandidate = role === 'aluno' || role === 'candidato' || role === 'estudante' || role === 'student';
 
-  if (user.role === 'professor') {
-    return { success: false, message: 'Perfis de docente não realizam candidaturas a vagas.' };
+  if (!isCandidate) {
+    if (role === 'empresa' || role === 'company' || role === 'recrutador') {
+      return { success: false, message: 'Perfis de empresa não podem se candidatar a vagas de emprego.' };
+    }
+    if (role === 'professor' || role === 'docente' || role === 'teacher') {
+      return { success: false, message: 'Perfis de professor/docente não realizam candidaturas a vagas.' };
+    }
+    return { success: false, message: 'Apenas perfis de alunos e candidatos podem se candidatar a vagas.' };
   }
 
   const job = getJobById(jobId);
@@ -471,7 +476,7 @@ export async function applyToJob(jobId, user) {
     }
   }
 
-  if (user.role === 'aluno' && !user.isVerifiedStudent) {
+  if (role === 'aluno' && !user.isVerifiedStudent) {
     return {
       success: false,
       requiresVerification: true,

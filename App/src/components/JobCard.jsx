@@ -21,13 +21,18 @@ export default function JobCard({ job, matchScore, onSelect }) {
     : (typeof job.benefits === 'string' ? job.benefits.split(',').map(s => s.trim()).filter(Boolean) : []);
 
   const isFavorite = Array.isArray(favoriteJobs) ? favoriteJobs.includes(id) : false;
-  const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
+  const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
+  const canSeeMatch = isCandidate;
   
-  const isOwner = currentUser?.role === 'empresa' && (
+  const isOwner = isCompany && currentUser && (
     (job.createdBy && currentUser?.uid && String(job.createdBy) === String(currentUser.uid)) ||
     (job.createdBy && currentUser?.id && String(job.createdBy) === String(currentUser.id)) ||
     (job.createdBy && currentUser?.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (currentUser?.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+    (currentUser?.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+    (currentUser?.razaoSocial && job.company && job.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
+    (currentUser?.nomeFantasia && job.company && job.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
 
   // Compute match score safely

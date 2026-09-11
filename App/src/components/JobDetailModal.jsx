@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
   Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus, safeSkillsArray } from '../lib/ivaiConecta';
+import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus, safeSkillsArray, getUserApplications } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -31,8 +31,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     ? job.responsibilities.map(r => String(r || '').trim()).filter(Boolean)
     : (typeof job.responsibilities === 'string' ? job.responsibilities.split('\n').map(s => s.trim()).filter(Boolean) : []);
 
-  const isCompany = currentUser?.role === 'empresa';
-  const isProfessor = currentUser?.role === 'professor';
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
+  const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
+  const isProfessor = Boolean(userRole === 'professor' || userRole === 'docente' || userRole === 'teacher');
+
   const isJobOwner = isCompany && currentUser && (
     (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
     (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
@@ -43,7 +46,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     (currentUser.nomeFantasia && company && company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
 
-  const canSeeMatch = currentUser && (currentUser.role === 'aluno' || currentUser.role === 'candidato');
+  const canSeeMatch = isCandidate;
   const userSkills = safeSkillsArray(currentUser?.skills);
   const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, {
     userCity: currentUser?.city,
@@ -51,6 +54,16 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     isVerifiedStudent: currentUser?.isVerifiedStudent,
     endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
   }) : null);
+
+  useEffect(() => {
+    if (!currentUser || !isCandidate || !jobId) return;
+    const userUid = currentUser.uid || currentUser.id || currentUser.email;
+    const apps = getUserApplications(userUid);
+    const hasApplied = apps.some(a => String(a.jobId) === String(jobId));
+    if (hasApplied) {
+      setApplied(true);
+    }
+  }, [jobId, currentUser, isCandidate]);
 
   const handleToggleJobStatus = async () => {
     const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
@@ -63,6 +76,16 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const handleApply = async () => {
     if (!currentUser) {
       showToast('Faça login como Aluno ou Candidato para se candidatar!');
+      return;
+    }
+    if (!isCandidate) {
+      if (isCompany) {
+        showToast('Perfis de empresa não realizam candidaturas a vagas.');
+      } else if (isProfessor) {
+        showToast('Perfis de professor/docente não realizam candidaturas a vagas.');
+      } else {
+        showToast('Apenas estudantes e candidatos podem se candidatar a vagas.');
+      }
       return;
     }
     if (isSubmitting) return;
@@ -307,7 +330,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {!isJobOwner && currentUser?.role !== 'empresa' && (
+            {isCandidate && !isJobOwner && (
               <button
                 type="button"
                 onClick={handleOpenChat}
@@ -343,11 +366,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 </Link>
               </div>
             ) : isCompany ? (
-              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
+              <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-3.5 py-2 rounded-xl font-medium border border-amber-200 dark:border-amber-800/70 flex items-center gap-1.5">
                 🏢 Empresas não se candidatam a vagas
               </span>
             ) : isProfessor ? (
-              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
+              <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-3.5 py-2 rounded-xl font-medium border border-blue-200 dark:border-blue-800/70 flex items-center gap-1.5">
                 👨‍🏫 Apenas estudantes e candidatos se candidatam
               </span>
             ) : !currentUser ? (
@@ -358,18 +381,24 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               >
                 <Send size={14} /> Entrar para Candidatar-se
               </Link>
-            ) : applied ? (
-              <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5">
-                <CheckCircle2 size={15} /> Candidatura Enviada!
-              </button>
+            ) : isCandidate ? (
+              applied ? (
+                <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5 shadow-sm">
+                  <CheckCircle2 size={15} /> Candidatura Enviada!
+                </button>
+              ) : (
+                <button 
+                  onClick={handleApply} 
+                  disabled={isSubmitting}
+                  className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <Send size={14} /> {isSubmitting ? 'Enviando...' : 'Candidatar-se à Vaga'}
+                </button>
+              )
             ) : (
-              <button 
-                onClick={handleApply} 
-                disabled={isSubmitting}
-                className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Send size={14} /> {isSubmitting ? 'Enviando...' : 'Candidatar-se à Vaga'}
-              </button>
+              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
+                Apenas alunos e candidatos podem se candidatar
+              </span>
             )}
           </div>
         </div>
