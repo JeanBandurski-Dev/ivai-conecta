@@ -464,5 +464,25 @@
   .dark .stages-scrollbar::-webkit-scrollbar-thumb:active {
     background: #3b82f6;
   }
+
+  /* ── Animação de Abertura / Desdobramento do CNPJ ── */
+  @keyframes cnpjUnfold {
+    0% {
+      max-height: 0px;
+      opacity: 0;
+      transform: scaleY(0.4) translateY(-12px);
+    }
+    100% {
+      max-height: 160px;
+      opacity: 1;
+      transform: scaleY(1) translateY(0);
+    }
+  }
+
+  .animate-cnpj-unfold {
+    animation: cnpjUnfold 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top;
+  }
 }
+
 

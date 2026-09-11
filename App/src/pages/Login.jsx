@@ -483,14 +483,14 @@ export default function Login() {
                   {selectedRole === 'empresa' ? (
                     <div
                       key="cnpj-empresa-box"
-                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs origin-top animate-in fade-in-0 slide-in-from-top-3 zoom-in-95 duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs animate-cnpj-unfold"
                     >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-bounce" style={{ animationIterationCount: 2, animationDuration: '0.8s' }} />
+                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
                           CNPJ da Empresa (14 dígitos)
                         </label>
-                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs animate-in zoom-in-75 duration-300 delay-100">
+                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">
                           Receita Federal
                         </span>
                       </div>
