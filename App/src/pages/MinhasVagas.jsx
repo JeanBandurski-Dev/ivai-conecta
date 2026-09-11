@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare, Layers, Share2, Sparkles, ExternalLink
+  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare, Layers, Share2, Sparkles, ExternalLink, Bookmark
 } from 'lucide-react';
 import {
   getUserApplications, getJobs,
@@ -14,12 +14,16 @@ import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } fr
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
 import JobActionModal from '../components/JobActionModal';
+import JobCard from '../components/JobCard';
+import JobDetailModal from '../components/JobDetailModal';
 
 export default function MinhasVagas() {
-  const { currentUser, showToast, startChatWith } = useAppStore();
+  const { currentUser, favoriteJobs = [], showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
   const [, forceUpdate] = useState(0);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [candidateTab, setCandidateTab] = useState('applications'); // 'applications' | 'favorites'
+  const [selectedJob, setSelectedJob] = useState(null);
 
   const isCompany   = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
@@ -43,6 +47,15 @@ export default function MinhasVagas() {
 
   const apps = Array.isArray(liveApps) ? liveApps : [];
   const safeLiveJobs = Array.isArray(liveJobs) ? liveJobs : [];
+  
+  const savedJobsList = useMemo(() => {
+    if (!Array.isArray(favoriteJobs) || favoriteJobs.length === 0) return [];
+    return safeLiveJobs.filter(j => {
+      const jId = String(j.id || j.firestoreId || '');
+      return favoriteJobs.some(favId => String(favId) === jId || (j.firestoreId && String(favId) === String(j.firestoreId)));
+    });
+  }, [safeLiveJobs, favoriteJobs]);
+
   const companyJobs = safeLiveJobs.filter(j => 
     j && (
       (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
@@ -187,17 +200,21 @@ export default function MinhasVagas() {
             <div className="max-w-2xl">
               <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-heading font-extrabold text-white mb-3 tracking-tight">
                 {isProfessor
-                  ? 'Painel do Docente &amp; Recomendações'
+                  ? 'Painel do Docente & Recomendações'
                   : isCompany
-                  ? 'Minhas Vagas Criadas &amp; Candidatos'
-                  : 'Minhas Candidaturas'}
+                  ? 'Minhas Vagas Criadas & Candidatos'
+                  : candidateTab === 'favorites'
+                  ? 'Minhas Vagas Salvas & Favoritas'
+                  : 'Minhas Candidaturas & Processos'}
               </h1>
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
                 {isProfessor
                   ? 'Gerencie pedidos de parecer pedagógico dos seus alunos do IFPR, Univale e UENP e atribua selos verificados.'
                   : isCompany
                   ? 'Gerencie os processos seletivos da sua empresa, acompanhe os estudantes inscritos e altere os status das vagas.'
-                  : 'Acompanhe o status e a evolução de todas as suas candidaturas no Vale do Ivaí.'}
+                  : candidateTab === 'favorites'
+                  ? 'Suas oportunidades favoritadas para acompanhar prazos, comparar requisitos e candidatar-se no momento certo.'
+                  : 'Acompanhe o status e a evolução em tempo real de todas as suas candidaturas no Vale do Ivaí.'}
               </p>
             </div>
 
@@ -444,108 +461,206 @@ export default function MinhasVagas() {
             )}
           </div>
         ) : (
-          /* ── VISÃO DO ALUNO / CANDIDATO: MINHAS CANDIDATURAS ── */
-          <>
-            {apps.length === 0 ? (
-              <div className="text-center py-20 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8">
-                <Briefcase size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
-                <p className="font-bold text-lg text-gray-600 dark:text-slate-200">Você ainda não se candidatou a nenhuma vaga.</p>
-                <Link to="/vagas" className="btn btn-primary btn-sm mt-5">Explorar Vagas Disponíveis</Link>
-              </div>
-            ) : (
-              <div className="space-y-6 max-w-4xl mx-auto">
-                {apps.map(app => {
-                  return (
-                    <div key={app.id} className="card gap-4 p-5 sm:p-6">
-                      {/* Top */}
-                      <div className="flex items-start justify-between flex-wrap gap-3">
-                        <div>
-                          <h3 className="font-heading text-lg sm:text-xl font-bold text-primary-dark dark:text-white">{app.title}</h3>
-                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 mt-1">
-                            <Building2 size={15} />{app.company}
-                            <span>·</span>
-                            <MapPin size={15} />{app.city}
-                            <span>·</span>
-                            <span className="font-medium text-gray-600 dark:text-slate-300">{app.type}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            (Number(app.matchScore) || 0) >= 85
-                              ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                              : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
-                          }`}>
-                            {app.matchScore || 0}% Match
-                          </span>
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                            String(app.status || '').includes('Entrevista')
-                              ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                              : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
-                          }`}>
-                            {app.status || 'Candidatura Enviada'}
-                          </span>
-                        </div>
-                      </div>
+          /* ── VISÃO DO ALUNO / CANDIDATO: MINHAS CANDIDATURAS & FAVORITAS ── */
+          <div className="space-y-6 max-w-5xl mx-auto">
+            
+            {/* Seletor de Abas do Candidato */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setCandidateTab('applications')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  candidateTab === 'applications'
+                    ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
+                    : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Send size={15} className={candidateTab === 'applications' ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
+                <span>Vagas Candidatadas</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                  candidateTab === 'applications'
+                    ? 'bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
+                }`}>
+                  {apps.length}
+                </span>
+              </button>
 
-                      {/* Progress stages (Linha do Tempo Gupy) */}
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-                        {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
-                          <div key={i} className="flex items-center gap-2 shrink-0">
-                            <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                              stage?.completed
-                                ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
-                                : stage?.active
-                                ? 'bg-primary-blue text-white shadow-xs font-bold'
-                                : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
-                            }`}>
-                              {stage?.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
-                              {stage?.name || 'Etapa'}
-                            </div>
-                            {i < arr.length - 1 && (
-                              <ArrowRight size={13} className="text-gray-300 dark:text-slate-700 shrink-0" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
+              <button
+                type="button"
+                onClick={() => setCandidateTab('favorites')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  candidateTab === 'favorites'
+                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
+                    : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Bookmark size={15} className={candidateTab === 'favorites' ? 'fill-amber-500 text-amber-500' : 'text-gray-400'} />
+                <span>Vagas Favoritas</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                  candidateTab === 'favorites'
+                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
+                }`}>
+                  {savedJobsList.length}
+                </span>
+              </button>
+            </div>
 
-                      {/* Next step note */}
-                      {app.nextStepNote && (
-                        <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-xl px-4 py-3 text-sm text-primary-blue dark:text-blue-300 font-medium flex items-center gap-2">
-                          <FileText size={15} className="shrink-0 text-primary-blue" />
-                          <span><strong>Recrutador:</strong> {app.nextStepNote}</span>
-                        </div>
-                      )}
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
-                        <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
-
-                              startChatWith({
-                                name: app.company,
-                                email: targetEmail,
-                                role: 'empresa',
-                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-                              }, `Candidatura: ${app.title}`);
-                            }}
-                            className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          >
-                            <MessageSquare size={13} /> Conversar no Chat
-                          </button>
-                        </div>
-                      </div>
+            {/* CONTEÚDO DA ABA 1: VAGAS CANDIDATADAS */}
+            {candidateTab === 'applications' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                {apps.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center mx-auto">
+                      <Briefcase size={32} />
                     </div>
-                  );
-                })}
+                    <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Você ainda não se candidatou a nenhuma vaga.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-400 mb-5 max-w-md mx-auto">
+                      Explore o mural de oportunidades abertas e envie seu currículo para as melhores empresas da nossa região.
+                    </p>
+                    <Link to="/vagas" className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2">
+                      <ExternalLink size={15} /> Explorar Vagas Disponíveis
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {apps.map(app => (
+                      <div key={app.id} className="card gap-4 p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs">
+                        {/* Top */}
+                        <div className="flex items-start justify-between flex-wrap gap-3">
+                          <div>
+                            <h3 className="font-heading text-lg sm:text-xl font-bold text-primary-dark dark:text-white">{app.title}</h3>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
+                              <span className="flex items-center gap-1 font-semibold text-gray-700 dark:text-slate-300">
+                                <Building2 size={15} className="text-primary-blue" /> {app.company}
+                              </span>
+                              <span>·</span>
+                              <span className="flex items-center gap-1">
+                                <MapPin size={15} className="text-gray-400" /> {app.city}
+                              </span>
+                              <span>·</span>
+                              <span className="font-medium text-gray-600 dark:text-slate-300">{app.type}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              (Number(app.matchScore) || 0) >= 85
+                                ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                                : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                            }`}>
+                              {app.matchScore || 0}% Match
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              String(app.status || '').includes('Entrevista')
+                                ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                                : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
+                            }`}>
+                              {app.status || 'Candidatura Enviada'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Progress stages (Linha do Tempo Gupy) */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+                          {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
+                            <div key={i} className="flex items-center gap-2 shrink-0">
+                              <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
+                                stage?.completed
+                                  ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
+                                  : stage?.active
+                                  ? 'bg-primary-blue text-white shadow-xs font-bold'
+                                  : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
+                              }`}>
+                                {stage?.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
+                                {stage?.name || 'Etapa'}
+                              </div>
+                              {i < arr.length - 1 && (
+                                <ArrowRight size={13} className="text-gray-300 dark:text-slate-700 shrink-0" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Next step note */}
+                        {app.nextStepNote && (
+                          <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-xl px-4 py-3 text-sm text-primary-blue dark:text-blue-300 font-medium flex items-center gap-2">
+                            <FileText size={15} className="shrink-0 text-primary-blue" />
+                            <span><strong>Recrutador:</strong> {app.nextStepNote}</span>
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
+                          <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+
+                                startChatWith({
+                                  name: app.company,
+                                  email: targetEmail,
+                                  role: 'empresa',
+                                  avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                                }, `Candidatura: ${app.title}`);
+                              }}
+                              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <MessageSquare size={13} /> Conversar no Chat
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </>
+
+            {/* CONTEÚDO DA ABA 2: VAGAS FAVORITAS / SALVAS */}
+            {candidateTab === 'favorites' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                {savedJobsList.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto">
+                      <Bookmark size={32} className="fill-amber-500" />
+                    </div>
+                    <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga favoritada ainda.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-400 mb-5 max-w-md mx-auto">
+                      Ao navegar pelo mural de vagas, clique no botão de marcador para salvar vagas do seu interesse e acessá-las rapidamente aqui.
+                    </p>
+                    <Link to="/vagas" className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2">
+                      <ExternalLink size={15} /> Explorar Vagas no Vale do Ivaí
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {savedJobsList.map(job => (
+                      <JobCard
+                        key={job.id || job.firestoreId}
+                        job={job}
+                        onSelect={setSelectedJob}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
         )}
 
       </main>
+
+      {/* Modal: Detalhes da Vaga para Candidatura Direta */}
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          matchScore={selectedJob.calculatedScore}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
 
       {/* Modal: Candidatos Inscritos na Vaga (Visão da Empresa) */}
       {selectedJobApplicants && (
