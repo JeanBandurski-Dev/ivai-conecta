@@ -62,12 +62,15 @@ export default function Navbar() {
       : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
     }`;
 
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+
   const getProfileLink = () => {
     if (!currentUser) return '/login';
     const userIdentifier = currentUser.uid || currentUser.id;
-    if (currentUser.role === 'empresa') return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
-    if (currentUser.role === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
-    if (currentUser.role === 'freelancer') return '/servicos?view=dashboard';
+    if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
+    if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
+    if (userRole === 'freelancer') return '/servicos?view=dashboard';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
@@ -91,7 +94,9 @@ export default function Navbar() {
               <li><NavLink to="/" end className={navLinkClass}>Início</NavLink></li>
               <li><NavLink to="/vagas" className={navLinkClass}>Vagas &amp; Match</NavLink></li>
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>
-              <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
+              {isCompany && (
+                <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
+              )}
             </ul>
 
             {/* Right actions: Theme Switcher & User / Auth */}
@@ -259,7 +264,9 @@ export default function Navbar() {
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Início</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>
-              <NavLink to="/talentos" className={mobileNavLinkClass} onClick={closeMobile}>Banco de Talentos</NavLink>
+              {isCompany && (
+                <NavLink to="/talentos" className={mobileNavLinkClass} onClick={closeMobile}>Banco de Talentos</NavLink>
+              )}
 
               {currentUser && (
                 <>

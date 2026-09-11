@@ -101,31 +101,72 @@ export default function BancoDeTalentos() {
       });
   }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy]);
 
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+
+  if (!isCompany) {
+    return (
+      <main className="container section text-center py-24 max-w-xl mx-auto animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center mx-auto mb-5 shadow-inner">
+          <ShieldCheck size={32} />
+        </div>
+        <h2 className="font-heading text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+          Acesso Exclusivo para Empresas
+        </h2>
+        <p className="text-gray-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed mb-8">
+          {currentUser
+            ? 'O Banco de Talentos é uma ferramenta reservada para empresas e recrutadores contratantes avaliarem perfis profissionais e acadêmicos da região.'
+            : 'Faça login com uma conta corporativa de empresa ou recrutador para visualizar os perfis e habilidades do Banco de Talentos.'}
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {!currentUser ? (
+            <button
+              onClick={() => navigate('/login')}
+              className="btn btn-primary px-6 py-2.5 font-bold shadow-md cursor-pointer"
+            >
+              Entrar como Empresa
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/vagas')}
+              className="btn btn-primary px-6 py-2.5 font-bold shadow-md cursor-pointer"
+            >
+              Ver Vagas &amp; Oportunidades
+            </button>
+          )}
+          <button
+            onClick={() => navigate(-1)}
+            className="btn btn-outline px-6 py-2.5 font-bold cursor-pointer"
+          >
+            Voltar
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
-      {/* ── HEADER ── */}
-      <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 lg:py-16 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(34,197,94,0.15),transparent_50%)] pointer-events-none" />
-
+      {/* Hero Header */}
+      <header className="bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 relative overflow-hidden">
         <div className="container relative z-10">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-6 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
           >
             <ArrowLeft size={14} /> Voltar para a tela anterior
           </button>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="max-w-2xl">
-              <div className="hero-tag mb-3">
-                <span>Talentos &amp; Docentes Verificados no Vale do Ivaí</span>
+            <div>
+              <div className="flex items-center gap-2 text-accent-sky text-xs font-bold uppercase tracking-wider mb-2">
+                <Sparkles size={16} /> Banco de Talentos Regional
               </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-heading font-extrabold text-white mt-1 mb-3 tracking-tight">
-                Banco de Talentos &amp; Corpo Docente
+              <h1 className="text-3xl sm:text-4xl font-heading font-extrabold text-white mb-2">
+                Talentos &amp; Docentes do Vale do Ivaí
               </h1>
-              <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-                Conecte-se com estudantes das instituições parceiras (IFPR, Univale, UENP) com matrícula autenticada e recomendações docentes validadas.
+              <p className="text-gray-300 text-base max-w-2xl">
+                Encontre estudantes qualificados, profissionais técnicos e professores orientadores do IFPR, Univale e UENP.
               </p>
             </div>
 

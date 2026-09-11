@@ -1,7 +1,19 @@
 import { Link } from 'react-router-dom';
 import Logo from '../ui/Logo';
+import useAppStore from '../../store/useAppStore';
 
 export default function Footer() {
+  const { currentUser } = useAppStore();
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+
+  const platformLinks = [
+    { label: 'Dashboard', to: '/' },
+    { label: 'Vagas Regionais', to: '/vagas' },
+    { label: 'Serviços Locais', to: '/servicos' },
+    ...(isCompany ? [{ label: 'Banco de Talentos', to: '/talentos' }] : []),
+  ];
+
   return (
     <footer className="bg-primary-dark dark:bg-slate-950 dark:border-t dark:border-slate-800 text-white mt-auto transition-colors duration-300">
       <div className="container py-8 sm:py-10">
@@ -26,12 +38,7 @@ export default function Footer() {
           <div>
             <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Plataforma</h4>
             <ul className="space-y-2.5">
-              {[
-                { label: 'Dashboard', to: '/' },
-                { label: 'Vagas Regionais', to: '/vagas' },
-                { label: 'Serviços Locais', to: '/servicos' },
-                { label: 'Banco de Talentos', to: '/talentos' },
-              ].map(link => (
+              {platformLinks.map(link => (
                 <li key={link.to}>
                   <Link to={link.to} className="text-sm text-gray-400 hover:text-accent-sky transition-colors">
                     {link.label}

@@ -85,6 +85,9 @@ export default function Dashboard() {
     },
   ];
 
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+
   return (
     <>
       {/* ── HERO ── */}
@@ -183,32 +186,34 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* ── TALENTS CAROUSEL (Fundo Azul Suave Moderno) ── */}
-      <section className="section bg-gradient-to-b from-[#eaf2ff] via-[#f1f6ff] to-[#f8fbff] dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border-b border-blue-100/80 dark:border-slate-800 overflow-hidden transition-colors duration-300 relative">
-        {/* Orbes de Iluminação Ambiente */}
-        <div className="absolute -top-16 right-1/4 w-96 h-96 bg-blue-400/15 dark:bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-10 w-80 h-80 bg-sky-300/15 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* ── TALENTS CAROUSEL (Fundo Azul Suave Moderno - Visível para Empresas) ── */}
+      {isCompany && (
+        <section className="section bg-gradient-to-b from-[#eaf2ff] via-[#f1f6ff] to-[#f8fbff] dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border-b border-blue-100/80 dark:border-slate-800 overflow-hidden transition-colors duration-300 relative">
+          {/* Orbes de Iluminação Ambiente */}
+          <div className="absolute -top-16 right-1/4 w-96 h-96 bg-blue-400/15 dark:bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-10 w-80 h-80 bg-sky-300/15 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="container relative z-10">
-          <div className="section-header">
-            <div>
-              <div className="section-subtitle text-primary-blue dark:text-sky-400">Banco de Talentos</div>
-              <h2 className="section-title text-primary-dark dark:text-white">Talentos &amp; Profissionais Regionais</h2>
+          <div className="container relative z-10">
+            <div className="section-header">
+              <div>
+                <div className="section-subtitle text-primary-blue dark:text-sky-400">Banco de Talentos</div>
+                <h2 className="section-title text-primary-dark dark:text-white">Talentos &amp; Profissionais Regionais</h2>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                <Link to="/talentos" className="btn btn-outline bg-white/80 dark:bg-slate-800 border-blue-200 dark:border-slate-700 text-primary-blue dark:text-blue-300 hover:bg-primary-blue hover:text-white btn-sm shrink-0 shadow-2xs font-bold">
+                  Ver Banco Completo
+                </Link>
+              </div>
             </div>
-            <div className="flex gap-2.5 items-center">
-              <Link to="/talentos" className="btn btn-outline bg-white/80 dark:bg-slate-800 border-blue-200 dark:border-slate-700 text-primary-blue dark:text-blue-300 hover:bg-primary-blue hover:text-white btn-sm shrink-0 shadow-2xs font-bold">
-                Ver Banco Completo
-              </Link>
-            </div>
+
+            {talents.length === 0 ? (
+              <EmptyState message={`Nenhum talento ou profissional cadastrado em ${selectedCity} no momento.`} />
+            ) : (
+              <TalentsCarousel talents={talents} />
+            )}
           </div>
-
-          {talents.length === 0 ? (
-            <EmptyState message={`Nenhum talento ou profissional cadastrado em ${selectedCity} no momento.`} />
-          ) : (
-            <TalentsCarousel talents={talents} />
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── EMPRESAS PARCEIRAS & CADASTRADAS ── */}
       <section className="section bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 relative">
