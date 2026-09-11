@@ -462,7 +462,7 @@ export default function MinhasVagas() {
           </div>
         ) : (
           /* ── VISÃO DO ALUNO / CANDIDATO: MINHAS CANDIDATURAS & FAVORITAS ── */
-          <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="space-y-6 max-w-7xl mx-auto w-full">
             
             {/* Seletor de Abas do Candidato */}
             <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit shadow-2xs">
@@ -635,11 +635,12 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {savedJobsList.map(job => (
                       <JobCard
                         key={job.id || job.firestoreId}
                         job={job}
+                        matchScore={job.calculatedScore}
                         onSelect={setSelectedJob}
                       />
                     ))}
