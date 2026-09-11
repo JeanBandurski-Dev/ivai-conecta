@@ -174,15 +174,31 @@ export default function Login() {
 
   return (
     <main className="min-h-[calc(100vh-80px)] flex items-center justify-center p-3 sm:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-      <div className="w-full max-w-5xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200/90 dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden my-auto min-h-[560px] sm:min-h-[600px] lg:min-h-[640px] transition-all duration-300 ease-out">
+      <div className={`w-full max-w-5xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900 rounded-3xl border auth-card-transition overflow-hidden my-auto min-h-[560px] sm:min-h-[600px] lg:min-h-[640px] transition-all duration-500 ease-out ${
+        tab === 'login'
+          ? 'border-gray-200/90 dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,82,255,0.08)]'
+          : 'border-blue-200/90 dark:border-slate-700/80 shadow-[0_20px_60px_-15px_rgba(56,189,248,0.12)]'
+      }`}>
         
         {/* ═════════════════════════════════════════════════════════════
             COLUNA ESQUERDA (DESKTOP): BRAND SHOWCASE & ATMOSPHERE
         ═════════════════════════════════════════════════════════════ */}
-        <div className="hidden lg:flex lg:col-span-5 relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-8 lg:p-9 flex-col justify-between overflow-hidden lg:min-h-[640px]">
+        <div className={`hidden lg:flex lg:col-span-5 relative text-white p-8 lg:p-9 flex-col justify-between overflow-hidden lg:min-h-[640px] transition-all duration-700 ease-in-out ${
+          tab === 'login'
+            ? 'bg-[linear-gradient(135deg,#070e24_0%,#051944_50%,#0052FF_100%)]'
+            : 'bg-[linear-gradient(135deg,#051438_0%,#022b7a_50%,#0284c7_100%)]'
+        }`}>
           {/* Background Elements com Animação Suave */}
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-72 h-72 rounded-full bg-blue-400/20 blur-3xl animate-pulse pointer-events-none transition-all duration-1000" />
-          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-72 h-72 rounded-full bg-cyan-400/15 blur-3xl animate-[pulse_5s_ease-in-out_infinite] pointer-events-none" />
+          <div className={`absolute top-0 right-0 -mr-16 -mt-16 w-72 h-72 rounded-full blur-3xl auth-ambient-orb pointer-events-none ${
+            tab === 'login'
+              ? 'bg-blue-400/20 translate-x-0 translate-y-0 scale-100'
+              : 'bg-cyan-400/25 -translate-x-6 translate-y-6 scale-110'
+          }`} />
+          <div className={`absolute bottom-0 left-0 -ml-16 -mb-16 w-72 h-72 rounded-full blur-3xl auth-ambient-orb pointer-events-none ${
+            tab === 'login'
+              ? 'bg-cyan-400/15 translate-x-0 translate-y-0 scale-100'
+              : 'bg-blue-400/25 translate-x-6 -translate-y-6 scale-110'
+          }`} />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.15),transparent_60%)] pointer-events-none" />
 
           {/* Top Header */}
@@ -204,14 +220,16 @@ export default function Login() {
             <div className="space-y-2 pt-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/10 border border-white/20 text-cyan-300 backdrop-blur-md shadow-2xs hover:bg-white/15 transition-all duration-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                <span>Plataforma Oficial do Vale do Ivaí</span>
+                <span>{tab === 'login' ? 'Área de Acesso Seguro' : 'Plataforma Oficial do Vale do Ivaí'}</span>
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-snug">
-                Onde talentos encontram oportunidades reais.
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-snug transition-all duration-500">
+                {tab === 'login' ? 'Conecte-se e impulsione sua jornada hoje.' : 'Onde talentos encontram oportunidades reais.'}
               </h2>
-              <p className="text-xs text-slate-300 leading-relaxed font-normal">
-                Conectamos estudantes de instituições como IFPR, UENP e UNIVALE com as empresas mais inovadoras da nossa região.
+              <p className="text-xs text-slate-300 leading-relaxed font-normal transition-all duration-500">
+                {tab === 'login'
+                  ? 'Acesse vagas exclusivas, gerencie processos seletivos e interaja em tempo real.'
+                  : 'Conectamos estudantes de instituições como IFPR, UENP e UNIVALE com as empresas mais inovadoras da nossa região.'}
               </p>
             </div>
           </div>
@@ -257,15 +275,15 @@ export default function Login() {
           
           <div className="w-full max-w-lg mx-auto space-y-3.5">
             
-            {/* Header Mobile / Title */}
-            <div className="text-center lg:text-left space-y-0.5 transition-all duration-300">
+            {/* Header Mobile / Title com Animação Fluida */}
+            <div key={`header-${tab}`} className="text-center lg:text-left space-y-0.5 auth-form-crossfade">
               <span className="text-[10px] font-extrabold text-primary-blue dark:text-blue-400 uppercase tracking-wider">
                 {tab === 'login' ? 'Área de Acesso' : 'Novo Cadastro'}
               </span>
-              <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-gray-900 dark:text-white tracking-tight transition-all duration-300">
+              <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-gray-900 dark:text-white tracking-tight">
                 {tab === 'login' ? 'Bem-vindo(a) de volta!' : 'Crie sua conta gratuita'}
               </h1>
-              <p className="text-xs text-gray-500 dark:text-slate-400 transition-colors duration-200">
+              <p className="text-xs text-gray-500 dark:text-slate-400">
                 {tab === 'login'
                   ? 'Informe suas credenciais para acessar o painel.'
                   : 'Faça parte da maior rede de oportunidades do Vale do Ivaí.'}
@@ -361,7 +379,7 @@ export default function Login() {
                 FORMULÁRIO DE LOGIN (ANIMAÇÃO SUAVE)
             ═════════════════════════════════════════════════════════════ */}
             {tab === 'login' && (
-              <form key="login-form" onSubmit={handleLogin} className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out fill-mode-both">
+              <form key="login-form" onSubmit={handleLogin} className="space-y-3 auth-form-crossfade">
                 <div>
                   <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1">
                     E-mail de Acesso
@@ -439,7 +457,7 @@ export default function Login() {
                 FORMULÁRIO DE CADASTRO (ANIMAÇÃO SUAVE + TROCA DE PERFIL FLUIDA)
             ═════════════════════════════════════════════════════════════ */}
             {tab === 'register' && (
-              <form key="register-form" onSubmit={handleRegister} className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out fill-mode-both">
+              <form key="register-form" onSubmit={handleRegister} className="space-y-3 auth-form-crossfade">
                 
                 {/* Seletor Compacto de Papel em Linha Única com Microinterações */}
                 <div className="space-y-1.5 mb-1">
