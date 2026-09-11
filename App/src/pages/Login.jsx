@@ -174,12 +174,12 @@ export default function Login() {
 
   return (
     <main className="min-h-[calc(100vh-80px)] flex items-center justify-center p-3 sm:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-      <div className="w-full max-w-5xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200/90 dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden my-auto transition-all duration-300 ease-out">
+      <div className="w-full max-w-5xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200/90 dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden my-auto min-h-[560px] sm:min-h-[600px] lg:min-h-[640px] transition-all duration-300 ease-out">
         
         {/* ═════════════════════════════════════════════════════════════
             COLUNA ESQUERDA (DESKTOP): BRAND SHOWCASE & ATMOSPHERE
         ═════════════════════════════════════════════════════════════ */}
-        <div className="hidden lg:flex lg:col-span-5 relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-8 lg:p-9 flex-col justify-between overflow-hidden">
+        <div className="hidden lg:flex lg:col-span-5 relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-8 lg:p-9 flex-col justify-between overflow-hidden lg:min-h-[640px]">
           {/* Background Elements com Animação Suave */}
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-72 h-72 rounded-full bg-blue-400/20 blur-3xl animate-pulse pointer-events-none transition-all duration-1000" />
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-72 h-72 rounded-full bg-cyan-400/15 blur-3xl animate-[pulse_5s_ease-in-out_infinite] pointer-events-none" />
@@ -253,7 +253,7 @@ export default function Login() {
         {/* ═════════════════════════════════════════════════════════════
             COLUNA DIREITA: FORMULÁRIO DE AUTENTICAÇÃO (ZERO SCROLL + FLUID)
         ═════════════════════════════════════════════════════════════ */}
-        <div className="lg:col-span-7 p-5 sm:p-7 lg:p-8 flex flex-col justify-center">
+        <div className="lg:col-span-7 p-5 sm:p-7 lg:p-8 flex flex-col justify-center min-h-[560px] sm:min-h-[600px] lg:min-h-[640px]">
           
           <div className="w-full max-w-lg mx-auto space-y-3.5">
             
