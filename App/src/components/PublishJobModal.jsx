@@ -52,6 +52,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   const [respInput, setRespInput] = useState('');
   const [previewTab, setPreviewTab] = useState('card'); // 'card' | 'details'
   const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
@@ -71,6 +72,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   if (!isOpen) return null;
 
   const handleClose = () => {
+    if (isPublishing) return;
     setStep(1);
     setShowMobilePreview(false);
     onClose();
@@ -130,8 +132,10 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     }));
   };
 
-  const handlePublish = (e) => {
+  const handlePublish = async (e) => {
     if (e) e.preventDefault();
+    if (isPublishing) return;
+
     if (!form.title || !form.title.trim()) {
       showToast('Por favor, informe o cargo / título da vaga.');
       setStep(1);
@@ -150,13 +154,18 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
       ? form.responsibilities.filter(r => r && r.trim())
       : (typeof form.responsibilities === 'string' ? form.responsibilities.split('\n').map(r => r.trim()).filter(Boolean) : []);
 
+    setIsPublishing(true);
     let created = null;
 
     try {
-      created = addJob({
+      const companyName = currentUser?.company || currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'ValeTech Soluções Digitais';
+      const companyLogo = currentUser?.avatar || currentUser?.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250';
+      const userUid = currentUser?.uid || currentUser?.id || currentUser?.email || 'empresa';
+
+      created = await addJob({
         title: form.title.trim(),
-        company: currentUser?.name || currentUser?.company || 'ValeTech Soluções Digitais',
-        companyLogo: currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250',
+        company: companyName,
+        companyLogo: companyLogo,
         type: form.type || 'Tempo Integral',
         modality: form.modality || 'Presencial',
         city: form.city || currentUser?.city || 'Ivaiporã',
@@ -172,14 +181,15 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
           'Atuar nas rotinas e atividades do setor',
           'Colaborar com a equipe no aprimoramento dos processos'
         ],
-        createdBy: currentUser?.uid || currentUser?.email || 'empresa',
+        createdBy: userUid,
         isVerifiedCompany: true
       });
 
-      showToast('Nova vaga publicada com sucesso no Mural Regional!');
+      showToast('🎉 Nova vaga publicada com sucesso no Mural Regional!');
     } catch (err) {
       console.error('[PublishJobModal] Erro ao salvar vaga:', err);
       showToast('Ocorreu um erro ao salvar a vaga.');
+      setIsPublishing(false);
       return;
     }
 
@@ -190,6 +200,8 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     } catch (callbackErr) {
       console.warn('[PublishJobModal] Aviso no callback onJobCreated:', callbackErr);
     }
+
+    setIsPublishing(false);
 
     try {
       setStep(1);
@@ -1004,11 +1016,16 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
               <button
                 type="button"
                 onClick={handlePublish}
-                className="px-3.5 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                disabled={isPublishing}
+                className="px-3.5 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                 title="Publicar direto com as informações preenchidas"
               >
-                <Sparkles size={13} />
-                <span>Publicar Direto</span>
+                {isPublishing ? (
+                  <RefreshCw size={13} className="animate-spin" />
+                ) : (
+                  <Sparkles size={13} />
+                )}
+                <span>{isPublishing ? 'Publicando...' : 'Publicar Direto'}</span>
               </button>
             )}
 
@@ -1031,10 +1048,15 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
               <button
                 type="button"
                 onClick={handlePublish}
-                className="bg-primary-blue hover:bg-blue-600 text-white px-6 py-2.5 text-xs font-extrabold rounded-xl flex items-center gap-2 cursor-pointer shadow-brand-sm hover:shadow-brand-md hover:scale-[1.02] active:scale-95 transition-all"
+                disabled={isPublishing}
+                className="bg-primary-blue hover:bg-blue-600 text-white px-6 py-2.5 text-xs font-extrabold rounded-xl flex items-center gap-2 cursor-pointer shadow-brand-sm hover:shadow-brand-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
               >
-                <Sparkles size={15} />
-                <span>Publicar Vaga no Mural</span>
+                {isPublishing ? (
+                  <RefreshCw size={15} className="animate-spin" />
+                ) : (
+                  <Sparkles size={15} />
+                )}
+                <span>{isPublishing ? 'Publicando Oportunidade...' : 'Publicar Vaga no Mural'}</span>
               </button>
             )}
           </div>
