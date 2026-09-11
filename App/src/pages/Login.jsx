@@ -478,52 +478,60 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Bloco de Validação de CNPJ (Empresas) com Abertura Suave */}
-                {selectedRole === 'empresa' && (
-                  <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1.5 animate-in fade-in-50 slide-in-from-top-2 duration-300 ease-out fill-mode-both">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                        <Building2 size={13} className="text-primary-blue dark:text-blue-400" />
-                        CNPJ da Empresa (14 dígitos)
-                      </label>
-                      <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700">
-                        Receita Federal
-                      </span>
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={regCnpj}
-                        onChange={handleCnpjChange}
-                        className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 font-mono text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
-                        placeholder="00.000.000/0000-00"
-                        maxLength={18}
-                        required
-                      />
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        {cnpjLoading && <Loader2 size={14} className="animate-spin text-primary-blue" />}
-                        {!cnpjLoading && cnpjData && <CheckCircle2 size={14} className="text-emerald-500 animate-in zoom-in-75 duration-200" />}
-                      </div>
-                    </div>
-
-                    {cnpjError && (
-                      <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1 animate-in fade-in duration-200">
-                        <AlertCircle size={12} className="shrink-0" />
-                        <span>{cnpjError}</span>
-                      </p>
-                    )}
-
-                    {cnpjData && (
-                      <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between pt-0.5 animate-in fade-in duration-200">
-                        <span className="truncate flex items-center gap-1">
-                          <ShieldCheck size={12} /> {cnpjData.razaoSocial}
+                {/* Bloco de Validação de CNPJ (Empresas) com Desdobramento em Animação Fluida */}
+                <div
+                  className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
+                    selectedRole === 'empresa'
+                      ? 'grid-rows-[1fr] opacity-100 translate-y-0 my-1'
+                      : 'grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none my-0'
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
+                          CNPJ da Empresa (14 dígitos)
+                        </label>
+                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">
+                          Receita Federal
                         </span>
-                        <span className="shrink-0 ml-1">({cnpjData.cidade}/{cnpjData.uf})</span>
                       </div>
-                    )}
+
+                      <div className="relative group">
+                        <input
+                          type="text"
+                          value={regCnpj}
+                          onChange={handleCnpjChange}
+                          className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:border-primary-blue rounded-lg px-3 py-1.5 font-mono text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
+                          placeholder="00.000.000/0000-00"
+                          maxLength={18}
+                          required={selectedRole === 'empresa'}
+                        />
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                          {cnpjLoading && <Loader2 size={14} className="animate-spin text-primary-blue" />}
+                          {!cnpjLoading && cnpjData && <CheckCircle2 size={14} className="text-emerald-500 animate-in zoom-in-75 duration-200" />}
+                        </div>
+                      </div>
+
+                      {cnpjError && (
+                        <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                          <AlertCircle size={12} className="shrink-0" />
+                          <span>{cnpjError}</span>
+                        </p>
+                      )}
+
+                      {cnpjData && (
+                        <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between pt-0.5 animate-in fade-in duration-200">
+                          <span className="truncate flex items-center gap-1">
+                            <ShieldCheck size={12} /> {cnpjData.razaoSocial}
+                          </span>
+                          <span className="shrink-0 ml-1">({cnpjData.cidade}/{cnpjData.uf})</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
 
                 {/* Grade de 2 Colunas para Campos de Entrada */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
