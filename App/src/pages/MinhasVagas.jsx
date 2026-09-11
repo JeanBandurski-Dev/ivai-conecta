@@ -381,79 +381,92 @@ export default function MinhasVagas() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {companyJobs.map(job => (
-                  <div key={job.id} className="card p-6 space-y-4 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/40 transition-all shadow-xs hover:shadow-md">
-                    <div className="flex items-start justify-between flex-wrap gap-4">
+                  <div key={job.id} className="card p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/40 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 border ${
+                          job.status === 'Encerrada'
+                            ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'Encerrada' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                          {job.status === 'Encerrada' ? 'Vaga Encerrada' : 'Vaga Ativa'}
+                        </span>
+                        <span className="text-[11px] text-gray-400 dark:text-slate-400">
+                          {job.createdAt ? (typeof job.createdAt === 'string' && job.createdAt.includes('/') ? job.createdAt : new Date(job.createdAt).toLocaleDateString('pt-BR')) : 'Recente'}
+                        </span>
+                      </div>
+
                       <div>
-                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 border ${
-                            job.status === 'Encerrada'
-                              ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
-                              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'Encerrada' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
-                            {job.status === 'Encerrada' ? 'Vaga Encerrada' : 'Vaga Ativa'}
-                          </span>
-                          <span className="text-xs text-gray-400 dark:text-slate-400">
-                            Criada em: {job.createdAt ? (typeof job.createdAt === 'string' && job.createdAt.includes('/') ? job.createdAt : new Date(job.createdAt).toLocaleDateString('pt-BR')) : 'Recentemente'}
-                          </span>
-                        </div>
-                        <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">{job.title}</h3>
-                        <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
+                        <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white leading-snug line-clamp-2">{job.title}</h3>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-1.5 flex-wrap">
                           <span className="flex items-center gap-1 font-semibold text-primary-blue"><MapPin size={13} /> {job.city}</span>
                           <span>·</span>
-                          <span>{job.type} ({job.modality || 'Presencial'})</span>
-                          <span>·</span>
-                          <span className="font-semibold text-primary-blue dark:text-blue-400">
-                            <Users size={14} className="inline mr-1" />
-                            {job.applicantsCount || 0} {(job.applicantsCount || 0) === 1 ? 'Candidato Inscrito' : 'Candidatos Inscritos'}
-                          </span>
+                          <span>{job.type}</span>
                         </div>
                       </div>
 
+                      <div className="bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl px-3 py-2 text-xs font-semibold text-primary-blue dark:text-blue-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Users size={14} /> Candidatos Inscritos
+                        </span>
+                        <span className="font-extrabold bg-primary-blue text-white px-2 py-0.5 rounded-full text-[11px]">
+                          {job.applicantsCount || 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mt-auto">
+                      {/* Vales e Requisitos */}
+                      <div className="pt-2 border-t border-gray-100 dark:border-slate-800 flex flex-wrap gap-1.5 text-xs">
+                        {safeSkillsArray(job.requiredSkills).slice(0, 3).map(s => (
+                          <span key={s} className="tag tag-blue text-[10px]">{s}</span>
+                        ))}
+                        {safeSkillsArray(job.requiredSkills).length > 3 && (
+                          <span className="text-[10px] text-gray-400 font-bold self-center">
+                            +{safeSkillsArray(job.requiredSkills).length - 3}
+                          </span>
+                        )}
+                      </div>
+
                       {/* Ações da Vaga */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
                         <Link
                           to={`/gerenciamento-vagas`}
-                          className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 rounded-xl shadow-xs"
+                          className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 rounded-xl shadow-xs flex-1 justify-center"
                         >
-                          <Layers size={14} /> Funil Kanban ({job.applicantsCount || 0})
+                          <Layers size={13} /> Funil Kanban
                         </Link>
 
                         {job.status === 'Encerrada' ? (
                           <button
                             onClick={() => handleJobAction(job.id, 'reopen')}
-                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            title="Reabrir Vaga"
                           >
-                            <RotateCcw size={14} /> Reabrir
+                            <RotateCcw size={13} />
                           </button>
                         ) : (
                           <button
                             onClick={() => setJobActionModalTarget(job)}
-                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                            className="btn btn-outline border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 btn-sm text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            title="Encerrar Vaga"
                           >
-                            <XCircle size={14} /> Encerrar Vaga
+                            <XCircle size={13} />
                           </button>
                         )}
 
                         <button
                           onClick={() => setJobActionModalTarget(job)}
                           className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900/40 transition-colors cursor-pointer"
-                          title="Encerrar ou Excluir Vaga"
+                          title="Excluir Vaga"
                           aria-label="Excluir vaga"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
-                    </div>
-
-                    {/* Vales e Requisitos */}
-                    <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap gap-2 text-xs">
-                      <span className="font-semibold text-gray-500 dark:text-slate-400">Habilidades Exigidas:</span>
-                      {safeSkillsArray(job.requiredSkills).map(s => (
-                        <span key={s} className="tag tag-blue text-[11px]">{s}</span>
-                      ))}
                     </div>
                   </div>
                 ))}
@@ -524,92 +537,93 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {apps.map(app => (
-                      <div key={app.id} className="card gap-4 p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs">
+                      <div key={app.id} className="card p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
                         {/* Top */}
-                        <div className="flex items-start justify-between flex-wrap gap-3">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                (Number(app.matchScore) || 0) >= 85
+                                  ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                                  : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                              }`}>
+                                {app.matchScore || 0}% Match
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                String(app.status || '').includes('Entrevista')
+                                  ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                                  : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
+                              }`}>
+                                {app.status || 'Candidatura Enviada'}
+                              </span>
+                            </div>
+                          </div>
+
                           <div>
-                            <h3 className="font-heading text-lg sm:text-xl font-bold text-primary-dark dark:text-white">{app.title}</h3>
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 mt-1 flex-wrap">
+                            <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white leading-snug line-clamp-2">{app.title}</h3>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-1.5 flex-wrap">
                               <span className="flex items-center gap-1 font-semibold text-gray-700 dark:text-slate-300">
-                                <Building2 size={15} className="text-primary-blue" /> {app.company}
+                                <Building2 size={13} className="text-primary-blue" /> {app.company}
                               </span>
                               <span>·</span>
                               <span className="flex items-center gap-1">
-                                <MapPin size={15} className="text-gray-400" /> {app.city}
+                                <MapPin size={13} className="text-gray-400" /> {app.city}
                               </span>
                               <span>·</span>
                               <span className="font-medium text-gray-600 dark:text-slate-300">{app.type}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              (Number(app.matchScore) || 0) >= 85
-                                ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                                : 'bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800'
-                            }`}>
-                              {app.matchScore || 0}% Match
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              String(app.status || '').includes('Entrevista')
-                                ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                                : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
-                            }`}>
-                              {app.status || 'Candidatura Enviada'}
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Progress stages (Linha do Tempo Gupy) */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
-                          {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
-                            <div key={i} className="flex items-center gap-2 shrink-0">
-                              <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                                stage?.completed
-                                  ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
-                                  : stage?.active
-                                  ? 'bg-primary-blue text-white shadow-xs font-bold'
-                                  : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
-                              }`}>
-                                {stage?.completed ? <CheckCircle size={12} /> : <Clock size={12} />}
-                                {stage?.name || 'Etapa'}
+                          {/* Progress stages (Linha do Tempo Gupy) */}
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 scrollbar-none">
+                            {(Array.isArray(app.stages) ? app.stages : []).map((stage, i, arr) => (
+                              <div key={i} className="flex items-center gap-1.5 shrink-0">
+                                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                                  stage?.completed
+                                    ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
+                                    : stage?.active
+                                    ? 'bg-primary-blue text-white shadow-xs font-bold'
+                                    : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500'
+                                }`}>
+                                  {stage?.completed ? <CheckCircle size={11} /> : <Clock size={11} />}
+                                  <span>{stage?.name || 'Etapa'}</span>
+                                </div>
+                                {i < arr.length - 1 && (
+                                  <ArrowRight size={11} className="text-gray-300 dark:text-slate-700 shrink-0" />
+                                )}
                               </div>
-                              {i < arr.length - 1 && (
-                                <ArrowRight size={13} className="text-gray-300 dark:text-slate-700 shrink-0" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Next step note */}
-                        {app.nextStepNote && (
-                          <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-xl px-4 py-3 text-sm text-primary-blue dark:text-blue-300 font-medium flex items-center gap-2">
-                            <FileText size={15} className="shrink-0 text-primary-blue" />
-                            <span><strong>Recrutador:</strong> {app.nextStepNote}</span>
+                            ))}
                           </div>
-                        )}
+
+                          {/* Next step note */}
+                          {app.nextStepNote && (
+                            <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-xl px-3 py-2 text-xs text-primary-blue dark:text-blue-300 font-medium flex items-start gap-1.5">
+                              <FileText size={13} className="shrink-0 text-primary-blue mt-0.5" />
+                              <span><strong>Recrutador:</strong> {app.nextStepNote}</span>
+                            </div>
+                          )}
+                        </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800 flex-wrap gap-2">
-                          <span className="text-xs text-gray-400 dark:text-slate-400">Candidatado em {app.appliedAt}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+                        <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[11px] text-gray-400 dark:text-slate-400">Em {app.appliedAt}</span>
+                          <button
+                            onClick={() => {
+                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
 
-                                startChatWith({
-                                  name: app.company,
-                                  email: targetEmail,
-                                  role: 'empresa',
-                                  avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
-                                }, `Candidatura: ${app.title}`);
-                              }}
-                              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                            >
-                              <MessageSquare size={13} /> Conversar no Chat
-                            </button>
-                          </div>
+                              startChatWith({
+                                name: app.company,
+                                email: targetEmail,
+                                role: 'empresa',
+                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                              }, `Candidatura: ${app.title}`);
+                            }}
+                            className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <MessageSquare size={13} /> Chat
+                          </button>
                         </div>
                       </div>
                     ))}
