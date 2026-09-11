@@ -272,15 +272,22 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Alternador de Abas Ultra Suave */}
-            <div className="bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl flex items-center border border-gray-200/80 dark:border-slate-700 shadow-2xs">
+            {/* Alternador de Abas Ultra Suave com Indicador Deslizante */}
+            <div className="relative bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl flex items-center border border-gray-200/80 dark:border-slate-700 shadow-2xs">
+              {/* Pill deslizante que se move suavemente entre as abas */}
+              <div
+                className={`absolute top-1 bottom-1 rounded-lg bg-white dark:bg-slate-900 shadow-xs transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none ${
+                  tab === 'login' ? 'left-1 w-[calc(50%-4px)]' : 'left-[calc(50%+0px)] w-[calc(50%-4px)]'
+                }`}
+              />
+
               <button
                 type="button"
                 onClick={() => { setTab('login'); setAlert(''); }}
-                className={`flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`relative z-10 flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
                   tab === 'login'
-                    ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-white shadow-xs scale-[1.01]'
-                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    ? 'text-primary-blue dark:text-white'
+                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <span>Já Tenho Conta</span>
@@ -288,10 +295,10 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => { setTab('register'); setAlert(''); }}
-                className={`flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`relative z-10 flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
                   tab === 'register'
-                    ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-white shadow-xs scale-[1.01]'
-                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    ? 'text-primary-blue dark:text-white'
+                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <span>Quero Me Cadastrar</span>
@@ -351,10 +358,10 @@ export default function Login() {
             )}
 
             {/* ═════════════════════════════════════════════════════════════
-                FORMULÁRIO DE LOGIN
+                FORMULÁRIO DE LOGIN (ANIMAÇÃO SUAVE)
             ═════════════════════════════════════════════════════════════ */}
             {tab === 'login' && (
-              <form onSubmit={handleLogin} className="space-y-3 animate-in fade-in duration-300">
+              <form key="login-form" onSubmit={handleLogin} className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out fill-mode-both">
                 <div>
                   <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1">
                     E-mail de Acesso
@@ -429,10 +436,10 @@ export default function Login() {
             )}
 
             {/* ═════════════════════════════════════════════════════════════
-                FORMULÁRIO DE CADASTRO (ZERO SCROLL + FLUID + BOTÃO AZUL)
+                FORMULÁRIO DE CADASTRO (ANIMAÇÃO SUAVE + TROCA DE PERFIL FLUIDA)
             ═════════════════════════════════════════════════════════════ */}
             {tab === 'register' && (
-              <form onSubmit={handleRegister} className="space-y-3 animate-in fade-in duration-300">
+              <form key="register-form" onSubmit={handleRegister} className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out fill-mode-both">
                 
                 {/* Seletor Compacto de Papel em Linha Única com Microinterações */}
                 <div className="space-y-1">
@@ -440,7 +447,10 @@ export default function Login() {
                     <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
                       Perfil de Atuação
                     </label>
-                    <span className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate max-w-[200px] transition-all duration-200">
+                    <span
+                      key={selectedRole}
+                      className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate max-w-[200px] inline-block animate-in fade-in-50 slide-in-from-right-1 duration-200"
+                    >
                       {ROLES.find(r => r.id === selectedRole)?.desc}
                     </span>
                   </div>
@@ -453,14 +463,14 @@ export default function Login() {
                           key={r.id}
                           type="button"
                           onClick={() => setRole(r.id)}
-                          className={`py-1.5 px-1 rounded-lg text-center transition-all duration-200 ease-out cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 text-[11px] font-bold active:scale-95 ${
+                          className={`relative py-1.5 px-1 rounded-lg text-center transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 text-[11px] font-bold active:scale-95 ${
                             isSelected
-                              ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs ring-2 ring-primary-blue/30 scale-[1.02]'
+                              ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs ring-2 ring-primary-blue/30 scale-[1.03]'
                               : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                           }`}
                           title={`${r.label}: ${r.desc}`}
                         >
-                          <Icon size={13} className={`transition-transform duration-200 ${isSelected ? 'text-primary-blue dark:text-blue-400 scale-110' : 'text-gray-400 dark:text-slate-500'}`} />
+                          <Icon size={13} className={`transition-all duration-300 ease-out ${isSelected ? 'text-primary-blue dark:text-blue-400 scale-110' : 'text-gray-400 dark:text-slate-500'}`} />
                           <span className="truncate text-[10px] sm:text-[11px]">{r.shortLabel}</span>
                         </button>
                       );
@@ -468,9 +478,9 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Bloco de Validação de CNPJ (Empresas) */}
+                {/* Bloco de Validação de CNPJ (Empresas) com Abertura Suave */}
                 {selectedRole === 'empresa' && (
-                  <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1.5 animate-in fade-in duration-300">
+                  <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1.5 animate-in fade-in-50 slide-in-from-top-2 duration-300 ease-out fill-mode-both">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                         <Building2 size={13} className="text-primary-blue dark:text-blue-400" />
@@ -519,7 +529,7 @@ export default function Login() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {/* Nome Completo / Razão */}
                   <div>
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1">
+                    <label key={`label-name-${selectedRole === 'empresa' ? 'empresa' : 'user'}`} className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1 animate-in fade-in duration-200">
                       {selectedRole === 'empresa' ? 'Razão Social / Nome' : 'Nome Completo'}
                     </label>
                     <input
@@ -534,7 +544,7 @@ export default function Login() {
 
                   {/* E-mail */}
                   <div>
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1">
+                    <label key={`label-email-${selectedRole === 'professor' ? 'prof' : 'user'}`} className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1 animate-in fade-in duration-200">
                       E-mail {selectedRole === 'professor' ? 'Institucional' : 'Principal'}
                     </label>
                     <input
@@ -626,5 +636,6 @@ export default function Login() {
     </main>
   );
 }
+
 
 
