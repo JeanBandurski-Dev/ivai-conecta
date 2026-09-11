@@ -11,13 +11,51 @@ import {
   getSelectedCity,
   setSelectedCity as libSetCity,
   CITIES,
+  getFavoriteJobs,
+  getFavoriteTalents,
+  toggleFavoriteJob as libToggleFavoriteJob,
+  toggleFavoriteTalent as libToggleFavoriteTalent,
+  fetchUserFavoriteJobsFromFirestore,
+  fetchUserFavoriteTalentsFromFirestore,
 } from '../lib/ivaiConecta';
+
+const initialAuthUser = getAuthUser();
 
 const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
-  currentUser: getAuthUser(),
+  currentUser: initialAuthUser,
   authLoading: true,
   isAuthReady: false,
+
+  // ─── Favorites State (User-Scoped) ─────────────────────
+  favoriteJobs: getFavoriteJobs(initialAuthUser),
+  favoriteTalents: getFavoriteTalents(initialAuthUser),
+
+  syncUserFavorites: async (user) => {
+    if (!user) {
+      set({ favoriteJobs: [], favoriteTalents: [] });
+      return;
+    }
+    const localJobs = getFavoriteJobs(user);
+    const localTalents = getFavoriteTalents(user);
+    set({ favoriteJobs: localJobs, favoriteTalents: localTalents });
+
+    const userUid = user.uid || user.id;
+    if (userUid) {
+      try {
+        const [remoteJobs, remoteTalents] = await Promise.all([
+          fetchUserFavoriteJobsFromFirestore(userUid),
+          fetchUserFavoriteTalentsFromFirestore(userUid),
+        ]);
+        const active = get().currentUser;
+        if (active && (active.uid === userUid || active.id === userUid)) {
+          set({ favoriteJobs: remoteJobs, favoriteTalents: remoteTalents });
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar favoritos do usuário:', err);
+      }
+    }
+  },
 
   initAuthListener: () => {
     return watchAuthState((user) => {
@@ -26,6 +64,7 @@ const useAppStore = create((set, get) => ({
         authLoading: false,
         isAuthReady: true,
       });
+      get().syncUserFavorites(user);
     });
   },
 
@@ -33,6 +72,7 @@ const useAppStore = create((set, get) => ({
     const result = await libLogin(email, password);
     if (result.success) {
       set({ currentUser: result.user, authLoading: false });
+      get().syncUserFavorites(result.user);
     }
     return result;
   },
@@ -41,6 +81,7 @@ const useAppStore = create((set, get) => ({
     const result = await libRegister(data);
     if (result.success) {
       set({ currentUser: result.user, authLoading: false });
+      get().syncUserFavorites(result.user);
     }
     return result;
   },
@@ -49,6 +90,7 @@ const useAppStore = create((set, get) => ({
     const result = await libLoginGoogle();
     if (result.success) {
       set({ currentUser: result.user, authLoading: false });
+      get().syncUserFavorites(result.user);
     }
     return result;
   },
@@ -57,17 +99,19 @@ const useAppStore = create((set, get) => ({
     const result = await libCompleteProfile(uid, data);
     if (result.success) {
       set({ currentUser: result.user });
+      get().syncUserFavorites(result.user);
     }
     return result;
   },
 
   logout: async () => {
     await libLogout();
-    set({ currentUser: null, authLoading: false });
+    set({ currentUser: null, authLoading: false, favoriteJobs: [], favoriteTalents: [] });
   },
 
   setCurrentUser: (user) => {
     set({ currentUser: user, authLoading: false });
+    get().syncUserFavorites(user);
   },
 
   // ─── City State ────────────────────────────────────────
@@ -107,28 +151,21 @@ const useAppStore = create((set, get) => ({
     set({ theme: nextTheme });
   },
 
-  // ─── Favorites State ───────────────────────────────────
-  favoriteJobs: typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('ivai_conecta_fav_jobs') || '[]')) : [],
-  favoriteTalents: typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('ivai_conecta_fav_talents') || '[]')) : [],
-
+  // ─── Favorites Actions ─────────────────────────────────
   toggleFavoriteJob: (jobId) => {
+    const user = get().currentUser;
     const current = get().favoriteJobs;
-    const exists = current.includes(jobId);
-    const updated = exists ? current.filter(id => id !== jobId) : [...current, jobId];
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ivai_conecta_fav_jobs', JSON.stringify(updated));
-    }
+    const exists = current.some(id => String(id) === String(jobId));
+    const updated = libToggleFavoriteJob(jobId, user);
     set({ favoriteJobs: updated });
     return !exists;
   },
 
   toggleFavoriteTalent: (talentId) => {
+    const user = get().currentUser;
     const current = get().favoriteTalents;
-    const exists = current.includes(talentId);
-    const updated = exists ? current.filter(id => id !== talentId) : [...current, talentId];
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ivai_conecta_fav_talents', JSON.stringify(updated));
-    }
+    const exists = current.some(id => String(id) === String(talentId));
+    const updated = libToggleFavoriteTalent(talentId, user);
     set({ favoriteTalents: updated });
     return !exists;
   },
