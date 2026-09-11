@@ -478,77 +478,78 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Slot Reservado Fixo: Mantém o Formulário Estável sem Deslocar a Tela ao Abrir o CNPJ */}
-                <div className="min-h-[72px] relative flex flex-col justify-center my-1 overflow-hidden">
-                  {selectedRole === 'empresa' ? (
-                    <div
-                      key="cnpj-empresa-box"
-                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs animate-cnpj-unfold"
-                    >
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
-                          CNPJ da Empresa (14 dígitos)
-                        </label>
-                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">
-                          Receita Federal
+                {/* Slot Reservado Fixo: Mantém o Formulário Estável com Abertura e Fechamento Lentos */}
+                <div className="relative min-h-[72px] my-1">
+                  {/* Painel CNPJ Empresa com Abertura e Fechamento Fluidos (0.75s) */}
+                  <div className={`cnpj-accordion-container ${selectedRole === 'empresa' ? 'is-open' : ''}`}>
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                            <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
+                            CNPJ da Empresa (14 dígitos)
+                          </label>
+                          <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">
+                            Receita Federal
+                          </span>
+                        </div>
+
+                        <div className="relative group">
+                          <input
+                            type="text"
+                            value={regCnpj}
+                            onChange={handleCnpjChange}
+                            className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:border-primary-blue rounded-lg px-3 py-1.5 font-mono text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
+                            placeholder="00.000.000/0000-00"
+                            maxLength={18}
+                            required={selectedRole === 'empresa'}
+                          />
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            {cnpjLoading && <Loader2 size={14} className="animate-spin text-primary-blue" />}
+                            {!cnpjLoading && cnpjData && <CheckCircle2 size={14} className="text-emerald-500 animate-in zoom-in-75 duration-200" />}
+                          </div>
+                        </div>
+
+                        {cnpjError && (
+                          <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{cnpjError}</span>
+                          </p>
+                        )}
+
+                        {cnpjData && (
+                          <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between pt-0.5 animate-in fade-in duration-200">
+                            <span className="truncate flex items-center gap-1">
+                              <ShieldCheck size={12} /> {cnpjData.razaoSocial}
+                            </span>
+                            <span className="shrink-0 ml-1">({cnpjData.cidade}/{cnpjData.uf})</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Painel de Benefícios para Outros Perfis com Transição Suave */}
+                  <div className={`role-benefit-container ${selectedRole === 'empresa' ? 'is-hidden' : ''}`}>
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center shrink-0">
+                            <Sparkles size={12} />
+                          </div>
+                          <p className="text-[11px] leading-tight truncate text-gray-600 dark:text-slate-300">
+                            {selectedRole === 'aluno' && 'Acesso a estágios e vagas iniciais de empresas parceiras regionais.'}
+                            {selectedRole === 'professor' && 'Validação de pareceres acadêmicos e orientação de projetos.'}
+                            {selectedRole === 'freelancer' && 'Vitrine de portfólio para captação de clientes no Vale do Ivaí.'}
+                            {selectedRole === 'candidato' && 'Oportunidades profissionais e conexão direta com recrutadores.'}
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
+                          {selectedRole}
                         </span>
                       </div>
-
-                      <div className="relative group">
-                        <input
-                          type="text"
-                          value={regCnpj}
-                          onChange={handleCnpjChange}
-                          className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:border-primary-blue rounded-lg px-3 py-1.5 font-mono text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
-                          placeholder="00.000.000/0000-00"
-                          maxLength={18}
-                          required={selectedRole === 'empresa'}
-                          autoFocus
-                        />
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                          {cnpjLoading && <Loader2 size={14} className="animate-spin text-primary-blue" />}
-                          {!cnpjLoading && cnpjData && <CheckCircle2 size={14} className="text-emerald-500 animate-in zoom-in-75 duration-200" />}
-                        </div>
-                      </div>
-
-                      {cnpjError && (
-                        <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1 animate-in fade-in duration-200">
-                          <AlertCircle size={12} className="shrink-0" />
-                          <span>{cnpjError}</span>
-                        </p>
-                      )}
-
-                      {cnpjData && (
-                        <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between pt-0.5 animate-in fade-in duration-200">
-                          <span className="truncate flex items-center gap-1">
-                            <ShieldCheck size={12} /> {cnpjData.razaoSocial}
-                          </span>
-                          <span className="shrink-0 ml-1">({cnpjData.cidade}/{cnpjData.uf})</span>
-                        </div>
-                      )}
                     </div>
-                  ) : (
-                    <div
-                      key={`role-placeholder-${selectedRole}`}
-                      className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400 animate-in fade-in-0 duration-200"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center shrink-0">
-                          <Sparkles size={12} />
-                        </div>
-                        <p className="text-[11px] leading-tight truncate text-gray-600 dark:text-slate-300">
-                          {selectedRole === 'aluno' && 'Acesso a estágios e vagas iniciais de empresas parceiras regionais.'}
-                          {selectedRole === 'professor' && 'Validação de pareceres acadêmicos e orientação de projetos.'}
-                          {selectedRole === 'freelancer' && 'Vitrine de portfólio para captação de clientes no Vale do Ivaí.'}
-                          {selectedRole === 'candidato' && 'Oportunidades profissionais e conexão direta com recrutadores.'}
-                        </p>
-                      </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
-                        {selectedRole}
-                      </span>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Grade de 2 Colunas para Campos de Entrada */}
