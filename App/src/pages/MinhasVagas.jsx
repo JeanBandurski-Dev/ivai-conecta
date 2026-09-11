@@ -188,7 +188,7 @@ export default function MinhasVagas() {
       <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 lg:py-16 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(34,197,94,0.15),transparent_50%)] pointer-events-none" />
 
-        <div className="container relative z-10">
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
@@ -230,7 +230,7 @@ export default function MinhasVagas() {
         </div>
       </header>
 
-      <main className="container section">
+      <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
 
         {/* ── VISÃO DO PROFESSOR / DOCENTE ── */}
         {isProfessor ? (
@@ -475,7 +475,7 @@ export default function MinhasVagas() {
           </div>
         ) : (
           /* ── VISÃO DO ALUNO / CANDIDATO: MINHAS CANDIDATURAS & FAVORITAS ── */
-          <div className="space-y-6 max-w-7xl mx-auto w-full">
+          <div className="space-y-6 w-full">
             
             {/* Seletor de Abas do Candidato */}
             <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit shadow-2xs">
@@ -537,9 +537,9 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4 sm:gap-5">
                     {apps.map(app => (
-                      <div key={app.id} className="card p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
+                      <div key={app.id} className="card p-5 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
                         {/* Top */}
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-2">
@@ -649,7 +649,7 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4 sm:gap-5">
                     {savedJobsList.map(job => (
                       <JobCard
                         key={job.id || job.firestoreId}
