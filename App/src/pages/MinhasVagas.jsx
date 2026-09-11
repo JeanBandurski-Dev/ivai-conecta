@@ -381,7 +381,7 @@ export default function MinhasVagas() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,360px),1fr))] gap-5">
                 {companyJobs.map(job => (
                   <div key={job.id} className="card p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/40 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
                     <div className="space-y-3">
@@ -537,9 +537,9 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4 sm:gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,360px),1fr))] gap-5">
                     {apps.map(app => (
-                      <div key={app.id} className="card p-5 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
+                      <div key={app.id} className="card p-6 rounded-3xl border border-gray-200 dark:border-slate-800 hover:border-primary-blue/30 transition-all shadow-xs hover:shadow-md flex flex-col justify-between h-full bg-white dark:bg-slate-900 gap-4">
                         {/* Top */}
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-2">
@@ -649,7 +649,7 @@ export default function MinhasVagas() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4 sm:gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,360px),1fr))] gap-5">
                     {savedJobsList.map(job => (
                       <JobCard
                         key={job.id || job.firestoreId}
