@@ -479,18 +479,18 @@ export default function Login() {
                 </div>
 
                 {/* Slot Reservado Fixo: Mantém o Formulário Estável sem Deslocar a Tela ao Abrir o CNPJ */}
-                <div className="min-h-[72px] relative flex flex-col justify-center my-1">
+                <div className="min-h-[72px] relative flex flex-col justify-center my-1 overflow-hidden">
                   {selectedRole === 'empresa' ? (
                     <div
                       key="cnpj-empresa-box"
-                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs animate-in fade-in-50 zoom-in-98 duration-300 ease-out"
+                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs origin-top animate-in fade-in-0 slide-in-from-top-3 zoom-in-95 duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]"
                     >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
+                          <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-bounce" style={{ animationIterationCount: 2, animationDuration: '0.8s' }} />
                           CNPJ da Empresa (14 dígitos)
                         </label>
-                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">
+                        <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs animate-in zoom-in-75 duration-300 delay-100">
                           Receita Federal
                         </span>
                       </div>
@@ -531,7 +531,7 @@ export default function Login() {
                   ) : (
                     <div
                       key={`role-placeholder-${selectedRole}`}
-                      className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400 animate-in fade-in-50 duration-200"
+                      className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400 animate-in fade-in-0 duration-200"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center shrink-0">
