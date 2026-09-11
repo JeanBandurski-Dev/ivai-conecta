@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle, Bookmark, MessageSquare } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
+import { isTalentFavorited } from '../lib/ivaiConecta';
 
 export default function TalentCard({ talent }) {
-  const { favoriteTalents, toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
+  const { favoriteTalents = [], toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
   const { id, name, course, institution, city, avatar, skills = [], endorsements = [] } = talent;
 
-  const isFavorite = favoriteTalents.includes(id);
+  const isFavorite = isTalentFavorited(talent, favoriteTalents);
 
   const isSelf = currentUser && (
     (currentUser.uid && talent.uid && String(currentUser.uid) === String(talent.uid)) ||
@@ -20,7 +21,7 @@ export default function TalentCard({ talent }) {
   const handleFavoriteToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const added = toggleFavoriteTalent(id);
+    const added = toggleFavoriteTalent(talent);
     showToast(added ? 'Talento salvo nos seus Favoritos!' : 'Talento removido dos Favoritos.');
   };
 

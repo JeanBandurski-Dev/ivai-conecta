@@ -313,37 +313,57 @@ export async function logout() {
 }
 
 export function watchAuthState(callback) {
-  return onAuthStateChanged(auth, async (fbUser) => {
-    if (fbUser) {
-      seedFirestoreIfEmpty();
-      const profileRes = await getUserProfile(fbUser.uid);
-      const role = profileRes.profile?.role || 'aluno';
-      const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
-      const sessionUser = {
-        uid: fbUser.uid,
-        id: fbUser.uid,
-        email: fbUser.email,
-        name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
-        city: profileRes.profile?.city || 'Ivaiporã',
-        role,
-        badge: roleMeta.badge,
-        avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-        isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
-        isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-        ...(profileRes.profile || {})
-      };
-      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-      callback(sessionUser);
-    } else {
-      const localUser = getAuthUser();
-      if (localUser && (localUser.id?.startsWith?.('usr_') || localUser.id?.startsWith?.('prof_') || localUser.email?.includes?.('@ivaiconecta.com.br'))) {
-        callback(localUser);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_AUTH_USER);
-        callback(null);
+  try {
+    return onAuthStateChanged(auth, async (fbUser) => {
+      try {
+        if (fbUser) {
+          seedFirestoreIfEmpty();
+          let profileRes = { success: false, profile: {} };
+          try {
+            profileRes = await getUserProfile(fbUser.uid);
+          } catch (pErr) {
+            console.warn('[watchAuthState] Erro ao buscar perfil do Firestore:', pErr);
+          }
+
+          const role = profileRes.profile?.role || 'aluno';
+          const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+          const sessionUser = {
+            uid: fbUser.uid,
+            id: fbUser.uid,
+            email: fbUser.email,
+            name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
+            city: profileRes.profile?.city || 'Ivaiporã',
+            role,
+            badge: roleMeta.badge,
+            avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
+            isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
+            ...(profileRes.profile || {})
+          };
+          localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+          callback(sessionUser);
+        } else {
+          const localUser = getAuthUser();
+          if (localUser && (localUser.id?.startsWith?.('usr_') || localUser.id?.startsWith?.('prof_') || localUser.email?.includes?.('@ivaiconecta.com.br'))) {
+            callback(localUser);
+          } else {
+            localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+            callback(null);
+          }
+        }
+      } catch (innerErr) {
+        console.warn('[watchAuthState] Erro no processamento do estado de auth:', innerErr);
+        callback(getAuthUser() || null);
       }
-    }
-  });
+    }, (authError) => {
+      console.warn('[watchAuthState] Erro no Firebase onAuthStateChanged:', authError);
+      callback(getAuthUser() || null);
+    });
+  } catch (outerErr) {
+    console.warn('[watchAuthState] Falha ao iniciar observador de auth:', outerErr);
+    callback(getAuthUser() || null);
+    return () => {};
+  }
 }
 
 export function updateAuthUser(data) {

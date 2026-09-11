@@ -1,7 +1,7 @@
 import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { calculateMatchScore, safeSkillsArray } from '../lib/ivaiConecta';
+import { calculateMatchScore, safeSkillsArray, isJobFavorited } from '../lib/ivaiConecta';
 
 export default function JobCard({ job, matchScore, onSelect }) {
   const { currentUser, favoriteJobs = [], toggleFavoriteJob, showToast } = useAppStore();
@@ -20,7 +20,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
     ? job.benefits.map(b => String(b || '').trim()).filter(Boolean)
     : (typeof job.benefits === 'string' ? job.benefits.split(',').map(s => s.trim()).filter(Boolean) : []);
 
-  const isFavorite = Array.isArray(favoriteJobs) ? favoriteJobs.includes(id) : false;
+  const isFavorite = isJobFavorited(job, favoriteJobs);
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
   const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
@@ -56,8 +56,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
   const handleFavoriteToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!id) return;
-    const added = toggleFavoriteJob(id);
+    const added = toggleFavoriteJob(job);
     showToast(added ? 'Vaga salva nos seus Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 

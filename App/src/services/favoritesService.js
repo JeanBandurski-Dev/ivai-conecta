@@ -17,14 +17,39 @@ export function getFavoriteJobs(userOrUid = null) {
   const key = getUserStorageKey(STORAGE_KEY_FAV_JOBS, userOrUid);
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];
   }
 }
 
+/**
+ * Checks if a given job (by object or id) is in the favorite list.
+ * Supports comparison against numeric ID, string ID, and firestoreId.
+ */
+export function isJobFavorited(jobOrId, favoriteJobsList = []) {
+  if (!jobOrId || !Array.isArray(favoriteJobsList) || favoriteJobsList.length === 0) return false;
+
+  const targetIds = new Set();
+  if (typeof jobOrId === 'object' && jobOrId !== null) {
+    if (jobOrId.id !== undefined && jobOrId.id !== null) targetIds.add(String(jobOrId.id));
+    if (jobOrId.firestoreId) targetIds.add(String(jobOrId.firestoreId));
+    if (jobOrId._id) targetIds.add(String(jobOrId._id));
+  } else if (jobOrId !== undefined && jobOrId !== null) {
+    targetIds.add(String(jobOrId));
+  }
+
+  if (targetIds.size === 0) return false;
+
+  return favoriteJobsList.some(favId => {
+    if (favId === undefined || favId === null) return false;
+    return targetIds.has(String(favId));
+  });
+}
+
 export async function fetchUserFavoriteJobsFromFirestore(userUid) {
-  if (!userUid) return [];
+  if (!userUid) return getFavoriteJobs(null);
   try {
     const favRef = collection(db, 'favorites');
     const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'job'));
@@ -48,14 +73,47 @@ export async function fetchUserFavoriteJobsFromFirestore(userUid) {
   }
 }
 
-export function toggleFavoriteJob(jobId, userOrUid = null) {
+export function toggleFavoriteJob(jobOrId, userOrUid = null) {
   const userUid = typeof userOrUid === 'object' && userOrUid !== null
     ? (userOrUid.uid || userOrUid.id)
     : userOrUid;
+
+  const targetIds = new Set();
+  let primaryId = '';
+
+  if (typeof jobOrId === 'object' && jobOrId !== null) {
+    if (jobOrId.id !== undefined && jobOrId.id !== null) {
+      primaryId = String(jobOrId.id);
+      targetIds.add(primaryId);
+    }
+    if (jobOrId.firestoreId) {
+      const fId = String(jobOrId.firestoreId);
+      if (!primaryId) primaryId = fId;
+      targetIds.add(fId);
+    }
+    if (jobOrId._id) {
+      const uId = String(jobOrId._id);
+      if (!primaryId) primaryId = uId;
+      targetIds.add(uId);
+    }
+  } else if (jobOrId !== undefined && jobOrId !== null) {
+    primaryId = String(jobOrId);
+    targetIds.add(primaryId);
+  }
+
+  if (!primaryId) return getFavoriteJobs(userOrUid);
+
   const current = getFavoriteJobs(userOrUid);
-  const exists = current.some(id => String(id) === String(jobId));
-  const updated = exists ? current.filter(id => String(id) !== String(jobId)) : [...current, String(jobId)];
-  
+  const exists = current.some(id => targetIds.has(String(id)));
+
+  let updated;
+  if (exists) {
+    updated = current.filter(id => !targetIds.has(String(id)));
+  } else {
+    const idsToAdd = Array.from(targetIds);
+    updated = Array.from(new Set([...current.map(String), ...idsToAdd]));
+  }
+
   if (typeof localStorage !== 'undefined') {
     const key = getUserStorageKey(STORAGE_KEY_FAV_JOBS, userOrUid);
     localStorage.setItem(key, JSON.stringify(updated));
@@ -64,18 +122,24 @@ export function toggleFavoriteJob(jobId, userOrUid = null) {
   // Sincronizar com Firestore se usuario estiver logado
   if (userUid) {
     try {
+      const targetIdList = Array.from(targetIds);
       if (!exists) {
         addDoc(collection(db, 'favorites'), {
           userUid: String(userUid),
-          targetId: String(jobId),
+          targetId: primaryId,
           targetType: 'job',
           createdAt: new Date().toISOString()
         }).catch(() => {});
       } else {
         const favRef = collection(db, 'favorites');
-        const q = query(favRef, where('userUid', '==', String(userUid)), where('targetId', '==', String(jobId)));
+        const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'job'));
         getDocs(q).then(snap => {
-          snap.forEach(d => deleteDoc(doc(db, 'favorites', d.id)));
+          snap.forEach(d => {
+            const data = d.data();
+            if (data?.targetId && targetIdList.includes(String(data.targetId))) {
+              deleteDoc(doc(db, 'favorites', d.id)).catch(() => {});
+            }
+          });
         }).catch(() => {});
       }
     } catch (err) {
@@ -91,14 +155,38 @@ export function getFavoriteTalents(userOrUid = null) {
   const key = getUserStorageKey(STORAGE_KEY_FAV_TALENTS, userOrUid);
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];
   }
 }
 
+/**
+ * Checks if a given talent (by object or id) is in the favorite list.
+ */
+export function isTalentFavorited(talentOrId, favoriteTalentsList = []) {
+  if (!talentOrId || !Array.isArray(favoriteTalentsList) || favoriteTalentsList.length === 0) return false;
+
+  const targetIds = new Set();
+  if (typeof talentOrId === 'object' && talentOrId !== null) {
+    if (talentOrId.id !== undefined && talentOrId.id !== null) targetIds.add(String(talentOrId.id));
+    if (talentOrId.uid) targetIds.add(String(talentOrId.uid));
+    if (talentOrId.firestoreId) targetIds.add(String(talentOrId.firestoreId));
+  } else if (talentOrId !== undefined && talentOrId !== null) {
+    targetIds.add(String(talentOrId));
+  }
+
+  if (targetIds.size === 0) return false;
+
+  return favoriteTalentsList.some(favId => {
+    if (favId === undefined || favId === null) return false;
+    return targetIds.has(String(favId));
+  });
+}
+
 export async function fetchUserFavoriteTalentsFromFirestore(userUid) {
-  if (!userUid) return [];
+  if (!userUid) return getFavoriteTalents(null);
   try {
     const favRef = collection(db, 'favorites');
     const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'talent'));
@@ -122,14 +210,47 @@ export async function fetchUserFavoriteTalentsFromFirestore(userUid) {
   }
 }
 
-export function toggleFavoriteTalent(talentId, userOrUid = null) {
+export function toggleFavoriteTalent(talentOrId, userOrUid = null) {
   const userUid = typeof userOrUid === 'object' && userOrUid !== null
     ? (userOrUid.uid || userOrUid.id)
     : userOrUid;
+
+  const targetIds = new Set();
+  let primaryId = '';
+
+  if (typeof talentOrId === 'object' && talentOrId !== null) {
+    if (talentOrId.id !== undefined && talentOrId.id !== null) {
+      primaryId = String(talentOrId.id);
+      targetIds.add(primaryId);
+    }
+    if (talentOrId.uid) {
+      const uId = String(talentOrId.uid);
+      if (!primaryId) primaryId = uId;
+      targetIds.add(uId);
+    }
+    if (talentOrId.firestoreId) {
+      const fId = String(talentOrId.firestoreId);
+      if (!primaryId) primaryId = fId;
+      targetIds.add(fId);
+    }
+  } else if (talentOrId !== undefined && talentOrId !== null) {
+    primaryId = String(talentOrId);
+    targetIds.add(primaryId);
+  }
+
+  if (!primaryId) return getFavoriteTalents(userOrUid);
+
   const current = getFavoriteTalents(userOrUid);
-  const exists = current.some(id => String(id) === String(talentId));
-  const updated = exists ? current.filter(id => String(id) !== String(talentId)) : [...current, String(talentId)];
-  
+  const exists = current.some(id => targetIds.has(String(id)));
+
+  let updated;
+  if (exists) {
+    updated = current.filter(id => !targetIds.has(String(id)));
+  } else {
+    const idsToAdd = Array.from(targetIds);
+    updated = Array.from(new Set([...current.map(String), ...idsToAdd]));
+  }
+
   if (typeof localStorage !== 'undefined') {
     const key = getUserStorageKey(STORAGE_KEY_FAV_TALENTS, userOrUid);
     localStorage.setItem(key, JSON.stringify(updated));
@@ -138,18 +259,24 @@ export function toggleFavoriteTalent(talentId, userOrUid = null) {
   // Sincronizar com Firestore
   if (userUid) {
     try {
+      const targetIdList = Array.from(targetIds);
       if (!exists) {
         addDoc(collection(db, 'favorites'), {
           userUid: String(userUid),
-          targetId: String(talentId),
+          targetId: primaryId,
           targetType: 'talent',
           createdAt: new Date().toISOString()
         }).catch(() => {});
       } else {
         const favRef = collection(db, 'favorites');
-        const q = query(favRef, where('userUid', '==', String(userUid)), where('targetId', '==', String(talentId)));
+        const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'talent'));
         getDocs(q).then(snap => {
-          snap.forEach(d => deleteDoc(doc(db, 'favorites', d.id)));
+          snap.forEach(d => {
+            const data = d.data();
+            if (data?.targetId && targetIdList.includes(String(data.targetId))) {
+              deleteDoc(doc(db, 'favorites', d.id)).catch(() => {});
+            }
+          });
         }).catch(() => {});
       }
     } catch (err) {

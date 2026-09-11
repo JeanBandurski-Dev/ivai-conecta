@@ -8,7 +8,8 @@ import {
 import {
   getUserApplications, getJobs,
   updateJobStatus, deleteJob, getEndorsementRequests,
-  approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray
+  approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray,
+  isJobFavorited
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -50,10 +51,7 @@ export default function MinhasVagas() {
   
   const savedJobsList = useMemo(() => {
     if (!Array.isArray(favoriteJobs) || favoriteJobs.length === 0) return [];
-    return safeLiveJobs.filter(j => {
-      const jId = String(j.id || j.firestoreId || '');
-      return favoriteJobs.some(favId => String(favId) === jId || (j.firestoreId && String(favId) === String(j.firestoreId)));
-    });
+    return safeLiveJobs.filter(j => isJobFavorited(j, favoriteJobs));
   }, [safeLiveJobs, favoriteJobs]);
 
   const companyJobs = safeLiveJobs.filter(j => 

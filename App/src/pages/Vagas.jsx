@@ -3,12 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getJobs, addJob, calculateMatchScore, CITIES, getJobById, safeSkillsArray
+  getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
-import JobFormModal from '../components/JobFormModal';
+import PublishJobModal from '../components/PublishJobModal';
 import CustomSelect from '../components/ui/CustomSelect';
 
 const TYPES = [
@@ -92,18 +92,20 @@ export default function Vagas() {
     }
   }, [selectedCity]);
 
-  const handleSaveJob = async (jobPayload) => {
+  const handleOpenPublish = () => {
     const uRole = String(currentUser?.role || '').toLowerCase().trim();
-    if (!currentUser || (uRole !== 'empresa' && uRole !== 'company' && uRole !== 'recrutador')) {
-      showToast('⚠️ Apenas empresas cadastradas podem cadastrar e publicar vagas.');
-      return;
+    if (uRole === 'empresa' || uRole === 'company' || uRole === 'recrutador') {
+      setShowModal(true);
+    } else {
+      showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
     }
-    await addJob(jobPayload);
-    showToast('🎉 Vaga homologada e publicada com sucesso! Ela já está visível para candidatos e no seu painel.');
-    setShowModal(false);
-    setParams({});
-    setRefreshKey(k => k + 1);
   };
+
+  const handleJobCreated = () => {
+    setRefreshKey(k => k + 1);
+    setParams({});
+  };
+
   const toggleSkill = (skill) => {
     setSelectedSkills(prev =>
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
@@ -208,7 +210,7 @@ export default function Vagas() {
             </div>
 
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleOpenPublish}
               className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
             >
               <Plus size={18} /> Publicar Nova Vaga
@@ -391,15 +393,14 @@ export default function Vagas() {
         />
       )}
 
-      {/* New Job Modal (Padrão LinkedIn / Gupy Profissional) */}
-      <JobFormModal
+      {/* New Job Modal (Padrão Vale do Ivaí / 3 Passos Completo) */}
+      <PublishJobModal
         isOpen={showNewModal}
         onClose={() => {
           setShowModal(false);
           setParams({});
         }}
-        onSave={handleSaveJob}
-        currentUser={currentUser}
+        onJobCreated={handleJobCreated}
       />
     </>
   );

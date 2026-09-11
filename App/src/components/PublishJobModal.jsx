@@ -2,10 +2,19 @@ import React, { useState } from 'react';
 import {
   Briefcase, DollarSign, FileText, X, Check, ChevronLeft, ChevronRight,
   Plus, MapPin, Phone, Sparkles, Building2, RefreshCw, Globe, ShieldCheck,
-  Clock, Award, Gift, CheckCircle2, AlertCircle, Eye, Bookmark, Share2
+  Clock, Award, Gift, CheckCircle2, AlertCircle, Eye, Bookmark, Share2, Wand2
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { addJob, CITIES } from '../lib/ivaiConecta';
+import {
+  addJob,
+  CITIES,
+  STANDARD_JOB_TITLES,
+  validateJobTitle,
+  validateSkill,
+  validateBenefit,
+  validateProfessionalText,
+  getJobDescriptionTemplate
+} from '../lib/ivaiConecta';
 
 const SUGGESTED_SKILLS = [
   'Comunicação', 'Trabalho em Equipe', 'Atendimento ao Cliente', 'Organização',
@@ -44,6 +53,24 @@ const SCHEDULE_PRESETS = [
   'Escala 12x36'
 ];
 
+// Limites máximos configurados
+const LIMITS = {
+  TITLE_MAX: 80,
+  TITLE_MIN: 3,
+  SALARY_MAX: 40,
+  SALARY_NUMBER_MAX_DIGITS: 7,
+  WORKING_HOURS_MAX: 60,
+  PHONE_MAX: 15,
+  SKILLS_MAX_COUNT: 12,
+  SKILL_INPUT_MAX: 45,
+  BENEFITS_MAX_COUNT: 10,
+  BENEFIT_INPUT_MAX: 50,
+  DESCRIPTION_MAX: 2000,
+  DESCRIPTION_MIN: 15,
+  RESPONSIBILITIES_MAX_COUNT: 8,
+  RESPONSIBILITY_INPUT_MAX: 120
+};
+
 export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   const { currentUser, showToast } = useAppStore();
   const [step, setStep] = useState(1);
@@ -53,6 +80,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   const [previewTab, setPreviewTab] = useState('card'); // 'card' | 'details'
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [form, setForm] = useState({
     title: '',
@@ -71,21 +99,140 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
   if (!isOpen) return null;
 
+  // Formatação e máscara de telefone brasileiro
+  const formatPhone = (val) => {
+    const digits = String(val || '').replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 2) return digits.length ? `(${digits}` : '';
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  };
+
   const handleClose = () => {
     if (isPublishing) return;
     setStep(1);
+    setFieldErrors({});
     setShowMobilePreview(false);
     onClose();
   };
 
+  // Limpar erro de um campo específico ao digitar
+  const clearFieldError = (fieldName) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    }
+  };
+
+  // Validação do Step 1
+  // Validação do Step 1
+  const validateStep1 = () => {
+    const errors = {};
+    const titleClean = form.title.trim();
+
+    if (!titleClean) {
+      errors.title = 'Por favor, informe o cargo ou título da vaga.';
+    } else if (titleClean.length < LIMITS.TITLE_MIN) {
+      errors.title = `O título deve conter pelo menos ${LIMITS.TITLE_MIN} caracteres.`;
+    } else if (titleClean.length > LIMITS.TITLE_MAX) {
+      errors.title = `O título deve conter no máximo ${LIMITS.TITLE_MAX} caracteres.`;
+    }
+
+    if (form.recruiterPhone) {
+      const digits = form.recruiterPhone.replace(/\D/g, '');
+      if (digits.length > 0 && digits.length < 10) {
+        errors.recruiterPhone = 'Informe um telefone válido com DDD (10 ou 11 dígitos).';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Validação do Salário (Limite de Caracteres)
+  const validateSalary = (salary) => {
+    if (!salary || !salary.trim()) return { valid: true };
+    const clean = salary.trim();
+    if (clean.length > LIMITS.SALARY_MAX) {
+      return { valid: false, error: `O salário deve conter no máximo ${LIMITS.SALARY_MAX} caracteres.` };
+    }
+    return { valid: true };
+  };
+
+  // Validação do Step 2
+  const validateStep2 = () => {
+    const errors = {};
+    if (form.requiredSkills.length === 0) {
+      errors.skills = 'Adicione ao menos 1 competência ou requisito para a vaga.';
+    }
+    const salVal = validateSalary(form.salary);
+    if (!salVal.valid) {
+      errors.salary = salVal.error;
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Validação do Step 3
+  const validateStep3 = () => {
+    const errors = {};
+    const descClean = form.description.trim();
+    if (descClean && descClean.length > LIMITS.DESCRIPTION_MAX) {
+      errors.description = `A descrição excede o limite de ${LIMITS.DESCRIPTION_MAX} caracteres.`;
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (step === 1) {
+      if (!validateStep1()) {
+        showToast('⚠️ Corrija os campos indicados antes de avançar.');
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      if (!validateStep2()) {
+        showToast('⚠️ Adicione ao menos 1 competência antes de avançar.');
+        return;
+      }
+      setStep(3);
+    }
+  };
+
+  // Adicionar Habilidade com limites flexíveis
   const handleAddSkill = (skill) => {
     const s = (skill || skillInput).trim();
     if (!s) return;
+
     const current = Array.isArray(form.requiredSkills) ? form.requiredSkills : [];
-    if (!current.some(item => item.toLowerCase() === s.toLowerCase())) {
-      setForm(prev => ({ ...prev, requiredSkills: [...current, s] }));
+
+    if (current.length >= LIMITS.SKILLS_MAX_COUNT) {
+      showToast(`Limite máximo de ${LIMITS.SKILLS_MAX_COUNT} competências atingido.`);
+      return;
     }
+
+    if (s.length < 2) {
+      showToast('A competência deve conter no mínimo 2 caracteres.');
+      return;
+    }
+
+    if (s.length > LIMITS.SKILL_INPUT_MAX) {
+      showToast(`O nome da competência deve ter no máximo ${LIMITS.SKILL_INPUT_MAX} caracteres.`);
+      return;
+    }
+
+    if (current.some(item => item.toLowerCase() === s.toLowerCase())) {
+      showToast('Esta competência já foi adicionada.');
+      return;
+    }
+
+    setForm(prev => ({ ...prev, requiredSkills: [...current, s] }));
     setSkillInput('');
+    clearFieldError('skills');
   };
 
   const handleRemoveSkill = (skillToRemove) => {
@@ -95,32 +242,77 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     }));
   };
 
+  // Alternar Benefício com limites
   const handleToggleBenefit = (benefitName) => {
     const current = Array.isArray(form.benefits) ? form.benefits : [];
     const exists = current.includes(benefitName);
     if (exists) {
       setForm(prev => ({ ...prev, benefits: current.filter(b => b !== benefitName) }));
     } else {
+      if (current.length >= LIMITS.BENEFITS_MAX_COUNT) {
+        showToast(`Limite máximo de ${LIMITS.BENEFITS_MAX_COUNT} benefícios atingido.`);
+        return;
+      }
       setForm(prev => ({ ...prev, benefits: [...current, benefitName] }));
     }
   };
 
+  // Adicionar Benefício Personalizado
   const handleAddCustomBenefit = () => {
     const b = benefitInput.trim();
     if (!b) return;
+
     const current = Array.isArray(form.benefits) ? form.benefits : [];
-    if (!current.includes(b)) {
-      setForm(prev => ({ ...prev, benefits: [...current, b] }));
+
+    if (current.length >= LIMITS.BENEFITS_MAX_COUNT) {
+      showToast(`Limite máximo de ${LIMITS.BENEFITS_MAX_COUNT} benefícios atingido.`);
+      return;
     }
+
+    if (b.length < 2) {
+      showToast('O benefício deve conter no mínimo 2 caracteres.');
+      return;
+    }
+
+    if (b.length > LIMITS.BENEFIT_INPUT_MAX) {
+      showToast(`O benefício deve ter no máximo ${LIMITS.BENEFIT_INPUT_MAX} caracteres.`);
+      return;
+    }
+
+    if (current.some(item => item.toLowerCase() === b.toLowerCase())) {
+      showToast('Este benefício já foi adicionado.');
+      return;
+    }
+
+    setForm(prev => ({ ...prev, benefits: [...current, b] }));
     setBenefitInput('');
   };
 
+  // Adicionar Atividade / Responsabilidade
   const handleAddResponsibility = () => {
     const r = respInput.trim();
     if (!r) return;
+
+    const current = Array.isArray(form.responsibilities) ? form.responsibilities : [];
+
+    if (current.length >= LIMITS.RESPONSIBILITIES_MAX_COUNT) {
+      showToast(`Limite máximo de ${LIMITS.RESPONSIBILITIES_MAX_COUNT} atividades atingido.`);
+      return;
+    }
+
+    if (r.length < 3) {
+      showToast('A atividade deve conter no mínimo 3 caracteres.');
+      return;
+    }
+
+    if (r.length > LIMITS.RESPONSIBILITY_INPUT_MAX) {
+      showToast(`A atividade deve ter no máximo ${LIMITS.RESPONSIBILITY_INPUT_MAX} caracteres.`);
+      return;
+    }
+
     setForm(prev => ({
       ...prev,
-      responsibilities: [...(prev.responsibilities || []), r]
+      responsibilities: [...current, r]
     }));
     setRespInput('');
   };
@@ -132,33 +324,55 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     }));
   };
 
+  // Inserir Template Profissional Automático
+  const handleApplyTemplate = () => {
+    const companyName = currentUser?.company || currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Nossa Empresa';
+    const template = getJobDescriptionTemplate(form.title || 'Oportunidade Profissional', companyName);
+    setForm(prev => ({ ...prev, description: template }));
+    clearFieldError('description');
+    showToast('✨ Modelo estruturado de descrição inserido com sucesso!');
+  };
+
+  // Publicação final da vaga
   const handlePublish = async (e) => {
     if (e) e.preventDefault();
     if (isPublishing) return;
 
-    if (!form.title || !form.title.trim()) {
-      showToast('Por favor, informe o cargo / título da vaga.');
+    if (!validateStep1()) {
       setStep(1);
+      showToast('⚠️ Por favor, preencha o título da vaga corretamente.');
+      return;
+    }
+
+    if (!validateStep2()) {
+      setStep(2);
+      showToast('⚠️ Adicione ao menos 1 competência para a vaga.');
+      return;
+    }
+
+    if (!validateStep3()) {
+      setStep(3);
+      showToast('⚠️ Verifique o tamanho da descrição da vaga.');
       return;
     }
 
     const skillsArray = Array.isArray(form.requiredSkills)
       ? form.requiredSkills.filter(s => s && s.trim())
-      : (typeof form.requiredSkills === 'string' ? form.requiredSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+      : [];
 
     const benefitsArray = Array.isArray(form.benefits)
       ? form.benefits.filter(b => b && b.trim())
-      : (typeof form.benefits === 'string' ? form.benefits.split(',').map(b => b.trim()).filter(Boolean) : []);
+      : [];
 
     const responsibilitiesArray = Array.isArray(form.responsibilities)
       ? form.responsibilities.filter(r => r && r.trim())
-      : (typeof form.responsibilities === 'string' ? form.responsibilities.split('\n').map(r => r.trim()).filter(Boolean) : []);
+      : [];
 
     setIsPublishing(true);
     let created = null;
 
     try {
-      const companyName = currentUser?.company || currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'ValeTech Soluções Digitais';
+      const companyName = currentUser?.company || currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Regional';
       const companyLogo = currentUser?.avatar || currentUser?.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250';
       const userUid = currentUser?.uid || currentUser?.id || currentUser?.email || 'empresa';
 
@@ -205,6 +419,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
     try {
       setStep(1);
+      setFieldErrors({});
       setForm({
         title: '',
         type: 'Tempo Integral',
@@ -302,8 +517,8 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 px-2.5 py-1 rounded-full">
+              <div className="flex items-center gap-1.5 shrink-0 max-w-[45%]">
+                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 px-2.5 py-1 rounded-full truncate block max-w-full" title={displaySalary}>
                   {displaySalary}
                 </span>
               </div>
@@ -357,15 +572,20 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
             {/* Requisitos / Skills */}
             {form.requiredSkills.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {form.requiredSkills.map(skill => (
+              <div className="flex flex-wrap gap-1.5 pt-1 items-center">
+                {form.requiredSkills.slice(0, 3).map(skill => (
                   <span
                     key={skill}
-                    className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md"
+                    className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md truncate max-w-[130px]"
                   >
                     {skill}
                   </span>
                 ))}
+                {form.requiredSkills.length > 3 && (
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 font-semibold self-center">
+                    +{form.requiredSkills.length - 3} requisitos
+                  </span>
+                )}
               </div>
             ) : (
               <div className="text-[11px] text-gray-400 dark:text-slate-500 italic py-0.5">
@@ -382,12 +602,12 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
           </div>
         ) : (
           /* ── PREVIEW TAB: DETALHES COMPLETOS DA VAGA ── */
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm space-y-3.5 text-xs">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm space-y-3.5 text-xs overflow-hidden">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary-blue dark:text-blue-400">
                 Sobre a Oportunidade
               </span>
-              <p className={`mt-1 leading-relaxed text-xs ${
+              <p className={`mt-1 leading-relaxed text-xs whitespace-pre-line break-words [overflow-wrap:anywhere] ${
                 form.description ? 'text-gray-700 dark:text-slate-300' : 'text-gray-400 italic'
               }`}>
                 {form.description || 'A descrição detalhada da oportunidade aparecerá aqui conforme você preenche o campo...'}
@@ -401,9 +621,9 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                 </span>
                 <ul className="space-y-1">
                   {form.responsibilities.map((r, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-gray-700 dark:text-slate-300">
-                      <span className="text-primary-blue font-bold">•</span>
-                      <span>{r}</span>
+                    <li key={i} className="flex items-start gap-1.5 text-gray-700 dark:text-slate-300 break-words [overflow-wrap:anywhere]">
+                      <span className="text-primary-blue font-bold shrink-0">•</span>
+                      <span className="min-w-0 flex-1">{r}</span>
                     </li>
                   ))}
                 </ul>
@@ -485,9 +705,15 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                   key={s.num}
                   type="button"
                   onClick={() => {
-                    if (s.num > 1 && !form.title.trim()) {
-                      showToast('Informe o cargo da vaga antes de prosseguir.');
+                    if (s.num === 2 && !validateStep1()) {
+                      showToast('Preencha o cargo corretamente antes de ir para a etapa 2.');
                       return;
+                    }
+                    if (s.num === 3) {
+                      if (!validateStep1() || !validateStep2()) {
+                        showToast('Complete os requisitos anteriores antes de avançar.');
+                        return;
+                      }
                     }
                     setStep(s.num);
                   }}
@@ -539,28 +765,65 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                   
                   {/* Título do Cargo */}
                   <div>
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1.5">
-                      Título do Cargo / Função <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                        Título do Cargo / Função <span className="text-red-500">*</span>
+                      </label>
+                      <span className={`text-[10px] font-semibold ${
+                        form.title.length > LIMITS.TITLE_MAX ? 'text-red-500 font-bold' : 'text-gray-400'
+                      }`}>
+                        {form.title.length}/{LIMITS.TITLE_MAX} caracteres
+                      </span>
+                    </div>
                     <div className="relative">
                       <input
                         type="text"
+                        maxLength={LIMITS.TITLE_MAX}
                         placeholder="Ex: Assistente Administrativo, Vendedor Comercial, Desenvolvedor React..."
                         value={form.title}
-                        onChange={e => setForm({ ...form, title: e.target.value })}
+                        onChange={e => {
+                          setForm({ ...form, title: e.target.value });
+                          clearFieldError('title');
+                        }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (form.title.trim()) setStep(2);
-                            else showToast('Por favor, informe o título do cargo.');
+                            handleNextStep();
                           }
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold outline-none focus:border-primary-blue focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white transition-all placeholder:text-gray-400 placeholder:font-normal"
+                        className={`w-full bg-slate-50 dark:bg-slate-800/80 border rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white transition-all placeholder:text-gray-400 placeholder:font-normal ${
+                          fieldErrors.title
+                            ? 'border-red-400 dark:border-red-500/80 bg-red-50/20'
+                            : 'border-gray-200 dark:border-slate-700 focus:border-primary-blue'
+                        }`}
                         autoFocus
                         required
                       />
                       <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-blue pointer-events-none" />
                     </div>
+                    {fieldErrors.title ? (
+                      <p className="mt-1.5 text-xs text-red-500 font-semibold flex items-center gap-1">
+                        <AlertCircle size={13} className="shrink-0" />
+                        {fieldErrors.title}
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sugestões:</span>
+                        {STANDARD_JOB_TITLES.slice(0, 4).map(st => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => {
+                              setForm({ ...form, title: st });
+                              clearFieldError('title');
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:text-primary-blue hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer border border-transparent hover:border-blue-200"
+                          >
+                            + {st}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Nível de Experiência */}
@@ -667,12 +930,18 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1.5">
-                        Carga Horária & Dias
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                          Carga Horária & Dias
+                        </label>
+                        <span className="text-[10px] text-gray-400">
+                          {form.workingHours.length}/{LIMITS.WORKING_HOURS_MAX}
+                        </span>
+                      </div>
                       <div className="relative">
                         <input
                           type="text"
+                          maxLength={LIMITS.WORKING_HOURS_MAX}
                           placeholder="Ex: 08:00 às 18:00 (Seg a Sex)"
                           value={form.workingHours}
                           onChange={e => setForm({ ...form, workingHours: e.target.value })}
@@ -700,19 +969,38 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
                   {/* Telefone para Contato */}
                   <div>
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1.5">
-                      Telefone Comercial / WhatsApp para Contato <span className="text-gray-400 font-normal">(Opcional)</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                        Telefone Comercial / WhatsApp <span className="text-gray-400 font-normal">(Opcional)</span>
+                      </label>
+                      <span className="text-[10px] text-gray-400">
+                        {form.recruiterPhone.length}/{LIMITS.PHONE_MAX}
+                      </span>
+                    </div>
                     <div className="relative">
                       <input
                         type="text"
+                        maxLength={LIMITS.PHONE_MAX}
                         placeholder="(43) 99999-9999"
                         value={form.recruiterPhone}
-                        onChange={e => setForm({ ...form, recruiterPhone: e.target.value })}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-semibold text-gray-900 dark:text-white outline-none focus:border-primary-blue"
+                        onChange={e => {
+                          const formatted = formatPhone(e.target.value);
+                          setForm({ ...form, recruiterPhone: formatted });
+                          clearFieldError('recruiterPhone');
+                        }}
+                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-semibold text-gray-900 dark:text-white outline-none ${
+                          fieldErrors.recruiterPhone
+                            ? 'border-red-400 bg-red-50/20'
+                            : 'border-gray-200 dark:border-slate-700 focus:border-primary-blue'
+                        }`}
                       />
                       <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-blue pointer-events-none" />
                     </div>
+                    {fieldErrors.recruiterPhone && (
+                      <p className="mt-1 text-xs text-red-500 font-semibold flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.recruiterPhone}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -725,26 +1013,61 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                   
                   {/* Remuneração */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block">
-                      Faixa Salarial / Bolsa-Auxílio
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                        Faixa Salarial / Bolsa-Auxílio
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-gray-400">
+                          (Números: máx. 7 dígitos · Texto: máx. {LIMITS.SALARY_MAX} carac.)
+                        </span>
+                        <span className={`text-[10px] font-semibold ${
+                          form.salary.length > LIMITS.SALARY_MAX ? 'text-red-500 font-bold' : 'text-gray-400'
+                        }`}>
+                          {form.salary.length}/{LIMITS.SALARY_MAX}
+                        </span>
+                      </div>
+                    </div>
                     <div className="relative">
                       <input
                         type="text"
+                        maxLength={LIMITS.SALARY_MAX}
                         placeholder="Ex: R$ 2.500 - R$ 3.500 / mês ou A Combinar"
                         value={form.salary}
-                        onChange={e => setForm({ ...form, salary: e.target.value })}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl pl-10 pr-4 py-2.5 text-sm font-bold outline-none focus:border-primary-blue text-gray-900 dark:text-white"
+                        onChange={e => {
+                          const raw = e.target.value;
+                          // Limita qualquer sequência ininterrupta de números a no máximo 7 dígitos
+                          let val = raw.replace(/\d{8,}/g, (match) => match.slice(0, 7));
+                          if (val.length > LIMITS.SALARY_MAX) {
+                            val = val.slice(0, LIMITS.SALARY_MAX);
+                          }
+                          setForm(prev => ({ ...prev, salary: val }));
+                          clearFieldError('salary');
+                        }}
+                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-2xl pl-10 pr-4 py-2.5 text-sm font-bold outline-none text-gray-900 dark:text-white transition-all ${
+                          fieldErrors.salary
+                            ? 'border-red-400 dark:border-red-500/80 bg-red-50/20'
+                            : 'border-gray-200 dark:border-slate-700 focus:border-primary-blue'
+                        }`}
                       />
                       <DollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none" />
                     </div>
+
+                    {fieldErrors.salary && (
+                      <p className="text-xs text-red-500 font-semibold flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.salary}
+                      </p>
+                    )}
 
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                       {SALARY_PRESETS.map(sal => (
                         <button
                           key={sal}
                           type="button"
-                          onClick={() => setForm({ ...form, salary: sal })}
+                          onClick={() => {
+                            setForm({ ...form, salary: sal });
+                            clearFieldError('salary');
+                          }}
                           className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition-all cursor-pointer border border-emerald-200/60 dark:border-emerald-800 font-semibold"
                         >
                           {sal}
@@ -757,39 +1080,55 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
-                        Competências & Requisitos Desejados ({form.requiredSkills.length})
+                        Competências & Requisitos Desejados ({form.requiredSkills.length}/{LIMITS.SKILLS_MAX_COUNT}) <span className="text-red-500">*</span>
                       </label>
-                      <span className="text-[11px] text-gray-400">Pressione Enter ou clique em Adicionar</span>
+                      <span className="text-[10px] text-gray-400">Pressione Enter ou clique em Adicionar</span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Digite uma habilidade (ex: Atendimento, Pacote Office, React)..."
-                        value={skillInput}
-                        onChange={e => setSkillInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddSkill();
-                          }
-                        }}
-                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-medium outline-none focus:border-primary-blue text-gray-900 dark:text-white"
-                      />
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          maxLength={LIMITS.SKILL_INPUT_MAX}
+                          placeholder="Digite uma habilidade (ex: Atendimento, Pacote Office, React)..."
+                          value={skillInput}
+                          onChange={e => setSkillInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddSkill();
+                            }
+                          }}
+                          disabled={form.requiredSkills.length >= LIMITS.SKILLS_MAX_COUNT}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-medium outline-none focus:border-primary-blue text-gray-900 dark:text-white disabled:opacity-50"
+                        />
+                        {skillInput.length > 0 && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                            {skillInput.length}/{LIMITS.SKILL_INPUT_MAX}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleAddSkill()}
-                        className="bg-primary-blue hover:bg-blue-600 text-white px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shrink-0 transition-all shadow-xs"
+                        disabled={form.requiredSkills.length >= LIMITS.SKILLS_MAX_COUNT || !skillInput.trim()}
+                        className="bg-primary-blue hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shrink-0 transition-all shadow-xs"
                       >
                         <Plus size={14} /> Adicionar
                       </button>
                     </div>
 
+                    {fieldErrors.skills && (
+                      <p className="text-xs text-red-500 font-semibold flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.skills}
+                      </p>
+                    )}
+
                     {/* Chips Ativos */}
                     <div className="flex flex-wrap gap-1.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 min-h-[48px] items-center">
                       {form.requiredSkills.length === 0 ? (
                         <span className="text-gray-400 text-xs italic">
-                          Nenhuma habilidade adicionada ainda.
+                          Nenhuma competência adicionada ainda (adicione ao menos 1).
                         </span>
                       ) : (
                         form.requiredSkills.map(skill => (
@@ -802,6 +1141,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                               type="button"
                               onClick={() => handleRemoveSkill(skill)}
                               className="text-blue-400 hover:text-red-500 cursor-pointer"
+                              title="Remover"
                             >
                               <X size={12} />
                             </button>
@@ -817,12 +1157,18 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                         {SUGGESTED_SKILLS.map(skill => {
                           const isAdded = form.requiredSkills.some(s => s.toLowerCase() === skill.toLowerCase());
                           if (isAdded) return null;
+                          const isMax = form.requiredSkills.length >= LIMITS.SKILLS_MAX_COUNT;
                           return (
                             <button
                               key={skill}
                               type="button"
                               onClick={() => handleAddSkill(skill)}
-                              className="px-2.5 py-1 rounded-lg text-[11px] bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-primary-blue dark:hover:text-blue-300 border border-transparent hover:border-blue-200 transition-colors cursor-pointer"
+                              disabled={isMax}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors border ${
+                                isMax
+                                  ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-gray-400 border-transparent'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-primary-blue dark:hover:text-blue-300 border-transparent hover:border-blue-200 cursor-pointer'
+                              }`}
                             >
                               + {skill}
                             </button>
@@ -834,22 +1180,29 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
                   {/* Benefícios */}
                   <div className="space-y-2.5">
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block">
-                      Benefícios Oferecidos ({form.benefits.length})
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                        Benefícios Oferecidos ({form.benefits.length}/{LIMITS.BENEFITS_MAX_COUNT})
+                      </label>
+                      <span className="text-[10px] text-gray-400">Selecione ou crie personalizados</span>
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {SUGGESTED_BENEFITS.map(b => {
                         const isChecked = form.benefits.includes(b);
+                        const isMax = !isChecked && form.benefits.length >= LIMITS.BENEFITS_MAX_COUNT;
                         return (
                           <button
                             key={b}
                             type="button"
                             onClick={() => handleToggleBenefit(b)}
-                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-left transition-all cursor-pointer ${
-                              isChecked
-                                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold'
-                                : 'bg-slate-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-emerald-300'
+                            disabled={isMax}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-left transition-all ${
+                              isMax
+                                ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-400'
+                                : isChecked
+                                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold cursor-pointer'
+                                : 'bg-slate-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-emerald-300 cursor-pointer'
                             }`}
                           >
                             <span className="text-xs truncate">{b}</span>
@@ -865,23 +1218,33 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
                     {/* Adicionar Benefício Personalizado */}
                     <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="text"
-                        placeholder="Outro benefício (ex: Bonificação por Metas)..."
-                        value={benefitInput}
-                        onChange={e => setBenefitInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddCustomBenefit();
-                          }
-                        }}
-                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-primary-blue text-gray-900 dark:text-white"
-                      />
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          maxLength={LIMITS.BENEFIT_INPUT_MAX}
+                          placeholder="Outro benefício (ex: Bonificação por Metas)..."
+                          value={benefitInput}
+                          onChange={e => setBenefitInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomBenefit();
+                            }
+                          }}
+                          disabled={form.benefits.length >= LIMITS.BENEFITS_MAX_COUNT}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-primary-blue text-gray-900 dark:text-white disabled:opacity-50"
+                        />
+                        {benefitInput.length > 0 && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                            {benefitInput.length}/{LIMITS.BENEFIT_INPUT_MAX}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={handleAddCustomBenefit}
-                        className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+                        disabled={form.benefits.length >= LIMITS.BENEFITS_MAX_COUNT || !benefitInput.trim()}
+                        className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-slate-200 font-bold text-xs rounded-xl cursor-pointer transition-colors"
                       >
                         + Adicionar
                       </button>
@@ -896,43 +1259,73 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
               {step === 3 && (
                 <div className="space-y-6 animate-in fade-in duration-200">
                   
-                  {/* Descrição */}
+                  {/* Descrição com Contador e Template Helper */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
                         Descrição da Vaga & Contexto da Empresa
                       </label>
-                      <span className="text-[10px] text-gray-400">
-                        {form.description.length} caracteres
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleApplyTemplate}
+                          className="text-[10px] font-bold text-primary-blue dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Inserir modelo padrão estruturado"
+                        >
+                          <Wand2 size={11} /> Usar Modelo Padrão
+                        </button>
+                        <span className={`text-[10px] font-semibold ${
+                          form.description.length > LIMITS.DESCRIPTION_MAX ? 'text-red-500 font-bold' : 'text-gray-400'
+                        }`}>
+                          {form.description.length}/{LIMITS.DESCRIPTION_MAX}
+                        </span>
+                      </div>
                     </div>
                     <textarea
-                      rows={4}
+                      rows={5}
+                      maxLength={LIMITS.DESCRIPTION_MAX}
                       placeholder="Descreva o objetivo da contratação, o ambiente de trabalho e o que a empresa espera do candidato..."
                       value={form.description}
-                      onChange={e => setForm({ ...form, description: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-3.5 text-xs leading-relaxed outline-none focus:border-primary-blue text-gray-900 dark:text-white placeholder:text-gray-400"
+                      onChange={e => {
+                        setForm({ ...form, description: e.target.value });
+                        clearFieldError('description');
+                      }}
+                      className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-2xl p-3.5 text-xs leading-relaxed outline-none text-gray-900 dark:text-white placeholder:text-gray-400 ${
+                        fieldErrors.description
+                          ? 'border-red-400 bg-red-50/20'
+                          : 'border-gray-200 dark:border-slate-700 focus:border-primary-blue'
+                      }`}
                     />
+                    {fieldErrors.description && (
+                      <p className="mt-1 text-xs text-red-500 font-semibold flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.description}
+                      </p>
+                    )}
                   </div>
 
                   {/* Atividades & Responsabilidades */}
                   <div className="space-y-2.5">
-                    <label className="text-xs font-bold text-gray-800 dark:text-slate-200 block">
-                      Principais Atividades & Responsabilidades
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
+                        Principais Atividades & Responsabilidades ({form.responsibilities.length}/{LIMITS.RESPONSIBILITIES_MAX_COUNT})
+                      </label>
+                      <span className="text-[10px] text-gray-400">Até {LIMITS.RESPONSIBILITIES_MAX_COUNT} tópicos</span>
+                    </div>
 
                     {form.responsibilities.length > 0 && (
                       <div className="space-y-1.5">
                         {form.responsibilities.map((resp, idx) => (
-                          <div key={idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs">
-                            <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300 text-[10px] font-black flex items-center justify-center shrink-0">
+                          <div key={idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs w-full overflow-hidden">
+                            <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300 text-[10px] font-black flex items-center justify-center shrink-0">
                               {idx + 1}
                             </span>
-                            <span className="flex-1 text-gray-800 dark:text-slate-200 font-medium">{resp}</span>
+                            <span className="flex-1 min-w-0 text-gray-800 dark:text-slate-200 font-medium break-words [overflow-wrap:anywhere] leading-snug">
+                              {resp}
+                            </span>
                             <button
                               type="button"
                               onClick={() => handleRemoveResponsibility(idx)}
-                              className="text-gray-400 hover:text-red-500 cursor-pointer p-0.5"
+                              className="text-gray-400 hover:text-red-500 cursor-pointer p-1 shrink-0 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                               title="Remover atividade"
                             >
                               <X size={14} />
@@ -943,23 +1336,33 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                     )}
 
                     <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Adicione uma atividade (ex: Atendimento a clientes, Elaboração de relatórios)..."
-                        value={respInput}
-                        onChange={e => setRespInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddResponsibility();
-                          }
-                        }}
-                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-primary-blue text-gray-900 dark:text-white"
-                      />
+                      <div className="relative flex-1 min-w-0">
+                        <input
+                          type="text"
+                          maxLength={LIMITS.RESPONSIBILITY_INPUT_MAX}
+                          placeholder="Adicione uma atividade (ex: Atendimento a clientes, Elaboração de relatórios)..."
+                          value={respInput}
+                          onChange={e => setRespInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddResponsibility();
+                            }
+                          }}
+                          disabled={form.responsibilities.length >= LIMITS.RESPONSIBILITIES_MAX_COUNT}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3.5 pr-14 py-2 text-xs outline-none focus:border-primary-blue text-gray-900 dark:text-white disabled:opacity-50"
+                        />
+                        {respInput.length > 0 && (
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                            {respInput.length}/{LIMITS.RESPONSIBILITY_INPUT_MAX}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={handleAddResponsibility}
-                        className="bg-primary-blue hover:bg-blue-600 text-white px-3.5 py-2 font-bold text-xs rounded-xl cursor-pointer shrink-0 transition-colors"
+                        disabled={form.responsibilities.length >= LIMITS.RESPONSIBILITIES_MAX_COUNT || !respInput.trim()}
+                        className="bg-primary-blue hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 font-bold text-xs rounded-xl cursor-pointer shrink-0 transition-colors"
                       >
                         + Adicionar
                       </button>
@@ -1032,13 +1435,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
             {step < 3 ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (step === 1 && !form.title.trim()) {
-                    showToast('Por favor, informe o cargo/título da vaga.');
-                    return;
-                  }
-                  setStep(prev => prev + 1);
-                }}
+                onClick={handleNextStep}
                 className="btn btn-primary px-5 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-brand-sm"
               >
                 <span>{step === 1 ? 'Requisitos & Salário' : 'Descrição & Atividades'}</span>

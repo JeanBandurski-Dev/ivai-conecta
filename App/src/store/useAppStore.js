@@ -13,6 +13,8 @@ import {
   CITIES,
   getFavoriteJobs,
   getFavoriteTalents,
+  isJobFavorited,
+  isTalentFavorited,
   toggleFavoriteJob as libToggleFavoriteJob,
   toggleFavoriteTalent as libToggleFavoriteTalent,
   fetchUserFavoriteJobsFromFirestore,
@@ -24,8 +26,8 @@ const initialAuthUser = getAuthUser();
 const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
   currentUser: initialAuthUser,
-  authLoading: true,
-  isAuthReady: false,
+  authLoading: false,
+  isAuthReady: true,
 
   // ─── Favorites State (User-Scoped) ─────────────────────
   favoriteJobs: getFavoriteJobs(initialAuthUser),
@@ -33,7 +35,9 @@ const useAppStore = create((set, get) => ({
 
   syncUserFavorites: async (user) => {
     if (!user) {
-      set({ favoriteJobs: [], favoriteTalents: [] });
+      const guestJobs = getFavoriteJobs(null);
+      const guestTalents = getFavoriteTalents(null);
+      set({ favoriteJobs: guestJobs, favoriteTalents: guestTalents });
       return;
     }
     const localJobs = getFavoriteJobs(user);
@@ -58,7 +62,14 @@ const useAppStore = create((set, get) => ({
   },
 
   initAuthListener: () => {
-    return watchAuthState((user) => {
+    const safetyTimer = setTimeout(() => {
+      if (get().authLoading) {
+        set({ authLoading: false, isAuthReady: true });
+      }
+    }, 1500);
+
+    const unsubscribe = watchAuthState((user) => {
+      clearTimeout(safetyTimer);
       set({
         currentUser: user,
         authLoading: false,
@@ -66,6 +77,11 @@ const useAppStore = create((set, get) => ({
       });
       get().syncUserFavorites(user);
     });
+
+    return () => {
+      clearTimeout(safetyTimer);
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   },
 
   login: async (email, password) => {
@@ -106,7 +122,9 @@ const useAppStore = create((set, get) => ({
 
   logout: async () => {
     await libLogout();
-    set({ currentUser: null, authLoading: false, favoriteJobs: [], favoriteTalents: [] });
+    const guestJobs = getFavoriteJobs(null);
+    const guestTalents = getFavoriteTalents(null);
+    set({ currentUser: null, authLoading: false, favoriteJobs: guestJobs, favoriteTalents: guestTalents });
   },
 
   setCurrentUser: (user) => {
@@ -152,22 +170,22 @@ const useAppStore = create((set, get) => ({
   },
 
   // ─── Favorites Actions ─────────────────────────────────
-  toggleFavoriteJob: (jobId) => {
+  toggleFavoriteJob: (jobOrId) => {
     const user = get().currentUser;
     const current = get().favoriteJobs;
-    const exists = current.some(id => String(id) === String(jobId));
-    const updated = libToggleFavoriteJob(jobId, user);
+    const wasFavorite = isJobFavorited(jobOrId, current);
+    const updated = libToggleFavoriteJob(jobOrId, user);
     set({ favoriteJobs: updated });
-    return !exists;
+    return !wasFavorite;
   },
 
-  toggleFavoriteTalent: (talentId) => {
+  toggleFavoriteTalent: (talentOrId) => {
     const user = get().currentUser;
     const current = get().favoriteTalents;
-    const exists = current.some(id => String(id) === String(talentId));
-    const updated = libToggleFavoriteTalent(talentId, user);
+    const wasFavorite = isTalentFavorited(talentOrId, current);
+    const updated = libToggleFavoriteTalent(talentOrId, user);
     set({ favoriteTalents: updated });
-    return !exists;
+    return !wasFavorite;
   },
 
   // ─── Toast State ──────────────────────────────────────
