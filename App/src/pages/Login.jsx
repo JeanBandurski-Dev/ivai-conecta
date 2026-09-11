@@ -478,16 +478,13 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Bloco de Validação de CNPJ (Empresas) com Desdobramento em Animação Fluida */}
-                <div
-                  className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
-                    selectedRole === 'empresa'
-                      ? 'grid-rows-[1fr] opacity-100 translate-y-0 my-1'
-                      : 'grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none my-0'
-                  }`}
-                >
-                  <div className="min-h-0 overflow-hidden">
-                    <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs">
+                {/* Slot Reservado Fixo: Mantém o Formulário Estável sem Deslocar a Tela ao Abrir o CNPJ */}
+                <div className="min-h-[72px] relative flex flex-col justify-center my-1">
+                  {selectedRole === 'empresa' ? (
+                    <div
+                      key="cnpj-empresa-box"
+                      className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs animate-in fade-in-50 zoom-in-98 duration-300 ease-out"
+                    >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                           <Building2 size={13} className="text-primary-blue dark:text-blue-400 animate-pulse" />
@@ -507,6 +504,7 @@ export default function Login() {
                           placeholder="00.000.000/0000-00"
                           maxLength={18}
                           required={selectedRole === 'empresa'}
+                          autoFocus
                         />
                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                           {cnpjLoading && <Loader2 size={14} className="animate-spin text-primary-blue" />}
@@ -530,7 +528,27 @@ export default function Login() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  ) : (
+                    <div
+                      key={`role-placeholder-${selectedRole}`}
+                      className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400 animate-in fade-in-50 duration-200"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center shrink-0">
+                          <Sparkles size={12} />
+                        </div>
+                        <p className="text-[11px] leading-tight truncate text-gray-600 dark:text-slate-300">
+                          {selectedRole === 'aluno' && 'Acesso a estágios e vagas iniciais de empresas parceiras regionais.'}
+                          {selectedRole === 'professor' && 'Validação de pareceres acadêmicos e orientação de projetos.'}
+                          {selectedRole === 'freelancer' && 'Vitrine de portfólio para captação de clientes no Vale do Ivaí.'}
+                          {selectedRole === 'candidato' && 'Oportunidades profissionais e conexão direta com recrutadores.'}
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
+                        {selectedRole}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Grade de 2 Colunas para Campos de Entrada */}
