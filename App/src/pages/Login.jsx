@@ -442,7 +442,7 @@ export default function Login() {
               <form key="register-form" onSubmit={handleRegister} className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out fill-mode-both">
                 
                 {/* Seletor Compacto de Papel em Linha Única com Microinterações */}
-                <div className="space-y-1">
+                <div className="space-y-1.5 mb-1">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
                       Perfil de Atuação
@@ -478,8 +478,8 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Slot Reservado Fixo: Mantém o Formulário Estável com Abertura e Fechamento Lentos */}
-                <div className="relative min-h-[72px] my-1">
+                {/* Slot Reservado Fixo: Mantém o Formulário Estável com Espaçamento Confortável */}
+                <div className="relative min-h-[82px] mt-3 mb-2.5">
                   {/* Painel CNPJ Empresa com Abertura e Fechamento Fluidos (0.75s) */}
                   <div className={`cnpj-accordion-container ${selectedRole === 'empresa' ? 'is-open' : ''}`}>
                     <div className="min-h-0 overflow-hidden">
