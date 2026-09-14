@@ -7,6 +7,10 @@ import {
   STORAGE_KEY_ENDORSEMENT_REQUESTS,
 } from '../data/seedData.js';
 
+import { matchCity } from '../utils/searchUtils.js';
+
+let _memTalentsCache = null;
+
 /**
  * Normaliza um documento de usuário para uso no Banco de Talentos / Perfis
  */
@@ -18,7 +22,7 @@ function normalizeUserDoc(docData, docId) {
     firestoreId: docId,
     name: data.name || 'Usuário',
     role: data.role || 'aluno',
-    city: data.city || 'Ivaiporã',
+    city: data.city || '',
     avatar: data.avatar || '',
     skills: data.skills || [],
     endorsements: data.endorsements || [],
@@ -60,22 +64,24 @@ function normalizeTeacherDoc(docData, docId) {
  * Escuta banco de talentos em tempo real via Firestore onSnapshot da coleção 'users'
  */
 export function subscribeToTalents(city = 'Todas as Cidades', callback) {
+  callback(getTalents(city));
+
   try {
     const usersRef = collection(db, 'users');
 
     return onSnapshot(usersRef, (snapshot) => {
       const allUsers = snapshot.docs.map(d => normalizeUserDoc(d.data(), d.id));
-      let remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
+      const remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
 
-      if (city && city !== 'Todas as Cidades') {
-        remoteTalents = remoteTalents.filter(t => t.city && t.city.toLowerCase() === city.toLowerCase());
-      }
-
+      _memTalentsCache = remoteTalents;
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remoteTalents));
+        try {
+          localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remoteTalents));
+        } catch {}
       }
 
-      callback(remoteTalents);
+      const filtered = remoteTalents.filter(t => matchCity(t.city, city));
+      callback(filtered);
     }, (error) => {
       console.warn('[Firestore Talents Listener] Offline fallback:', error.message);
       callback(getTalents(city));
@@ -101,7 +107,9 @@ export function subscribeToTeachers(callback) {
         .filter(u => u.role === 'professor');
 
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remoteTeachers));
+        try {
+          localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remoteTeachers));
+        } catch {}
       }
 
       callback(remoteTeachers);
@@ -118,32 +126,23 @@ export function subscribeToTeachers(callback) {
 
 export function getTalents(city = 'Todas as Cidades') {
   let talents = [];
-  if (typeof localStorage !== 'undefined') {
+  if (Array.isArray(_memTalentsCache) && _memTalentsCache.length > 0) {
+    talents = _memTalentsCache;
+  } else if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_TALENTS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) talents = parsed;
+        if (Array.isArray(parsed)) {
+          talents = parsed;
+          _memTalentsCache = parsed;
+        }
       } catch {}
     }
   }
 
-  // Sync background com o Firestore (coleção 'users')
-  try {
-    const usersRef = collection(db, 'users');
-    getDocs(usersRef).then(snapshot => {
-      const remote = snapshot.docs
-        .map(d => normalizeUserDoc(d.data(), d.id))
-        .filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
-
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remote));
-      }
-    }).catch(err => console.warn('[Firestore] getTalents offline:', err.message));
-  } catch {}
-
   if (!city || city === 'Todas as Cidades') return talents;
-  return talents.filter(t => t.city && t.city.toLowerCase() === city.toLowerCase());
+  return talents.filter(t => matchCity(t.city, city));
 }
 
 export function getTalentById(id) {

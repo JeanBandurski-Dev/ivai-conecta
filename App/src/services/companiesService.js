@@ -10,6 +10,7 @@ import { getJobs, subscribeToJobs } from './jobsService.js';
 import { subscribeToTalents } from './talentsService.js';
 import { subscribeToServices } from './servicesService.js';
 import { getUsersDB } from './authService.js';
+import { matchCity } from '../utils/searchUtils.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 
@@ -108,8 +109,8 @@ export function getCompanies(city = 'Todas as Cidades') {
   }
 
   return companiesList.filter(c => 
-    (c.city && c.city.toLowerCase() === city.toLowerCase()) ||
-    (c.activeJobs && c.activeJobs.some(j => j.city && j.city.toLowerCase() === city.toLowerCase()))
+    matchCity(c.city, city) ||
+    (c.activeJobs && c.activeJobs.some(j => matchCity(j.city, city)))
   );
 }
 

@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { applyToJob, calculateMatchScore, isSkillMatch, getUsersDB, updateJobStatus, safeSkillsArray, getUserApplications } from '../lib/ivaiConecta';
+import {
+  applyToJob, calculateMatchScore, isSkillMatch, getUsersDB,
+  updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications
+} from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -56,21 +59,63 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   }) : null);
 
   useEffect(() => {
-    if (!currentUser || !isCandidate || !jobId) return;
-    const userUid = currentUser.uid || currentUser.id || currentUser.email;
-    const apps = getUserApplications(userUid);
-    const hasApplied = apps.some(a => String(a.jobId) === String(jobId));
-    if (hasApplied) {
+    if (!currentUser || !isCandidate) return;
+    const userUid = currentUser.uid || currentUser.id;
+    const userEmail = currentUser.email?.toLowerCase().trim();
+    const possibleJobIds = [
+      String(job?.id || ''),
+      String(job?.firestoreId || ''),
+      String(jobId || '')
+    ].filter(Boolean);
+
+    const checkIsApplied = (list) => {
+      if (!Array.isArray(list)) return false;
+      return list.some(a => {
+        const matchesJob = possibleJobIds.includes(String(a.jobId || '')) ||
+                           (a.firestoreJobId && possibleJobIds.includes(String(a.firestoreJobId))) ||
+                           (a.originalJobId && possibleJobIds.includes(String(a.originalJobId)));
+        const matchesUser = (userUid && (String(a.candidateUid) === String(userUid) || String(a.candidateId) === String(userUid))) ||
+                            (userEmail && String(a.candidateEmail || '').toLowerCase().trim() === userEmail);
+        return matchesJob && matchesUser;
+      });
+    };
+
+    // Verificação inicial no cache local
+    if (checkIsApplied(getUserApplications())) {
       setApplied(true);
     }
-  }, [jobId, currentUser, isCandidate]);
+
+    // Assinatura em tempo real de candidaturas
+    const unsub = subscribeToApplications(userUid, (apps) => {
+      if (checkIsApplied(apps)) {
+        setApplied(true);
+      }
+    });
+
+    const handleLocalAppsUpdate = () => {
+      if (checkIsApplied(getUserApplications())) {
+        setApplied(true);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ivai_applications_updated', handleLocalAppsUpdate);
+    }
+
+    return () => {
+      if (typeof unsub === 'function') unsub();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('ivai_applications_updated', handleLocalAppsUpdate);
+      }
+    };
+  }, [job, jobId, currentUser, isCandidate]);
 
   const handleToggleJobStatus = async () => {
     const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
     await updateJobStatus(jobId, action);
     const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
     setCurrentStatus(newStatus);
-    showToast(action === 'close' ? '🔒 Vaga encerrada com sucesso!' : '🔓 Vaga reaberta com sucesso!');
+    showToast(action === 'close' ? 'Vaga encerrada com sucesso!' : 'Vaga reaberta com sucesso!');
   };
 
   const handleApply = async () => {
@@ -88,6 +133,10 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       }
       return;
     }
+    if (applied) {
+      showToast('Você já se candidatou a esta vaga!');
+      return;
+    }
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -95,9 +144,12 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       const res = await applyToJob(jobId, currentUser);
       if (res?.success) {
         setApplied(true);
-        showToast('🎉 Candidatura realizada com sucesso!');
+        showToast('Candidatura realizada com sucesso!');
       } else {
         showToast(res?.message || 'Não foi possível concluir a candidatura.');
+        if (res?.message?.includes('já se candidatou')) {
+          setApplied(true);
+        }
       }
     } catch {
       showToast('Erro ao processar candidatura. Tente novamente.');
@@ -367,11 +419,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               </div>
             ) : isCompany ? (
               <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-3.5 py-2 rounded-xl font-medium border border-amber-200 dark:border-amber-800/70 flex items-center gap-1.5">
-                🏢 Empresas não se candidatam a vagas
+                <Building2 size={14} /> Empresas não se candidatam a vagas
               </span>
             ) : isProfessor ? (
               <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-3.5 py-2 rounded-xl font-medium border border-blue-200 dark:border-blue-800/70 flex items-center gap-1.5">
-                👨‍🏫 Apenas estudantes e candidatos se candidatam
+                <Users size={14} /> Apenas estudantes e candidatos se candidatam
               </span>
             ) : !currentUser ? (
               <Link

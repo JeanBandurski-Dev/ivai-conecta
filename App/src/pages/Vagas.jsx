@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray
+  getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
@@ -147,9 +147,7 @@ export default function Vagas() {
       })
       .filter(j => {
         // Cidade
-        const filterCityClean = String(filterCity || '').trim().toLowerCase();
-        const jCityClean = String(j.city || '').trim().toLowerCase();
-        const matchCity = !filterCity || filterCity === 'Todas as Cidades' || jCityClean === filterCityClean;
+        const matchCityOk = matchCity(j.city, filterCity);
         
         // Tipo
         const matchType = filterType === 'Todos' || (j.type && String(j.type).toLowerCase().includes(filterType.toLowerCase()));
@@ -174,7 +172,7 @@ export default function Vagas() {
         ).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
-        return matchCity && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
+        return matchCityOk && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
       })
       .sort((a, b) => {
         if (sortBy === 'match' && canSeeMatch) {

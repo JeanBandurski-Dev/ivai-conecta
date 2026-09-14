@@ -9,7 +9,8 @@ import {
   ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
   Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
   GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History,
-  Users, DollarSign, Share2, Download, Phone, PhoneCall
+  Users, DollarSign, Share2, Download, Phone, PhoneCall,
+  ArrowUp, ArrowDown, Palette, Zap, CheckCircle, Info, Workflow, ArrowRight
 } from 'lucide-react';
 import {
   getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
@@ -22,6 +23,157 @@ import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
 
+export const STAGE_TEMPLATES = [
+  {
+    id: 'padrao',
+    name: 'Padrão Regional',
+    badge: '6 etapas • Geral',
+    description: 'Fluxo completo e equilibrado para a maioria das vagas de comércio, indústria e serviços.',
+    stages: [
+      { id: 'triagem', name: 'Triagem / Novos', color: 'sky', description: 'Candidaturas recebidas recentemente' },
+      { id: 'analise', name: 'Em Análise', color: 'amber', description: 'Currículo em avaliação detalhada pela equipe' },
+      { id: 'entrevista', name: 'Entrevista', color: 'purple', description: 'Entrevista presencial ou remota com RH' },
+      { id: 'desafio', name: 'Teste Prático', color: 'indigo', description: 'Avaliação técnica ou case prático da vaga' },
+      { id: 'aprovado', name: 'Aprovados', color: 'emerald', description: 'Candidatos selecionados para contratação' },
+      { id: 'reprovado', name: 'Banco de Talentos', color: 'slate', description: 'Currículos mantidos para futuras oportunidades' },
+    ],
+  },
+  {
+    id: 'tech',
+    name: 'Tech & Especialistas',
+    badge: '6 etapas • Técnico',
+    description: 'Estruturado para programadores, analistas, engenheiros e profissionais especializados.',
+    stages: [
+      { id: 'triagem', name: 'Triagem Técnica', color: 'sky', description: 'Filtro por stack, experiência e portfólio' },
+      { id: 'fit_cultural', name: 'Fit Cultural (RH)', color: 'blue', description: 'Alinhamento de valores, cultura e expectativas' },
+      { id: 'desafio_tech', name: 'Desafio / Live Coding', color: 'indigo', description: 'Teste prático de desenvolvimento ou case' },
+      { id: 'entrevista_lider', name: 'Entrevista com Gestor', color: 'purple', description: 'Avaliação aprofundada com a liderança técnica' },
+      { id: 'proposta', name: 'Proposta & Oferta', color: 'emerald', description: 'Apresentação formal da proposta salarial' },
+      { id: 'banco', name: 'Banco de Talentos', color: 'slate', description: 'Talentos aprovados guardados para novos projetos' },
+    ],
+  },
+  {
+    id: 'express',
+    name: 'Express / Ágil',
+    badge: '4 etapas • Rápido',
+    description: 'Processo enxuto e ágil para contratações imediatas, operacionais ou de reposição urgente.',
+    stages: [
+      { id: 'triagem', name: 'Triagem Rápida', color: 'sky', description: 'Conferência de requisitos mínimos e contato inicial' },
+      { id: 'entrevista_express', name: 'Entrevista Direta', color: 'purple', description: 'Entrevista com decisor da vaga' },
+      { id: 'aprovado', name: 'Contratação', color: 'emerald', description: 'Coleta de documentos e admissão imediata' },
+      { id: 'reprovado', name: 'Banco de Reserva', color: 'slate', description: 'Candidatos para substituições imediatas' },
+    ],
+  },
+  {
+    id: 'trainee',
+    name: 'Estágio & Trainee',
+    badge: '5 etapas • Jovens Talentos',
+    description: 'Focado em seleção de estagiários, aprendizes e programas de desenvolvimento.',
+    stages: [
+      { id: 'inscricao', name: 'Inscrições & Triagem', color: 'sky', description: 'Revisão de curso, período e disponibilidade' },
+      { id: 'dinamica', name: 'Dinâmica em Grupo', color: 'amber', description: 'Atividade colaborativa para avaliar soft skills' },
+      { id: 'entrevista', name: 'Entrevista Individual', color: 'purple', description: 'Conversa aprofundada com a liderança' },
+      { id: 'aprovado', name: 'Aprovados', color: 'emerald', description: 'Seleção final para início do programa' },
+      { id: 'banco', name: 'Banco de Talentos', color: 'slate', description: 'Candidatos qualificados para os próximos ciclos' },
+    ],
+  },
+];
+
+export const COMMON_STAGE_SUGGESTIONS = [
+  { name: 'Fit Cultural', color: 'blue', description: 'Avaliação de alinhamento com a cultura e valores da empresa' },
+  { name: 'Dinâmica de Grupo', color: 'amber', description: 'Atividade prática em grupo para avaliar soft skills e liderança' },
+  { name: 'Teste Prático', color: 'indigo', description: 'Avaliação de conhecimentos específicos ou estudo de caso' },
+  { name: 'Entrevista com Gestor', color: 'purple', description: 'Conversa técnica com a liderança direta da vaga' },
+  { name: 'Checagem de Referências', color: 'teal', description: 'Contato com empresas anteriores e validação profissional' },
+  { name: 'Proposta Salarial', color: 'emerald', description: 'Envio de oferta formal e alinhamento do pacote de benefícios' },
+];
+
+export const STAGE_COLOR_OPTIONS = [
+  { key: 'sky', label: 'Azul Celeste', bgClass: 'bg-sky-500' },
+  { key: 'blue', label: 'Azul Real', bgClass: 'bg-blue-600' },
+  { key: 'indigo', label: 'Índigo', bgClass: 'bg-indigo-500' },
+  { key: 'purple', label: 'Roxo', bgClass: 'bg-purple-500' },
+  { key: 'amber', label: 'Âmbar / Laranja', bgClass: 'bg-amber-500' },
+  { key: 'emerald', label: 'Esmeralda / Verde', bgClass: 'bg-emerald-500' },
+  { key: 'rose', label: 'Rosa / Coral', bgClass: 'bg-rose-500' },
+  { key: 'teal', label: 'Verde Petróleo', bgClass: 'bg-teal-500' },
+  { key: 'slate', label: 'Cinza Neutro', bgClass: 'bg-slate-500' },
+];
+
+export const STAGE_COLOR_MAP = {
+  sky: {
+    dot: 'bg-sky-500',
+    badge: 'bg-sky-50 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+    headerBorder: 'border-l-sky-500',
+    pill: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-300/40',
+    dropHighlight: 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-400 dark:border-sky-600',
+    previewBg: 'bg-sky-500',
+  },
+  blue: {
+    dot: 'bg-blue-600',
+    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    headerBorder: 'border-l-blue-600',
+    pill: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-300/40',
+    dropHighlight: 'bg-blue-50/70 dark:bg-blue-950/30 border-blue-400 dark:border-blue-600',
+    previewBg: 'bg-blue-600',
+  },
+  indigo: {
+    dot: 'bg-indigo-500',
+    badge: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+    headerBorder: 'border-l-indigo-500',
+    pill: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300/40',
+    dropHighlight: 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-600',
+    previewBg: 'bg-indigo-500',
+  },
+  purple: {
+    dot: 'bg-purple-500',
+    badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    headerBorder: 'border-l-purple-500',
+    pill: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40',
+    dropHighlight: 'bg-purple-50/70 dark:bg-purple-950/30 border-purple-400 dark:border-purple-600',
+    previewBg: 'bg-purple-500',
+  },
+  amber: {
+    dot: 'bg-amber-500',
+    badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    headerBorder: 'border-l-amber-500',
+    pill: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300/40',
+    dropHighlight: 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-600',
+    previewBg: 'bg-amber-500',
+  },
+  emerald: {
+    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    headerBorder: 'border-l-emerald-500',
+    pill: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300/40',
+    dropHighlight: 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-600',
+    previewBg: 'bg-emerald-500',
+  },
+  rose: {
+    dot: 'bg-rose-500',
+    badge: 'bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    headerBorder: 'border-l-rose-500',
+    pill: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-300/40',
+    dropHighlight: 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600',
+    previewBg: 'bg-rose-500',
+  },
+  teal: {
+    dot: 'bg-teal-500',
+    badge: 'bg-teal-50 text-teal-700 dark:bg-teal-950/70 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+    headerBorder: 'border-l-teal-500',
+    pill: 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300/40',
+    dropHighlight: 'bg-teal-50/70 dark:bg-teal-950/30 border-teal-400 dark:border-teal-600',
+    previewBg: 'bg-teal-500',
+  },
+  slate: {
+    dot: 'bg-slate-400 dark:bg-slate-500',
+    badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+    headerBorder: 'border-l-slate-400',
+    pill: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40',
+    dropHighlight: 'bg-slate-100/80 dark:bg-slate-800/40 border-slate-400 dark:border-slate-600',
+    previewBg: 'bg-slate-500',
+  },
+};
 
 export default function GerenciamentoVagasEmpresa() {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -256,6 +408,8 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Custom Stages State for selected job
   const [customStages, setCustomStages] = useState(() => (getJobCustomStages(currentJob?.id) || []).map(sanitizeStageItem));
+  const [draggedStageIdx, setDraggedStageIdx] = useState(null);
+  const [dragOverStageIdx, setDragOverStageIdx] = useState(null);
 
   useEffect(() => {
     if (selectedJobId === 'default' || !currentJob) {
@@ -560,59 +714,25 @@ export default function GerenciamentoVagasEmpresa() {
   }, [allCompanyJobs, updateCount]);
 
   // ── Stage Color Helper ──
-  const getStageStyle = (stageId) => {
-    const styles = {
-      triagem: {
-        dot: 'bg-sky-500',
-        badge: 'bg-sky-50 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300 border-sky-200 dark:border-sky-800',
-        headerBorder: 'border-l-sky-500',
-        pill: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-300/40',
-        dropHighlight: 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-400 dark:border-sky-600',
-      },
-      analise: {
-        dot: 'bg-amber-500',
-        badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-        headerBorder: 'border-l-amber-500',
-        pill: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300/40',
-        dropHighlight: 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-600',
-      },
-      entrevista: {
-        dot: 'bg-purple-500',
-        badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-        headerBorder: 'border-l-purple-500',
-        pill: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40',
-        dropHighlight: 'bg-purple-50/70 dark:bg-purple-950/30 border-purple-400 dark:border-purple-600',
-      },
-      desafio: {
-        dot: 'bg-indigo-500',
-        badge: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
-        headerBorder: 'border-l-indigo-500',
-        pill: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300/40',
-        dropHighlight: 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-600',
-      },
-      aprovado: {
-        dot: 'bg-emerald-500',
-        badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-        headerBorder: 'border-l-emerald-500',
-        pill: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300/40',
-        dropHighlight: 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-600',
-      },
-      reprovado: {
-        dot: 'bg-slate-400 dark:bg-slate-500',
-        badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-        headerBorder: 'border-l-slate-400',
-        pill: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40',
-        dropHighlight: 'bg-slate-100/80 dark:bg-slate-800/40 border-slate-400 dark:border-slate-600',
-      },
+  const getStageStyle = (stageId, stageColor) => {
+    if (stageColor && STAGE_COLOR_MAP[stageColor]) {
+      return STAGE_COLOR_MAP[stageColor];
+    }
+    const defaultByStage = {
+      triagem: STAGE_COLOR_MAP.sky,
+      analise: STAGE_COLOR_MAP.amber,
+      entrevista: STAGE_COLOR_MAP.purple,
+      desafio: STAGE_COLOR_MAP.indigo,
+      desafio_tech: STAGE_COLOR_MAP.indigo,
+      aprovado: STAGE_COLOR_MAP.emerald,
+      proposta: STAGE_COLOR_MAP.emerald,
+      reprovado: STAGE_COLOR_MAP.slate,
+      banco: STAGE_COLOR_MAP.slate,
+      banco_talentos: STAGE_COLOR_MAP.slate,
+      fit_cultural: STAGE_COLOR_MAP.blue,
+      dinamica: STAGE_COLOR_MAP.amber,
     };
-
-    return styles[stageId] || {
-      dot: 'bg-blue-500',
-      badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-      headerBorder: 'border-l-blue-500',
-      pill: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-300/40',
-      dropHighlight: 'bg-blue-50/70 dark:bg-blue-950/30 border-blue-400 dark:border-blue-600',
-    };
+    return defaultByStage[stageId] || STAGE_COLOR_MAP.blue;
   };
 
   // ── Candidate Actions ──
@@ -939,10 +1059,10 @@ export default function GerenciamentoVagasEmpresa() {
     // 2. Persiste a alteração
     try {
       await updateJobStatus(firestoreIdStr || idStr, 'close');
-      showToast('🔒 Processo seletivo encerrado com sucesso!');
+      showToast('Processo seletivo encerrado com sucesso!');
     } catch (err) {
       console.error('Erro ao encerrar vaga:', err);
-      showToast('⚠️ Erro ao sincronizar encerramento da vaga.');
+      showToast('Erro ao sincronizar encerramento da vaga.');
     }
     forceUpdate(n => n + 1);
   };
@@ -1009,6 +1129,88 @@ export default function GerenciamentoVagasEmpresa() {
     showToast('Nova etapa adicionada. Lembre-se de salvar as alterações!');
   };
 
+  const handleAddPredefinedStage = (predefined) => {
+    const newId = `etapa_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newStage = {
+      id: newId,
+      name: predefined.name,
+      color: predefined.color || 'blue',
+      description: predefined.description || '',
+    };
+    setCustomStages([...customStages, newStage]);
+    showToast(`Etapa "${predefined.name}" adicionada! Lembre-se de salvar.`);
+  };
+
+  const handleMoveStageUp = (index) => {
+    if (index <= 0) return;
+    const newStages = [...customStages];
+    const [moved] = newStages.splice(index, 1);
+    newStages.splice(index - 1, 0, moved);
+    setCustomStages(newStages);
+  };
+
+  const handleMoveStageDown = (index) => {
+    if (index >= customStages.length - 1) return;
+    const newStages = [...customStages];
+    const [moved] = newStages.splice(index, 1);
+    newStages.splice(index + 1, 0, moved);
+    setCustomStages(newStages);
+  };
+
+  const handleStageCardDragStart = (e, index) => {
+    setDraggedStageIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleStageCardDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverStageIdx !== index) {
+      setDragOverStageIdx(index);
+    }
+  };
+
+  const handleStageCardDragLeave = (e) => {
+    e.preventDefault();
+  };
+
+  const handleStageCardDragEnd = () => {
+    setDraggedStageIdx(null);
+    setDragOverStageIdx(null);
+  };
+
+  const handleStageCardDrop = (e, targetIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedStageIdx === null || draggedStageIdx === targetIndex) {
+      setDraggedStageIdx(null);
+      setDragOverStageIdx(null);
+      return;
+    }
+    const updated = [...customStages];
+    const [moved] = updated.splice(draggedStageIdx, 1);
+    updated.splice(targetIndex, 0, moved);
+    setCustomStages(updated);
+    setDraggedStageIdx(null);
+    setDragOverStageIdx(null);
+    showToast(`Etapa "${moved.name}" movida para a posição ${targetIndex + 1}! Lembre-se de salvar.`);
+  };
+
+  const handleDuplicateStage = (index) => {
+    const stageToCopy = customStages[index];
+    if (!stageToCopy) return;
+    const duplicated = {
+      ...stageToCopy,
+      id: `etapa_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      name: `${stageToCopy.name} (Cópia)`,
+    };
+    const newStages = [...customStages];
+    newStages.splice(index + 1, 0, duplicated);
+    setCustomStages(newStages);
+    showToast(`Etapa "${stageToCopy.name}" duplicada com sucesso!`);
+  };
+
   const handleRemoveCustomStage = (index) => {
     if (customStages.length <= 2) {
       showToast('O processo seletivo precisa conter no mínimo 2 etapas.');
@@ -1022,7 +1224,7 @@ export default function GerenciamentoVagasEmpresa() {
   const handleSaveCustomStagesForJob = () => {
     if (selectedJobId === 'default' || !currentJob) {
       saveCompanyCustomStages(customStages);
-      showToast('⭐ Modelo padrão de etapas da empresa salvo com sucesso!');
+      showToast('Modelo padrão de etapas da empresa salvo com sucesso!');
       forceUpdate(n => n + 1);
       return;
     }
@@ -1036,7 +1238,7 @@ export default function GerenciamentoVagasEmpresa() {
     allCompanyJobs.forEach(job => {
       saveJobCustomStages(job.id, customStages);
     });
-    showToast('🚀 Estas etapas foram salvas e aplicadas a TODAS as vagas da empresa!');
+    showToast('Estas etapas foram salvas e aplicadas a todas as vagas da empresa com sucesso!');
     forceUpdate(n => n + 1);
   };
 
@@ -1383,13 +1585,13 @@ export default function GerenciamentoVagasEmpresa() {
                 <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
                   <button
                     onClick={() => setSelectedStageFilter('todos')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${selectedStageFilter === 'todos'
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${selectedStageFilter === 'todos'
                         ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs'
                         : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
                       }`}
                   >
                     <span>Todas as Etapas</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${selectedStageFilter === 'todos'
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${selectedStageFilter === 'todos'
                         ? 'bg-white/20 dark:bg-gray-900/20 text-current'
                         : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
                       }`}>
@@ -1406,14 +1608,14 @@ export default function GerenciamentoVagasEmpresa() {
                       <button
                         key={stage.id}
                         onClick={() => setSelectedStageFilter(isSelected ? 'todos' : stage.id)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${isSelected
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${isSelected
                             ? 'bg-primary-blue text-white shadow-xs'
                             : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
                           }`}
                       >
                         <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
                         <span>{stage.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${isSelected
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isSelected
                             ? 'bg-white/25 text-white'
                             : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
                           }`}>
@@ -1428,23 +1630,23 @@ export default function GerenciamentoVagasEmpresa() {
                 <div className="flex items-center gap-3 text-xs pr-2 shrink-0">
                   <div className="flex items-center gap-1.5 text-gray-600 dark:text-slate-300 border-l border-gray-200 dark:border-slate-700 pl-4">
                     <ArrowUpDown size={13} className="text-gray-400" />
-                    <span className="font-semibold hidden lg:inline">Ordenar:</span>
+                    <span className="font-normal text-gray-500 dark:text-slate-400 hidden lg:inline">Ordenar:</span>
                     <select
                       value={sortBy}
                       onChange={e => setSortBy(e.target.value)}
-                      className="bg-transparent border-none text-xs font-bold text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-0"
+                      className="bg-transparent border-none text-xs font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:ring-0"
                     >
                       <option value="match_desc">Maior Match</option>
                       <option value="match_asc">Menor Match</option>
-                      <option value="rating_desc">Melhor Avaliação (★)</option>
+                      <option value="rating_desc">Melhor Avaliação</option>
                       <option value="recent">Mais Recentes</option>
                       <option value="oldest">Mais Antigos</option>
                       <option value="name_asc">Nome (A-Z)</option>
                     </select>
                   </div>
 
-                  <div className="border-l border-gray-200 dark:border-slate-700 pl-4 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
-                    Mostrando <strong className="text-gray-900 dark:text-white">{filteredCandidates.length}</strong> <span className="hidden sm:inline">de {jobCandidates.length}</span>
+                  <div className="border-l border-gray-200 dark:border-slate-700 pl-4 text-gray-500 dark:text-slate-400 font-normal whitespace-nowrap">
+                    Mostrando <span className="font-semibold text-gray-900 dark:text-white">{filteredCandidates.length}</span> <span className="hidden sm:inline">de {jobCandidates.length}</span>
                   </div>
                 </div>
               </div>
@@ -1455,7 +1657,7 @@ export default function GerenciamentoVagasEmpresa() {
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
                     <div className="flex items-center gap-2">
                       <SlidersHorizontal size={15} className="text-primary-blue" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      <h4 className="text-xs font-semibold text-gray-900 dark:text-white">
                         Filtros Avançados de Candidatos
                       </h4>
                     </div>
@@ -1466,7 +1668,7 @@ export default function GerenciamentoVagasEmpresa() {
                         setSelectedRatingFilter(0);
                         setMinMatchFilter(0);
                       }}
-                      className="text-xs text-primary-blue hover:underline font-semibold cursor-pointer"
+                      className="text-xs text-primary-blue hover:underline font-medium cursor-pointer"
                     >
                       Redefinir Filtros Avançados
                     </button>
@@ -1475,13 +1677,13 @@ export default function GerenciamentoVagasEmpresa() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                     {/* Cidade do Candidato */}
                     <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-slate-300 mb-1.5">
                         Cidade do Candidato
                       </label>
                       <select
                         value={selectedCityFilter}
                         onChange={e => setSelectedCityFilter(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-normal text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
                       >
                         <option value="todas">Todas as Cidades</option>
                         {availableCandidateCities.map(city => (
@@ -1492,13 +1694,13 @@ export default function GerenciamentoVagasEmpresa() {
 
                     {/* Instituição de Ensino */}
                     <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-slate-300 mb-1.5">
                         Instituição de Ensino
                       </label>
                       <select
                         value={selectedInstitutionFilter}
                         onChange={e => setSelectedInstitutionFilter(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-medium text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 font-normal text-gray-800 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
                       >
                         <option value="todas">Todas as Instituições</option>
                         {availableInstitutions.map(inst => (
@@ -1509,7 +1711,7 @@ export default function GerenciamentoVagasEmpresa() {
 
                     {/* Nota de Match Mínima */}
                     <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-slate-300 mb-1.5">
                         Match Mínimo ({minMatchFilter === 0 ? 'Qualquer' : `≥ ${minMatchFilter}%`})
                       </label>
                       <div className="flex gap-1">
@@ -1517,7 +1719,7 @@ export default function GerenciamentoVagasEmpresa() {
                           <button
                             key={val}
                             onClick={() => setMinMatchFilter(val)}
-                            className={`flex-1 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${minMatchFilter === val
+                            className={`flex-1 py-1.5 rounded-lg font-medium text-[11px] transition-all cursor-pointer ${minMatchFilter === val
                                 ? 'bg-emerald-600 text-white shadow-2xs'
                                 : 'bg-slate-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
                               }`}
@@ -1530,20 +1732,20 @@ export default function GerenciamentoVagasEmpresa() {
 
                     {/* Avaliação em Estrelas */}
                     <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-slate-300 mb-1.5">
                         Avaliação Interna
                       </label>
                       <div className="flex gap-1">
                         {[
                           { val: 0, label: 'Todas' },
-                          { val: 3, label: '3+ ★' },
-                          { val: 4, label: '4+ ★' },
-                          { val: 5, label: '5 ★' }
+                          { val: 3, label: '3+ estrelas' },
+                          { val: 4, label: '4+ estrelas' },
+                          { val: 5, label: '5 estrelas' }
                         ].map(item => (
                           <button
                             key={item.val}
                             onClick={() => setSelectedRatingFilter(item.val)}
-                            className={`flex-1 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${selectedRatingFilter === item.val
+                            className={`flex-1 py-1.5 rounded-lg font-medium text-[11px] transition-all cursor-pointer ${selectedRatingFilter === item.val
                                 ? 'bg-amber-500 text-white shadow-2xs'
                                 : 'bg-slate-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
                               }`}
@@ -1560,80 +1762,80 @@ export default function GerenciamentoVagasEmpresa() {
               {/* ── CHIPS DE FILTROS ATIVOS ── */}
               {activeCandidateFiltersCount > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-xs text-gray-500 dark:text-slate-400 font-semibold">Filtros Ativos:</span>
+                  <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">Filtros Ativos:</span>
 
                   {candidateSearch && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-primary-blue border border-blue-200 dark:border-blue-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/60 text-primary-blue border border-blue-200 dark:border-blue-800">
                       Busca: "{candidateSearch}"
                       <button onClick={() => setCandidateSearch('')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {selectedStageFilter !== 'todos' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                       Etapa: {customStages.find(s => s.id === selectedStageFilter)?.name || selectedStageFilter}
                       <button onClick={() => setSelectedStageFilter('todos')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {selectedCityFilter !== 'todas' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
                       Cidade: {selectedCityFilter}
                       <button onClick={() => setSelectedCityFilter('todas')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {selectedInstitutionFilter !== 'todas' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
                       Inst.: {selectedInstitutionFilter}
                       <button onClick={() => setSelectedInstitutionFilter('todas')} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {minMatchFilter > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                       Match: &ge; {minMatchFilter}%
                       <button onClick={() => setMinMatchFilter(0)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {selectedRatingFilter > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                      Avaliação: &ge; {selectedRatingFilter}★
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      Avaliação: &ge; {selectedRatingFilter} estrelas
                       <button onClick={() => setSelectedRatingFilter(0)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {onlyVerified && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                       Selo IFPR
                       <button onClick={() => setOnlyVerified(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {onlyWithInterview && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                       Com Entrevista
                       <button onClick={() => setOnlyWithInterview(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {onlyWithEndorsement && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                       Parecer Docente
                       <button onClick={() => setOnlyWithEndorsement(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {onlyWithNotes && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                       Com Anotações
                       <button onClick={() => setOnlyWithNotes(false)} className="hover:opacity-75 cursor-pointer"><X size={12} /></button>
                     </span>
                   )}
 
                   {sortBy !== 'match_desc' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
                       Ordem: {
                         sortBy === 'match_asc' ? 'Menor Match' :
                           sortBy === 'rating_desc' ? 'Melhor Avaliação' :
@@ -1646,7 +1848,7 @@ export default function GerenciamentoVagasEmpresa() {
 
                   <button
                     onClick={resetCandidateFilters}
-                    className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1 ml-auto"
+                    className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1 ml-auto"
                   >
                     <RotateCcw size={12} /> Limpar todos ({activeCandidateFiltersCount})
                   </button>
@@ -1667,7 +1869,7 @@ export default function GerenciamentoVagasEmpresa() {
                       </span>
                       <button
                         onClick={() => setSelectedStageFilter('todos')}
-                        className="underline hover:opacity-80 font-bold cursor-pointer"
+                        className="underline hover:opacity-80 font-semibold cursor-pointer"
                       >
                         Ver todas as etapas do funil
                       </button>
@@ -1679,13 +1881,13 @@ export default function GerenciamentoVagasEmpresa() {
                       <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
                         <Filter size={20} />
                       </div>
-                      <h3 className="font-bold text-base text-gray-900 dark:text-white">Nenhum candidato encontrado</h3>
+                      <h3 className="font-semibold text-base text-gray-900 dark:text-white">Nenhum candidato encontrado</h3>
                       <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
                         Não encontramos candidatos nesta vaga que correspondam aos filtros selecionados.
                       </p>
                       <button
                         onClick={resetCandidateFilters}
-                        className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                        className="btn btn-outline btn-sm font-medium text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
                       >
                         <RotateCcw size={13} /> Limpar Todos os Filtros
                       </button>
@@ -1717,7 +1919,7 @@ export default function GerenciamentoVagasEmpresa() {
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <span className={`w-3 h-3 rounded-full shrink-0 ${style.dot} ring-4 ring-slate-100 dark:ring-slate-800`} />
                                     <div className="min-w-0">
-                                      <h4 className="font-heading text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                                         {stage.name}
                                       </h4>
                                       <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate leading-tight mt-0.5">
@@ -1727,7 +1929,7 @@ export default function GerenciamentoVagasEmpresa() {
                                   </div>
 
                                   <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${style.badge}`}>
+                                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border shadow-2xs ${style.badge}`}>
                                       {stageCandidates.length}
                                     </span>
                                     <button
@@ -1747,11 +1949,11 @@ export default function GerenciamentoVagasEmpresa() {
                                 <div className="flex-1 flex flex-col gap-3 min-h-[420px] max-h-[calc(100vh-270px)] overflow-y-auto pr-1">
                                   {stageCandidates.length === 0 ? (
                                     <div className={`h-full min-h-[260px] border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all ${isDragOver
-                                        ? 'border-primary-blue bg-blue-500/10 text-primary-blue font-bold'
+                                        ? 'border-primary-blue bg-blue-500/10 text-primary-blue font-semibold'
                                         : 'border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-800/20 text-slate-400 dark:text-slate-500'
                                       }`}>
                                       <Inbox size={32} className={`opacity-60 mb-1 ${isDragOver ? 'animate-bounce text-primary-blue' : ''}`} />
-                                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                                         {isDragOver ? 'Solte o candidato aqui' : 'Nenhum candidato'}
                                       </span>
                                       <span className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -1812,10 +2014,10 @@ export default function GerenciamentoVagasEmpresa() {
                                                 </div>
 
                                                 <div className="min-w-0 flex-1">
-                                                  <h5 className="text-xs font-black text-slate-900 dark:text-white group-hover:text-primary-blue transition-colors leading-snug truncate">
+                                                  <h5 className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-primary-blue transition-colors leading-snug truncate">
                                                     {cand.name}
                                                   </h5>
-                                                  <div className="text-[11px] font-semibold text-primary-blue dark:text-blue-400 truncate mt-0.2">
+                                                  <div className="text-[11px] font-medium text-primary-blue dark:text-blue-400 truncate mt-0.2">
                                                     {cand.course}
                                                   </div>
                                                   <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
@@ -1827,7 +2029,7 @@ export default function GerenciamentoVagasEmpresa() {
                                               </div>
 
                                               {/* Match Badge */}
-                                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${cand.matchScore >= 90
+                                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 border ${cand.matchScore >= 90
                                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
                                                   : cand.matchScore >= 80
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800'
@@ -1981,7 +2183,7 @@ export default function GerenciamentoVagasEmpresa() {
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs sm:text-sm">
-                          <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 uppercase font-black tracking-wider text-[11px]">
+                          <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider text-[11px]">
                             <tr>
                               <th className="py-4 px-5">Candidato</th>
                               <th className="py-4 px-5">Curso / Instituição</th>
@@ -1999,7 +2201,7 @@ export default function GerenciamentoVagasEmpresa() {
                                   <div className="flex items-center gap-3">
                                     <img src={cand.avatar} alt={cand.name} className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs" />
                                     <div>
-                                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                      <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                                         {cand.name}
                                         {cand.isVerifiedStudent && <ShieldCheck size={13} className="text-emerald-500" />}
                                       </div>
@@ -2009,10 +2211,10 @@ export default function GerenciamentoVagasEmpresa() {
                                 </td>
                                 <td className="py-4 px-5 font-medium text-slate-700 dark:text-slate-300">
                                   <div>{cand.course}</div>
-                                  <div className="text-[11px] text-primary-blue font-bold">{cand.institution}</div>
+                                  <div className="text-[11px] text-primary-blue font-medium">{cand.institution}</div>
                                 </td>
                                 <td className="py-4 px-5">
-                                  <span className="font-black text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 text-xs">
+                                  <span className="font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 text-xs">
                                     {cand.matchScore}% Match
                                   </span>
                                 </td>
@@ -2020,7 +2222,7 @@ export default function GerenciamentoVagasEmpresa() {
                                   <select
                                     value={cand.stage}
                                     onChange={e => handleStageChange(cand.id, e.target.value)}
-                                    className="text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 outline-none cursor-pointer focus:border-primary-blue"
+                                    className="text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 outline-none cursor-pointer focus:border-primary-blue"
                                   >
                                     {customStages.map(st => (
                                       <option key={st.id} value={st.id}>{st.name}</option>
@@ -2040,7 +2242,7 @@ export default function GerenciamentoVagasEmpresa() {
                                     ))}
                                   </div>
                                 </td>
-                                <td className="py-4 px-5 text-slate-500 text-xs">
+                                <td className="py-4 px-5 text-slate-500 text-xs font-normal">
                                   {cand.appliedAt}
                                 </td>
                                 <td className="py-4 px-5 text-right">
@@ -2761,48 +2963,48 @@ export default function GerenciamentoVagasEmpresa() {
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Total Entrevistas</span>
+                        <span className="text-[11px] font-medium text-gray-500 dark:text-slate-400">Total de Entrevistas</span>
                         <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
                           <History size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-gray-900 dark:text-white mt-2">{interviewStats.total}</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{interviewStats.total}</div>
                       <div className="text-[11px] text-gray-400 mt-0.5">Em todas as vagas da empresa</div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Concluídas / Aprovadas</span>
+                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Concluídas / Aprovadas</span>
                         <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
                           <CheckCircle2 size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">{interviewStats.completed}</div>
-                      <div className="text-[11px] text-emerald-600/80 font-semibold mt-0.5">{interviewStats.passRate}% taxa de aprovação</div>
+                      <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{interviewStats.completed}</div>
+                      <div className="text-[11px] text-emerald-600/80 font-medium mt-0.5">{interviewStats.passRate}% taxa de aprovação</div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-slate-400 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Banco de Talentos</span>
+                        <span className="text-[11px] font-medium text-slate-500">Banco de Talentos</span>
                         <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
                           <Users size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-slate-800 dark:text-slate-200 mt-2">{interviewStats.talentPool}</div>
+                      <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-2">{interviewStats.talentPool}</div>
                       <div className="text-[11px] text-gray-400 mt-0.5">Disponíveis para futuras oportunidades</div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs hover:border-blue-300 dark:hover:border-blue-800 transition-all">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-primary-blue dark:text-blue-400 uppercase tracking-wider">Agendadas / Em Aberto</span>
+                        <span className="text-[11px] font-medium text-primary-blue dark:text-blue-400">Agendadas / Em Aberto</span>
                         <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center">
                           <Calendar size={16} />
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-primary-blue dark:text-blue-400 mt-2">
+                      <div className="text-2xl font-bold text-primary-blue dark:text-blue-400 mt-2">
                         {interviewStats.scheduled + interviewStats.inProgress}
                       </div>
-                      <div className="text-[11px] text-blue-500/80 font-semibold mt-0.5">
+                      <div className="text-[11px] text-blue-500/80 font-medium mt-0.5">
                         {interviewStats.inProgress > 0 ? `${interviewStats.inProgress} em andamento no momento` : 'Próximas nos calendários'}
                       </div>
                     </div>
@@ -3344,90 +3546,241 @@ export default function GerenciamentoVagasEmpresa() {
               )}
 
               {/* ═════════════════════════════════════════════════════════════════
-            TAB 4: CONFIGURAÇÕES DE ETAPAS DO PROCESSO SELETIVO POR VAGA
+            TAB 4: CONFIGURAÇÕES DE ETAPAS DO PROCESSO SELETIVO POR VAGA (STUDIO ATS FULL-WIDTH)
         ═════════════════════════════════════════════════════════════════ */}
               {activeTab === 'stage_settings' && (
-                <div className="max-w-3xl mx-auto space-y-6">
-                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-slate-800">
-                      <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-primary-blue mb-1 block">Customização do Funil</span>
-                        <h2 className="text-2xl font-heading font-extrabold text-gray-900 dark:text-white">
-                          Etapas do Processo Seletivo por Vaga
-                        </h2>
-                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                          Defina e reordene as colunas do seu quadro Kanban especificamente para esta vaga.
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={handleAddCustomStage}
-                        className="btn btn-primary btn-sm px-4 py-2 text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-xs shrink-0 rounded-xl"
-                      >
-                        <Plus size={14} /> Adicionar Nova Etapa
-                      </button>
-                    </div>
-
-                    {/* Job Selector Box */}
-                    <div className="bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-4 sm:p-5 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                          <Briefcase size={14} className="text-primary-blue" /> Configurando as Etapas de:
-                        </label>
-                        <span className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
-                          {selectedJobId === 'default' || !currentJob
-                            ? '⭐ Modelo Padrão da Empresa'
-                            : 'Vaga selecionada no painel'}
-                        </span>
-                      </div>
-
-                      {allCompanyJobs.length === 0 && (
-                        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
-                            <span className="text-base">💡</span>
-                            <span>Sua empresa não possui vagas abertas no momento. Você está editando o <strong>Modelo Padrão da Empresa</strong>.</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowNewJobModal(true)}
-                            className="btn btn-primary btn-sm text-xs font-bold rounded-lg shrink-0 flex items-center gap-1 cursor-pointer"
-                          >
-                            <Plus size={13} /> Publicar Nova Vaga
-                          </button>
+                <div className="w-full space-y-6 animate-fadeIn pb-12">
+                  
+                  {/* ── BARRA SUPERIOR DE CONTROLE & AÇÕES (FULL WIDTH) ── */}
+                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    
+                    {/* Título e Seletor de Vaga */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-800">
+                          <Workflow size={20} />
                         </div>
-                      )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                              Editor de Etapas do Processo Seletivo
+                            </h2>
+                            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {customStages.length} etapas
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">
+                            Configure e ordene o funil de contratação da sua empresa
+                          </p>
+                        </div>
+                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                        <div className={allCompanyJobs.length > 1 ? "md:col-span-7" : "md:col-span-12"}>
+                      {/* Dropdown de Vaga */}
+                      <div className="sm:ml-auto flex items-center gap-2 max-w-md w-full sm:w-auto">
+                        <span className="text-xs font-normal text-gray-500 dark:text-slate-400 whitespace-nowrap hidden md:inline">
+                          Vaga Alvo:
+                        </span>
+                        <div className="relative flex-1 sm:w-72">
                           <select
                             value={selectedJobId}
                             onChange={e => setSelectedJobId(e.target.value === 'default' ? 'default' : (Number(e.target.value) || e.target.value))}
-                            className="w-full bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue shadow-2xs truncate"
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-medium text-gray-900 dark:text-white outline-none cursor-pointer focus:ring-2 focus:ring-primary-blue/30 focus:border-primary-blue truncate appearance-none"
                           >
                             {allCompanyJobs.length === 0 ? (
-                              <option value="default">⭐ Modelo Padrão da Empresa (Todas as novas vagas)</option>
+                              <option value="default">Modelo Padrão Global da Empresa</option>
                             ) : (
                               <>
-                                <optgroup label="Vagas da Sua Empresa">
+                                <optgroup label="Vagas Ativas da Empresa">
                                   {allCompanyJobs.map(job => (
                                     <option key={job.id} value={job.id}>
-                                      {job.title} — {job.city || 'Ivaiporã'} ({job.type || 'Tempo Integral'})
+                                      {job.title} — {job.city || 'Ivaiporã'}
                                     </option>
                                   ))}
                                 </optgroup>
-                                <optgroup label="Modelo Global">
-                                  <option value="default">⭐ Modelo Padrão da Empresa (Todas as novas vagas)</option>
+                                <optgroup label="Configuração Geral">
+                                  <option value="default">Modelo Padrão Global (Novas Vagas)</option>
                                 </optgroup>
                               </>
                             )}
                           </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                         </div>
+                      </div>
+                    </div>
 
-                        {/* Copy stages from another job */}
-                        {allCompanyJobs.length > 1 && (
-                          <div className="md:col-span-5">
+                    {/* Botões de Ação Topo */}
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0 border-t xl:border-t-0 pt-3 xl:pt-0 border-gray-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomStages(SELECTION_STAGES);
+                          showToast('Padrões da plataforma restaurados. Lembre-se de salvar!');
+                        }}
+                        className="btn btn-outline btn-sm text-xs font-medium rounded-xl flex items-center gap-1.5 px-3 py-2 cursor-pointer text-gray-600 dark:text-slate-300"
+                        title="Restaurar etapas padrão do sistema"
+                      >
+                        <RotateCcw size={13} />
+                        <span className="hidden sm:inline">Restaurar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomStagesToAllJobs}
+                        className="btn btn-outline btn-sm text-xs font-medium rounded-xl flex items-center gap-1.5 px-3.5 py-2 cursor-pointer border-gray-300 dark:border-slate-700 hover:border-primary-blue text-gray-700 dark:text-slate-200"
+                        title="Replicar esta mesma estrutura para todas as vagas da empresa"
+                      >
+                        <CheckSquare size={13} />
+                        <span className="hidden sm:inline">Replicar em Todas</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSaveCustomStagesForJob}
+                        className="btn btn-primary btn-sm text-xs font-medium rounded-xl flex items-center gap-2 px-4 py-2 shadow-sm cursor-pointer hover:scale-[1.02] transition-transform"
+                      >
+                        <Save size={14} />
+                        <span>Salvar Funil</span>
+                      </button>
+                    </div>
+
+                  </div>
+
+                  {/* ── LIVE STEPPER / MAPA VISUAL DO FUNIL (FULL WIDTH) ── */}
+                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <h3 className="text-xs font-semibold text-gray-700 dark:text-slate-300">
+                          Fluxo Visual do Candidato (Quadro Kanban)
+                        </h3>
+                      </div>
+                      <span className="text-[11px] text-gray-400 hidden sm:inline">
+                        Atualizado em tempo real conforme você edita
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                      <div className="flex items-center gap-2 min-w-max">
+                        {customStages.map((stage, idx) => {
+                          const style = getStageStyle(stage.id, stage.color);
+                          return (
+                            <div key={stage.id || idx} className="flex items-center gap-2">
+                              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all shadow-2xs ${style.badge || 'bg-slate-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'}`}>
+                                <span className={`w-4.5 h-4.5 rounded-full text-[10px] font-semibold flex items-center justify-center text-white ${style.dot || 'bg-primary-blue'}`}>
+                                  {idx + 1}
+                                </span>
+                                <span className="truncate max-w-[150px]">{stage.name || `Etapa ${idx + 1}`}</span>
+                              </div>
+                              {idx < customStages.length - 1 && (
+                                <ArrowRight size={13} className="text-gray-300 dark:text-slate-600 shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── GRID PRINCIPAL DE 2 COLUNAS (SPLIT VIEW FULL WIDTH) ── */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    {/* ═══ COLUNA ESQUERDA (SIDEBAR): MODELOS & SUGESTÕES ═══ */}
+                    <div className="lg:col-span-4 xl:col-span-4 space-y-5">
+                      
+                      {/* Card de Modelos Rápidos */}
+                      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={16} className="text-amber-500" />
+                            <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
+                              Modelos Prontos de Funil
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            1 Clique
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
+                          Escolha um modelo padrão da indústria para preencher automaticamente as etapas:
+                        </p>
+
+                        <div className="space-y-2.5">
+                          {STAGE_TEMPLATES.map(tpl => (
+                            <div
+                              key={tpl.id}
+                              className="group p-3.5 rounded-xl border border-gray-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40 hover:border-primary-blue dark:hover:border-primary-blue hover:bg-blue-50/30 dark:hover:bg-blue-950/20 stage-card-fluid"
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div>
+                                  <h4 className="text-xs font-semibold text-gray-900 dark:text-white group-hover:text-primary-blue transition-colors">
+                                    {tpl.name}
+                                  </h4>
+                                  <span className="text-[10px] text-gray-500 dark:text-slate-400 block mt-0.5 leading-snug">
+                                    {tpl.description}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0 border border-gray-200 dark:border-slate-600">
+                                  {tpl.badge.split('•')[0].trim()}
+                                </span>
+                              </div>
+
+                              <div className="pt-2 border-t border-gray-100 dark:border-slate-700/50 flex items-center justify-between">
+                                <span className="text-[10px] text-gray-400 truncate max-w-[170px]">
+                                  {tpl.stages.map(s => s.name).join(' → ')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomStages(tpl.stages);
+                                    showToast(`Modelo "${tpl.name}" aplicado! Revise e clique em Salvar.`);
+                                  }}
+                                  className="text-[11px] font-semibold text-primary-blue hover:underline cursor-pointer flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                                >
+                                  <CheckCircle2 size={12} /> Aplicar
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Card de Adição Rápida de Etapas */}
+                      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3.5">
+                        <div className="flex items-center gap-2">
+                          <Plus size={15} className="text-primary-blue" />
+                          <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
+                            Adicionar Etapas Comuns
+                          </h3>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
+                          Clique para incluir novas fases imediatamente ao seu processo:
+                        </p>
+
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {COMMON_STAGE_SUGGESTIONS.map((item, sIdx) => (
+                            <button
+                              key={sIdx}
+                              type="button"
+                              onClick={() => handleAddPredefinedStage(item)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-gray-700 dark:text-slate-300 hover:text-primary-blue dark:hover:text-blue-300 border border-gray-200 dark:border-slate-700 hover:border-primary-blue/50 rounded-xl text-xs font-normal cursor-pointer shadow-2xs group stage-chip-fluid"
+                            >
+                              <Plus size={12} className="text-gray-400 group-hover:text-primary-blue group-hover:scale-110 transition-transform" />
+                              <span>{item.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Card de Clonar de Outra Vaga */}
+                      {allCompanyJobs.length > 1 && (
+                        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Copy size={15} className="text-purple-600 dark:text-purple-400" />
+                            <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
+                              Importar de Outra Vaga
+                            </h3>
+                          </div>
+                          <div className="relative">
                             <select
                               defaultValue=""
                               onChange={e => {
@@ -3436,9 +3789,9 @@ export default function GerenciamentoVagasEmpresa() {
                                   e.target.value = '';
                                 }
                               }}
-                              className="w-full bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 dark:text-slate-300 outline-none cursor-pointer hover:border-primary-blue transition-colors truncate shadow-2xs"
+                              className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-2 text-xs font-normal text-gray-700 dark:text-slate-300 outline-none cursor-pointer hover:border-primary-blue transition-colors truncate appearance-none"
                             >
-                              <option value="" disabled>Copiar etapas de outra vaga...</option>
+                              <option value="" disabled>Selecione uma vaga para copiar...</option>
                               {allCompanyJobs
                                 .filter(j => j.id !== currentJob?.id)
                                 .map(j => (
@@ -3447,104 +3800,242 @@ export default function GerenciamentoVagasEmpresa() {
                                   </option>
                                 ))}
                             </select>
+                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                           </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-[11px] text-blue-800 dark:text-blue-300 pt-1">
-                        <span className="font-semibold">💡 Dica:</span> As etapas configuradas abaixo serão salvas exclusivamente para <strong>{currentJob?.title}</strong>.
-                      </div>
-                    </div>
-
-                    {/* Stages List */}
-                    <div className="space-y-3.5">
-                      <div className="flex items-center justify-between text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        <span>Sequência das Etapas ({customStages.length} etapas no funil)</span>
-                      </div>
-
-                      {customStages.map((stage, idx) => (
-                        <div
-                          key={stage.id || idx}
-                          className="p-4 rounded-2xl border border-gray-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-2.5 hover:border-primary-blue/50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              <span className="w-6 h-6 rounded-full bg-primary-blue text-white text-xs font-black flex items-center justify-center shrink-0">
-                                {idx + 1}
-                              </span>
-                              <input
-                                type="text"
-                                value={stage.name}
-                                onChange={e => {
-                                  const updated = [...customStages];
-                                  updated[idx].name = e.target.value;
-                                  setCustomStages(updated);
-                                }}
-                                placeholder="Nome da Etapa..."
-                                className="font-bold text-sm bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white outline-none focus:border-primary-blue flex-1"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[10px] font-semibold text-gray-400 uppercase hidden sm:inline">ID: {stage.id}</span>
-                              {customStages.length > 2 && (
-                                <button
-                                  onClick={() => handleRemoveCustomStage(idx)}
-                                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                                  title="Remover esta etapa"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={stage.description}
-                            onChange={e => {
-                              const updated = [...customStages];
-                              updated[idx].description = e.target.value;
-                              setCustomStages(updated);
-                            }}
-                            placeholder="Descrição desta etapa (ex: Avaliação de currículo e portfólio)..."
-                            className="w-full text-xs bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-gray-700 dark:text-slate-300 outline-none focus:border-primary-blue"
-                          />
                         </div>
-                      ))}
+                      )}
+
                     </div>
 
-                    {/* Action Buttons Footer */}
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-5 border-t border-gray-200 dark:border-slate-800">
-                      <button
-                        onClick={() => setCustomStages(SELECTION_STAGES)}
-                        className="btn btn-outline btn-sm font-semibold text-xs order-3 md:order-1 flex items-center justify-center gap-1.5 rounded-xl"
-                      >
-                        <RotateCcw size={13} /> Restaurar Padrões Desta Vaga
-                      </button>
+                    {/* ═══ COLUNA DIREITA (EDITOR PRINCIPAL DAS ETAPAS) ═══ */}
+                    <div className="lg:col-span-8 xl:col-span-8 space-y-4">
+                      
+                      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+                        
+                        {/* Header da Lista de Etapas */}
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Layers size={16} className="text-primary-blue" />
+                              Sequência do Processo ({customStages.length} Etapas)
+                            </h3>
+                            <p className="text-xs text-gray-400 dark:text-slate-400 mt-0.5">
+                              Arraste os cards para reorganizar a ordem, ou edite nomes, objetivos e cores
+                            </p>
+                          </div>
 
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 order-1 md:order-2">
-                        <button
-                          onClick={handleApplyCustomStagesToAllJobs}
-                          className="btn btn-outline btn-sm font-bold text-xs flex items-center justify-center gap-1.5 border-gray-300 hover:border-primary-blue text-gray-700 dark:text-slate-200 rounded-xl"
-                          title="Salvar e replicar estas etapas em todas as outras vagas da empresa"
-                        >
-                          <CheckSquare size={14} /> Aplicar a Todas as Vagas
-                        </button>
+                          <button
+                            type="button"
+                            onClick={handleAddCustomStage}
+                            className="btn btn-primary btn-sm text-xs font-medium rounded-xl flex items-center gap-1.5 px-3 py-1.5 shadow-2xs cursor-pointer hover:scale-105 active:scale-95 transition-all shrink-0"
+                          >
+                            <Plus size={14} /> Adicionar Etapa
+                          </button>
+                        </div>
 
-                        <button
-                          onClick={handleSaveCustomStagesForJob}
-                          className="btn btn-primary px-5 py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer rounded-xl"
-                        >
-                          <Save size={15} />{' '}
-                          {selectedJobId === 'default' || !currentJob
-                            ? 'Salvar Modelo Padrão da Empresa'
-                            : 'Salvar Etapas Desta Vaga'}
-                        </button>
+                        {/* Lista de Cards de Etapas com Suporte a Drag and Drop (Arrastar e Soltar) */}
+                        <div className="space-y-3">
+                          {customStages.map((stage, idx) => {
+                            const currentStyle = getStageStyle(stage.id, stage.color);
+                            const isBeingDragged = draggedStageIdx === idx;
+                            const isDragTarget = dragOverStageIdx === idx && draggedStageIdx !== idx;
+
+                            return (
+                              <div
+                                key={stage.id || idx}
+                                draggable={true}
+                                onDragStart={(e) => handleStageCardDragStart(e, idx)}
+                                onDragOver={(e) => handleStageCardDragOver(e, idx)}
+                                onDragLeave={handleStageCardDragLeave}
+                                onDragEnd={handleStageCardDragEnd}
+                                onDrop={(e) => handleStageCardDrop(e, idx)}
+                                className={`group p-4 rounded-xl border shadow-2xs space-y-3 stage-card-fluid animate-smooth-in transition-all ${
+                                  isBeingDragged
+                                    ? 'stage-card-dragging border-primary-blue bg-blue-50/40 dark:bg-blue-950/30 ring-2 ring-primary-blue/50'
+                                    : isDragTarget
+                                      ? 'stage-card-dragover border-primary-blue ring-2 ring-primary-blue/70'
+                                      : 'border-gray-200 dark:border-slate-700/70 bg-slate-50/50 dark:bg-slate-800/40 hover:border-primary-blue/60 dark:hover:border-primary-blue/60 hover:bg-white dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                {/* Linha 1: Alça de Arraste, Posição, Reordenação, Título e Ações */}
+                                <div className="flex items-center justify-between gap-3">
+                                  
+                                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                    {/* Alça de Arraste (Drag Handle) */}
+                                    <div
+                                      className="p-1 -ml-1 text-gray-400 hover:text-primary-blue hover:bg-blue-50 dark:hover:bg-slate-700/60 rounded-lg cursor-grab active:cursor-grabbing transition-colors shrink-0 flex items-center justify-center select-none"
+                                      title="Clique e arraste para reordenar a etapa"
+                                    >
+                                      <GripVertical size={16} />
+                                    </div>
+
+                                    {/* Botões Reordenação Up/Down (Alternativa por Clique) */}
+                                    <div 
+                                      className="flex items-center bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg p-0.5 shrink-0 shadow-2xs"
+                                      onDragStart={(e) => e.stopPropagation()}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMoveStageUp(idx)}
+                                        disabled={idx === 0}
+                                        title="Mover etapa para cima"
+                                        className={`p-1 rounded transition-colors cursor-pointer ${
+                                          idx === 0
+                                            ? 'text-gray-300 dark:text-slate-600 cursor-not-allowed'
+                                            : 'text-gray-600 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-600 hover:text-primary-blue active:scale-90'
+                                        }`}
+                                      >
+                                        <ArrowUp size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMoveStageDown(idx)}
+                                        disabled={idx === customStages.length - 1}
+                                        title="Mover etapa para baixo"
+                                        className={`p-1 rounded transition-colors cursor-pointer ${
+                                          idx === customStages.length - 1
+                                            ? 'text-gray-300 dark:text-slate-600 cursor-not-allowed'
+                                            : 'text-gray-600 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-600 hover:text-primary-blue active:scale-90'
+                                        }`}
+                                      >
+                                        <ArrowDown size={13} />
+                                      </button>
+                                    </div>
+
+                                    {/* Número da Etapa */}
+                                    <span className={`w-6.5 h-6.5 rounded-lg text-white text-xs font-semibold flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${currentStyle.dot || 'bg-primary-blue'}`}>
+                                      {String(idx + 1).padStart(2, '0')}
+                                    </span>
+
+                                    {/* Nome da Etapa */}
+                                    <input
+                                      type="text"
+                                      value={stage.name}
+                                      maxLength={40}
+                                      draggable={false}
+                                      onDragStart={(e) => e.stopPropagation()}
+                                      onChange={e => {
+                                        const updated = [...customStages];
+                                        updated[idx].name = e.target.value;
+                                        setCustomStages(updated);
+                                      }}
+                                      placeholder="Nome da etapa (Ex: Entrevista com Gestor)..."
+                                      className="font-medium text-sm bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white outline-none focus:border-primary-blue focus:ring-1 focus:ring-primary-blue/30 transition-all flex-1 min-w-[120px]"
+                                    />
+                                  </div>
+
+                                  {/* Botões Duplicar e Excluir */}
+                                  <div 
+                                    className="flex items-center gap-1 shrink-0"
+                                    onDragStart={(e) => e.stopPropagation()}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDuplicateStage(idx)}
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-primary-blue hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors active:scale-90 cursor-pointer"
+                                      title="Duplicar esta etapa"
+                                    >
+                                      <Copy size={14} />
+                                    </button>
+
+                                    {customStages.length > 2 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveCustomStage(idx)}
+                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors active:scale-90 cursor-pointer"
+                                        title="Remover esta etapa"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                </div>
+
+                                {/* Linha 2: Descrição e Seletor de Cores na mesma linha em telas médias/largas */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1 border-t border-gray-100 dark:border-slate-700/40">
+                                  
+                                  {/* Descrição */}
+                                  <div className="md:col-span-7 lg:col-span-8">
+                                    <input
+                                      type="text"
+                                      value={stage.description || ''}
+                                      maxLength={120}
+                                      draggable={false}
+                                      onDragStart={(e) => e.stopPropagation()}
+                                      onChange={e => {
+                                        const updated = [...customStages];
+                                        updated[idx].description = e.target.value;
+                                        setCustomStages(updated);
+                                      }}
+                                      placeholder="Objetivo da etapa (Ex: Avaliar aderência técnica e testes práticos)..."
+                                      className="w-full text-xs font-normal bg-white dark:bg-slate-700/60 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-gray-700 dark:text-slate-300 outline-none focus:border-primary-blue transition-all"
+                                    />
+                                  </div>
+
+                                  {/* Cores */}
+                                  <div 
+                                    className="md:col-span-5 lg:col-span-4 flex items-center justify-start md:justify-end gap-1.5"
+                                    onDragStart={(e) => e.stopPropagation()}
+                                  >
+                                    <span className="text-[10px] font-normal text-gray-400 hidden xl:inline">Cor:</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {STAGE_COLOR_OPTIONS.map(colorOpt => {
+                                        const isSelected = (stage.color || 'blue') === colorOpt.key;
+                                        return (
+                                          <button
+                                            key={colorOpt.key}
+                                            type="button"
+                                            onClick={() => {
+                                              const updated = [...customStages];
+                                              updated[idx].color = colorOpt.key;
+                                              setCustomStages(updated);
+                                            }}
+                                            title={colorOpt.label}
+                                            className={`w-5 h-5 rounded-full cursor-pointer flex items-center justify-center ${colorOpt.bgClass} stage-color-dot-fluid ${
+                                              isSelected
+                                                ? 'ring-2 ring-offset-1 ring-primary-blue dark:ring-offset-slate-800 scale-110'
+                                                : 'opacity-60 hover:opacity-100'
+                                            }`}
+                                          >
+                                            {isSelected && <Check size={10} className="text-white stroke-[3]" />}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                </div>
+
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Rodapé Interno com Ação Principal */}
+                        <div className="pt-4 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <span className="text-xs text-gray-400">
+                            {selectedJobId === 'default' || !currentJob
+                              ? 'Salvando como Modelo Global para novas vagas'
+                              : `Salvando exclusivamente para: "${currentJob?.title}"`}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomStagesForJob}
+                            className="w-full sm:w-auto btn btn-primary px-6 py-2.5 text-xs font-medium rounded-xl flex items-center justify-center gap-2 shadow-sm cursor-pointer hover:scale-[1.02] transition-transform"
+                          >
+                            <Save size={15} />
+                            <span>Salvar Configuração de Etapas</span>
+                          </button>
+                        </div>
+
                       </div>
+
                     </div>
 
                   </div>
+
                 </div>
               )}
 
@@ -3555,14 +4046,14 @@ export default function GerenciamentoVagasEmpresa() {
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-3 gap-5">
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
                         <BarChart3 size={18} className="text-primary-blue" /> Taxa de Conversão do Funil
                       </h3>
                       <div className="space-y-3">
                         <div>
-                          <div className="flex justify-between text-xs font-semibold mb-1">
+                          <div className="flex justify-between text-xs font-medium mb-1">
                             <span>Triagem &rarr; Entrevista</span>
-                            <span className="text-primary-blue font-bold">45%</span>
+                            <span className="text-primary-blue font-semibold">45%</span>
                           </div>
                           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                             <div className="bg-primary-blue h-full rounded-full" style={{ width: '45%' }}></div>
@@ -3570,9 +4061,9 @@ export default function GerenciamentoVagasEmpresa() {
                         </div>
 
                         <div>
-                          <div className="flex justify-between text-xs font-semibold mb-1">
+                          <div className="flex justify-between text-xs font-medium mb-1">
                             <span>Entrevista &rarr; Desafio</span>
-                            <span className="text-indigo-600 font-bold">60%</span>
+                            <span className="text-indigo-600 font-semibold">60%</span>
                           </div>
                           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                             <div className="bg-indigo-600 h-full rounded-full" style={{ width: '60%' }}></div>
@@ -3580,9 +4071,9 @@ export default function GerenciamentoVagasEmpresa() {
                         </div>
 
                         <div>
-                          <div className="flex justify-between text-xs font-semibold mb-1">
+                          <div className="flex justify-between text-xs font-medium mb-1">
                             <span>Desafio &rarr; Aprovado</span>
-                            <span className="text-emerald-600 font-bold">75%</span>
+                            <span className="text-emerald-600 font-semibold">75%</span>
                           </div>
                           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                             <div className="bg-emerald-600 h-full rounded-full" style={{ width: '75%' }}></div>
@@ -3592,32 +4083,32 @@ export default function GerenciamentoVagasEmpresa() {
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
                         <GraduationCap size={18} className="text-emerald-500" /> Origem dos Talentos Inscritos
                       </h3>
                       <div className="space-y-2.5 text-xs">
                         <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-bold">IFPR Campus Ivaiporã</span>
-                          <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full font-black">58% dos inscritos</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">IFPR Campus Ivaiporã</span>
+                          <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold">58% dos inscritos</span>
                         </div>
                         <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-bold">Univale Ivaiporã</span>
-                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-black">27% dos inscritos</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">Univale Ivaiporã</span>
+                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-semibold">27% dos inscritos</span>
                         </div>
                         <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-bold">UENP / Outras</span>
-                          <span className="bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 px-2.5 py-0.5 rounded-full font-black">15% dos inscritos</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">UENP / Outras</span>
+                          <span className="bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 px-2.5 py-0.5 rounded-full font-semibold">15% dos inscritos</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
                         <Sparkles size={18} className="text-amber-500" /> Tecnologias com Mais Afinidade
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {['React (95%)', 'JavaScript (92%)', 'Tailwind (90%)', 'Git (88%)', 'Python (82%)', 'SQL (80%)', 'Figma (78%)'].map(item => (
-                          <span key={item} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span key={item} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
                             {item}
                           </span>
                         ))}
@@ -3646,17 +4137,17 @@ export default function GerenciamentoVagasEmpresa() {
                   />
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-heading text-xl font-bold text-gray-900 dark:text-white">
+                      <h3 className="font-heading text-xl font-semibold text-gray-900 dark:text-white">
                         {selectedCandidate.name}
                       </h3>
-                      <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 px-2.5 py-0.5 rounded-full">
+                      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 px-2.5 py-0.5 rounded-full">
                         {selectedCandidate.matchScore}% Match
                       </span>
                     </div>
-                    <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">
+                    <div className="text-xs font-medium text-primary-blue dark:text-blue-400 mt-0.5">
                       {selectedCandidate.course} · {selectedCandidate.institution}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-normal">
                       {selectedCandidate.city} · Inscrito em {selectedCandidate.appliedAt}
                     </div>
 
@@ -3670,7 +4161,7 @@ export default function GerenciamentoVagasEmpresa() {
                             avatar: selectedCandidate.avatar
                           }, `Processo Seletivo: ${currentJob?.title || 'Vaga'}`);
                         }}
-                        className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer rounded-xl"
+                        className="btn btn-primary btn-sm text-xs font-medium flex items-center gap-1.5 cursor-pointer rounded-xl"
                       >
                         <MessageSquare size={13} /> Chat com o Candidato
                       </button>
@@ -3688,7 +4179,7 @@ export default function GerenciamentoVagasEmpresa() {
 
               {/* Stage Progression Stepper Bar */}
               <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/40 border-b border-gray-200 dark:border-slate-800">
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400 block mb-3">
+                <label className="text-[11px] font-medium text-gray-500 dark:text-slate-400 block mb-3">
                   Progresso no Processo Seletivo:
                 </label>
                 <div className="flex items-start justify-between relative">
@@ -3703,15 +4194,15 @@ export default function GerenciamentoVagasEmpresa() {
                           <div className={`absolute top-3.5 right-1/2 w-full h-[3px] -translate-y-1/2 z-0 ${isPast || isCurrent ? 'bg-primary-blue dark:bg-blue-600' : 'bg-gray-200 dark:bg-slate-700'
                             }`} />
                         )}
-                        <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all ${isCurrent
+                        <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold border-2 transition-all ${isCurrent
                             ? 'bg-primary-blue text-white border-primary-blue shadow-md ring-4 ring-blue-100 dark:ring-blue-900/40 scale-110'
                             : isPast
                               ? 'bg-primary-blue text-white border-primary-blue'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
                           }`}>
-                          {isPast ? <Check size={14} strokeWidth={4} /> : idx + 1}
+                          {isPast ? <Check size={14} strokeWidth={3} /> : idx + 1}
                         </div>
-                        <span className={`text-[10px] font-bold mt-2.5 text-center leading-tight max-w-[80px] ${isCurrent ? 'text-primary-blue dark:text-blue-400' : isPast ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'
+                        <span className={`text-[10px] font-medium mt-2.5 text-center leading-tight max-w-[80px] ${isCurrent ? 'text-primary-blue dark:text-blue-400' : isPast ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'
                           }`}>
                           {stage.name}
                         </span>
@@ -3722,11 +4213,11 @@ export default function GerenciamentoVagasEmpresa() {
               </div>
 
               {/* Modal Navigation Tabs */}
-              <div className="px-6 pt-3 border-b border-gray-200 dark:border-slate-800 flex gap-4 overflow-x-auto text-xs font-bold">
+              <div className="px-6 pt-3 border-b border-gray-200 dark:border-slate-800 flex gap-4 overflow-x-auto text-xs font-medium">
                 <button
                   onClick={() => setActiveModalTab('overview')}
                   className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeModalTab === 'overview'
-                      ? 'border-primary-blue text-primary-blue'
+                      ? 'border-primary-blue text-primary-blue font-semibold'
                       : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400'
                     }`}
                 >
@@ -3736,7 +4227,7 @@ export default function GerenciamentoVagasEmpresa() {
                 <button
                   onClick={() => setActiveModalTab('interview')}
                   className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeModalTab === 'interview'
-                      ? 'border-primary-blue text-primary-blue'
+                      ? 'border-primary-blue text-primary-blue font-semibold'
                       : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400'
                     }`}
                 >
@@ -3746,7 +4237,7 @@ export default function GerenciamentoVagasEmpresa() {
                 <button
                   onClick={() => setActiveModalTab('endorsements')}
                   className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeModalTab === 'endorsements'
-                      ? 'border-primary-blue text-primary-blue'
+                      ? 'border-primary-blue text-primary-blue font-semibold'
                       : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400'
                     }`}
                 >
@@ -3756,7 +4247,7 @@ export default function GerenciamentoVagasEmpresa() {
                 <button
                   onClick={() => setActiveModalTab('activity')}
                   className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeModalTab === 'activity'
-                      ? 'border-primary-blue text-primary-blue'
+                      ? 'border-primary-blue text-primary-blue font-semibold'
                       : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400'
                     }`}
                 >
@@ -3771,12 +4262,12 @@ export default function GerenciamentoVagasEmpresa() {
                 {activeModalTab === 'overview' && (
                   <div className="space-y-5 text-xs">
                     <div>
-                      <h4 className="font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider text-[11px] mb-2">
+                      <h4 className="font-medium text-gray-700 dark:text-slate-300 text-xs mb-2">
                         Competências &amp; Habilidades Técnicas:
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {selectedCandidate.skills?.map(skill => (
-                          <span key={skill} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-xl font-bold border border-slate-200 dark:border-slate-700">
+                          <span key={skill} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-xl font-medium border border-slate-200 dark:border-slate-700">
                             {skill}
                           </span>
                         ))}
@@ -3784,7 +4275,7 @@ export default function GerenciamentoVagasEmpresa() {
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider text-[11px] mb-2">
+                      <h4 className="font-medium text-gray-700 dark:text-slate-300 text-xs mb-2">
                         Anotações Internas do Recrutador / Avaliação:
                       </h4>
                       <textarea
@@ -3832,11 +4323,11 @@ export default function GerenciamentoVagasEmpresa() {
                           <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                                <span className="font-medium text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
                                   <Calendar size={15} className="text-purple-600" /> Entrevista confirmada para {selectedCandidate.interview.date} às {selectedCandidate.interview.time}
                                 </span>
                                 {currentStatus && (
-                                  <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${currentStatus.color}`}>
+                                  <span className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${currentStatus.color}`}>
                                     <Icon size={10} className={currentStatus.pulse ? 'animate-pulse' : ''} /> {currentStatus.label}
                                   </span>
                                 )}
@@ -3848,7 +4339,7 @@ export default function GerenciamentoVagasEmpresa() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setActiveModalTab('interview')}
-                                className="btn btn-outline btn-sm text-xs font-bold rounded-xl border-purple-300 text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/40 cursor-pointer"
+                                className="btn btn-outline btn-sm text-xs font-medium rounded-xl border-purple-300 text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/40 cursor-pointer"
                               >
                                 Alterar
                               </button>
@@ -3875,20 +4366,20 @@ export default function GerenciamentoVagasEmpresa() {
                                 });
                                 forceUpdate(prev => prev + 1);
                               }}
-                              className="btn btn-sm text-xs font-bold bg-primary-blue hover:bg-blue-600 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="btn btn-sm text-xs font-medium bg-primary-blue hover:bg-blue-600 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                               <Video size={13} /> Abrir Sala
                             </button>
                             <button
                               onClick={() => handleInterviewConcluded(selectedCandidate)}
-                              className="btn btn-sm text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="btn btn-sm text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
                               title="Aprovar candidato na entrevista e avançar para a próxima etapa"
                             >
                               <Check size={13} strokeWidth={3} /> Concluída (Passar Etapa)
                             </button>
                             <button
                               onClick={() => handleInterviewFinalized(selectedCandidate)}
-                              className="btn btn-sm text-xs font-bold bg-slate-600 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="btn btn-sm text-xs font-medium bg-slate-600 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
                               title="Finalizar e mover candidato para o Banco de Talentos"
                             >
                               <X size={13} strokeWidth={3} /> Finalizada (Banco)
@@ -4146,12 +4637,10 @@ export default function GerenciamentoVagasEmpresa() {
           onClose={() => setShowNewJobModal(false)}
           onJobCreated={(created) => {
             try {
+              setActiveTab('jobs_list');
               if (created?.id) {
                 setSelectedJobId(created.id);
               }
-              setActiveTab('jobs_list');
-              setLiveJobs(getJobs('Todas as Cidades'));
-              forceUpdate(n => n + 1);
             } catch (err) {
               console.warn('[GerenciamentoVagasEmpresa] Erro no onJobCreated:', err);
             }

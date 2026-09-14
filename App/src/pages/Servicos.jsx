@@ -6,7 +6,7 @@ import {
   BarChart3, CheckCircle2, AlertCircle, HelpCircle
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getServices, addService, updateService, CITIES, maskPhone } from '../lib/ivaiConecta';
+import { getServices, addService, updateService, CITIES, maskPhone, matchCity } from '../lib/ivaiConecta';
 import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
 
@@ -111,7 +111,7 @@ export default function Servicos() {
   const filtered = useMemo(() => {
     return all
       .filter(s => {
-        const mCity = city === 'Todas as Cidades' || s.city === city;
+        const mCity = matchCity(s.city, city);
         const mCat  = category === 'Todas' || s.category === category;
         
         let mBadge = true;
