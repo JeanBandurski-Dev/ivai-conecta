@@ -122,7 +122,7 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
     callback(list);
   };
 
-  // Disparo inicial imediato
+  // Disparo inicial com dados do cache local
   emit();
 
   // Escuta jobs em tempo real para recalcular contagem de vagas
@@ -135,19 +135,25 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('role', '==', 'empresa'));
     unsubscribeFirestore = onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const remoteCompanyUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-        const local = getUsersDB();
-        const merged = [...local];
-        remoteCompanyUsers.forEach(rc => {
-          const idx = merged.findIndex(m => m.uid === rc.uid || m.email === rc.email);
-          if (idx !== -1) merged[idx] = { ...merged[idx], ...rc };
-          else merged.push(rc);
-        });
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('ivai_conecta_users_db', JSON.stringify(merged));
-        }
+      // Empresas reais vindas do Firestore (pode ser lista vazia)
+      const remoteCompanyUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+
+      // Mantém usuários não-empresa intactos e descarta empresas que não existem no Firestore
+      const local = getUsersDB();
+      const nonCompanyUsers = local.filter(u => u?.role !== 'empresa');
+
+      // Faz merge: parte dos não-empresa + empresas reais do Firestore
+      const merged = [...nonCompanyUsers];
+      remoteCompanyUsers.forEach(rc => {
+        const idx = merged.findIndex(m => m.uid === rc.uid || m.email === rc.email);
+        if (idx !== -1) merged[idx] = { ...merged[idx], ...rc };
+        else merged.push(rc);
+      });
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ivai_conecta_users_db', JSON.stringify(merged));
       }
+
       emit();
     }, () => {
       emit();
