@@ -659,6 +659,7 @@ export async function applyToJob(jobId, user) {
     company: job ? job.company : 'Empresa do Vale do Ivaí',
     companyLogo: job ? (job.companyLogo || '') : '',
     recruiterEmail: job ? (job.recruiterEmail || job.createdBy || '') : '',
+    recruiterUid: job ? (job.createdBy || '') : '',
     recruiterPhone: job ? (job.recruiterPhone || '') : '',
     city: job ? job.city : 'Ivaiporã',
     type: job ? job.type : 'Tempo Integral',
