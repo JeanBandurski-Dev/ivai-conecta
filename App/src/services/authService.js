@@ -6,6 +6,8 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  sendEmailVerification,
+  reload,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
@@ -74,7 +76,8 @@ export async function login(email, password) {
       avatar: profileRes.profile?.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-      ...(profileRes.profile || {})
+      ...(profileRes.profile || {}),
+      emailVerified: Boolean(fbUser.emailVerified),
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -163,6 +166,7 @@ export async function register(data) {
       uid: fbUser.uid,
       name,
       email: cleanEmail,
+      emailVerified: Boolean(fbUser.emailVerified),
       city: city || 'Ivaiporã',
       role: selectedRole,
       badge: roleMeta.badge,
@@ -176,6 +180,7 @@ export async function register(data) {
 
     const sessionUser = {
       ...profileData,
+      emailVerified: Boolean(fbUser.emailVerified),
       isVerifiedCompany: selectedRole === 'empresa'
     };
 
@@ -253,7 +258,8 @@ export async function loginWithGoogle() {
       avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
       isVerifiedCompany: role === 'empresa',
-      ...(profileRes.profile || {})
+      ...(profileRes.profile || {}),
+      emailVerified: Boolean(fbUser.emailVerified),
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -338,7 +344,8 @@ export function watchAuthState(callback) {
             avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
             isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-            ...(profileRes.profile || {})
+            ...(profileRes.profile || {}),
+            emailVerified: Boolean(fbUser.emailVerified),
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
           callback(sessionUser);
@@ -431,3 +438,52 @@ export function setSelectedCity(city) {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(STORAGE_KEY_CITY, city);
 }
+
+/**
+ * Envia o e-mail de verificação oficial do Firebase Authentication para o usuário atual
+ */
+export async function sendEmailVerificationToUser() {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, error: 'Usuário não autenticado no Firebase Authentication.' };
+    }
+    await sendEmailVerification(user);
+    return {
+      success: true,
+      message: `Link de confirmação enviado para ${user.email}! Verifique sua caixa de entrada e pasta de spam.`
+    };
+  } catch (error) {
+    console.warn('[sendEmailVerificationToUser] Erro:', error);
+    let msg = 'Erro ao enviar e-mail de confirmação.';
+    if (error.code === 'auth/too-many-requests') {
+      msg = 'Muitas solicitações recentes. Por favor, aguarde alguns minutos antes de solicitar novamente.';
+    } else if (error.code === 'auth/user-token-expired') {
+      msg = 'Sua sessão expirou. Faça login novamente.';
+    } else if (error.message) {
+      msg = error.message;
+    }
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Recarrega os dados do Firebase Authentication e atualiza o status real de emailVerified
+ */
+export async function refreshEmailVerificationStatus() {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      const local = getAuthUser();
+      return { success: true, emailVerified: Boolean(local?.emailVerified) };
+    }
+    await reload(user);
+    const verified = Boolean(user.emailVerified);
+    const updated = updateAuthUser({ emailVerified: verified });
+    return { success: true, emailVerified: verified, user: updated };
+  } catch (error) {
+    console.warn('[refreshEmailVerificationStatus] Erro ao sincronizar status:', error);
+    return { success: false, error: error.message };
+  }
+}
+

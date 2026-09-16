@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
   Building2, FileText, Camera,
-  Search, Loader2, AlertCircle, RefreshCw, Check
+  Search, Loader2, AlertCircle, RefreshCw, Check, KeyRound
 } from 'lucide-react';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 import useAppStore from '../store/useAppStore';
 import {
   updateAuthUser,
@@ -16,7 +17,9 @@ import {
   maskCNPJ,
   cleanCNPJ,
   validateCNPJ,
-  fetchCNPJData
+  fetchCNPJData,
+  sendEmailVerificationToUser,
+  refreshEmailVerificationStatus
 } from '../lib/ivaiConecta';
 
 export default function Configuracoes() {
@@ -56,6 +59,62 @@ export default function Configuracoes() {
 
   const [submittingStudent, setSubmittingStudent] = useState(false);
   const [submittingCompany, setSubmittingCompany] = useState(false);
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
+  const [isVerifModalOpen, setIsVerifModalOpen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const syncStatus = async () => {
+      try {
+        const res = await refreshEmailVerificationStatus();
+        if (isMounted && res.success && res.user) {
+          setCurrentUser(res.user);
+        }
+      } catch {}
+    };
+    syncStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [setCurrentUser]);
+
+  const isEmailVerified = Boolean(currentUser?.emailVerified);
+
+  const handleSendVerificationEmail = async () => {
+    setSendingVerification(true);
+    try {
+      const res = await sendEmailVerificationToUser();
+      if (res.success) {
+        showToast(res.message || 'Link de confirmação enviado para seu e-mail!');
+      } else {
+        showToast(res.error || 'Erro ao enviar e-mail de confirmação.');
+      }
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setCheckingVerification(true);
+    try {
+      const res = await refreshEmailVerificationStatus();
+      if (res.success) {
+        if (res.user) {
+          setCurrentUser(res.user);
+        }
+        if (res.emailVerified) {
+          showToast('✅ E-mail confirmado com sucesso no Firebase!');
+        } else {
+          showToast('⚠️ O e-mail ainda não foi confirmado no Firebase. Verifique sua caixa de entrada.');
+        }
+      } else {
+        showToast(res.error || 'Não foi possível atualizar o status no momento.');
+      }
+    } finally {
+      setCheckingVerification(false);
+    }
+  };
 
   if (!currentUser) {
     return (
@@ -376,14 +435,29 @@ export default function Configuracoes() {
           {/* ── ABA 1: CONTA & PERFIL ── */}
           {activeTab === 'account' && (
             <div className="card p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4 gap-3">
                 <div>
                   <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white">Informações Gerais &amp; Redes Sociais</h3>
                   <p className="text-sm text-gray-500 dark:text-slate-400">Atualize seu nome de exibição, e-mail e perfis do LinkedIn / GitHub.</p>
                 </div>
-                <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 size={13} /> E-mail Confirmado
-                </span>
+                {isEmailVerified ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-full shrink-0 shadow-xs">
+                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" /> E-mail Confirmado
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-3 py-1 rounded-full shadow-xs">
+                      <AlertCircle size={13} className="text-amber-600 dark:text-amber-400" /> E-mail Não Confirmado
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsVerifModalOpen(true)}
+                      className="btn btn-sm btn-primary text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm hover:scale-105 transition-all cursor-pointer"
+                    >
+                      <ShieldCheck size={14} /> Verificar E-mail
+                    </button>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleSaveAccount} className="space-y-4">
@@ -428,7 +502,12 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">E-mail de Acesso</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="form-label mb-0">E-mail de Acesso</label>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">
+                      Firebase Authentication
+                    </span>
+                  </div>
                   <div className="relative">
                     <input
                       type="email"
@@ -439,6 +518,42 @@ export default function Configuracoes() {
                     />
                     <Mail size={16} className="absolute right-3 top-3.5 text-gray-400 dark:text-slate-500" />
                   </div>
+
+                  {isEmailVerified ? (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1.5 font-medium">
+                      <CheckCircle2 size={14} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      E-mail verificado e confirmado no Firebase Authentication.
+                    </p>
+                  ) : (
+                    <div className="mt-2.5 p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start sm:items-center gap-2">
+                        <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                        <div>
+                          <p className="font-semibold text-amber-800 dark:text-amber-300">E-mail ainda não confirmado no Firebase.</p>
+                          <p className="text-gray-600 dark:text-slate-400 text-[11px] mt-0.5">Confirme para garantir total segurança e recuperação da sua conta.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setIsVerifModalOpen(true)}
+                          className="btn btn-sm btn-primary font-bold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:scale-105"
+                        >
+                          <KeyRound size={13} /> Verificar com Código de 6 Dígitos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCheckVerification}
+                          disabled={checkingVerification}
+                          title="Atualizar status do Firebase"
+                          className="btn btn-sm btn-outline border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-semibold text-xs px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw size={13} className={checkingVerification ? 'animate-spin' : ''} />
+                          <span>{checkingVerification ? 'Checando...' : 'Atualizar Status'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Redes Sociais Opcionais */}
@@ -867,6 +982,17 @@ export default function Configuracoes() {
 
         </div>
       </main>
+
+      {/* Modal de Verificação de E-mail com Código */}
+      <EmailVerificationModal
+        isOpen={isVerifModalOpen}
+        onClose={() => setIsVerifModalOpen(false)}
+        onVerified={(user) => {
+          if (user) setCurrentUser(user);
+          setIsVerifModalOpen(false);
+        }}
+      />
     </>
   );
 }
+

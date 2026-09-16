@@ -12,3 +12,4 @@ export * from '../services/storageService';
 export * from '../services/cnpjService';
 export * from '../services/jobTaxonomy';
 export * from '../services/companiesService';
+export * from '../services/emailVerificationService';
