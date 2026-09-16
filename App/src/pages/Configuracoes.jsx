@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  Settings, Bell, Lock, Eye, Shield, LogOut, ArrowLeft,
+  Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
   Building2, FileText, Camera,
   Search, Loader2, AlertCircle, RefreshCw, Check
@@ -16,7 +16,9 @@ import {
   maskCNPJ,
   cleanCNPJ,
   validateCNPJ,
-  fetchCNPJData
+  fetchCNPJData,
+  updateUserPassword,
+  isGoogleOnlyAuthUser
 } from '../lib/ivaiConecta';
 
 export default function Configuracoes() {
@@ -51,8 +53,14 @@ export default function Configuracoes() {
   const companyFileInputRef = useRef(null);
 
   // Password form
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [submittingPassword, setSubmittingPassword] = useState(false);
+  const [passwordReauthRequired, setPasswordReauthRequired] = useState(false);
 
   const [submittingStudent, setSubmittingStudent] = useState(false);
   const [submittingCompany, setSubmittingCompany] = useState(false);
@@ -270,7 +278,7 @@ export default function Configuracoes() {
     }
   };
 
-  const handleUpdatePassword = (e) => {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (newPassword.length < 6) {
       showToast('A nova senha deve ter no mínimo 6 caracteres.');
@@ -280,9 +288,31 @@ export default function Configuracoes() {
       showToast('As senhas digitadas não coincidem.');
       return;
     }
-    showToast('Senha alterada com sucesso!');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (currentPassword && currentPassword === newPassword) {
+      showToast('A nova senha deve ser diferente da senha atual.');
+      return;
+    }
+
+    setSubmittingPassword(true);
+    try {
+      const res = await updateUserPassword(currentPassword, newPassword);
+      if (res.success) {
+        showToast(res.message || 'Senha alterada com sucesso!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordReauthRequired(false);
+      } else {
+        if (res.requiresReauth) {
+          setPasswordReauthRequired(true);
+        }
+        showToast(res.error || 'Erro ao atualizar a senha.');
+      }
+    } catch (err) {
+      showToast(`Erro inesperado: ${err.message || err}`);
+    } finally {
+      setSubmittingPassword(false);
+    }
   };
 
   const handleLogout = () => {
@@ -776,38 +806,145 @@ export default function Configuracoes() {
           {activeTab === 'security' && (
             <div className="card p-6 sm:p-8 space-y-6">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
-                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white">Alteração de Senha</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Escolha uma nova senha forte para proteger seu acesso.</p>
+                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
+                  <ShieldCheck size={22} className="text-primary-blue dark:text-blue-400" />
+                  Alteração de Senha
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400">
+                  Gerencie sua senha de acesso conectada diretamente ao Firebase Authentication.
+                </p>
               </div>
+
+              {isGoogleOnlyAuthUser() && (
+                <div className="p-4 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-start gap-3">
+                  <AlertCircle size={18} className="text-primary-blue dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="text-xs sm:text-sm text-blue-900 dark:text-blue-200">
+                    <p className="font-bold">Conta vinculada com Google</p>
+                    <p className="mt-0.5 opacity-90">
+                      Você pode criar uma senha abaixo caso queira também acessar sua conta digitando e-mail e senha diretamente.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {passwordReauthRequired && (
+                <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 flex items-start gap-3 animate-shake">
+                  <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200">
+                    <p className="font-bold">Reautenticação Necessária</p>
+                    <p className="mt-0.5">
+                      Por motivos de segurança do Firebase Auth, confirme sua <strong>Senha Atual</strong> no campo abaixo para autorizar a modificação.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md">
                 <div className="form-group">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="form-label mb-0">Senha Atual</label>
+                    {passwordReauthRequired && (
+                      <span className="text-[11px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+                        Obrigatória
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative group">
+                    <input
+                      type={showCurrentPass ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={e => {
+                        setCurrentPassword(e.target.value);
+                        if (passwordReauthRequired && e.target.value.length > 0) {
+                          setPasswordReauthRequired(false);
+                        }
+                      }}
+                      className={`form-control pl-10 pr-10 ${
+                        passwordReauthRequired ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : ''
+                      }`}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                    />
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPass(!showCurrentPass)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
+                      title={showCurrentPass ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
+                    Necessária para confirmar a sua identidade caso sua sessão não seja recente.
+                  </p>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label">Nova Senha</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    className="form-control"
-                    placeholder="Mínimo de 6 caracteres"
-                    required
-                  />
+                  <div className="relative group">
+                    <input
+                      type={showNewPass ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="form-control pl-10 pr-10"
+                      placeholder="Mínimo de 6 caracteres"
+                      required
+                      autoComplete="new-password"
+                    />
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPass(!showNewPass)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
+                      title={showNewPass ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Confirmar Nova Senha</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    className="form-control"
-                    placeholder="Repita a nova senha"
-                    required
-                  />
+                  <div className="relative group">
+                    <input
+                      type={showConfirmPass ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className="form-control pl-10 pr-10"
+                      placeholder="Repita a nova senha"
+                      required
+                      autoComplete="new-password"
+                    />
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPass(!showConfirmPass)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
+                      title={showConfirmPass ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex justify-start pt-2">
-                  <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">
-                    Atualizar Senha
+                  <button
+                    type="submit"
+                    disabled={submittingPassword}
+                    className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {submittingPassword ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Atualizando no Firebase...
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={16} />
+                        Atualizar Senha
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

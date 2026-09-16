@@ -6,6 +6,10 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  reauthenticateWithPopup,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
@@ -346,6 +350,123 @@ export async function logout() {
   } catch {}
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+  }
+}
+
+/**
+ * Verifica se a conta do usuário conectado utiliza exclusivamente provedor Google (sem senha de e-mail cadastrada)
+ */
+export function isGoogleOnlyAuthUser() {
+  const user = auth.currentUser;
+  if (!user || !user.providerData) return false;
+  return (
+    user.providerData.every(p => p.providerId !== 'password') &&
+    user.providerData.some(p => p.providerId === 'google.com')
+  );
+}
+
+/**
+ * Altera a senha do usuário autenticado no Firebase Auth.
+ * Se a senha atual for fornecida, reautentica previamente para autorizar a operação sensível.
+ * Se o Firebase lançar auth/requires-recent-login, sinaliza requiresReauth para solicitar a senha atual,
+ * ou dispara reautenticação com Google caso seja conta vinculada exclusivamente pelo Google.
+ *
+ * @param {string} currentPassword - Senha atual do usuário
+ * @param {string} newPassword - Nova senha a ser configurada
+ * @returns {Promise<{success: boolean, message?: string, error?: string, requiresReauth?: boolean, errorCode?: string}>}
+ */
+export async function updateUserPassword(currentPassword, newPassword) {
+  const user = auth.currentUser;
+  if (!user) {
+    return {
+      success: false,
+      error: 'Nenhuma sessão ativa encontrada no Firebase. Por favor, faça login novamente.'
+    };
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return {
+      success: false,
+      error: 'A nova senha deve ter no mínimo 6 caracteres.'
+    };
+  }
+
+  if (currentPassword && currentPassword === newPassword) {
+    return {
+      success: false,
+      error: 'A nova senha deve ser diferente da senha atual.'
+    };
+  }
+
+  const isGoogleOnly = isGoogleOnlyAuthUser();
+
+  try {
+    // Se foi informada a senha atual e a conta possui e-mail, executa reautenticação
+    if (currentPassword && user.email) {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    }
+
+    // Aplica a nova senha no Firebase Authentication
+    await updatePassword(user, newPassword);
+
+    return {
+      success: true,
+      message: 'Senha alterada com sucesso no Firebase Authentication!'
+    };
+  } catch (error) {
+    console.error('[authService] Erro ao alterar senha no Firebase:', error.code, error.message);
+
+    if (error.code === 'auth/requires-recent-login') {
+      if (isGoogleOnly) {
+        try {
+          await reauthenticateWithPopup(user, googleProvider);
+          await updatePassword(user, newPassword);
+          return {
+            success: true,
+            message: 'Senha definida com sucesso após confirmação com o Google!'
+          };
+        } catch (popupErr) {
+          return {
+            success: false,
+            error: 'Falha na confirmação com o Google: ' + (popupErr.message || popupErr.code)
+          };
+        }
+      }
+
+      return {
+        success: false,
+        requiresReauth: true,
+        error: 'Esta é uma operação sensível e exige reautenticação recente. Por favor, confirme sua senha atual.'
+      };
+    }
+
+    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      return {
+        success: false,
+        error: 'A senha atual informada está incorreta.'
+      };
+    }
+
+    if (error.code === 'auth/weak-password') {
+      return {
+        success: false,
+        error: 'A nova senha deve ter no mínimo 6 caracteres.'
+      };
+    }
+
+    if (error.code === 'auth/too-many-requests') {
+      return {
+        success: false,
+        error: 'Muitas tentativas sem sucesso. Aguarde alguns instantes antes de tentar novamente.'
+      };
+    }
+
+    return {
+      success: false,
+      error: error.message || 'Erro ao alterar a senha no Firebase.',
+      errorCode: error.code
+    };
   }
 }
 
