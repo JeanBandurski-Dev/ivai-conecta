@@ -528,7 +528,76 @@
                 opacity 0.8s ease,
                 background-color 0.8s ease;
   }
+
+  /* ── Animações Fluidas de Etapas & Studio ATS ── */
+  .stage-card-fluid {
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.22s ease,
+                background-color 0.22s ease;
+  }
+  .stage-card-fluid:hover {
+    transform: translateY(-2px);
+  }
+  .stage-card-dragging {
+    opacity: 0.45;
+    border-style: dashed !important;
+    border-color: #0284c7 !important;
+    transform: scale(0.98);
+    cursor: grabbing !important;
+  }
+  .stage-card-dragover {
+    border-color: #0284c7 !important;
+    background-color: rgba(239, 246, 255, 0.75) !important;
+    box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.18), 0 8px 10px -6px rgba(2, 132, 199, 0.12) !important;
+    transform: translateY(-4px) scale(1.01);
+  }
+  .dark .stage-card-dragover {
+    background-color: rgba(15, 23, 42, 0.85) !important;
+    box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.22) !important;
+  }
+
+  .stage-chip-fluid {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.18s ease,
+                background-color 0.18s ease,
+                color 0.18s ease;
+  }
+  .stage-chip-fluid:hover {
+    transform: translateY(-1px) scale(1.02);
+  }
+  .stage-chip-fluid:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .stage-color-dot-fluid {
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.15s ease,
+                opacity 0.15s ease;
+  }
+  .stage-color-dot-fluid:hover {
+    transform: scale(1.18);
+  }
+  .stage-color-dot-fluid:active {
+    transform: scale(0.95);
+  }
+
+  @keyframes smoothSlideIn {
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-smooth-in {
+    animation: smoothSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
+
 
 
 

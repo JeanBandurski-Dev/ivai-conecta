@@ -8,6 +8,10 @@ import {
   onAuthStateChanged,
   sendEmailVerification,
   reload,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  reauthenticateWithPopup,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
@@ -27,11 +31,61 @@ export function getUsersDB() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) users = parsed;
+      if (Array.isArray(parsed)) {
+        users = parsed.map(u => {
+          if (u && typeof u === 'object') {
+            const { password, ...safeUser } = u;
+            return safeUser;
+          }
+          return u;
+        });
+      }
     } catch {}
   }
   return users;
 }
+
+/**
+ * Remove proativamente qualquer senha legada salva em texto puro no LocalStorage
+ */
+export function purgePasswordsFromLocalStorage() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEY_USERS_DB);
+    if (rawUsers) {
+      const parsed = JSON.parse(rawUsers);
+      if (Array.isArray(parsed)) {
+        let hasPassword = false;
+        const sanitized = parsed.map(user => {
+          if (user && typeof user === 'object' && 'password' in user) {
+            hasPassword = true;
+            const { password, ...clean } = user;
+            return clean;
+          }
+          return user;
+        });
+        if (hasPassword) {
+          localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(sanitized));
+        }
+      }
+    }
+
+    const rawAuth = localStorage.getItem(STORAGE_KEY_AUTH_USER);
+    if (rawAuth) {
+      const authUser = JSON.parse(rawAuth);
+      if (authUser && typeof authUser === 'object' && 'password' in authUser) {
+        delete authUser.password;
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(authUser));
+      }
+    }
+  } catch (err) {
+    console.warn('[authService] Erro ao purgar senhas residuais:', err);
+  }
+}
+
+// Auto-executa a limpeza de senhas residuais na inicialização do serviço
+purgePasswordsFromLocalStorage();
+
 
 export function getAuthUser() {
   if (typeof localStorage === 'undefined') return null;
@@ -185,6 +239,19 @@ export async function register(data) {
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+
+    // Atualiza cache local de usuários sem nenhuma senha
+    try {
+      const users = getUsersDB();
+      const existingIdx = users.findIndex(u => u.uid === fbUser.uid || u.email?.toLowerCase() === cleanEmail);
+      if (existingIdx >= 0) {
+        users[existingIdx] = { ...sessionUser };
+      } else {
+        users.push({ ...sessionUser });
+      }
+      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
+    } catch {}
+
     return { success: true, user: sessionUser };
   } catch (error) {
     console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
@@ -199,39 +266,13 @@ export async function register(data) {
       userFriendlyError = 'A senha deve conter no mínimo 6 caracteres.';
     } else if (error.code === 'auth/invalid-email') {
       userFriendlyError = 'Formato de e-mail inválido.';
+    } else if (error.code === 'auth/network-request-failed') {
+      userFriendlyError = 'Falha de conexão com o servidor. Verifique sua conexão com a internet e tente novamente.';
+    } else {
+      userFriendlyError = error.message || 'Erro ao realizar cadastro no Firebase. Tente novamente.';
     }
 
-    if (userFriendlyError) {
-      return { success: false, error: userFriendlyError, errorCode: error.code };
-    }
-
-    // Fallback: se houver erro genérico/offline, grava no LocalStorage
-    const users = getUsersDB();
-    if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
-      return { success: false, error: 'Este e-mail já está cadastrado no Ivaí Conecta.' };
-    }
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      uid: `usr_${Date.now()}`,
-      email: cleanEmail,
-      password,
-      name,
-      city: city || 'Ivaiporã',
-      role: selectedRole,
-      badge: roleMeta.badge,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...roleSpecific,
-      isVerifiedCompany: selectedRole === 'empresa',
-    };
-    users.push(newUser);
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
-
-    const sessionUser = { ...newUser };
-    delete sessionUser.password;
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-    return { success: true, user: sessionUser };
+    return { success: false, error: userFriendlyError, errorCode: error.code };
   }
 }
 
@@ -315,6 +356,123 @@ export async function logout() {
   } catch {}
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+  }
+}
+
+/**
+ * Verifica se a conta do usuário conectado utiliza exclusivamente provedor Google (sem senha de e-mail cadastrada)
+ */
+export function isGoogleOnlyAuthUser() {
+  const user = auth.currentUser;
+  if (!user || !user.providerData) return false;
+  return (
+    user.providerData.every(p => p.providerId !== 'password') &&
+    user.providerData.some(p => p.providerId === 'google.com')
+  );
+}
+
+/**
+ * Altera a senha do usuário autenticado no Firebase Auth.
+ * Se a senha atual for fornecida, reautentica previamente para autorizar a operação sensível.
+ * Se o Firebase lançar auth/requires-recent-login, sinaliza requiresReauth para solicitar a senha atual,
+ * ou dispara reautenticação com Google caso seja conta vinculada exclusivamente pelo Google.
+ *
+ * @param {string} currentPassword - Senha atual do usuário
+ * @param {string} newPassword - Nova senha a ser configurada
+ * @returns {Promise<{success: boolean, message?: string, error?: string, requiresReauth?: boolean, errorCode?: string}>}
+ */
+export async function updateUserPassword(currentPassword, newPassword) {
+  const user = auth.currentUser;
+  if (!user) {
+    return {
+      success: false,
+      error: 'Nenhuma sessão ativa encontrada no Firebase. Por favor, faça login novamente.'
+    };
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return {
+      success: false,
+      error: 'A nova senha deve ter no mínimo 6 caracteres.'
+    };
+  }
+
+  if (currentPassword && currentPassword === newPassword) {
+    return {
+      success: false,
+      error: 'A nova senha deve ser diferente da senha atual.'
+    };
+  }
+
+  const isGoogleOnly = isGoogleOnlyAuthUser();
+
+  try {
+    // Se foi informada a senha atual e a conta possui e-mail, executa reautenticação
+    if (currentPassword && user.email) {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    }
+
+    // Aplica a nova senha no Firebase Authentication
+    await updatePassword(user, newPassword);
+
+    return {
+      success: true,
+      message: 'Senha alterada com sucesso no Firebase Authentication!'
+    };
+  } catch (error) {
+    console.error('[authService] Erro ao alterar senha no Firebase:', error.code, error.message);
+
+    if (error.code === 'auth/requires-recent-login') {
+      if (isGoogleOnly) {
+        try {
+          await reauthenticateWithPopup(user, googleProvider);
+          await updatePassword(user, newPassword);
+          return {
+            success: true,
+            message: 'Senha definida com sucesso após confirmação com o Google!'
+          };
+        } catch (popupErr) {
+          return {
+            success: false,
+            error: 'Falha na confirmação com o Google: ' + (popupErr.message || popupErr.code)
+          };
+        }
+      }
+
+      return {
+        success: false,
+        requiresReauth: true,
+        error: 'Esta é uma operação sensível e exige reautenticação recente. Por favor, confirme sua senha atual.'
+      };
+    }
+
+    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      return {
+        success: false,
+        error: 'A senha atual informada está incorreta.'
+      };
+    }
+
+    if (error.code === 'auth/weak-password') {
+      return {
+        success: false,
+        error: 'A nova senha deve ter no mínimo 6 caracteres.'
+      };
+    }
+
+    if (error.code === 'auth/too-many-requests') {
+      return {
+        success: false,
+        error: 'Muitas tentativas sem sucesso. Aguarde alguns instantes antes de tentar novamente.'
+      };
+    }
+
+    return {
+      success: false,
+      error: error.message || 'Erro ao alterar a senha no Firebase.',
+      errorCode: error.code
+    };
   }
 }
 

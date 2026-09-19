@@ -1,7 +1,7 @@
 import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { calculateMatchScore, safeSkillsArray, isJobFavorited } from '../lib/ivaiConecta';
+import { calculateMatchScore, safeSkillsArray, isJobFavorited, getUserApplications } from '../lib/ivaiConecta';
 
 export default function JobCard({ job, matchScore, onSelect }) {
   const { currentUser, favoriteJobs = [], toggleFavoriteJob, showToast } = useAppStore();
@@ -34,6 +34,19 @@ export default function JobCard({ job, matchScore, onSelect }) {
     (currentUser?.razaoSocial && job.company && job.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
     (currentUser?.nomeFantasia && job.company && job.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
+
+  const userUid = currentUser?.uid || currentUser?.id;
+  const userEmail = currentUser?.email?.toLowerCase().trim();
+  const jobIds = [String(job.id || ''), String(job.firestoreId || ''), String(id)].filter(Boolean);
+  
+  const hasApplied = isCandidate && (getUserApplications() || []).some(a => {
+    const matchesJob = jobIds.includes(String(a.jobId || '')) ||
+                       (a.firestoreJobId && jobIds.includes(String(a.firestoreJobId))) ||
+                       (a.originalJobId && jobIds.includes(String(a.originalJobId)));
+    const matchesUser = (userUid && (String(a.candidateUid) === String(userUid) || String(a.candidateId) === String(userUid))) ||
+                        (userEmail && String(a.candidateEmail || '').toLowerCase().trim() === userEmail);
+    return matchesJob && matchesUser;
+  });
 
   // Compute match score safely
   const userSkills = safeSkillsArray(currentUser?.skills);
@@ -80,6 +93,11 @@ export default function JobCard({ job, matchScore, onSelect }) {
                   <ShieldCheck size={12} className="text-green-600 dark:text-green-400 shrink-0" />
                   {job.isVerifiedCompany ? 'CNPJ Validado · Vaga Verificada' : 'Vaga Ativa'}
                 </span>
+                {hasApplied && (
+                  <span className="text-[10px] font-bold bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5">
+                    <Check size={10} strokeWidth={3} /> Inscrito
+                  </span>
+                )}
                 {isOwner && (
                   <span className="text-[10px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 px-1.5 py-0.2 rounded">
                     Sua Empresa

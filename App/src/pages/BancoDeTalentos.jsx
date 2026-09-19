@@ -4,7 +4,7 @@ import {
   Search, X, Sparkles, RotateCcw,
   ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap
 } from 'lucide-react';
-import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES } from '../lib/ivaiConecta';
+import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES, matchCity } from '../lib/ivaiConecta';
 import { subscribeToTalents, subscribeToTeachers } from '../services/talentsService.js';
 import TalentCard from '../components/TalentCard';
 import useAppStore from '../store/useAppStore';
@@ -77,7 +77,7 @@ export default function BancoDeTalentos() {
   const filtered = useMemo(() => {
     return all
       .filter(t => {
-        const mCity = city === 'Todas as Cidades' || (t.city && t.city.toLowerCase() === city.toLowerCase());
+        const mCity = matchCity(t.city, city);
         const mArea = area === 'Todas' || (t.course && t.course.toLowerCase().includes(area.toLowerCase()));
         const mInst = institution === 'Todas as Instituições' || (t.institution && t.institution.toLowerCase().includes(institution.toLowerCase())) || (institution.includes('Autônomo') && t.institution && t.institution.includes('Autônomo'));
         const mEndorsed = !onlyEndorsed || (t.endorsements && t.endorsements.length > 0);

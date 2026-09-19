@@ -654,3 +654,37 @@ export function validateBenefit(benefitName) {
   return { valid: true };
 }
 
+/**
+ * Verifica se um texto contém linguagem inapropriada / palavrões.
+ * Usado como filtro leve para publicações no banco de dados (sem rejeitar 
+ * títulos de cargos que não estão na lista padronizada).
+ */
+export function hasProfanity(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase().trim();
+  const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
+
+  const roots = [
+    'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
+    'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
+    'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp'
+  ];
+  for (const root of roots) {
+    if (cleanAlpha.includes(root)) return true;
+  }
+
+  const bad = [
+    'bosta', 'merda', 'caralho', 'porra', 'foder', 'foda', 'cacete', 'buceta',
+    'piroca', 'viado', 'vagabundo', 'safado', 'vsf', 'fdp', 'krl', 'kct'
+  ];
+  for (const b of bad) {
+    if (b.length >= 3 && lower.includes(b)) return true;
+  }
+
+  // Termos curtos como 'cu' isolados
+  const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão)/i;
+  if (regexCu.test(lower) || (cleanAlpha === 'cu')) return true;
+
+  return false;
+}
+

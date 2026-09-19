@@ -38,6 +38,24 @@ export default function App() {
   const initAuthListener = useAppStore(state => state.initAuthListener);
 
   useEffect(() => {
+    // Verifica e limpa localStorage se estiver cheio, para garantir funcionamento
+    try {
+      const testKey = '__ivai_ls_test__';
+      localStorage.setItem(testKey, '1');
+      localStorage.removeItem(testKey);
+    } catch (e) {
+      // localStorage cheio — limpa dados de cache pesados para liberar espaço
+      const cacheKeys = [
+        'ivai_conecta_db_jobs',
+        'ivai_conecta_db_talents',
+        'ivai_conecta_db_services',
+        'ivai_conecta_user_applications',
+      ];
+      for (const key of cacheKeys) {
+        try { localStorage.removeItem(key); } catch {}
+      }
+      console.warn('[App] localStorage estava cheio. Cache de dados limpo para liberar espaço.');
+    }
     seedFirestoreIfEmpty();
     if (typeof initAuthListener === 'function') {
       const unsubscribe = initAuthListener();

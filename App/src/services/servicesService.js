@@ -115,26 +115,35 @@ export async function incrementServiceContact(id) {
   }
 }
 
+import { matchCity } from '../utils/searchUtils.js';
+
+let _memServicesCache = null;
+
 /**
  * Escuta serviços em tempo real via Firestore onSnapshot
  */
 export function subscribeToServices(city = 'Todas as Cidades', callback) {
+  callback(getServices(city));
+
   try {
     const servicesRef = collection(db, 'services');
-    const q = (city && city !== 'Todas as Cidades') ? query(servicesRef, where('city', '==', city)) : servicesRef;
     
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(servicesRef, (snapshot) => {
       const remoteServices = snapshot.docs.map(d => ({
         id: d.id,
         firestoreId: d.id,
         ...d.data()
       }));
 
+      _memServicesCache = remoteServices;
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(remoteServices));
+        try {
+          localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(remoteServices));
+        } catch {}
       }
 
-      callback(remoteServices);
+      const filtered = remoteServices.filter(s => matchCity(s.city, city));
+      callback(filtered);
     }, (error) => {
       console.warn('[Firestore Services Listener] Offline fallback:', error.message);
       callback(getServices(city));
@@ -151,30 +160,23 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
  */
 export function getServices(city = 'Todas as Cidades') {
   let services = [];
-  if (typeof localStorage !== 'undefined') {
+  if (Array.isArray(_memServicesCache) && _memServicesCache.length > 0) {
+    services = _memServicesCache;
+  } else if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_SERVICES);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) services = parsed;
+        if (Array.isArray(parsed)) {
+          services = parsed;
+          _memServicesCache = parsed;
+        }
       } catch {}
     }
   }
 
-  // Background sync com o Firestore
-  try {
-    const servicesRef = collection(db, 'services');
-    const q = (city && city !== 'Todas as Cidades') ? query(servicesRef, where('city', '==', city)) : servicesRef;
-    getDocs(q).then(snapshot => {
-      const remote = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }));
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(remote));
-      }
-    }).catch(err => console.warn('[Firestore] getServices offline:', err.message));
-  } catch {}
-
   if (!city || city === 'Todas as Cidades') return services;
-  return services.filter(s => s.city && s.city.toLowerCase() === city.toLowerCase());
+  return services.filter(s => matchCity(s.city, city));
 }
 
 export function getServiceById(id) {

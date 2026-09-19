@@ -13,11 +13,50 @@ import {
   increment
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
-import { validateProfessionalText, validateJobTitle, validateSkill } from './jobTaxonomy.js';
+import { validateProfessionalText, validateJobTitle, validateSkill, hasProfanity } from './jobTaxonomy.js';
 import { calculateMatchScore, safeSkillsArray } from './matchService.js';
+import { matchCity } from '../utils/searchUtils.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
+
+// Cache em memória como fallback quando localStorage estiver cheio
+let _memJobsCache = null;
+
+/**
+ * Salva no localStorage de forma segura, limpando dados antigos se a quota for excedida.
+ */
+function safeSetLS(key, value) {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)) {
+      // Tenta limpar chaves pesadas para liberar espaço
+      const heavyKeys = [
+        'ivai_conecta_db_jobs',
+        'ivai_conecta_db_talents',
+        'ivai_conecta_db_services',
+        'ivai_conecta_user_applications',
+      ];
+      for (const hk of heavyKeys) {
+        if (hk !== key) {
+          try { localStorage.removeItem(hk); } catch {}
+        }
+      }
+      // Segunda tentativa após limpeza
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch {
+        console.warn('[JobsService] localStorage quota persistente - usando cache em memória.');
+        return false;
+      }
+    }
+    return false;
+  }
+}
 
 function getDeletedJobIds() {
   if (typeof localStorage === 'undefined') return [];
@@ -42,14 +81,14 @@ function getJobStatusOverrides() {
 function isCleanProfessionalJob(job) {
   if (!job || typeof job !== 'object' || !job.title) return false;
   try {
-    const tCheck = validateJobTitle(String(job.title));
-    if (!tCheck.valid) return false;
+    // Apenas bloqueia conteúdo ofensivo (palavrões) - não rejeita títulos de cargos válidos
+    // que não estejam na lista padronizada (empresas podem criar vagas com títulos customizados)
+    const titleStr = String(job.title || '');
+    if (!titleStr.trim()) return false;
+    if (hasProfanity(titleStr)) return false;
     const salStr = String(job.salary || '').toLowerCase().trim();
-    if (salStr === 'cu' || salStr === 'bosta') return false;
-    if (job.description) {
-      const dCheck = validateProfessionalText(String(job.description), 'Descrição', 5);
-      if (!dCheck.valid) return false;
-    }
+    if (hasProfanity(salStr)) return false;
+    if (job.description && hasProfanity(String(job.description))) return false;
   } catch {
     return true;
   }
@@ -76,8 +115,8 @@ function applyJobOverrides(job) {
       ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean)
       : []);
 
-  // Remove qualquer habilidade com palavrão, termos troll ou sequências numéricas (ex: cubosta123)
-  const safeRequiredSkills = rawRequiredSkills.filter(s => validateSkill(s).valid);
+  // Remove apenas habilidades com conteúdo ofensivo (palavrões) — não rejeita competências válidas
+  const safeRequiredSkills = rawRequiredSkills.filter(s => s && !hasProfanity(s));
 
   const safeBenefits = Array.isArray(job.benefits)
     ? job.benefits.map(b => String(b || '').trim()).filter(Boolean)
@@ -101,6 +140,46 @@ function applyJobOverrides(job) {
 }
 
 /**
+ * Salva vagas no cache (localStorage com fallback em memória).
+ * Mescla com jobs em memória para nunca perder vagas recém-criadas.
+ * Limita a 150 vagas mais recentes para evitar quota exceeded.
+ */
+function persistJobs(jobs) {
+  if (!Array.isArray(jobs)) return;
+
+  const map = new Map();
+  // 1. Adiciona jobs recebidos
+  jobs.forEach(j => {
+    if (j && (j.id || j.firestoreId)) {
+      map.set(String(j.id || j.firestoreId), j);
+    }
+  });
+
+  // 2. Preserva jobs em memória que possam não estar ainda no snapshot recebido
+  if (Array.isArray(_memJobsCache)) {
+    _memJobsCache.forEach(j => {
+      if (j && (j.id || j.firestoreId)) {
+        const key = String(j.id || j.firestoreId);
+        if (!map.has(key)) {
+          map.set(key, j);
+        }
+      }
+    });
+  }
+
+  const merged = Array.from(map.values())
+    .map(applyJobOverrides)
+    .filter(Boolean)
+    .sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0))
+    .slice(0, 150);
+
+  _memJobsCache = merged;
+  if (typeof localStorage !== 'undefined') {
+    safeSetLS(STORAGE_KEY_JOBS, JSON.stringify(merged));
+  }
+}
+
+/**
  * Escuta vagas em tempo real via Firestore onSnapshot + Eventos Locais Imediatos
  */
 export function subscribeToJobs(city = 'Todas as Cidades', callback) {
@@ -118,11 +197,11 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
   }
 
   // 3. Sincronização em tempo real via Cloud Firestore
+  // Escuta sempre a coleção completa para que o cache local nunca fique truncado por cidade
   let unsubFirestore = () => {};
   try {
     const jobsRef = collection(db, 'jobs');
-    const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
-    unsubFirestore = onSnapshot(q, (snapshot) => {
+    unsubFirestore = onSnapshot(jobsRef, (snapshot) => {
       const remoteJobs = snapshot.docs
         .map(d => ({
           id: d.id,
@@ -132,12 +211,13 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
         .map(applyJobOverrides)
         .filter(Boolean);
 
-      // Atualiza cache local apenas com dados reais retornados pelo Firestore
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
-      }
+      // Persiste no cache global completo
+      persistJobs(remoteJobs);
 
-      callback(remoteJobs);
+      // Filtra pela cidade solicitada apenas ao entregar para o callback
+      const filtered = remoteJobs.filter(j => matchCity(j.city, city));
+
+      callback(filtered);
     }, (error) => {
       console.warn('[Firestore Jobs Listener] Offline fallback:', error.message);
       callback(getJobs(city));
@@ -221,40 +301,33 @@ export function subscribeToJobApplicants(jobId, callback) {
 }
 
 /**
- * Busca vagas do cache local (sem seeds fictícios)
+ * Busca vagas do cache local (memória com fallback em localStorage)
  */
 export function getJobs(city = 'Todas as Cidades') {
   let jobs = [];
-  if (typeof localStorage !== 'undefined') {
-    const raw = localStorage.getItem(STORAGE_KEY_JOBS);
-    if (raw) {
-      try {
+
+  // 1. Tenta memória primeiro
+  if (Array.isArray(_memJobsCache) && _memJobsCache.length > 0) {
+    jobs = _memJobsCache;
+  } else if (typeof localStorage !== 'undefined') {
+    // 2. Tenta localStorage se a memória ainda não tiver
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_JOBS);
+      if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) jobs = parsed;
-      } catch {}
-    }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          jobs = parsed;
+          _memJobsCache = parsed;
+        }
+      }
+    } catch {}
   }
 
   // Aplica overrides de status e deleções
   jobs = jobs.map(applyJobOverrides).filter(Boolean);
 
-  // Sincronização assíncrona com Cloud Firestore
-  try {
-    const jobsRef = collection(db, 'jobs');
-    const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
-    getDocs(q).then(snapshot => {
-      const remoteJobs = snapshot.docs
-        .map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }))
-        .map(applyJobOverrides)
-        .filter(Boolean);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
-      }
-    }).catch(err => console.warn('[Firestore] getJobs offline:', err.message));
-  } catch {}
-
   if (!city || city === 'Todas as Cidades') return jobs;
-  return jobs.filter(j => j.city && j.city.toLowerCase() === city.toLowerCase());
+  return jobs.filter(j => matchCity(j.city, city));
 }
 
 /**
@@ -263,16 +336,16 @@ export function getJobs(city = 'Todas as Cidades') {
 export async function getJobsAsync(city = 'Todas as Cidades') {
   try {
     const jobsRef = collection(db, 'jobs');
-    const q = (city && city !== 'Todas as Cidades') ? query(jobsRef, where('city', '==', city)) : jobsRef;
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(jobsRef);
     const remoteJobs = snapshot.docs
       .map(d => ({ id: d.id, firestoreId: d.id, ...d.data() }))
       .map(applyJobOverrides)
       .filter(Boolean);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(remoteJobs));
-    }
-    return remoteJobs;
+    
+    persistJobs(remoteJobs);
+
+    if (!city || city === 'Todas as Cidades') return remoteJobs;
+    return remoteJobs.filter(j => matchCity(j.city, city));
   } catch (error) {
     console.warn('[Firestore] Erro ao buscar vagas do Firestore:', error.message);
     return getJobs(city);
@@ -293,9 +366,10 @@ export function getJobById(id) {
 }
 
 export async function addJob(jobData) {
-  const jobs = getJobs('Todas as Cidades') || [];
+  const currentJobs = getJobs('Todas as Cidades') || [];
   const rawSkills = Array.isArray(jobData?.requiredSkills) ? jobData.requiredSkills : [];
-  const cleanSkills = rawSkills.filter(s => validateSkill(s).valid);
+  // Usa filtro leve (apenas palavrões) para não descartar skills legítimas que o usuário digitou
+  const cleanSkills = rawSkills.filter(s => s && typeof s === 'string' && s.trim() && !hasProfanity(s));
 
   // Sanitiza dados de entrada removendo qualquer chave com valor undefined
   const cleanData = {};
@@ -316,7 +390,7 @@ export async function addJob(jobData) {
     requiredSkills: cleanSkills.length > 0 ? cleanSkills : (Array.isArray(cleanData.requiredSkills) && cleanData.requiredSkills.length > 0 ? cleanData.requiredSkills : ['Comunicação Assertiva'])
   };
 
-  // Sincronização no Firestore
+  // 1. Sincronização no Firestore
   try {
     const docRef = await addDoc(collection(db, 'jobs'), newJob);
     newJob.id = docRef.id;
@@ -324,20 +398,19 @@ export async function addJob(jobData) {
   } catch (err) {
     console.warn('[Firestore] Erro ao cadastrar vaga no Firestore:', err.message);
     newJob.id = `job_${Date.now()}`;
+    newJob.firestoreId = newJob.id;
   }
 
-  const updated = [newJob, ...jobs.filter(j => j && j.id !== newJob.id)].map(applyJobOverrides).filter(Boolean);
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
-    } catch (lsErr) {
-      console.warn('[JobsService] LocalStorage quota warning ao salvar vaga:', lsErr);
-    }
-    try {
-      window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
-    } catch (evErr) {
-      console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
-    }
+  // 2. Mescla a nova vaga com todas as vagas existentes sem perder nada
+  const existingWithoutNew = currentJobs.filter(j => j && String(j.id) !== String(newJob.id) && String(j.firestoreId) !== String(newJob.id));
+  const updated = [newJob, ...existingWithoutNew].map(applyJobOverrides).filter(Boolean);
+
+  persistJobs(updated);
+
+  try {
+    window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
+  } catch (evErr) {
+    console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
   }
 
   return newJob;
@@ -374,9 +447,12 @@ export async function updateJobStatus(jobId, action) {
     return j;
   });
 
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+  persistJobs(updated);
+
+  try {
     window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
+  } catch (evErr) {
+    console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
   }
 
   return updated;
@@ -407,8 +483,12 @@ export async function deleteJob(jobId) {
     (targetNumericId && String(j.id) === targetNumericId)
   ));
 
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+  persistJobs(updated);
+
+  try {
+    window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
+  } catch (evErr) {
+    console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
   }
 
   // 4. Exclui do Cloud Firestore
@@ -428,7 +508,7 @@ export async function deleteJob(jobId) {
   return updated;
 }
 
-export function getUserApplications(candidateUid) {
+export function getUserApplications(candidateIdentifier) {
   let apps = [];
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_APPLICATIONS);
@@ -439,8 +519,13 @@ export function getUserApplications(candidateUid) {
       } catch {}
     }
   }
-  if (candidateUid) {
-    return apps.filter(a => a.candidateUid === candidateUid || a.candidateEmail === candidateUid);
+  if (candidateIdentifier) {
+    const idStr = String(candidateIdentifier).toLowerCase().trim();
+    return apps.filter(a => 
+      String(a.candidateUid || '').toLowerCase().trim() === idStr ||
+      String(a.candidateId || '').toLowerCase().trim() === idStr ||
+      String(a.candidateEmail || '').toLowerCase().trim() === idStr
+    );
   }
   return apps;
 }
@@ -484,11 +569,65 @@ export async function applyToJob(jobId, user) {
     };
   }
 
-  const userUid = user.uid || user.id || 'usr_guest';
-  const apps = getUserApplications(userUid);
-  const existing = apps.find(a => String(a.jobId) === String(jobId));
-  if (existing) {
+  const userUid = String(user.uid || user.id || 'usr_guest').trim();
+  const userEmail = String(user.email || '').toLowerCase().trim();
+  const possibleUserIds = [userUid, String(user.id || ''), userEmail].filter(Boolean);
+
+  const possibleJobIds = [
+    String(jobId),
+    String(job?.id || ''),
+    String(job?.firestoreId || ''),
+    job?.id ? String(job.id) : null
+  ].filter(Boolean);
+
+  // 1. Verificação local imediata no cache
+  const localApps = getUserApplications();
+  const isDuplicateLocal = localApps.some(a => {
+    const matchJob = possibleJobIds.includes(String(a.jobId || '')) ||
+                     (a.firestoreJobId && possibleJobIds.includes(String(a.firestoreJobId))) ||
+                     (a.originalJobId && possibleJobIds.includes(String(a.originalJobId)));
+    const matchUser = possibleUserIds.includes(String(a.candidateUid || '')) ||
+                      possibleUserIds.includes(String(a.candidateId || '')) ||
+                      (a.candidateEmail && possibleUserIds.includes(String(a.candidateEmail).toLowerCase().trim()));
+    return matchJob && matchUser;
+  });
+
+  if (isDuplicateLocal) {
     return { success: false, message: 'Você já se candidatou a esta vaga!' };
+  }
+
+  // 2. Verificação assíncrona no Cloud Firestore para evitar duplicações remotas
+  try {
+    const appsRef = collection(db, 'applications');
+    if (userUid && userUid !== 'usr_guest') {
+      const qUid = query(appsRef, where('candidateUid', '==', userUid));
+      const snapUid = await getDocs(qUid);
+      const existsUid = snapUid.docs.some(d => {
+        const data = d.data();
+        return possibleJobIds.includes(String(data.jobId || '')) ||
+               (data.firestoreJobId && possibleJobIds.includes(String(data.firestoreJobId))) ||
+               (data.originalJobId && possibleJobIds.includes(String(data.originalJobId)));
+      });
+      if (existsUid) {
+        return { success: false, message: 'Você já se candidatou a esta vaga!' };
+      }
+    }
+
+    if (userEmail) {
+      const qEmail = query(appsRef, where('candidateEmail', '==', userEmail));
+      const snapEmail = await getDocs(qEmail);
+      const existsEmail = snapEmail.docs.some(d => {
+        const data = d.data();
+        return possibleJobIds.includes(String(data.jobId || '')) ||
+               (data.firestoreJobId && possibleJobIds.includes(String(data.firestoreJobId))) ||
+               (data.originalJobId && possibleJobIds.includes(String(data.originalJobId)));
+      });
+      if (existsEmail) {
+        return { success: false, message: 'Você já se candidatou a esta vaga!' };
+      }
+    }
+  } catch (fsErr) {
+    console.warn('[Firestore] Verificação prévia de duplicidade:', fsErr.message);
   }
 
   const candidateSkills = safeSkillsArray(user.skills);
@@ -501,11 +640,16 @@ export async function applyToJob(jobId, user) {
     modality: job?.modality
   });
 
+  const targetJobId = String(job?.firestoreId || job?.id || jobId);
+
   const newApp = {
-    jobId: String(jobId),
+    jobId: targetJobId,
+    firestoreJobId: targetJobId,
+    originalJobId: String(job?.id || jobId),
     candidateUid: userUid,
+    candidateId: String(user.id || userUid),
     candidateName: user.name || 'Candidato Ivaí Conecta',
-    candidateEmail: user.email || '',
+    candidateEmail: userEmail,
     candidateAvatar: user.avatar || '',
     candidateCourse: user.course || (user.role === 'aluno' ? 'Estudante' : 'Profissional'),
     candidateCity: user.city || 'Ivaiporã',
@@ -515,6 +659,7 @@ export async function applyToJob(jobId, user) {
     company: job ? job.company : 'Empresa do Vale do Ivaí',
     companyLogo: job ? (job.companyLogo || '') : '',
     recruiterEmail: job ? (job.recruiterEmail || job.createdBy || '') : '',
+    recruiterUid: job ? (job.createdBy || '') : '',
     recruiterPhone: job ? (job.recruiterPhone || '') : '',
     city: job ? job.city : 'Ivaiporã',
     type: job ? job.type : 'Tempo Integral',
@@ -554,9 +699,14 @@ export async function applyToJob(jobId, user) {
   }
 
   const allApps = getUserApplications();
-  const updated = [newApp, ...allApps];
+  const updated = [newApp, ...allApps.filter(a => a && a.id !== newApp.id)];
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
+    try {
+      localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
+    } catch {}
+    try {
+      window.dispatchEvent(new CustomEvent('ivai_applications_updated', { detail: updated }));
+    } catch {}
   }
 
   return { success: true, application: newApp };
