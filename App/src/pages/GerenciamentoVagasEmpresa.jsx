@@ -22,6 +22,7 @@ import {
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
+import CompanyAnalyticsDashboard from '../components/CompanyAnalyticsDashboard';
 
 export const STAGE_TEMPLATES = [
   {
@@ -4043,80 +4044,19 @@ export default function GerenciamentoVagasEmpresa() {
             TAB 4: INDICADORES & ANALYTICS
         ═════════════════════════════════════════════════════════════════ */}
               {activeTab === 'analytics' && (
-                <div className="space-y-6">
-                  <div className="grid md:grid-cols-3 gap-5">
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                        <BarChart3 size={18} className="text-primary-blue" /> Taxa de Conversão do Funil
-                      </h3>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between text-xs font-medium mb-1">
-                            <span>Triagem &rarr; Entrevista</span>
-                            <span className="text-primary-blue font-semibold">45%</span>
-                          </div>
-                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div className="bg-primary-blue h-full rounded-full" style={{ width: '45%' }}></div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="flex justify-between text-xs font-medium mb-1">
-                            <span>Entrevista &rarr; Desafio</span>
-                            <span className="text-indigo-600 font-semibold">60%</span>
-                          </div>
-                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div className="bg-indigo-600 h-full rounded-full" style={{ width: '60%' }}></div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="flex justify-between text-xs font-medium mb-1">
-                            <span>Desafio &rarr; Aprovado</span>
-                            <span className="text-emerald-600 font-semibold">75%</span>
-                          </div>
-                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div className="bg-emerald-600 h-full rounded-full" style={{ width: '75%' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                        <GraduationCap size={18} className="text-emerald-500" /> Origem dos Talentos Inscritos
-                      </h3>
-                      <div className="space-y-2.5 text-xs">
-                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-medium text-slate-800 dark:text-slate-200">IFPR Campus Ivaiporã</span>
-                          <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold">58% dos inscritos</span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-medium text-slate-800 dark:text-slate-200">Univale Ivaiporã</span>
-                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-semibold">27% dos inscritos</span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                          <span className="font-medium text-slate-800 dark:text-slate-200">UENP / Outras</span>
-                          <span className="bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 px-2.5 py-0.5 rounded-full font-semibold">15% dos inscritos</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-                      <h3 className="font-heading font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                        <Sparkles size={18} className="text-amber-500" /> Tecnologias com Mais Afinidade
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {['React (95%)', 'JavaScript (92%)', 'Tailwind (90%)', 'Git (88%)', 'Python (82%)', 'SQL (80%)', 'Figma (78%)'].map(item => (
-                          <span key={item} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <CompanyAnalyticsDashboard
+                  allCompanyJobs={allCompanyJobs}
+                  onSelectJob={(jobId) => setSelectedJobId(jobId)}
+                  onNavigateTab={(tab) => handleTabChange(tab)}
+                  onOpenPublishModal={() => {
+                    setEditingJob(null);
+                    setShowNewJobModal(true);
+                  }}
+                  currentUser={currentUser}
+                  updateCount={updateCount}
+                />
               )}
+
 
             </main>
 
