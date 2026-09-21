@@ -44,10 +44,10 @@ export default function Dashboard() {
   const [companies, setCompanies] = useState(() => getCompanies(selectedCity));
 
   const [platformMetrics, setPlatformMetrics] = useState(() => ({
-    talentsCount: getTalents(selectedCity).length,
-    companiesCount: getCompanies(selectedCity).length,
-    jobsCount: getJobs(selectedCity).filter(j => j.status === 'Ativa').length,
-    servicesCount: getServices(selectedCity).length
+    talentsCount: getTalents('Todas as Cidades').length,
+    companiesCount: getCompanies('Todas as Cidades').length,
+    jobsCount: getJobs('Todas as Cidades').filter(j => j.status === 'Ativa').length,
+    servicesCount: getServices('Todas as Cidades').length
   }));
 
   useEffect(() => {
@@ -56,7 +56,8 @@ export default function Dashboard() {
     const unsubServices  = subscribeToServices(selectedCity, data => { if (Array.isArray(data)) setServices(data); });
     const unsubCompanies = subscribeToCompanies(selectedCity, data => { if (Array.isArray(data)) setCompanies(data); });
 
-    const unsubMetrics   = subscribeToPlatformMetrics(selectedCity, metricsData => {
+    // O card 'Impacto no Vale do Ivaí' reflete as estatísticas globais e consolidadas de toda a região
+    const unsubMetrics   = subscribeToPlatformMetrics('Todas as Cidades', metricsData => {
       if (metricsData) {
         setPlatformMetrics(metricsData);
       }
@@ -134,22 +135,22 @@ export default function Dashboard() {
 
   const metrics = [
     {
-      value: platformMetrics.talentsCount > 0 ? `${platformMetrics.talentsCount}` : `${talents.length}`,
+      value: `${platformMetrics.talentsCount || 0}`,
       label: 'Talentos Registrados',
       color: 'text-[#4ADE80]'
     },
     {
-      value: platformMetrics.companiesCount > 0 ? `${platformMetrics.companiesCount}` : `${companies.length}`,
+      value: `${platformMetrics.companiesCount || 0}`,
       label: 'Empresas Parceiras',
       color: 'text-[#A78BFA]'
     },
     {
-      value: platformMetrics.jobsCount > 0 ? `${platformMetrics.jobsCount}` : `${jobs.filter(j => j.status === 'Ativa').length}`,
+      value: `${platformMetrics.jobsCount || 0}`,
       label: 'Vagas Ativas',
       color: 'text-[#38BDF8]'
     },
     {
-      value: platformMetrics.servicesCount > 0 ? `${platformMetrics.servicesCount}` : `${services.length}`,
+      value: `${platformMetrics.servicesCount || 0}`,
       label: 'Serviços no Marketplace',
       color: 'text-[#FBBF24]'
     },

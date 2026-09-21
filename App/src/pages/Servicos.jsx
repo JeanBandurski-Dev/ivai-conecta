@@ -3,12 +3,18 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, HelpCircle
+  BarChart3, CheckCircle2, AlertCircle, HelpCircle, FileText, Check,
+  Clock, Play, Inbox, ShieldCheck, DollarSign, Calendar
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getServices, addService, updateService, CITIES, maskPhone, matchCity } from '../lib/ivaiConecta';
+import {
+  getServices, addService, updateService, CITIES, maskPhone, matchCity,
+  subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders
+} from '../lib/ivaiConecta';
 import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
+import ServiceOrderCard from '../components/ServiceOrderCard';
+import AvaliarServicoModal from '../components/AvaliarServicoModal';
 
 const CATEGORIES = [
   'Todas',
@@ -96,6 +102,65 @@ export default function Servicos() {
       });
     }
   }, [currentService, currentUser]);
+
+  // ── Service Orders Lifecycle State ──
+  const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
+  const [evaluatingOrder, setEvaluatingOrder] = useState(null);
+  const [orderSubTab, setOrderSubTab] = useState('received'); // 'received' | 'sent'
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeToServiceOrders(currentUser, (data) => {
+      if (Array.isArray(data)) setLiveOrders(data);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleOrdersUpdated = (e) => {
+      if (Array.isArray(e.detail)) setLiveOrders(e.detail);
+      else setLiveOrders(getServiceOrders());
+    };
+    window.addEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+    return () => window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+  }, []);
+
+  const receivedOrders = useMemo(() => {
+    if (!currentUser) return [];
+    const uid = String(currentUser.uid || currentUser.id || '');
+    const email = String(currentUser.email || '').toLowerCase();
+    return liveOrders.filter(o =>
+      (uid && String(o.providerId) === uid) ||
+      (email && String(o.providerEmail || '').toLowerCase() === email)
+    );
+  }, [liveOrders, currentUser]);
+
+  const sentOrders = useMemo(() => {
+    if (!currentUser) return [];
+    const uid = String(currentUser.uid || currentUser.id || '');
+    const email = String(currentUser.email || '').toLowerCase();
+    return liveOrders.filter(o =>
+      (uid && String(o.clientId) === uid) ||
+      (email && String(o.clientEmail || '').toLowerCase() === email)
+    );
+  }, [liveOrders, currentUser]);
+
+  const handleOrderStatusTransition = async (orderId, nextStatus, note) => {
+    try {
+      await updateServiceOrderStatus(orderId, nextStatus, note);
+      const statusNames = {
+        aceito: 'Demanda aceita com sucesso!',
+        recusado: 'Demanda recusada.',
+        em_andamento: 'Atendimento iniciado!',
+        concluido: 'Serviço marcado como concluído!'
+      };
+      showToast(statusNames[nextStatus] || `Status atualizado para: ${nextStatus}`);
+    } catch (err) {
+      showToast('Erro ao atualizar status do serviço.');
+    }
+  };
 
   const hasActiveFilters = query || city !== 'Todas as Cidades' || category !== 'Todas' || badgeFilter !== 'todos' || minRating > 0;
 
@@ -192,9 +257,9 @@ export default function Servicos() {
             )}
           </div>
 
-          {/* Abas para Freelancer */}
-          {currentUser?.role === 'freelancer' && (
-            <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2">
+          {/* Abas de Navegação */}
+          {currentUser && (
+            <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('explore')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
@@ -204,13 +269,26 @@ export default function Servicos() {
                 Explorar Marketplace
               </button>
               <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                  activeTab === 'dashboard' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+                onClick={() => setActiveTab('orders')}
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                  activeTab === 'orders' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
                 }`}
               >
-                <BarChart3 size={15} /> Minha Dashboard &amp; Avaliações
+                <FileText size={15} /> Minhas Demandas &amp; Pedidos
+                {(receivedOrders.some(o => o.status === 'solicitado') || sentOrders.some(o => o.status === 'concluido')) && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                )}
               </button>
+              {currentUser?.role === 'freelancer' && (
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                    activeTab === 'dashboard' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+                  }`}
+                >
+                  <BarChart3 size={15} /> Minha Dashboard &amp; Avaliações
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -218,8 +296,97 @@ export default function Servicos() {
 
       <main className="container section">
 
-        {/* ── ABA FREELANCER DASHBOARD DE DESEMPENHO ── */}
-        {activeTab === 'dashboard' && currentUser?.role === 'freelancer' ? (
+        {/* ── ABA MINHAS DEMANDAS & ORDENS DE SERVIÇO ── */}
+        {activeTab === 'orders' ? (
+          <div className="space-y-6 max-w-5xl mx-auto">
+            {/* Subtabs for Freelancers or header for clients */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-slate-800">
+              <div>
+                <h2 className="text-2xl font-bold font-heading text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText size={24} className="text-primary-blue" /> Gestão de Demandas &amp; Ordens de Serviço
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Acompanhe todas as etapas do atendimento: solicitação, aceite, execução, conclusão e avaliação com nota.
+                </p>
+              </div>
+
+              {currentUser?.role === 'freelancer' && (
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 p-1 rounded-2xl">
+                  <button
+                    onClick={() => setOrderSubTab('received')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      orderSubTab === 'received'
+                        ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs'
+                        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900'
+                    }`}
+                  >
+                    Demandas Recebidas ({receivedOrders.length})
+                  </button>
+                  <button
+                    onClick={() => setOrderSubTab('sent')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      orderSubTab === 'sent'
+                        ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs'
+                        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900'
+                    }`}
+                  >
+                    Meus Pedidos Solicitados ({sentOrders.length})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* List of Orders */}
+            {currentUser?.role === 'freelancer' && orderSubTab === 'received' ? (
+              receivedOrders.length === 0 ? (
+                <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-3">
+                  <Inbox size={48} className="mx-auto text-gray-400 dark:text-slate-600" />
+                  <h3 className="font-heading text-lg font-bold text-gray-800 dark:text-white">Nenhuma solicitação de serviço recebida ainda</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Assim que clientes de Ivaiporã e região solicitarem demandas nos seus anúncios de serviço, elas aparecerão aqui para você aceitar e gerenciar.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {receivedOrders.map(order => (
+                    <ServiceOrderCard
+                      key={order.id}
+                      order={order}
+                      isProvider={true}
+                      onTransition={handleOrderStatusTransition}
+                      onEvaluate={setEvaluatingOrder}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              sentOrders.length === 0 ? (
+                <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-3">
+                  <Inbox size={48} className="mx-auto text-gray-400 dark:text-slate-600" />
+                  <h3 className="font-heading text-lg font-bold text-gray-800 dark:text-white">Você ainda não solicitou nenhum serviço</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Navegue pelo catálogo de serviços locais, selecione um prestador de serviços e clique em "Solicitar" para iniciar uma ordem de atendimento.
+                  </p>
+                  <button onClick={() => setActiveTab('explore')} className="btn btn-primary btn-sm text-xs font-bold shadow-md">
+                    Explorar Marketplace de Serviços
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sentOrders.map(order => (
+                    <ServiceOrderCard
+                      key={order.id}
+                      order={order}
+                      isProvider={false}
+                      onTransition={handleOrderStatusTransition}
+                      onEvaluate={setEvaluatingOrder}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        ) : activeTab === 'dashboard' && currentUser?.role === 'freelancer' ? (
           <div className="space-y-8 max-w-5xl mx-auto">
             {!currentService ? (
               <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-4">
@@ -675,6 +842,14 @@ export default function Servicos() {
             </form>
           </div>
         </div>
+      )}
+
+      {evaluatingOrder && (
+        <AvaliarServicoModal
+          order={evaluatingOrder}
+          onClose={() => setEvaluatingOrder(null)}
+          onSuccess={() => setEvaluatingOrder(null)}
+        />
       )}
     </>
   );

@@ -6,7 +6,7 @@ import {
   ArrowRight, MapPin, Check
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
+import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, isInstitutionalEmail } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',    shortLabel: 'Aluno',      desc: 'Estágios & 1º Emprego',    icon: GraduationCap, color: 'text-blue-500' },
@@ -125,6 +125,13 @@ export default function Login() {
       }
       if (!validateCNPJ(cleanDigits)) {
         setAlert('O CNPJ informado possui dígitos verificadores inválidos pelo cálculo oficial da Receita Federal.');
+        return;
+      }
+    }
+
+    if (selectedRole === 'professor') {
+      if (!isInstitutionalEmail(regEmail.trim())) {
+        setAlert('Para cadastrar uma conta de Professor/Docente, é obrigatório utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br ou outro domínio .edu.br).');
         return;
       }
     }

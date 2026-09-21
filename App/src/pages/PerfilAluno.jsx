@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle
 } from 'lucide-react';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
@@ -49,6 +49,14 @@ export default function PerfilAluno() {
   );
 
   const isProfessor = currentUser?.role === 'professor';
+
+  const hasAlreadyEndorsed = Boolean(isProfessor && (talent?.endorsements || []).some(e => {
+    const pEmail = (currentUser?.email || '').toLowerCase().trim();
+    const eEmail = (e.profEmail || '').toLowerCase().trim();
+    const pUid = currentUser?.uid || currentUser?.id;
+    const eUid = e.profUid || e.profId;
+    return (pEmail && eEmail === pEmail) || (pUid && eUid && String(pUid) === String(eUid));
+  }));
 
   const [activeTab, setActiveTab] = useState('overview');
   const [editModalOpen, setEditModalOpen] = useState(Boolean(searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true'));
@@ -100,28 +108,33 @@ export default function PerfilAluno() {
   const [newProj, setNewProj] = useState({ title: '', tech: '', link: '', description: '' });
   const [newEdu, setNewEdu] = useState({ degree: '', institution: '', period: '' });
 
-  const handleRequestSubmit = (e) => {
+  const handleRequestSubmit = async (e) => {
     e.preventDefault();
     if (!requestForm.profEmail.toLowerCase().includes('@')) {
       setError('Por favor, informe um e-mail educacional válido.');
       return;
     }
     setError('');
-    requestTeacherEndorsement(requestForm.profEmail, requestForm.profName, requestForm.discipline, currentUser);
-    setRequestModal(false);
-    showToast(`Solicitação enviada para o professor ${requestForm.profName}!`);
-    setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+    const res = await requestTeacherEndorsement(requestForm.profEmail, requestForm.profName, requestForm.discipline, currentUser);
+    if (res.success) {
+      setRequestModal(false);
+      showToast(res.message || `Solicitação enviada para o professor ${requestForm.profName}!`);
+      setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+    } else {
+      setError(res.message || 'Erro ao enviar solicitação.');
+      showToast(res.message || 'Erro ao enviar solicitação.');
+    }
   };
 
-  const handleProactiveEndorseSubmit = (e) => {
+  const handleProactiveEndorseSubmit = async (e) => {
     e.preventDefault();
-    const res = proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
+    const res = await proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
     if (res.success) {
       showToast(`Recomendação concedida com sucesso para ${talent.name}!`);
       setProactiveEndorseModal(false);
       setProactiveQuote('');
     } else {
-      showToast(res.error);
+      showToast(res.error || 'Não foi possível conceder recomendação.');
     }
   };
 
@@ -413,12 +426,18 @@ export default function PerfilAluno() {
               )}
 
               {isProfessor && (
-                <button
-                  onClick={() => setProactiveEndorseModal(true)}
-                  className="btn btn-teal btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full"
-                >
-                  <Award size={16} /> Recomendar Este Aluno
-                </button>
+                hasAlreadyEndorsed ? (
+                  <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 w-full">
+                    <CheckCircle size={14} /> Recomendação já concedida por você
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setProactiveEndorseModal(true)}
+                    className="btn btn-teal btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full"
+                  >
+                    <Award size={16} /> Recomendar Este Aluno
+                  </button>
+                )
               )}
             </div>
           </div>

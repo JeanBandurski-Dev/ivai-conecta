@@ -16,9 +16,17 @@ export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 
 export const DEFAULT_COMPANIES = [];
 
+let _memCompanyUsers = null;
+
 export function getCompanies(city = 'Todas as Cidades') {
   const users = getUsersDB() || [];
-  const companyUsers = users.filter(u => u?.role === 'empresa');
+  const localCompanies = users.filter(u => u?.role === 'empresa');
+  const companyUsersMap = new Map();
+  localCompanies.forEach(u => companyUsersMap.set(String(u.uid || u.id || u.email), u));
+  if (Array.isArray(_memCompanyUsers)) {
+    _memCompanyUsers.forEach(u => companyUsersMap.set(String(u.uid || u.id || u.email), u));
+  }
+  const companyUsers = Array.from(companyUsersMap.values());
   const allJobs = getJobs('Todas as Cidades');
 
   // Mapa com deduplicação por nome normalizado
@@ -137,6 +145,7 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
     unsubscribeFirestore = onSnapshot(q, (snap) => {
       if (!snap.empty) {
         const remoteCompanyUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+        _memCompanyUsers = remoteCompanyUsers;
         const local = getUsersDB();
         const merged = [...local];
         remoteCompanyUsers.forEach(rc => {
@@ -147,6 +156,8 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('ivai_conecta_users_db', JSON.stringify(merged));
         }
+      } else {
+        _memCompanyUsers = [];
       }
       emit();
     }, () => {

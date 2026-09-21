@@ -13,7 +13,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js';
-import { validateProfessionalText, validateJobTitle, validateSkill, hasProfanity } from './jobTaxonomy.js';
+import { validateProfessionalText, validateJobTitle, validateSkill, validatePhoneNumber, STANDARD_WORKING_HOURS, hasProfanity } from './jobTaxonomy.js';
 import { calculateMatchScore, safeSkillsArray } from './matchService.js';
 import { matchCity } from '../utils/searchUtils.js';
 
@@ -301,6 +301,56 @@ export function subscribeToJobApplicants(jobId, callback) {
 }
 
 /**
+ * Escuta todas as candidaturas pertinentes a uma empresa em tempo real via Firestore
+ */
+export function subscribeToCompanyApplications(companyUserOrUid, callback) {
+  try {
+    const appsRef = collection(db, 'applications');
+    return onSnapshot(appsRef, (snapshot) => {
+      const allApps = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(allApps));
+        } catch {}
+      }
+
+      let companyApps = allApps;
+      if (companyUserOrUid) {
+        const uid = typeof companyUserOrUid === 'string' ? companyUserOrUid : (companyUserOrUid.uid || companyUserOrUid.id);
+        const email = typeof companyUserOrUid === 'object' ? (companyUserOrUid.email || '').toLowerCase() : '';
+        const name = typeof companyUserOrUid === 'object' ? (companyUserOrUid.name || companyUserOrUid.company || companyUserOrUid.razaoSocial || companyUserOrUid.nomeFantasia || '').toLowerCase().trim() : '';
+
+        companyApps = allApps.filter(a => {
+          if (uid && String(a.companyUid || '') === String(uid)) return true;
+          if (email && String(a.recruiterEmail || '').toLowerCase() === email) return true;
+          if (name && a.company && (a.company.toLowerCase().trim() === name || a.company.toLowerCase().includes(name))) return true;
+          return false;
+        });
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ivai_applications_updated', { detail: allApps }));
+      }
+
+      callback(companyApps, allApps);
+    }, (error) => {
+      console.warn('[Firestore Company Applications Listener] Offline fallback:', error.message);
+      const cached = getUserApplications();
+      callback(cached, cached);
+    });
+  } catch (error) {
+    console.warn('[Firestore Company Applications] Falha ao assinar:', error.message);
+    callback([], []);
+    return () => {};
+  }
+}
+
+/**
  * Busca vagas do cache local (memória com fallback em localStorage)
  */
 export function getJobs(city = 'Todas as Cidades') {
@@ -366,20 +416,52 @@ export function getJobById(id) {
 }
 
 export async function addJob(jobData) {
+  if (!jobData || typeof jobData !== 'object') {
+    throw new Error('Dados da vaga inválidos.');
+  }
+
+  // Validação estrita defensiva de título
+  const titleClean = String(jobData.title || '').trim();
+  const titleVal = validateJobTitle(titleClean);
+  if (!titleVal.valid) {
+    throw new Error(titleVal.error);
+  }
+
+  // Validação estrita defensiva de descrição
+  if (jobData.description) {
+    const descClean = String(jobData.description).trim();
+    const descVal = validateProfessionalText(descClean, 'Descrição da Vaga', 30, 2000);
+    if (!descVal.valid) {
+      throw new Error(descVal.error);
+    }
+  }
+
+  // Validação estrita defensiva de telefone
+  if (jobData.recruiterPhone && String(jobData.recruiterPhone).trim()) {
+    const phoneVal = validatePhoneNumber(String(jobData.recruiterPhone), false);
+    if (!phoneVal.valid) {
+      throw new Error(phoneVal.error);
+    }
+  }
+
   const currentJobs = getJobs('Todas as Cidades') || [];
   const rawSkills = Array.isArray(jobData?.requiredSkills) ? jobData.requiredSkills : [];
-  // Usa filtro leve (apenas palavrões) para não descartar skills legítimas que o usuário digitou
-  const cleanSkills = rawSkills.filter(s => s && typeof s === 'string' && s.trim() && !hasProfanity(s));
+  // Valida cada habilidade contra a base profissional
+  const cleanSkills = rawSkills
+    .map(s => String(s || '').trim())
+    .filter(s => s && validateSkill(s).valid);
 
   // Sanitiza dados de entrada removendo qualquer chave com valor undefined
   const cleanData = {};
-  if (jobData && typeof jobData === 'object') {
-    Object.keys(jobData).forEach(key => {
-      if (jobData[key] !== undefined) {
-        cleanData[key] = jobData[key];
-      }
-    });
-  }
+  Object.keys(jobData).forEach(key => {
+    if (jobData[key] !== undefined) {
+      cleanData[key] = jobData[key];
+    }
+  });
+
+  const workingHours = jobData.workingHours && typeof jobData.workingHours === 'string' && jobData.workingHours.trim()
+    ? jobData.workingHours.trim()
+    : (STANDARD_WORKING_HOURS[0] || '44h semanais • 08:00 às 18:00 (Segunda a Sexta / CLT Comercial)');
 
   const newJob = {
     createdAt: new Date().toLocaleDateString('pt-BR'),
@@ -387,7 +469,9 @@ export async function addJob(jobData) {
     status: 'Ativa',
     applicantsCount: 0,
     ...cleanData,
-    requiredSkills: cleanSkills.length > 0 ? cleanSkills : (Array.isArray(cleanData.requiredSkills) && cleanData.requiredSkills.length > 0 ? cleanData.requiredSkills : ['Comunicação Assertiva'])
+    title: titleClean,
+    workingHours,
+    requiredSkills: cleanSkills.length > 0 ? cleanSkills : ['Trabalho em Equipe', 'Comunicação Assertiva']
   };
 
   // 1. Sincronização no Firestore
@@ -536,19 +620,58 @@ export async function applyToJob(jobId, user) {
   }
 
   const role = String(user.role || '').toLowerCase().trim();
-  const isCandidate = role === 'aluno' || role === 'candidato' || role === 'estudante' || role === 'student';
+  const isStudent = role === 'aluno' || role === 'estudante' || role === 'student';
+  const isStandardCandidate = role === 'candidato';
+  const isFreelancer = role === 'freelancer' || role === 'prestador';
+  const isCompany = role === 'empresa' || role === 'company' || role === 'recrutador';
+  const isProfessor = role === 'professor' || role === 'docente' || role === 'teacher';
 
-  if (!isCandidate) {
-    if (role === 'empresa' || role === 'company' || role === 'recrutador') {
-      return { success: false, message: 'Perfis de empresa não podem se candidatar a vagas de emprego.' };
-    }
-    if (role === 'professor' || role === 'docente' || role === 'teacher') {
-      return { success: false, message: 'Perfis de professor/docente não realizam candidaturas a vagas.' };
-    }
-    return { success: false, message: 'Apenas perfis de alunos e candidatos podem se candidatar a vagas.' };
+  if (isCompany) {
+    return { success: false, message: 'Perfis de empresa não podem se candidatar a vagas de emprego.' };
+  }
+  if (isProfessor) {
+    return { success: false, message: 'Perfis de professor/docente não realizam candidaturas a vagas.' };
   }
 
   const job = getJobById(jobId);
+  const jobType = String(job?.type || '').toLowerCase().trim();
+
+  // Regra Freelancer: apenas PJ, Freelance ou Projetos
+  if (isFreelancer) {
+    const isPjOrFreelance = jobType.includes('pj') || jobType.includes('freelanc') || jobType.includes('projeto') || jobType.includes('prestador');
+    if (!isPjOrFreelance) {
+      return {
+        success: false,
+        message: 'Seu perfil está cadastrado como Freelancer (PJ). Esta vaga é no regime CLT / Estágio. Para se candidatar a vagas de emprego formal, acesse suas configurações para alterar seu tipo de perfil ou busque demandas e oportunidades PJ.'
+      };
+    }
+  }
+
+  // Regra Candidato convencional: não pode se candidatar a estágio
+  if (isStandardCandidate) {
+    if (jobType.includes('estágio') || jobType.includes('estagio')) {
+      return {
+        success: false,
+        message: 'Vagas de estágio são exclusivas para estudantes regularmente matriculados (perfil Aluno). Se você é estudante, altere seu perfil para Aluno ou busque oportunidades CLT e Meio Período.'
+      };
+    }
+  }
+
+  // Regra Aluno: estágio exige comprovação de matrícula
+  if (isStudent) {
+    if ((jobType.includes('estágio') || jobType.includes('estagio')) && !user.isVerifiedStudent) {
+      return {
+        success: false,
+        requiresVerification: true,
+        message: 'Para sua segurança e das empresas contratantes, envie sua Declaração de Matrícula nas Configurações para liberar candidaturas de estágio!'
+      };
+    }
+  }
+
+  if (!isStudent && !isStandardCandidate && !isFreelancer) {
+    return { success: false, message: 'Apenas perfis de alunos, candidatos e freelancers podem se candidatar a vagas.' };
+  }
+
   if (job) {
     const isOwner = (
       (job.createdBy && user.uid && String(job.createdBy) === String(user.uid)) ||
@@ -559,14 +682,6 @@ export async function applyToJob(jobId, user) {
     if (isOwner) {
       return { success: false, message: 'Você não pode se candidatar à vaga publicada pela sua própria empresa.' };
     }
-  }
-
-  if (role === 'aluno' && !user.isVerifiedStudent) {
-    return {
-      success: false,
-      requiresVerification: true,
-      message: 'Para sua segurança e das empresas contratantes, envie sua Declaração de Matrícula nas Configurações para liberar candidaturas!'
-    };
   }
 
   const userUid = String(user.uid || user.id || 'usr_guest').trim();
@@ -641,31 +756,36 @@ export async function applyToJob(jobId, user) {
   });
 
   const targetJobId = String(job?.firestoreId || job?.id || jobId);
+  const companyUid = String(job?.createdBy || job?.companyUid || '');
 
   const newApp = {
     jobId: targetJobId,
     firestoreJobId: targetJobId,
     originalJobId: String(job?.id || jobId),
+    companyUid: companyUid,
+    company: job ? job.company : 'Empresa do Vale do Ivaí',
+    companyLogo: job ? (job.companyLogo || '') : '',
+    recruiterEmail: job ? (job.recruiterEmail || job.createdBy || '') : '',
+    recruiterPhone: job ? (job.recruiterPhone || '') : '',
     candidateUid: userUid,
     candidateId: String(user.id || userUid),
     candidateName: user.name || 'Candidato Ivaí Conecta',
     candidateEmail: userEmail,
     candidateAvatar: user.avatar || '',
-    candidateCourse: user.course || (user.role === 'aluno' ? 'Estudante' : 'Profissional'),
+    candidateCourse: user.course || (isStudent ? 'Estudante' : 'Profissional'),
+    candidateInstitution: user.institution || '',
     candidateCity: user.city || 'Ivaiporã',
     candidatePhone: user.phone || '',
+    isVerifiedStudent: Boolean(user.isVerifiedStudent),
     skills: candidateSkills,
     title: job ? job.title : 'Vaga de Emprego',
-    company: job ? job.company : 'Empresa do Vale do Ivaí',
-    companyLogo: job ? (job.companyLogo || '') : '',
-    recruiterEmail: job ? (job.recruiterEmail || job.createdBy || '') : '',
-    recruiterPhone: job ? (job.recruiterPhone || '') : '',
     city: job ? job.city : 'Ivaiporã',
     type: job ? job.type : 'Tempo Integral',
     appliedAt: new Date().toLocaleDateString('pt-BR'),
     appliedTimestamp: Date.now(),
     matchScore: calculatedScore,
     status: 'Candidatura Enviada',
+    stage: 'triagem',
     statusClass: calculatedScore >= 75 ? 'badge-match-high' : calculatedScore >= 50 ? 'badge-match-med' : 'badge-match-low',
     currentStageIndex: 0,
     nextStepNote: 'Sua candidatura foi recebida com sucesso e aguarda análise do recrutador.',
@@ -870,7 +990,13 @@ export function getJobCandidates(jobId) {
   // 1. Incorpora candidaturas reais gravadas no sistema (Firestore / LocalStorage)
   try {
     const allApps = getUserApplications();
-    const jobApps = allApps.filter(a => String(a.jobId) === idStr || (jobId && a.jobId == jobId));
+    const jobApps = allApps.filter(a => {
+      const aJobId = String(a.jobId || '');
+      const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
+      const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
+      return aJobId === idStr || aFsId === idStr || aOrigId === idStr || (jobId && (a.jobId == jobId || a.firestoreJobId == jobId || a.originalJobId == jobId));
+    });
+
     if (jobApps.length > 0) {
       const merged = [...list];
       jobApps.forEach(app => {
@@ -965,6 +1091,25 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
         } catch {}
       }
 
+      // Sincroniza no cache de candidaturas para atualizar visões locais
+      try {
+        const allApps = getUserApplications();
+        const updatedApps = allApps.map(a => {
+          if (a.id === appDocId || a.firestoreId === appDocId || String(a.candidateUid) === String(cand.id)) {
+            return {
+              ...a,
+              stage: normalizedStage,
+              status: stageNameMap[normalizedStage] || normalizedStage,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return a;
+        });
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updatedApps));
+        }
+      } catch {}
+
       return { ...cand, stage: normalizedStage, activity: newActivity };
     }
     return cand;
@@ -1017,6 +1162,15 @@ export function updateCandidateData(jobId, candidateId, patchData) {
 
   const updatedList = currentList.map(cand => {
     if (cand.id === candidateId || String(cand.id) === String(candidateId)) {
+      const appDocId = cand.firestoreApplicationId || cand.id;
+      if (appDocId) {
+        try {
+          updateDoc(doc(db, 'applications', String(appDocId)), {
+            ...patchData,
+            updatedAt: new Date().toISOString()
+          }).catch(() => {});
+        } catch {}
+      }
       return { ...cand, ...patchData };
     }
     return cand;
@@ -1074,6 +1228,29 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
 }
 
 export function updateJob(jobId, patchData) {
+  if (patchData && typeof patchData === 'object') {
+    if (patchData.title) {
+      const titleClean = String(patchData.title).trim();
+      const titleVal = validateJobTitle(titleClean);
+      if (!titleVal.valid) {
+        throw new Error(titleVal.error);
+      }
+    }
+    if (patchData.description) {
+      const descClean = String(patchData.description).trim();
+      const descVal = validateProfessionalText(descClean, 'Descrição da Vaga', 30, 2000);
+      if (!descVal.valid) {
+        throw new Error(descVal.error);
+      }
+    }
+    if (patchData.recruiterPhone && String(patchData.recruiterPhone).trim()) {
+      const phoneVal = validatePhoneNumber(String(patchData.recruiterPhone), false);
+      if (!phoneVal.valid) {
+        throw new Error(phoneVal.error);
+      }
+    }
+  }
+
   const jobs = getJobs('Todas as Cidades');
   const idStr = String(jobId);
   const updated = jobs.map(j => {

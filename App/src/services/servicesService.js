@@ -254,3 +254,187 @@ export async function deleteService(id) {
   }
   return updated;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Freelance Service Orders Lifecycle (Firestore Realtime)
+// Statuses: solicitado -> aceito (ou recusado) -> em_andamento -> concluido -> avaliado
+// ─────────────────────────────────────────────────────────────
+
+export const STORAGE_KEY_SERVICE_ORDERS = 'ivai_conecta_service_orders';
+
+export function getServiceOrders() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_SERVICE_ORDERS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveServiceOrders(orders) {
+  if (typeof localStorage === 'undefined' || !Array.isArray(orders)) return;
+  try {
+    localStorage.setItem(STORAGE_KEY_SERVICE_ORDERS, JSON.stringify(orders));
+  } catch {}
+}
+
+export async function createServiceOrder(orderData) {
+  const newOrder = {
+    status: 'solicitado',
+    createdAt: new Date().toLocaleDateString('pt-BR'),
+    createdAtTimestamp: Date.now(),
+    updatedAt: new Date().toISOString(),
+    history: [
+      {
+        status: 'solicitado',
+        date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+        note: 'Solicitação de serviço enviada pelo cliente.'
+      }
+    ],
+    ...orderData
+  };
+
+  try {
+    const docRef = await addDoc(collection(db, 'service_orders'), newOrder);
+    newOrder.id = docRef.id;
+    newOrder.firestoreId = docRef.id;
+  } catch (err) {
+    console.warn('[Firestore] Erro ao criar ordem de serviço:', err.message);
+    newOrder.id = `order_${Date.now()}`;
+  }
+
+  const all = getServiceOrders();
+  const updated = [newOrder, ...all.filter(o => o.id !== newOrder.id)];
+  saveServiceOrders(updated);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_service_orders_updated', { detail: updated }));
+  }
+
+  return newOrder;
+}
+
+export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
+  const orders = getServiceOrders();
+  const order = orders.find(o => o.id === orderId || o.firestoreId === orderId);
+
+  const statusLabels = {
+    solicitado: 'Solicitado',
+    aceito: 'Aceito pelo Prestador',
+    recusado: 'Recusado pelo Prestador',
+    em_andamento: 'Em Andamento / Execução',
+    concluido: 'Concluído pelo Prestador',
+    avaliado: 'Concluído e Avaliado'
+  };
+
+  const historyItem = {
+    status: newStatus,
+    date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+    note: note || `Status alterado para: ${statusLabels[newStatus] || newStatus}`
+  };
+
+  const updatedHistory = [...(order?.history || []), historyItem];
+  const patch = {
+    status: newStatus,
+    history: updatedHistory,
+    updatedAt: new Date().toISOString()
+  };
+
+  const docId = order?.firestoreId || order?.id || orderId;
+  if (docId) {
+    try {
+      await updateDoc(doc(db, 'service_orders', String(docId)), patch);
+    } catch (err) {
+      console.warn('[Firestore] Erro ao atualizar status da ordem de serviço:', err.message);
+    }
+  }
+
+  const updatedList = orders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, ...patch } : o));
+  saveServiceOrders(updatedList);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_service_orders_updated', { detail: updatedList }));
+  }
+
+  return { success: true, status: newStatus };
+}
+
+export async function submitServiceReview(orderId, { rating, comment, serviceId, clientName, clientAvatar }) {
+  const reviewData = {
+    rating: Number(rating) || 5,
+    comment: String(comment || '').trim(),
+    author: clientName || 'Cliente Ivaí Conecta',
+    avatar: clientAvatar || '',
+    date: new Date().toLocaleDateString('pt-BR'),
+    timestamp: Date.now()
+  };
+
+  // 1. Atualiza ordem de serviço para 'avaliado'
+  await updateServiceOrderStatus(orderId, 'avaliado', `Cliente avaliou o atendimento com ${rating} estrelas.`);
+  const docId = orderId;
+  if (docId) {
+    try {
+      await updateDoc(doc(db, 'service_orders', String(docId)), {
+        review: reviewData
+      });
+    } catch {}
+  }
+
+  // 2. Atualiza estatísticas e histórico do serviço correspondente
+  if (serviceId) {
+    try {
+      const targetService = getServiceById(serviceId);
+      const currentReviews = targetService?.reviews || [];
+      const updatedReviews = [reviewData, ...currentReviews];
+      const totalScore = updatedReviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+      const newAverage = Number((totalScore / updatedReviews.length).toFixed(1));
+
+      await updateService(serviceId, {
+        rating: newAverage,
+        reviewsCount: updatedReviews.length,
+        reviews: updatedReviews
+      });
+    } catch (err) {
+      console.warn('[Firestore] Erro ao atualizar notas do serviço:', err.message);
+    }
+  }
+
+  return { success: true };
+}
+
+export function subscribeToServiceOrders(user, callback) {
+  try {
+    const ordersRef = collection(db, 'service_orders');
+    return onSnapshot(ordersRef, (snapshot) => {
+      const allOrders = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      saveServiceOrders(allOrders);
+
+      let relevant = allOrders;
+      if (user) {
+        const uid = String(user.uid || user.id || '');
+        const email = String(user.email || '').toLowerCase();
+        relevant = allOrders.filter(o => 
+          (uid && (String(o.providerId) === uid || String(o.clientId) === uid)) ||
+          (email && (String(o.providerEmail || '').toLowerCase() === email || String(o.clientEmail || '').toLowerCase() === email))
+        );
+      }
+
+      callback(relevant, allOrders);
+    }, (error) => {
+      console.warn('[Firestore Service Orders Listener] Erro:', error.message);
+      const cached = getServiceOrders();
+      callback(cached, cached);
+    });
+  } catch (error) {
+    console.warn('[Firestore Service Orders] Falha ao assinar:', error.message);
+    callback([], []);
+    return () => {};
+  }
+}
+

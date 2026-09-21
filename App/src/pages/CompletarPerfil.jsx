@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
+import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, isInstitutionalEmail } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
 import { User, MapPin, CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -114,6 +114,13 @@ export default function CompletarPerfil() {
       }
       if (!validateCNPJ(cleanDigits)) {
         setAlert('O CNPJ informado possui dígitos verificadores inválidos.');
+        return;
+      }
+    }
+
+    if (selectedRole === 'professor') {
+      if (!isInstitutionalEmail(email)) {
+        setAlert('Para atuar com o perfil de Professor/Docente, sua conta Google/e-mail deve utilizar um domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br ou domínio .edu.br).');
         return;
       }
     }

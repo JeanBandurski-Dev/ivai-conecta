@@ -9,7 +9,7 @@ import {
   getUserApplications, getJobs,
   updateJobStatus, deleteJob, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray,
-  isJobFavorited
+  isJobFavorited, subscribeToEndorsementRequests
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -67,8 +67,24 @@ export default function MinhasVagas() {
   );
   
   // Teacher endorsement requests state
-  const requests = getEndorsementRequests();
-  const teacherRequests = requests.filter(r => (r.profEmail && currentUser?.email && r.profEmail.toLowerCase() === currentUser.email.toLowerCase()) || currentUser?.role === 'professor');
+  const [liveTeacherRequests, setLiveTeacherRequests] = useState(() => getEndorsementRequests());
+
+  useEffect(() => {
+    if (!currentUser || !isProfessor) return;
+    const unsub = subscribeToEndorsementRequests(currentUser.email, (data) => {
+      if (Array.isArray(data)) {
+        setLiveTeacherRequests(data);
+      }
+    });
+    return () => unsub();
+  }, [currentUser, isProfessor]);
+
+  const teacherRequests = useMemo(() => {
+    return liveTeacherRequests.filter(r => 
+      (r.profEmail && currentUser?.email && r.profEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
+      currentUser?.role === 'professor'
+    );
+  }, [liveTeacherRequests, currentUser]);
   const [customQuote, setCustomQuote] = useState({});
 
   // Selected job to view applicants (for company view)
@@ -163,19 +179,19 @@ export default function MinhasVagas() {
     forceUpdate(n => n + 1);
   };
 
-  const handleApproveTeacherRequest = (reqId) => {
+  const handleApproveTeacherRequest = async (reqId) => {
     const quoteText = customQuote[reqId] || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio lógico em disciplinas práticas.';
-    const res = approveEndorsementRequest(reqId, quoteText);
+    const res = await approveEndorsementRequest(reqId, quoteText, currentUser);
     if (res.success) {
       showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!');
       forceUpdate(n => n + 1);
     } else {
-      showToast(res.error);
+      showToast(res.error || 'Erro ao conceder parecer.');
     }
   };
 
-  const handleRejectTeacherRequest = (reqId) => {
-    rejectEndorsementRequest(reqId);
+  const handleRejectTeacherRequest = async (reqId) => {
+    await rejectEndorsementRequest(reqId);
     showToast('Solicitação recusada.');
     forceUpdate(n => n + 1);
   };

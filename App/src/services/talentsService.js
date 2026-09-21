@@ -268,10 +268,29 @@ export function getTeacherEndorsedStudents(profEmail) {
 }
 
 export async function proactiveEndorseStudent(studentId, profUser, quote, discipline) {
+  const talent = getTalentById(studentId);
+  const cleanEmail = (profUser?.email || '').toLowerCase().trim();
+  const profUid = profUser?.uid || profUser?.id;
+
+  // 1. Impedir recomendações duplicadas do mesmo professor para o mesmo aluno
+  const alreadyEndorsed = (talent?.endorsements || []).some(e => {
+    const eEmail = (e.profEmail || '').toLowerCase().trim();
+    const eUid = e.profUid || e.profId;
+    return (cleanEmail && eEmail === cleanEmail) || (profUid && eUid && String(profUid) === String(eUid));
+  });
+
+  if (alreadyEndorsed) {
+    return {
+      success: false,
+      error: 'Você já recomendou este aluno. É permitida apenas uma recomendação por professor para cada aluno.'
+    };
+  }
+
   const newEndorsement = {
     id: `end_${Date.now()}`,
+    profUid: profUid ? String(profUid) : '',
     profName: profUser?.name || 'Professor Avaliador',
-    profEmail: profUser?.email || '',
+    profEmail: cleanEmail,
     institution: profUser?.institution || 'IFPR Campus Ivaiporã',
     discipline: discipline || profUser?.discipline || 'Avaliação Pedagógica',
     quote: quote || 'Estudante com excelente desempenho acadêmico e ótimo trabalho em equipe.',
@@ -284,10 +303,18 @@ export async function proactiveEndorseStudent(studentId, profUser, quote, discip
   // Incrementar contador do professor
   const teachers = getVerifiedTeachers();
   const updatedTeachers = teachers.map(t =>
-    t.email?.toLowerCase() === (profUser?.email || '').toLowerCase() ? { ...t, endorsementCount: (t.endorsementCount || 0) + 1 } : t
+    t.email?.toLowerCase() === cleanEmail ? { ...t, endorsementCount: (t.endorsementCount || 0) + 1 } : t
   );
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updatedTeachers));
+  }
+
+  if (profUid) {
+    try {
+      await updateDoc(doc(db, 'users', String(profUid)), {
+        endorsementCount: (profUser?.endorsementCount || 0) + 1
+      });
+    } catch {}
   }
 
   return { success: true, endorsement: newEndorsement };
@@ -305,16 +332,86 @@ export function getEndorsementRequests() {
   return [];
 }
 
+/**
+ * Escuta solicitações de recomendação em tempo real no Firestore
+ */
+export function subscribeToEndorsementRequests(teacherEmail, callback) {
+  try {
+    const reqsRef = collection(db, 'endorsement_requests');
+    let q = reqsRef;
+    if (teacherEmail) {
+      const cleanEmail = String(teacherEmail).toLowerCase().trim();
+      q = query(reqsRef, where('profEmail', '==', cleanEmail));
+    }
+
+    return onSnapshot(q, (snapshot) => {
+      const requests = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(requests));
+      }
+
+      callback(requests);
+    }, (err) => {
+      console.warn('[Firestore Endorsement Listener] Offline fallback:', err.message);
+      callback(getEndorsementRequests());
+    });
+  } catch (err) {
+    console.warn('[Firestore Endorsement Listener] Falha ao assinar:', err.message);
+    callback(getEndorsementRequests());
+    return () => {};
+  }
+}
+
 export async function requestTeacherEndorsement(profEmail, profName, discipline, studentUser) {
-  const requests = getEndorsementRequests();
+  const cleanEmail = profEmail.toLowerCase().trim();
+  const studentId = studentUser?.uid || studentUser?.id || '';
+
+  // 1. Impedir solicitação se o aluno já possui recomendação deste professor
+  const talent = getTalentById(studentId);
+  const alreadyEndorsed = (talent?.endorsements || []).some(e => 
+    (e.profEmail || '').toLowerCase().trim() === cleanEmail
+  );
+  if (alreadyEndorsed) {
+    return {
+      success: false,
+      message: `Você já recebeu uma recomendação do professor ${profName} (${cleanEmail}). É permitida apenas uma por professor.`
+    };
+  }
+
+  // 2. Impedir solicitação duplicada pendente no Firestore
+  try {
+    const q = query(
+      collection(db, 'endorsement_requests'),
+      where('studentId', '==', studentId),
+      where('profEmail', '==', cleanEmail),
+      where('status', '==', 'Pendente')
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return {
+        success: false,
+        message: `Você já possui uma solicitação pendente aguardando avaliação do professor ${profName}.`
+      };
+    }
+  } catch (err) {
+    console.warn('[Firestore] Verificação prévia de solicitação duplicada:', err.message);
+  }
+
   const newReq = {
-    studentId: studentUser?.uid || studentUser?.id || '',
+    studentId,
     studentName: studentUser?.name || 'Estudante',
+    studentEmail: studentUser?.email || '',
     studentCourse: studentUser?.course || studentUser?.badge || 'Ensino Superior / Técnico',
-    profEmail: profEmail.toLowerCase().trim(),
+    profEmail: cleanEmail,
     profName: profName.trim(),
     discipline: discipline.trim(),
     requestedAt: new Date().toLocaleDateString('pt-BR'),
+    requestedTimestamp: Date.now(),
     message: `Solicitação de recomendação acadêmica referente à disciplina ${discipline}.`,
     status: 'Pendente'
   };
@@ -328,9 +425,10 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
     newReq.id = `req_${Date.now()}`;
   }
 
-  requests.push(newReq);
+  const local = getEndorsementRequests();
+  const updated = [newReq, ...local.filter(r => r.id !== newReq.id)];
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(requests));
+    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updated));
   }
 
   return {
@@ -339,17 +437,46 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
   };
 }
 
-export async function approveEndorsementRequest(requestId, quote) {
-  const requests = getEndorsementRequests();
-  const req = requests.find(r => r.id === requestId || String(r.id) === String(requestId) || r.firestoreId === requestId);
+export async function approveEndorsementRequest(requestId, quote, profUser) {
+  let req = null;
+  try {
+    const snap = await getDoc(doc(db, 'endorsement_requests', String(requestId)));
+    if (snap.exists()) {
+      req = { id: snap.id, firestoreId: snap.id, ...snap.data() };
+    }
+  } catch {}
+
+  if (!req) {
+    const requests = getEndorsementRequests();
+    req = requests.find(r => r.id === requestId || String(r.id) === String(requestId) || r.firestoreId === requestId);
+  }
+
   if (!req) return { success: false, error: 'Solicitação não encontrada.' };
+
+  // 1. Impedir aprovação se já houver recomendação concedida
+  const talent = getTalentById(req.studentId);
+  const cleanEmail = (req.profEmail || profUser?.email || '').toLowerCase().trim();
+  const alreadyEndorsed = (talent?.endorsements || []).some(e =>
+    (e.profEmail || '').toLowerCase().trim() === cleanEmail
+  );
+
+  if (alreadyEndorsed) {
+    const targetDocId = req.firestoreId || req.id;
+    if (targetDocId) {
+      try {
+        await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Aprovado' });
+      } catch {}
+    }
+    return { success: false, error: 'Este aluno já possui uma recomendação sua cadastrada.' };
+  }
 
   const newEndorsement = {
     id: `end_${Date.now()}`,
-    profName: req.profName,
-    profEmail: req.profEmail,
-    institution: 'IFPR Campus Ivaiporã',
-    discipline: req.discipline,
+    profUid: profUser?.uid || profUser?.id || '',
+    profName: req.profName || profUser?.name || 'Professor Docente',
+    profEmail: cleanEmail,
+    institution: profUser?.institution || 'IFPR Campus Ivaiporã',
+    discipline: req.discipline || profUser?.discipline || 'Formação Acadêmica',
     quote: quote || 'Estudante dedicado, com forte raciocínio prático e ótimo trabalho em equipe.',
     isVerified: true,
     date: new Date().toLocaleDateString('pt-BR')
@@ -360,11 +487,15 @@ export async function approveEndorsementRequest(requestId, quote) {
   const targetDocId = req.firestoreId || req.id;
   if (targetDocId) {
     try {
-      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Aprovado' });
+      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), {
+        status: 'Aprovado',
+        approvedAt: new Date().toISOString()
+      });
     } catch {}
   }
 
-  const updatedReqs = requests.map(r => (r.id === req.id || r.firestoreId === req.id) ? { ...r, status: 'Aprovado' } : r);
+  const local = getEndorsementRequests();
+  const updatedReqs = local.map(r => (r.id === req.id || r.firestoreId === req.id) ? { ...r, status: 'Aprovado' } : r);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
   }
@@ -373,13 +504,16 @@ export async function approveEndorsementRequest(requestId, quote) {
 }
 
 export async function rejectEndorsementRequest(requestId) {
-  const requests = getEndorsementRequests();
   const targetDocId = requestId;
   if (targetDocId) {
     try {
-      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Recusado' });
+      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), {
+        status: 'Recusado',
+        rejectedAt: new Date().toISOString()
+      });
     } catch {}
   }
+  const requests = getEndorsementRequests();
   const updatedReqs = requests.map(r => (String(r.id) === String(requestId) || r.firestoreId === requestId) ? { ...r, status: 'Recusado' } : r);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));

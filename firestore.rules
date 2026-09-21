@@ -55,5 +55,15 @@ service cloud.firestore {
     match /favorites/{favoriteId} {
       allow read, write: if isAuthenticated();
     }
+
+    // Endorsement Requests Collection
+    match /endorsement_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Service Orders Collection
+    match /service_orders/{orderId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

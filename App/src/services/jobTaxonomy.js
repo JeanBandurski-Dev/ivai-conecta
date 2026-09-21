@@ -128,17 +128,21 @@ export const SALARY_RANGES = [
   { id: 'faixa6',   label: 'Acima de R$ 10.000 (Sênior / Gestão)', value: 'Acima de R$ 10.000' }
 ];
 
-// 4. HORÁRIOS DE TRABALHO PADRONIZADOS
-export const WORK_SCHEDULES = [
-  '08:00 às 18:00 (Segunda a Sexta)',
-  '08:00 às 17:00 (Segunda a Sexta)',
-  '08:00 às 12:00 (Meio Período / Estágio)',
-  '13:00 às 17:00 (Meio Período / Estágio)',
-  '08:00 às 12:00 / 13:30 às 18:00 (Comércio)',
-  'Escala 6x1 (Comércio / Atendimento)',
-  'Escala 12x36 (Operacional / Saúde)',
-  'Horário Flexível / Home Office'
+// 4. HORÁRIOS DE TRABALHO PADRONIZADOS (CARGA HORÁRIA OFICIAL)
+export const STANDARD_WORKING_HOURS = [
+  '44h semanais • 08:00 às 18:00 (Segunda a Sexta / CLT Comercial)',
+  '44h semanais • 08:00 às 17:00 (Segunda a Sexta + Sábado até 12:00)',
+  '40h semanais • 08:00 às 17:00 (Segunda a Sexta)',
+  '40h semanais • 09:00 às 18:00 (Segunda a Sexta)',
+  '30h semanais • 6h diárias (Estágio / Manhã ou Tarde)',
+  '20h semanais • 4h diárias (Meio Período / Jovem Aprendiz)',
+  'Escala 6x1 • 44h semanais (Comércio / Atendimento)',
+  'Escala 12x36 • Diurno (07:00 às 19:00 / Saúde e Operacional)',
+  'Escala 12x36 • Noturno (19:00 às 07:00 / Vigilância e Plantão)',
+  'Horário Flexível • 40h semanais (Híbrido / Remoto)',
+  'A Combinar (Escala definida na entrevista)'
 ];
+export const WORK_SCHEDULES = STANDARD_WORKING_HOURS;
 
 // 5. VALES E BENEFÍCIOS OFERECIDOS (PADRÃO MERCADO BRASIL / LINKEDIN / GUPY)
 export const STANDARD_BENEFITS = [
@@ -204,19 +208,93 @@ export const STANDARD_BENEFITS = [
 ];
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
-const PROFANITY_ROOTS = [
+export const PROFANITY_ROOTS = [
   'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
   'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
-  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp'
+  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp', 'chupa', 'cacete', 'krl', 'kct', 'trouxa', 'babaca',
+  'cuzin', 'cuzao', 'cuzão', 'otari'
 ];
 
-const PROFANITY_LIST = [
+export const PROFANITY_LIST = [
   'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
   'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
   'piroca', 'viado', 'viadagem', 'corno', 'otario', 'otaria', 'vagabundo', 'safado',
   'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'chupa', 'rola', 'penis', 'vagina',
-  'arrombado', 'krl', 'kct', 'cu'
+  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'trouxa', 'babaca'
 ];
+
+/**
+ * Validador de Número de Telefone no Padrão Brasileiro (DDD + 8 ou 9 dígitos)
+ * Bloqueia sequências fictícias repetidas e valida DDDs oficiais.
+ */
+export function validatePhoneNumber(phone, required = false) {
+  if (!phone || typeof phone !== 'string' || !phone.trim()) {
+    if (required) {
+      return { valid: false, error: 'O número de telefone é obrigatório.' };
+    }
+    return { valid: true };
+  }
+
+  const clean = phone.trim();
+  const digits = clean.replace(/\D/g, '');
+
+  if (digits.length === 0) {
+    if (required) {
+      return { valid: false, error: 'O número de telefone é obrigatório.' };
+    }
+    return { valid: true };
+  }
+
+  if (digits.length !== 10 && digits.length !== 11) {
+    return {
+      valid: false,
+      error: 'Telefone inválido. Informe o DDD + número (ex: (43) 99999-9999).'
+    };
+  }
+
+  // Bloqueio de dígitos repetidos fictícios (ex: 11111111111, 00000000000)
+  if (/^(\d)\1+$/.test(digits)) {
+    return { valid: false, error: 'Número de telefone inválido (dígitos todos iguais).' };
+  }
+
+  // Códigos DDD válidos no Brasil (Anatel)
+  const validDDDs = [
+    11, 12, 13, 14, 15, 16, 17, 18, 19,
+    21, 22, 24,
+    27, 28,
+    31, 32, 33, 34, 35, 37, 38,
+    41, 42, 43, 44, 45, 46, // PR (43 é Vale do Ivaí/Ivaiporã)
+    47, 48, 49,
+    51, 53, 54, 55,
+    61, 62, 63, 64, 65, 66, 67, 68, 69,
+    71, 73, 74, 75, 77, 79,
+    81, 82, 83, 84, 85, 86, 87, 88, 89,
+    91, 92, 93, 94, 95, 96, 97, 98, 99
+  ];
+
+  const ddd = parseInt(digits.slice(0, 2), 10);
+  if (!validDDDs.includes(ddd)) {
+    return { valid: false, error: `O DDD (${ddd}) informado não é válido no Brasil.` };
+  }
+
+  // Celular com 11 dígitos deve iniciar com 9 após o DDD
+  if (digits.length === 11 && digits[2] !== '9') {
+    return {
+      valid: false,
+      error: 'Telefone celular de 11 dígitos deve iniciar com 9 após o DDD (ex: (43) 9XXXX-XXXX).'
+    };
+  }
+
+  // Fixo com 10 dígitos não pode iniciar com 0 ou 1 após o DDD
+  if (digits.length === 10 && ['0', '1'].includes(digits[2])) {
+    return {
+      valid: false,
+      error: 'O telefone fixo não pode iniciar com 0 ou 1 após o DDD.'
+    };
+  }
+
+  return { valid: true };
+}
 
 /**
  * Validador de Texto Profissional e Detecção de Spam / Gibberish
@@ -664,26 +742,21 @@ export function hasProfanity(text) {
   const lower = text.toLowerCase().trim();
   const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
 
-  const roots = [
-    'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
-    'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
-    'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp'
-  ];
-  for (const root of roots) {
+  for (const root of PROFANITY_ROOTS) {
     if (cleanAlpha.includes(root)) return true;
   }
 
-  const bad = [
-    'bosta', 'merda', 'caralho', 'porra', 'foder', 'foda', 'cacete', 'buceta',
-    'piroca', 'viado', 'vagabundo', 'safado', 'vsf', 'fdp', 'krl', 'kct'
-  ];
-  for (const b of bad) {
-    if (b.length >= 3 && lower.includes(b)) return true;
+  for (const b of PROFANITY_LIST) {
+    if (b.length >= 3) {
+      if (lower.includes(b) || cleanAlpha.includes(b)) return true;
+    }
   }
 
   // Termos curtos como 'cu' isolados
   const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão)/i;
-  if (regexCu.test(lower) || (cleanAlpha === 'cu')) return true;
+  if (regexCu.test(lower) || (cleanAlpha === 'cu') || (cleanAlpha.startsWith('cu') && !['curso', 'curriculo', 'currículo', 'custom', 'custos', 'cuidados', 'cultura', 'cuidado', 'curadoria'].some(ok => cleanAlpha.startsWith(ok)))) {
+    return true;
+  }
 
   return false;
 }

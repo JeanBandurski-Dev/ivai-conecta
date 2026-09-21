@@ -88,7 +88,9 @@ export default function JobTitleCombobox({
       if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredTitles.length) {
         handleSelectTitle(filteredTitles[highlightedIndex]);
       } else if (value.trim()) {
-        handleSelectTitle(value.trim());
+        if (titleValidation.valid) {
+          handleSelectTitle(value.trim());
+        }
       } else {
         setIsOpen(false);
       }
@@ -193,7 +195,7 @@ export default function JobTitleCombobox({
                 <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-2">
                   Nenhum cargo idêntico no catálogo CBO.
                 </p>
-                {value.trim().length >= 3 && (
+                {value.trim().length >= 3 && titleValidation.valid && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -205,12 +207,20 @@ export default function JobTitleCombobox({
                   >
                     <div className="flex items-center gap-2 truncate">
                       <Check size={14} className="text-primary-blue dark:text-blue-400 shrink-0" />
-                      <span className="truncate">Usar cargo personalizado: &quot;{value.trim()}&quot;</span>
+                      <span className="truncate">Usar cargo profissional: &quot;{value.trim()}&quot;</span>
                     </div>
                     <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 font-bold border border-blue-200 dark:border-blue-800 group-hover:scale-105 transition-transform">
                       Confirmar
                     </span>
                   </button>
+                )}
+                {value.trim().length >= 3 && !titleValidation.valid && (
+                  <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-600 dark:text-red-300 text-xs font-medium text-left">
+                    <p className="flex items-center gap-1 font-bold text-[11px] mb-0.5">
+                      <AlertCircle size={12} /> Título Não Permitido
+                    </p>
+                    <p className="text-[11px] leading-tight">{titleValidation.error}</p>
+                  </div>
                 )}
               </div>
             ) : (

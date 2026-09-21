@@ -83,11 +83,38 @@ export async function login(email, password) {
     let errorMsg = 'E-mail ou senha incorretos. Verifique seus dados.';
     if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
       errorMsg = 'E-mail ou senha inválidos. Verifique suas credenciais.';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMsg = 'O endereço de e-mail informado é inválido.';
+    } else if (error.code === 'auth/user-disabled') {
+      errorMsg = 'Esta conta foi desativada pelo administrador.';
     } else if (error.code === 'auth/too-many-requests') {
       errorMsg = 'Muitas tentativas sem sucesso. Tente novamente mais tarde.';
+    } else if (error.code === 'auth/network-request-failed') {
+      errorMsg = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão de rede.';
     }
-    return { success: false, error: errorMsg };
+    return { success: false, error: errorMsg, errorCode: error.code };
   }
+}
+
+export const ALLOWED_INSTITUTIONAL_DOMAINS = [
+  '@ifpr.edu.br',
+  '@uenp.edu.br',
+  '@univale.edu.br',
+  '@unespar.edu.br',
+  '@uel.br',
+  '@uem.br',
+  '@utfpr.edu.br',
+  '@escola.pr.gov.br',
+  '@prof.pr.gov.br'
+];
+
+export function isInstitutionalEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const clean = email.toLowerCase().trim();
+  if (!clean.includes('@')) return false;
+  if (ALLOWED_INSTITUTIONAL_DOMAINS.some(d => clean.endsWith(d))) return true;
+  if (clean.endsWith('.edu.br') || clean.endsWith('.edu') || clean.endsWith('.ac.br')) return true;
+  return false;
 }
 
 export async function register(data) {
@@ -95,6 +122,13 @@ export async function register(data) {
   const cleanEmail = email.toLowerCase().trim();
   const selectedRole = role || 'aluno';
   const roleMeta = USER_ROLES[selectedRole] || USER_ROLES.aluno;
+
+  if (selectedRole === 'professor' && !isInstitutionalEmail(cleanEmail)) {
+    return {
+      success: false,
+      error: 'Professores e docentes devem utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br ou outro domínio .edu.br).'
+    };
+  }
 
   const defaultRoleData = {
     aluno: {
@@ -124,10 +158,10 @@ export async function register(data) {
     },
     professor: {
       degree: data.degree || '',
-      institution: data.institution || '',
+      institution: data.institution || 'IFPR Campus Ivaiporã',
       discipline: data.discipline || '',
       endorsementCount: 0,
-      verified: false,
+      verified: true,
       bio: data.bio || '',
       education: [],
       classes: []
@@ -184,49 +218,27 @@ export async function register(data) {
   } catch (error) {
     console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
 
-    // Mensagens explicativas para erros comuns do Firebase Auth
-    let userFriendlyError = null;
+    // Mensagens explicativas para erros do Firebase Auth sem fallbacks mascarados
+    let userFriendlyError = 'Erro ao realizar cadastro no Firebase.';
     if (error.code === 'auth/operation-not-allowed') {
       userFriendlyError = 'O método E-mail/Senha não está ativado no Firebase Console (Vá em Authentication > Sign-in method e ative E-mail/senha).';
     } else if (error.code === 'auth/email-already-in-use') {
-      userFriendlyError = 'Este e-mail já está cadastrado no Firebase.';
+      userFriendlyError = 'Este e-mail já está cadastrado no sistema.';
     } else if (error.code === 'auth/weak-password') {
       userFriendlyError = 'A senha deve conter no mínimo 6 caracteres.';
     } else if (error.code === 'auth/invalid-email') {
       userFriendlyError = 'Formato de e-mail inválido.';
+    } else if (error.code === 'auth/network-request-failed') {
+      userFriendlyError = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão com a internet.';
+    } else if (error.code === 'auth/too-many-requests') {
+      userFriendlyError = 'Muitas tentativas bloqueadas temporariamente por segurança. Tente novamente mais tarde.';
+    } else if (error.code === 'auth/user-disabled') {
+      userFriendlyError = 'Esta conta de usuário foi desativada.';
+    } else if (error.message) {
+      userFriendlyError = `Erro no Firebase: ${error.message}`;
     }
 
-    if (userFriendlyError) {
-      return { success: false, error: userFriendlyError, errorCode: error.code };
-    }
-
-    // Fallback: se houver erro genérico/offline, grava no LocalStorage
-    const users = getUsersDB();
-    if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
-      return { success: false, error: 'Este e-mail já está cadastrado no Ivaí Conecta.' };
-    }
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      uid: `usr_${Date.now()}`,
-      email: cleanEmail,
-      password,
-      name,
-      city: city || 'Ivaiporã',
-      role: selectedRole,
-      badge: roleMeta.badge,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...roleSpecific,
-      isVerifiedCompany: selectedRole === 'empresa',
-    };
-    users.push(newUser);
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
-
-    const sessionUser = { ...newUser };
-    delete sessionUser.password;
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
-    return { success: true, user: sessionUser };
+    return { success: false, error: userFriendlyError, errorCode: error.code };
   }
 }
 

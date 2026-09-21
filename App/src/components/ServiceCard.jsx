@@ -1,8 +1,11 @@
-import { Star, MessageSquare, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Star, MessageSquare, Trash2, FileText } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { deleteService } from '../lib/ivaiConecta';
+import SolicitarServicoModal from './SolicitarServicoModal';
 
 export default function ServiceCard({ service, onDelete }) {
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const {
     id, title, name, providerName, category, city, rating,
     reviewsCount, badge, description, providerEmail, avatar, createdBy
@@ -102,16 +105,39 @@ export default function ServiceCard({ service, onDelete }) {
             <span>✨ Seu anúncio de serviço</span>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={handleContactChat}
-            className="btn btn-primary btn-sm w-full text-xs gap-2 cursor-pointer font-bold shadow-brand-sm transition-all flex items-center justify-center py-2.5 rounded-xl"
-          >
-            <MessageSquare size={15} />
-            Conversar com o Prestador
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleContactChat}
+              className="btn btn-outline btn-sm text-xs gap-1.5 cursor-pointer font-bold py-2 rounded-xl flex items-center justify-center border-gray-200 dark:border-slate-700 hover:border-primary-blue"
+            >
+              <MessageSquare size={14} />
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!currentUser) {
+                  showToast('Faça login para solicitar este serviço!');
+                  return;
+                }
+                setShowOrderModal(true);
+              }}
+              className="btn btn-primary btn-sm text-xs gap-1.5 cursor-pointer font-bold shadow-brand-sm py-2 rounded-xl flex items-center justify-center"
+            >
+              <FileText size={14} />
+              Solicitar
+            </button>
+          </div>
         )}
       </div>
+
+      {showOrderModal && (
+        <SolicitarServicoModal
+          service={service}
+          onClose={() => setShowOrderModal(false)}
+        />
+      )}
     </div>
   );
 }

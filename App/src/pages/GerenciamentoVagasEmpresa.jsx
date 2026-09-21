@@ -17,7 +17,9 @@ import {
   getJobCandidates, updateCandidateStage, updateCandidateData,
   scheduleCandidateInterview, SELECTION_STAGES,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem
+  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem,
+  subscribeToCompanyApplications,
+  STANDARD_WORKING_HOURS, validateJobTitle, validateProfessionalText, validatePhoneNumber
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
@@ -264,6 +266,24 @@ export default function GerenciamentoVagasEmpresa() {
   useEffect(() => {
     const unsub = subscribeToJobs('Todas as Cidades', (data) => setLiveJobs(data));
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeToCompanyApplications(currentUser, () => {
+      forceUpdate(prev => prev + 1);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleAppsChanged = () => {
+      forceUpdate(prev => prev + 1);
+    };
+    window.addEventListener('ivai_applications_updated', handleAppsChanged);
+    return () => window.removeEventListener('ivai_applications_updated', handleAppsChanged);
   }, []);
 
   const allCompanyJobs = useMemo(() => {
@@ -1111,7 +1131,40 @@ export default function GerenciamentoVagasEmpresa() {
   const handleSaveJobEdit = (e) => {
     e.preventDefault();
     if (!editingJob) return;
-    updateJob(editingJob.id, editingJob);
+
+    const titleClean = (editingJob.title || '').trim();
+    if (!titleClean) {
+      showToast('⚠️ O título da vaga é obrigatório.');
+      return;
+    }
+    const titleVal = validateJobTitle(titleClean);
+    if (!titleVal.valid) {
+      showToast(`⚠️ ${titleVal.error}`);
+      return;
+    }
+
+    if (editingJob.description) {
+      const descClean = editingJob.description.trim();
+      const descVal = validateProfessionalText(descClean, 'Descrição da Vaga', 30, 2000);
+      if (!descVal.valid) {
+        showToast(`⚠️ ${descVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.recruiterPhone && editingJob.recruiterPhone.trim()) {
+      const phoneVal = validatePhoneNumber(editingJob.recruiterPhone, false);
+      if (!phoneVal.valid) {
+        showToast(`⚠️ ${phoneVal.error}`);
+        return;
+      }
+    }
+
+    updateJob(editingJob.id, {
+      ...editingJob,
+      title: titleClean,
+      workingHours: editingJob.workingHours || STANDARD_WORKING_HOURS[0]
+    });
     showToast('Vaga atualizada com sucesso!');
     setEditingJob(null);
     forceUpdate(n => n + 1);
@@ -4662,12 +4715,16 @@ export default function GerenciamentoVagasEmpresa() {
 
               <form onSubmit={handleSaveJobEdit} className="p-6 space-y-4 text-xs">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Título:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-gray-700 dark:text-slate-300">Título do Cargo / Função:</label>
+                    <span className="text-[10px] text-gray-400 font-semibold">Exige função profissional válida</span>
+                  </div>
                   <input
                     type="text"
                     value={editingJob.title}
                     onChange={e => setEditingJob({ ...editingJob, title: e.target.value })}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold"
+                    placeholder="Ex: Assistente Administrativo, Vendedor Comercial, Desenvolvedor React..."
                     required
                   />
                 </div>
@@ -4698,12 +4755,29 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Descrição:</label>
+                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Carga Horária & Jornada:</label>
+                  <select
+                    value={editingJob.workingHours || STANDARD_WORKING_HOURS[0]}
+                    onChange={e => setEditingJob({ ...editingJob, workingHours: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
+                  >
+                    {STANDARD_WORKING_HOURS.map(wh => (
+                      <option key={wh} value={wh}>{wh}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-gray-700 dark:text-slate-300">Descrição Detalhada:</label>
+                    <span className="text-[10px] text-gray-400">Mínimo 30 caracteres</span>
+                  </div>
                   <textarea
                     rows={4}
                     value={editingJob.description || ''}
                     onChange={e => setEditingJob({ ...editingJob, description: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-xs"
+                    placeholder="Descreva as responsabilidades e detalhes da oportunidade..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-xs leading-relaxed"
                   />
                 </div>
 

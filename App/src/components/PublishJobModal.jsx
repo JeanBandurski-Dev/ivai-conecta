@@ -2,25 +2,30 @@ import React, { useState } from 'react';
 import {
   Briefcase, DollarSign, FileText, X, Check, ChevronLeft, ChevronRight,
   Plus, MapPin, Phone, Sparkles, Building2, RefreshCw, Globe, ShieldCheck,
-  Clock, Award, Gift, CheckCircle2, AlertCircle, Eye, Bookmark, Share2, Wand2
+  Clock, Award, Gift, CheckCircle2, AlertCircle, Eye, Bookmark, Share2, Wand2, ChevronDown
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   addJob,
   CITIES,
   STANDARD_JOB_TITLES,
+  STANDARD_SKILLS,
+  STANDARD_WORKING_HOURS,
   validateJobTitle,
   validateSkill,
   validateBenefit,
+  validatePhoneNumber,
   validateProfessionalText,
   getJobDescriptionTemplate
 } from '../lib/ivaiConecta';
+import SkillCombobox from './ui/SkillCombobox';
+import JobTitleCombobox from './ui/JobTitleCombobox';
 
 const SUGGESTED_SKILLS = [
-  'Comunicação', 'Trabalho em Equipe', 'Atendimento ao Cliente', 'Organização',
-  'Vendas', 'Pacote Office', 'Excel Avançado', 'Gestão de Tempo',
-  'React', 'JavaScript', 'TypeScript', 'Node.js', 'Python', 'SQL',
-  'Figma', 'UI/UX Design', 'Marketing Digital', 'Redes Sociais'
+  'Comunicação Assertiva', 'Trabalho em Equipe', 'Atendimento ao Cliente', 'Organização de Arquivos',
+  'Técnicas de Vendas (B2C)', 'Pacote Office', 'Excel Avançado', 'Gestão de Tempo',
+  'React', 'JavaScript', 'TypeScript', 'Node.js', 'Python', 'SQL / Bancos de Dados',
+  'Figma', 'UI/UX Design', 'Marketing Digital', 'Gestão de Redes Sociais'
 ];
 
 const SUGGESTED_BENEFITS = [
@@ -45,28 +50,20 @@ const SALARY_PRESETS = [
   'Acima de R$ 7.000'
 ];
 
-const SCHEDULE_PRESETS = [
-  '08:00 às 18:00 (Seg a Sex)',
-  'Comercial (44h semanais)',
-  '08:00 às 12:00 / 13:30 às 17:30',
-  '6h diárias / 30h semanais (Estágio)',
-  'Escala 12x36'
-];
-
 // Limites máximos configurados
 const LIMITS = {
   TITLE_MAX: 80,
   TITLE_MIN: 3,
   SALARY_MAX: 40,
   SALARY_NUMBER_MAX_DIGITS: 7,
-  WORKING_HOURS_MAX: 60,
+  WORKING_HOURS_MAX: 80,
   PHONE_MAX: 15,
   SKILLS_MAX_COUNT: 12,
   SKILL_INPUT_MAX: 45,
   BENEFITS_MAX_COUNT: 10,
   BENEFIT_INPUT_MAX: 50,
   DESCRIPTION_MAX: 2000,
-  DESCRIPTION_MIN: 15,
+  DESCRIPTION_MIN: 30,
   RESPONSIBILITIES_MAX_COUNT: 8,
   RESPONSIBILITY_INPUT_MAX: 120
 };
@@ -89,7 +86,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     city: currentUser?.city || 'Ivaiporã',
     level: 'Júnior',
     salary: '',
-    workingHours: '',
+    workingHours: STANDARD_WORKING_HOURS[0],
     recruiterPhone: currentUser?.phone || '',
     requiredSkills: [],
     benefits: [],
@@ -127,24 +124,24 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     }
   };
 
-  // Validação do Step 1
-  // Validação do Step 1
+  // Validação do Step 1 (Cargo, Carga Horária e Telefone)
   const validateStep1 = () => {
     const errors = {};
     const titleClean = form.title.trim();
 
     if (!titleClean) {
       errors.title = 'Por favor, informe o cargo ou título da vaga.';
-    } else if (titleClean.length < LIMITS.TITLE_MIN) {
-      errors.title = `O título deve conter pelo menos ${LIMITS.TITLE_MIN} caracteres.`;
-    } else if (titleClean.length > LIMITS.TITLE_MAX) {
-      errors.title = `O título deve conter no máximo ${LIMITS.TITLE_MAX} caracteres.`;
+    } else {
+      const titleVal = validateJobTitle(titleClean);
+      if (!titleVal.valid) {
+        errors.title = titleVal.error;
+      }
     }
 
-    if (form.recruiterPhone) {
-      const digits = form.recruiterPhone.replace(/\D/g, '');
-      if (digits.length > 0 && digits.length < 10) {
-        errors.recruiterPhone = 'Informe um telefone válido com DDD (10 ou 11 dígitos).';
+    if (form.recruiterPhone && form.recruiterPhone.trim()) {
+      const phoneVal = validatePhoneNumber(form.recruiterPhone, false);
+      if (!phoneVal.valid) {
+        errors.recruiterPhone = phoneVal.error;
       }
     }
 
@@ -162,11 +159,19 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     return { valid: true };
   };
 
-  // Validação do Step 2
+  // Validação do Step 2 (Competências & Salário)
   const validateStep2 = () => {
     const errors = {};
-    if (form.requiredSkills.length === 0) {
-      errors.skills = 'Adicione ao menos 1 competência ou requisito para a vaga.';
+    if (!form.requiredSkills || form.requiredSkills.length === 0) {
+      errors.skills = 'Adicione ao menos 1 competência ou requisito profissional para a vaga.';
+    } else {
+      for (const skill of form.requiredSkills) {
+        const val = validateSkill(skill);
+        if (!val.valid) {
+          errors.skills = `A competência "${skill}" não é permitida: ${val.error}`;
+          break;
+        }
+      }
     }
     const salVal = validateSalary(form.salary);
     if (!salVal.valid) {
@@ -176,12 +181,17 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     return Object.keys(errors).length === 0;
   };
 
-  // Validação do Step 3
+  // Validação do Step 3 (Descrição Detalhada)
   const validateStep3 = () => {
     const errors = {};
     const descClean = form.description.trim();
-    if (descClean && descClean.length > LIMITS.DESCRIPTION_MAX) {
-      errors.description = `A descrição excede o limite de ${LIMITS.DESCRIPTION_MAX} caracteres.`;
+    if (!descClean) {
+      errors.description = 'A descrição detalhada da vaga é obrigatória.';
+    } else {
+      const descVal = validateProfessionalText(descClean, 'Descrição da Vaga', LIMITS.DESCRIPTION_MIN, LIMITS.DESCRIPTION_MAX);
+      if (!descVal.valid) {
+        errors.description = descVal.error;
+      }
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -196,32 +206,30 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
       setStep(2);
     } else if (step === 2) {
       if (!validateStep2()) {
-        showToast('⚠️ Adicione ao menos 1 competência antes de avançar.');
+        showToast('⚠️ Adicione competências válidas antes de avançar.');
         return;
       }
       setStep(3);
     }
   };
 
-  // Adicionar Habilidade com limites flexíveis
+  // Adicionar Habilidade com validação estrita
   const handleAddSkill = (skill) => {
     const s = (skill || skillInput).trim();
     if (!s) return;
+
+    // Validação estrita contra catálogo e regras profissionais
+    const val = validateSkill(s);
+    if (!val.valid) {
+      showToast(`⚠️ ${val.error}`);
+      setFieldErrors(prev => ({ ...prev, skills: val.error }));
+      return;
+    }
 
     const current = Array.isArray(form.requiredSkills) ? form.requiredSkills : [];
 
     if (current.length >= LIMITS.SKILLS_MAX_COUNT) {
       showToast(`Limite máximo de ${LIMITS.SKILLS_MAX_COUNT} competências atingido.`);
-      return;
-    }
-
-    if (s.length < 2) {
-      showToast('A competência deve conter no mínimo 2 caracteres.');
-      return;
-    }
-
-    if (s.length > LIMITS.SKILL_INPUT_MAX) {
-      showToast(`O nome da competência deve ter no máximo ${LIMITS.SKILL_INPUT_MAX} caracteres.`);
       return;
     }
 
@@ -340,19 +348,19 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
     if (!validateStep1()) {
       setStep(1);
-      showToast('⚠️ Por favor, preencha o título da vaga corretamente.');
+      showToast('⚠️ Por favor, corrija o cargo e os dados da etapa 1.');
       return;
     }
 
     if (!validateStep2()) {
       setStep(2);
-      showToast('⚠️ Adicione ao menos 1 competência para a vaga.');
+      showToast('⚠️ Adicione ao menos 1 competência válida para a vaga.');
       return;
     }
 
     if (!validateStep3()) {
       setStep(3);
-      showToast('⚠️ Verifique o tamanho da descrição da vaga.');
+      showToast('⚠️ Por favor, preencha a descrição da vaga adequadamente.');
       return;
     }
 
@@ -385,16 +393,13 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
         city: form.city || currentUser?.city || 'Ivaiporã',
         level: form.level || 'Júnior',
         salary: form.salary?.trim() || 'A Combinar',
-        workingHours: form.workingHours?.trim() || '08:00 às 18:00 (Segunda a Sexta)',
+        workingHours: form.workingHours?.trim() || STANDARD_WORKING_HOURS[0],
         recruiterPhone: form.recruiterPhone?.trim() || currentUser?.phone || '',
         recruiterEmail: currentUser?.email || 'empresa@ivaiconecta.com.br',
-        requiredSkills: skillsArray.length > 0 ? skillsArray : ['Trabalho em Equipe', 'Comunicação'],
-        benefits: benefitsArray.length > 0 ? benefitsArray : ['Vale Transporte'],
-        description: form.description?.trim() || 'Estamos em busca de talentos para compor nossa equipe em Ivaiporã e região.',
-        responsibilities: responsibilitiesArray.length > 0 ? responsibilitiesArray : [
-          'Atuar nas rotinas e atividades do setor',
-          'Colaborar com a equipe no aprimoramento dos processos'
-        ],
+        requiredSkills: skillsArray,
+        benefits: benefitsArray,
+        description: form.description.trim(),
+        responsibilities: responsibilitiesArray,
         createdBy: userUid,
         isVerifiedCompany: true
       });
@@ -775,46 +780,31 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                         {form.title.length}/{LIMITS.TITLE_MAX} caracteres
                       </span>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        maxLength={LIMITS.TITLE_MAX}
-                        placeholder="Ex: Assistente Administrativo, Vendedor Comercial, Desenvolvedor React..."
-                        value={form.title}
-                        onChange={e => {
-                          setForm({ ...form, title: e.target.value });
-                          clearFieldError('title');
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleNextStep();
-                          }
-                        }}
-                        className={`w-full bg-slate-50 dark:bg-slate-800/80 border rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white transition-all placeholder:text-gray-400 placeholder:font-normal ${
-                          fieldErrors.title
-                            ? 'border-red-400 dark:border-red-500/80 bg-red-50/20'
-                            : 'border-gray-200 dark:border-slate-700 focus:border-primary-blue'
-                        }`}
-                        autoFocus
-                        required
-                      />
-                      <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-blue pointer-events-none" />
-                    </div>
-                    {fieldErrors.title ? (
+                    <JobTitleCombobox
+                      value={form.title}
+                      onChange={val => {
+                        setForm(prev => ({ ...prev, title: val }));
+                        clearFieldError('title');
+                      }}
+                      error={fieldErrors.title}
+                      placeholder="Ex: Assistente Administrativo, Vendedor Comercial, Desenvolvedor React..."
+                      required
+                    />
+                    {fieldErrors.title && (
                       <p className="mt-1.5 text-xs text-red-500 font-semibold flex items-center gap-1">
                         <AlertCircle size={13} className="shrink-0" />
                         {fieldErrors.title}
                       </p>
-                    ) : (
+                    )}
+                    {!fieldErrors.title && (
                       <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sugestões:</span>
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sugestões rápidas:</span>
                         {STANDARD_JOB_TITLES.slice(0, 4).map(st => (
                           <button
                             key={st}
                             type="button"
                             onClick={() => {
-                              setForm({ ...form, title: st });
+                              setForm(prev => ({ ...prev, title: st }));
                               clearFieldError('title');
                             }}
                             className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:text-primary-blue hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer border border-transparent hover:border-blue-200"
@@ -932,39 +922,26 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs font-bold text-gray-800 dark:text-slate-200">
-                          Carga Horária & Dias
+                          Carga Horária & Jornada <span className="text-red-500">*</span>
                         </label>
-                        <span className="text-[10px] text-gray-400">
-                          {form.workingHours.length}/{LIMITS.WORKING_HOURS_MAX}
-                        </span>
                       </div>
                       <div className="relative">
-                        <input
-                          type="text"
-                          maxLength={LIMITS.WORKING_HOURS_MAX}
-                          placeholder="Ex: 08:00 às 18:00 (Seg a Sex)"
+                        <select
                           value={form.workingHours}
-                          onChange={e => setForm({ ...form, workingHours: e.target.value })}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-semibold text-gray-900 dark:text-white outline-none focus:border-primary-blue"
-                        />
+                          onChange={e => {
+                            setForm(prev => ({ ...prev, workingHours: e.target.value }));
+                            clearFieldError('workingHours');
+                          }}
+                          className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2.5 text-xs font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue"
+                        >
+                          {STANDARD_WORKING_HOURS.map(wh => (
+                            <option key={wh} value={wh}>{wh}</option>
+                          ))}
+                        </select>
                         <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-blue pointer-events-none" />
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Sugestões de Horário Rápidas */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mr-1">Sugestões:</span>
-                    {SCHEDULE_PRESETS.slice(0, 3).map(preset => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setForm({ ...form, workingHours: preset })}
-                        className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-600 dark:text-slate-300 hover:text-primary-blue transition-colors cursor-pointer border border-transparent hover:border-blue-200 dark:hover:border-blue-800 font-medium"
-                      >
-                        {preset}
-                      </button>
-                    ))}
                   </div>
 
                   {/* Telefone para Contato */}
@@ -1085,38 +1062,12 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                       <span className="text-[10px] text-gray-400">Pressione Enter ou clique em Adicionar</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          maxLength={LIMITS.SKILL_INPUT_MAX}
-                          placeholder="Digite uma habilidade (ex: Atendimento, Pacote Office, React)..."
-                          value={skillInput}
-                          onChange={e => setSkillInput(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddSkill();
-                            }
-                          }}
-                          disabled={form.requiredSkills.length >= LIMITS.SKILLS_MAX_COUNT}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-medium outline-none focus:border-primary-blue text-gray-900 dark:text-white disabled:opacity-50"
-                        />
-                        {skillInput.length > 0 && (
-                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-                            {skillInput.length}/{LIMITS.SKILL_INPUT_MAX}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAddSkill()}
-                        disabled={form.requiredSkills.length >= LIMITS.SKILLS_MAX_COUNT || !skillInput.trim()}
-                        className="bg-primary-blue hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shrink-0 transition-all shadow-xs"
-                      >
-                        <Plus size={14} /> Adicionar
-                      </button>
-                    </div>
+                    <SkillCombobox
+                      skillsList={form.requiredSkills}
+                      onAddSkill={handleAddSkill}
+                      error={fieldErrors.skills}
+                      placeholder="Pesquise uma competência no catálogo (ex: Atendimento ao Cliente, Excel, React)..."
+                    />
 
                     {fieldErrors.skills && (
                       <p className="text-xs text-red-500 font-semibold flex items-center gap-1">
@@ -1275,9 +1226,13 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
                           <Wand2 size={11} /> Usar Modelo Padrão
                         </button>
                         <span className={`text-[10px] font-semibold ${
-                          form.description.length > LIMITS.DESCRIPTION_MAX ? 'text-red-500 font-bold' : 'text-gray-400'
+                          form.description.length > 0 && form.description.length < LIMITS.DESCRIPTION_MIN
+                            ? 'text-amber-500 font-bold'
+                            : form.description.length > LIMITS.DESCRIPTION_MAX
+                            ? 'text-red-500 font-bold'
+                            : 'text-gray-400'
                         }`}>
-                          {form.description.length}/{LIMITS.DESCRIPTION_MAX}
+                          {form.description.length}/{LIMITS.DESCRIPTION_MAX} (mín. {LIMITS.DESCRIPTION_MIN})
                         </span>
                       </div>
                     </div>

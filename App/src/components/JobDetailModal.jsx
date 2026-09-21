@@ -35,7 +35,10 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     : (typeof job.responsibilities === 'string' ? job.responsibilities.split('\n').map(s => s.trim()).filter(Boolean) : []);
 
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
+  const isStudent = userRole === 'aluno' || userRole === 'estudante' || userRole === 'student';
+  const isStandardCandidate = userRole === 'candidato';
+  const isFreelancer = userRole === 'freelancer' || userRole === 'prestador';
+  const isCandidate = Boolean(currentUser && (isStudent || isStandardCandidate || isFreelancer));
   const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
   const isProfessor = Boolean(userRole === 'professor' || userRole === 'docente' || userRole === 'teacher');
 
@@ -129,7 +132,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       } else if (isProfessor) {
         showToast('Perfis de professor/docente não realizam candidaturas a vagas.');
       } else {
-        showToast('Apenas estudantes e candidatos podem se candidatar a vagas.');
+        showToast('Apenas estudantes, candidatos e freelancers podem se candidatar a vagas.');
       }
       return;
     }
