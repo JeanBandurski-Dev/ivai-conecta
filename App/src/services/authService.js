@@ -14,6 +14,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
+import { validateStudentEmail } from './studentVerificationService.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -150,14 +151,28 @@ export async function register(data) {
   const selectedRole = role || 'aluno';
   const roleMeta = USER_ROLES[selectedRole] || USER_ROLES.aluno;
 
+  // Validação estrita para estudantes: exige e-mail educacional institucional
+  let studentVerification = null;
+  if (selectedRole === 'aluno') {
+    studentVerification = validateStudentEmail(cleanEmail);
+    if (!studentVerification.isValid) {
+      return {
+        success: false,
+        error: studentVerification.error || 'Para criar uma conta de Aluno, é obrigatório utilizar o e-mail institucional da sua faculdade (ex: @estudante.ifpr.edu.br, @aluno.uenp.edu.br, @univale.edu.br ou qualquer domínio .edu.br).'
+      };
+    }
+  }
+
   const defaultRoleData = {
     aluno: {
       course: data.course || '',
-      institution: data.institution || '',
+      institution: data.institution || studentVerification?.institution || studentVerification?.shortInstitution || 'IFPR Campus Ivaiporã',
       period: data.period || '',
       skills: data.skills || [],
-      isVerifiedStudent: false,
-      raNumber: '',
+      isVerifiedStudent: true,
+      studentEmailVerifiedAt: new Date().toISOString(),
+      studentEmailDomain: studentVerification?.domain || null,
+      raNumber: data.raNumber || '',
       bio: data.bio || '',
       experiences: [],
       projects: [],
@@ -282,6 +297,8 @@ export async function loginWithGoogle() {
 
     const role = profileRes.profile?.role || 'aluno';
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+    const studentCheck = validateStudentEmail(fbUser.email);
+    const isGoogleStudent = studentCheck?.isValid || false;
 
     const sessionUser = {
       uid: fbUser.uid,
@@ -292,8 +309,12 @@ export async function loginWithGoogle() {
       role,
       badge: roleMeta.badge,
       avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
+      isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? isGoogleStudent : false),
       isVerifiedCompany: role === 'empresa',
+      ...(role === 'aluno' && isGoogleStudent && !profileRes.profile?.institution ? {
+        institution: studentCheck?.institution || 'IFPR Campus Ivaiporã',
+        studentEmailVerifiedAt: new Date().toISOString()
+      } : {}),
       ...(profileRes.profile || {})
     };
 
@@ -309,6 +330,9 @@ export async function completeUserProfile(uid, additionalData) {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
     const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
 
+    const studentCheck = validateStudentEmail(additionalData.studentEmail || additionalData.email);
+    const isStudentValid = additionalData.role === 'aluno' && studentCheck.isValid;
+
     const payload = {
       name: additionalData.name,
       email: additionalData.email,
@@ -320,7 +344,15 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
-      ...(additionalData.isVerifiedCompany !== undefined ? { isVerifiedCompany: additionalData.isVerifiedCompany } : (additionalData.role === 'empresa' && !!additionalData.cnpj ? { isVerifiedCompany: true } : {}))
+      ...(additionalData.isVerifiedCompany !== undefined ? { isVerifiedCompany: additionalData.isVerifiedCompany } : (additionalData.role === 'empresa' && !!additionalData.cnpj ? { isVerifiedCompany: true } : {})),
+      ...(additionalData.role === 'aluno' ? {
+        isVerifiedStudent: isStudentValid || additionalData.isVerifiedStudent || false,
+        ...(isStudentValid ? {
+          institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
+          studentEmailVerifiedAt: new Date().toISOString(),
+          studentEmail: (additionalData.studentEmail || additionalData.email).toLowerCase().trim()
+        } : {})
+      } : {})
     };
 
     await setDoc(doc(db, 'users', uid), payload, { merge: true });
@@ -336,6 +368,14 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
       isVerifiedCompany: additionalData.isVerifiedCompany ?? (additionalData.role === 'empresa' && !!additionalData.cnpj),
+      ...(additionalData.role === 'aluno' ? {
+        isVerifiedStudent: isStudentValid || additionalData.isVerifiedStudent || false,
+        ...(isStudentValid ? {
+          institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
+          studentEmailVerifiedAt: new Date().toISOString(),
+          studentEmail: (additionalData.studentEmail || additionalData.email).toLowerCase().trim()
+        } : {})
+      } : {})
     });
 
     return { success: true, user: updated };
@@ -576,6 +616,29 @@ export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
   return {
     success: true,
     message: `✅ CNPJ ${formattedCNPJ} autenticado com sucesso! Selo de Empresa Verificada concedido.`,
+    user: updated
+  };
+}
+
+export function verifyStudentAccount(studentEmail) {
+  const check = validateStudentEmail(studentEmail);
+  if (!check.isValid) {
+    return { success: false, error: check.error || 'E-mail estudantil inválido.' };
+  }
+
+  const cleanEmail = studentEmail.toLowerCase().trim();
+  const updated = updateAuthUser({
+    isVerifiedStudent: true,
+    studentEmail: cleanEmail,
+    institution: check.institution || 'IFPR Campus Ivaiporã',
+    studentEmailVerifiedAt: new Date().toISOString()
+  });
+
+  return {
+    success: true,
+    message: `🎓 Vínculo acadêmico com ${check.institution || 'a Instituição'} comprovado com sucesso! Selo de Estudante Verificado concedido.`,
+    institution: check.institution,
+    shortInstitution: check.shortInstitution,
     user: updated
   };
 }

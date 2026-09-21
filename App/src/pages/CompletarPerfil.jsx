@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
+import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
 import { User, MapPin, CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: GraduationCap, desc: 'Acesse vagas de estágio e endossos acadêmicos' },
+  { id: 'empresa',    label: 'Empresa / Recrutador',     icon: Building2,     desc: 'Publique vagas e encontre talentos qualificados' },
   { id: 'professor',  label: 'Professor / Docente',     icon: UserCheck,     desc: 'Emita pareceres pedagógicos para seus alunos' },
   { id: 'freelancer', label: 'Freelancer / Autônomo',    icon: Wrench,        desc: 'Divulgue seus serviços no marketplace local' },
   { id: 'candidato',  label: 'Candidato Geral',          icon: Briefcase,     desc: 'Encontre vagas com cálculo de matching' },
-  { id: 'empresa',    label: 'Empresa / Recrutador',     icon: Building2,     desc: 'Publique vagas e encontre talentos qualificados' },
 ];
 
 export default function CompletarPerfil() {
@@ -22,6 +22,12 @@ export default function CompletarPerfil() {
   const [city, setCity]                 = useState(currentUser?.city || 'Ivaiporã');
   const [loading, setLoading]           = useState(false);
   const [alert, setAlert]               = useState('');
+
+  // Student Email State (Aluno)
+  const [studentEmail, setStudentEmail] = useState('');
+  const userEmail = currentUser?.email || auth.currentUser?.email || '';
+  const googleStudentValidation = validateStudentEmail(userEmail);
+  const inputStudentValidation = validateStudentEmail(studentEmail);
 
   // CNPJ Empresa State
   const [cnpj, setCnpj]                 = useState(currentUser?.cnpj || '');
@@ -118,6 +124,28 @@ export default function CompletarPerfil() {
       }
     }
 
+    let isStudentVerified = false;
+    let finalStudentEmail = null;
+    let studentInstitution = null;
+
+    if (selectedRole === 'aluno') {
+      const googleCheck = validateStudentEmail(email);
+      if (googleCheck.isValid) {
+        isStudentVerified = true;
+        finalStudentEmail = email;
+        studentInstitution = googleCheck.institution;
+      } else {
+        const inputCheck = validateStudentEmail(studentEmail);
+        if (!inputCheck.isValid) {
+          setAlert(inputCheck.error || 'Para criar uma conta como Aluno, é obrigatório comprovar o vínculo com o e-mail institucional da sua faculdade (ex: @estudante.ifpr.edu.br, @aluno.uenp.edu.br, @univale.edu.br ou .edu.br).');
+          return;
+        }
+        isStudentVerified = true;
+        finalStudentEmail = studentEmail.toLowerCase().trim();
+        studentInstitution = inputCheck.institution;
+      }
+    }
+
     setLoading(true);
 
     const res = await completeUserProfile(uid, {
@@ -126,6 +154,12 @@ export default function CompletarPerfil() {
       city: city,
       role: selectedRole,
       avatar: auth.currentUser?.photoURL || currentUser?.avatar,
+      ...(selectedRole === 'aluno' && {
+        isVerifiedStudent: isStudentVerified,
+        studentEmail: finalStudentEmail,
+        institution: studentInstitution || 'IFPR Campus Ivaiporã',
+        studentEmailVerifiedAt: new Date().toISOString()
+      }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(cnpj),
         razaoSocial: cnpjData?.razaoSocial || name.trim(),
@@ -227,6 +261,82 @@ export default function CompletarPerfil() {
               })}
             </div>
           </div>
+
+          {/* Comprovação de Vínculo Estudantil (Aluno) */}
+          {selectedRole === 'aluno' && googleStudentValidation.isValid && (
+            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                  E-mail Estudantil Institucional Reconhecido
+                </span>
+                <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full">
+                  Selo Estudante Ativo
+                </span>
+              </div>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                Sua conta Google (<strong>{userEmail}</strong>) foi identificada como vínculo acadêmico oficial com <strong>{googleStudentValidation.institution}</strong>.
+              </p>
+            </div>
+          )}
+
+          {selectedRole === 'aluno' && !googleStudentValidation.isValid && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="form-label text-gray-900 dark:text-white font-bold text-sm flex items-center gap-1.5 mb-0">
+                  <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" />
+                  E-mail Estudantil da Faculdade
+                </label>
+                <span className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                  Obrigatório para Aluno
+                </span>
+              </div>
+
+              <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
+                Sua conta Google conectada (<strong>{userEmail}</strong>) é pessoal. Para comprovar seu vínculo como Aluno e liberar candidaturas a vagas, informe o seu e-mail institucional oficial (ex: @estudante.ifpr.edu.br, @aluno.uenp.edu.br, @univale.edu.br ou .edu.br).
+              </p>
+
+              <div className="relative">
+                <input
+                  type="email"
+                  value={studentEmail}
+                  onChange={e => setStudentEmail(e.target.value)}
+                  className={`form-control pr-10 ${
+                    studentEmail.trim()
+                      ? inputStudentValidation.isValid
+                        ? 'border-emerald-500 focus:border-emerald-500'
+                        : 'border-amber-400 focus:border-amber-500'
+                      : ''
+                  }`}
+                  placeholder="seu.nome@estudante.ifpr.edu.br"
+                  required
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  {studentEmail.trim() && (
+                    inputStudentValidation.isValid ? (
+                      <CheckCircle2 size={18} className="text-emerald-500" />
+                    ) : (
+                      <AlertCircle size={18} className="text-amber-500" />
+                    )
+                  )}
+                </div>
+              </div>
+
+              {studentEmail.trim() && inputStudentValidation.isValid && (
+                <div className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="shrink-0 text-emerald-500" />
+                  <span>Instituição Confirmada: {inputStudentValidation.institution}</span>
+                </div>
+              )}
+
+              {studentEmail.trim() && !inputStudentValidation.isValid && studentEmail.length > 3 && (
+                <div className="text-xs text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                  <AlertCircle size={14} className="shrink-0 text-amber-500" />
+                  <span>{inputStudentValidation.error}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* CNPJ Empresarial com Validação & BrasilAPI */}
           {selectedRole === 'empresa' && (

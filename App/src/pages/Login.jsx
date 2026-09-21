@@ -6,7 +6,7 @@ import {
   ArrowRight, MapPin, Check
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData } from '../lib/ivaiConecta';
+import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',    shortLabel: 'Aluno',      desc: 'Estágios & 1º Emprego',    icon: GraduationCap, color: 'text-blue-500' },
@@ -46,6 +46,9 @@ export default function Login() {
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cnpjData, setCnpjData] = useState(null);
   const [cnpjError, setCnpjError] = useState('');
+
+  // Validação em tempo real de estudante institucional
+  const studentValidation = selectedRole === 'aluno' && regEmail.trim() ? validateStudentEmail(regEmail) : null;
 
   const handleCnpjChange = (e) => {
     const rawValue = e.target.value;
@@ -129,6 +132,15 @@ export default function Login() {
       }
     }
 
+    let validatedStudent = null;
+    if (selectedRole === 'aluno') {
+      validatedStudent = validateStudentEmail(regEmail);
+      if (!validatedStudent.isValid) {
+        setAlert(validatedStudent.error || 'Para cadastrar como Aluno, é obrigatório utilizar o e-mail institucional da sua faculdade (ex: @estudante.ifpr.edu.br, @aluno.uenp.edu.br, @univale.edu.br ou qualquer domínio .edu.br).');
+        return;
+      }
+    }
+
     setLoading(true);
     const res = await register({
       name: regName.trim(),
@@ -136,6 +148,11 @@ export default function Login() {
       city: regCity,
       role: selectedRole,
       password: regPass,
+      ...(selectedRole === 'aluno' && {
+        isVerifiedStudent: true,
+        institution: validatedStudent?.institution || 'IFPR Campus Ivaiporã',
+        studentEmail: regEmail.toLowerCase().trim()
+      }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(regCnpj),
         razaoSocial: cnpjData?.razaoSocial || regName.trim(),
@@ -547,8 +564,50 @@ export default function Login() {
                     </div>
                   </div>
 
+                  {/* Painel de Comprovação Estudantil (Aluno) */}
+                  <div className={`student-accordion-container ${selectedRole === 'aluno' ? 'is-open' : ''}`}>
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                            <GraduationCap size={14} className="text-primary-blue dark:text-blue-400" />
+                            Comprovação de Vínculo Estudantil
+                          </label>
+                          <span className="text-[9px] font-bold text-primary-blue dark:text-blue-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 shadow-2xs flex items-center gap-1">
+                            <ShieldCheck size={11} className="text-emerald-500" />
+                            E-mail da Faculdade
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-tight">
+                          O cadastro de estudante exige o e-mail oficial da sua faculdade (IFPR, UENP, UNIVALE ou qualquer domínio <strong>.edu.br</strong>) para autenticação automática e liberação de candidaturas.
+                        </p>
+
+                        {/* Status da validação em tempo real */}
+                        {studentValidation && studentValidation.isValid && (
+                          <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between pt-0.5 animate-in fade-in duration-200 bg-emerald-50/90 dark:bg-emerald-950/60 p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            <span className="truncate flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                              <span>{studentValidation.institution}</span>
+                            </span>
+                            <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-1.5 py-0.5 rounded font-bold shrink-0 ml-1">
+                              Selo Ativo
+                            </span>
+                          </div>
+                        )}
+
+                        {studentValidation && !studentValidation.isValid && regEmail.trim().length > 3 && (
+                          <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5 pt-0.5 animate-in fade-in duration-200 bg-amber-50/90 dark:bg-amber-950/60 p-1.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <AlertCircle size={12} className="text-amber-500 shrink-0" />
+                            <span className="leading-tight">{studentValidation.error}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Painel de Benefícios para Outros Perfis com Transição Suave */}
-                  <div className={`role-benefit-container ${selectedRole === 'empresa' ? 'is-hidden' : ''}`}>
+                  <div className={`role-benefit-container ${selectedRole === 'empresa' || selectedRole === 'aluno' ? 'is-hidden' : ''}`}>
                     <div className="min-h-0 overflow-hidden">
                       <div className="p-2.5 rounded-xl border border-dashed border-gray-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between gap-2.5 text-xs text-gray-500 dark:text-slate-400">
                         <div className="flex items-center gap-2 min-w-0">
@@ -556,7 +615,6 @@ export default function Login() {
                             <Sparkles size={12} />
                           </div>
                           <p className="text-[11px] leading-tight truncate text-gray-600 dark:text-slate-300">
-                            {selectedRole === 'aluno' && 'Acesso a estágios e vagas iniciais de empresas parceiras regionais.'}
                             {selectedRole === 'professor' && 'Validação de pareceres acadêmicos e orientação de projetos.'}
                             {selectedRole === 'freelancer' && 'Vitrine de portfólio para captação de clientes no Vale do Ivaí.'}
                             {selectedRole === 'candidato' && 'Oportunidades profissionais e conexão direta com recrutadores.'}
@@ -589,17 +647,51 @@ export default function Login() {
 
                   {/* E-mail */}
                   <div>
-                    <label key={`label-email-${selectedRole === 'professor' ? 'prof' : 'user'}`} className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1 animate-in fade-in duration-200">
-                      E-mail {selectedRole === 'professor' ? 'Institucional' : 'Principal'}
+                    <label key={`label-email-${selectedRole}`} className="text-xs font-bold text-gray-800 dark:text-slate-200 block mb-1 animate-in fade-in duration-200 flex items-center justify-between">
+                      <span>
+                        {selectedRole === 'aluno'
+                          ? 'E-mail Estudantil Institucional'
+                          : selectedRole === 'professor'
+                          ? 'E-mail Institucional'
+                          : 'E-mail Principal'}
+                      </span>
+                      {selectedRole === 'aluno' && (
+                        <span className="text-[10px] font-semibold text-primary-blue dark:text-blue-400">
+                          (da faculdade)
+                        </span>
+                      )}
                     </label>
-                    <input
-                      type="email"
-                      value={regEmail}
-                      onChange={e => setRegEmail(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 text-gray-900 dark:text-white transition-all duration-200 placeholder:text-gray-400 placeholder:font-normal"
-                      placeholder={selectedRole === 'professor' ? 'nome@ifpr.edu.br' : 'seu.email@exemplo.com'}
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={regEmail}
+                        onChange={e => setRegEmail(e.target.value)}
+                        className={`w-full bg-slate-50 dark:bg-slate-800/80 border rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold outline-none transition-all duration-200 placeholder:text-gray-400 placeholder:font-normal pr-8 ${
+                          selectedRole === 'aluno' && regEmail.trim()
+                            ? studentValidation?.isValid
+                              ? 'border-emerald-500 text-gray-900 dark:text-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15'
+                              : 'border-amber-400 text-gray-900 dark:text-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15'
+                            : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 text-gray-900 dark:text-white'
+                        }`}
+                        placeholder={
+                          selectedRole === 'aluno'
+                            ? 'nome@estudante.ifpr.edu.br'
+                            : selectedRole === 'professor'
+                            ? 'nome@ifpr.edu.br'
+                            : 'seu.email@exemplo.com'
+                        }
+                        required
+                      />
+                      {selectedRole === 'aluno' && regEmail.trim() && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                          {studentValidation?.isValid ? (
+                            <CheckCircle2 size={15} className="text-emerald-500 animate-in zoom-in-75 duration-200" title={`Validado: ${studentValidation.institution}`} />
+                          ) : (
+                            <AlertCircle size={15} className="text-amber-500 animate-in zoom-in-75 duration-200" title="Requer e-mail institucional" />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Cidade Polo */}
