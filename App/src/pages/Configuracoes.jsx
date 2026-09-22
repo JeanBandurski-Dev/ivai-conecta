@@ -12,6 +12,8 @@ import {
   submitStudentVerification,
   submitCompanyVerification,
   verifyStudentAccount,
+  sendStudentVerificationEmail,
+  checkStudentVerification,
   validateStudentEmail,
   getInstitutionFromEmail,
   uploadUserProfilePicture,
@@ -45,29 +47,54 @@ export default function Configuracoes() {
   const [verificationSubmitted, setVerificationSubmitted] = useState(currentUser?.isVerifiedStudent || false);
   const [studentInstEmail, setStudentInstEmail] = useState(currentUser?.studentEmail || (currentUser?.email?.includes?.('.edu') ? currentUser.email : ''));
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
+  const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
   const fileInputRef = useRef(null);
 
-  const handleVerifyStudentEmail = (e) => {
-    e.preventDefault();
-    const emailToVerify = studentInstEmail.trim() || currentUser?.email;
+  const handleSendVerificationEmail = async (e) => {
+    if (e) e.preventDefault();
+    const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
     if (!emailToVerify) {
       showToast('Por favor, informe seu e-mail estudantil institucional.');
       return;
     }
     setSubmittingStudentEmail(true);
     try {
-      const res = verifyStudentAccount(emailToVerify);
+      const res = await sendStudentVerificationEmail(emailToVerify);
       if (res.success) {
+        setVerificationEmailSent(true);
+        if (res.alreadyVerified) {
+          await handleCheckStudentStatus();
+        } else {
+          showToast(res.message);
+        }
+      } else {
+        showToast(res.error || 'Erro ao enviar e-mail de verificação.');
+      }
+    } catch (err) {
+      showToast('Erro ao disparar verificação: ' + (err.message || 'Tente novamente.'));
+    } finally {
+      setSubmittingStudentEmail(false);
+    }
+  };
+
+  const handleCheckStudentStatus = async () => {
+    setCheckingStudentStatus(true);
+    try {
+      const res = await checkStudentVerification();
+      if (res.success && res.verified) {
         setVerificationSubmitted(true);
         if (res.user) {
           setCurrentUser(res.user);
         }
         showToast(res.message);
       } else {
-        showToast(res.error || 'E-mail educacional inválido.');
+        showToast(res.message || 'O e-mail ainda não foi confirmado. Acesse sua caixa de entrada e clique no link de validação.');
       }
+    } catch (err) {
+      showToast('Erro ao verificar status no Firebase: ' + (err.message || 'Tente novamente.'));
     } finally {
-      setSubmittingStudentEmail(false);
+      setCheckingStudentStatus(false);
     }
   };
 
@@ -586,21 +613,23 @@ export default function Configuracoes() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Opção 1: Validação Instantânea por E-mail Estudantil */}
-                  <div className="p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-3">
+                  {/* Opção 1: Autenticação por E-mail Estudantil (Prova de Propriedade) */}
+                  <div className="p-5 sm:p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                        <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" />
-                        Opção 1: Autenticação por E-mail Estudantil (Instantânea)
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <GraduationCap size={18} className="text-primary-blue dark:text-blue-400" />
+                        Opção 1: Autenticação por E-mail Estudantil (Prova de Propriedade)
                       </h4>
-                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
-                        Recomendado
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
+                        Oficial Firebase Auth
                       </span>
                     </div>
+
                     <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                      Informe o e-mail institucional oficial fornecido pela sua faculdade (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer <strong>.edu.br</strong>) para ativar o selo imediatamente.
+                      Informe seu e-mail institucional oficial (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal para comprovar a titularidade da conta.
                     </p>
-                    <form onSubmit={handleVerifyStudentEmail} className="flex flex-col sm:flex-row gap-2">
+
+                    <form onSubmit={handleSendVerificationEmail} className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="email"
                         value={studentInstEmail}
@@ -608,16 +637,72 @@ export default function Configuracoes() {
                         placeholder="seu.nome@estudante.ifpr.edu.br"
                         className="form-control text-xs sm:text-sm flex-1"
                         required
+                        disabled={submittingStudentEmail || checkingStudentStatus}
                       />
                       <button
                         type="submit"
-                        disabled={submittingStudentEmail}
+                        disabled={submittingStudentEmail || checkingStudentStatus}
                         className="btn btn-primary btn-sm font-bold shrink-0 flex items-center justify-center gap-1.5"
                       >
-                        <ShieldCheck size={15} />
-                        {submittingStudentEmail ? 'Autenticando...' : 'Autenticar E-mail'}
+                        {submittingStudentEmail ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            <span>Enviando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mail size={15} />
+                            <span>{verificationEmailSent ? 'Reenviar Link' : 'Enviar Link de Validação'}</span>
+                          </>
+                        )}
                       </button>
                     </form>
+
+                    {/* Banner de Verificação Pendente & Botão de Checagem */}
+                    {(verificationEmailSent || currentUser?.studentEmailVerificationSentAt) && (
+                      <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-3">
+                        <div className="flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                          <AlertCircle size={17} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="font-semibold">Confirmação pendente na sua caixa postal institucional!</p>
+                            <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                              Um link de validação foi enviado para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra seu e-mail institucional, clique no link oficial do Firebase e em seguida clique no botão abaixo para ativar seu Selo de Estudante.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleCheckStudentStatus}
+                            disabled={checkingStudentStatus || submittingStudentEmail}
+                            className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl shadow-xs"
+                          >
+                            {checkingStudentStatus ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>Verificando com o Firebase...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck size={15} />
+                                <span>Já confirmei meu e-mail (Verificar Status)</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendVerificationEmail}
+                            disabled={submittingStudentEmail || checkingStudentStatus}
+                            className="btn btn-ghost btn-sm text-xs font-semibold text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1.5"
+                          >
+                            <RefreshCw size={13} className={submittingStudentEmail ? 'animate-spin' : ''} />
+                            <span>Reenviar link</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Divisor */}

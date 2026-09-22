@@ -5,7 +5,7 @@ import {
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
   Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture, validateStudentEmail } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -28,6 +28,7 @@ export default function PerfilAluno() {
     avatar: currentUser.avatar || '',
     skills: currentUser.skills || [],
     isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
+    studentEmail: currentUser.studentEmail || (currentUser.role === 'aluno' && validateStudentEmail(currentUser.email)?.isValid ? currentUser.email : ''),
     raNumber: currentUser.raNumber || '',
     linkedin: currentUser.linkedin || '',
     github: currentUser.github || '',
@@ -241,11 +242,11 @@ export default function PerfilAluno() {
             <div className="flex items-center gap-2 font-semibold">
               <Lock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <span>
-                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Envie sua Declaração de Matrícula para liberar candidaturas e o Selo Verificado.
+                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Valide seu e-mail estudantil institucional ou envie sua declaração para ativar o Selo Verificado.
               </span>
             </div>
             <Link to="/configuracoes" className="btn btn-primary btn-sm text-xs font-bold shrink-0">
-              Enviar Comprovante de Matrícula →
+              Validar E-mail Estudantil →
             </Link>
           </div>
         </div>
@@ -285,12 +286,12 @@ export default function PerfilAluno() {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">{talent.name}</h1>
                   {talent.isVerifiedStudent ? (
-                    <span className="bg-green-500/20 text-green-300 border border-green-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                      <ShieldCheck size={13} /> Matrícula Verificada
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-xs">
+                      <ShieldCheck size={13} className="text-emerald-400" /> Estudante Verificado
                     </span>
                   ) : (
                     <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                      <Lock size={12} /> Matrícula Pendente
+                      <Lock size={12} /> Comprovação Pendente
                     </span>
                   )}
                 </div>
@@ -304,6 +305,14 @@ export default function PerfilAluno() {
                     <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
                   ) : (
                     isOwner && <span className="text-gray-400 italic">Instituição não informada</span>
+                  )}
+                  {talent.studentEmail && (
+                    <>
+                      <span>·</span>
+                      <span className="flex items-center gap-1.5 text-blue-200 font-medium">
+                        <GraduationCap size={14} /> {talent.studentEmail}
+                      </span>
+                    </>
                   )}
                   {talent.period && (
                     <>

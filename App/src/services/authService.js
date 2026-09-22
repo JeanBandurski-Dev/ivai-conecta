@@ -10,11 +10,16 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   reauthenticateWithPopup,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
-import { validateStudentEmail } from './studentVerificationService.js';
+import {
+  validateStudentEmail,
+  sendStudentVerificationEmail,
+  checkStudentVerification,
+} from './studentVerificationService.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -169,9 +174,11 @@ export async function register(data) {
       institution: data.institution || studentVerification?.institution || studentVerification?.shortInstitution || 'IFPR Campus Ivaiporã',
       period: data.period || '',
       skills: data.skills || [],
-      isVerifiedStudent: true,
-      studentEmailVerifiedAt: new Date().toISOString(),
+      isVerifiedStudent: false, // Prova de Propriedade: Requer confirmação via Firebase Auth
+      studentEmailVerifiedAt: null,
       studentEmailDomain: studentVerification?.domain || null,
+      studentEmail: cleanEmail,
+      studentEmailVerificationSentAt: null,
       raNumber: data.raNumber || '',
       bio: data.bio || '',
       experiences: [],
@@ -226,19 +233,34 @@ export async function register(data) {
     const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
 
-    // 2. Salvar documento completo no Firestore em users/{uid}
+    // 2. Disparar link de Prova de Propriedade se for Aluno
+    let emailVerificationSent = false;
+    let emailVerificationError = null;
+    if (selectedRole === 'aluno') {
+      try {
+        await sendEmailVerification(fbUser);
+        emailVerificationSent = true;
+      } catch (eErr) {
+        console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
+        emailVerificationError = eErr.message;
+      }
+    }
+
+    // 3. Salvar documento completo no Firestore em users/{uid}
     const profileData = {
       id: fbUser.uid,
       uid: fbUser.uid,
       name,
       email: cleanEmail,
+      emailVerified: false,
       city: city || 'Ivaiporã',
       role: selectedRole,
       badge: roleMeta.badge,
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      ...roleSpecific
+      ...roleSpecific,
+      ...(emailVerificationSent ? { studentEmailVerificationSentAt: new Date().toISOString() } : {})
     };
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
     seedFirestoreIfEmpty();
@@ -262,7 +284,12 @@ export async function register(data) {
       localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
     } catch {}
 
-    return { success: true, user: sessionUser };
+    return {
+      success: true,
+      user: sessionUser,
+      emailVerificationSent,
+      emailVerificationError
+    };
   } catch (error) {
     console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
 
@@ -298,12 +325,13 @@ export async function loginWithGoogle() {
     const role = profileRes.profile?.role || 'aluno';
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
     const studentCheck = validateStudentEmail(fbUser.email);
-    const isGoogleStudent = studentCheck?.isValid || false;
+    const isGoogleStudent = Boolean(studentCheck?.isValid && fbUser.emailVerified);
 
     const sessionUser = {
       uid: fbUser.uid,
       id: fbUser.uid,
       email: fbUser.email,
+      emailVerified: fbUser.emailVerified,
       name: profileRes.profile?.name || fbUser.displayName || 'Usuário Google',
       city: profileRes.profile?.city || 'Ivaiporã',
       role,
@@ -330,8 +358,13 @@ export async function completeUserProfile(uid, additionalData) {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
     const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
 
-    const studentCheck = validateStudentEmail(additionalData.studentEmail || additionalData.email);
-    const isStudentValid = additionalData.role === 'aluno' && studentCheck.isValid;
+    const candidateEmail = (additionalData.studentEmail || additionalData.email || '').toLowerCase().trim();
+    const studentCheck = validateStudentEmail(candidateEmail);
+    const isOwnerEmailVerified = Boolean(
+      auth.currentUser?.emailVerified &&
+      auth.currentUser?.email?.toLowerCase() === candidateEmail
+    );
+    const isStudentVerified = Boolean(additionalData.role === 'aluno' && studentCheck.isValid && isOwnerEmailVerified);
 
     const payload = {
       name: additionalData.name,
@@ -346,12 +379,14 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
       ...(additionalData.isVerifiedCompany !== undefined ? { isVerifiedCompany: additionalData.isVerifiedCompany } : (additionalData.role === 'empresa' && !!additionalData.cnpj ? { isVerifiedCompany: true } : {})),
       ...(additionalData.role === 'aluno' ? {
-        isVerifiedStudent: isStudentValid || additionalData.isVerifiedStudent || false,
-        ...(isStudentValid ? {
-          institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
-          studentEmailVerifiedAt: new Date().toISOString(),
-          studentEmail: (additionalData.studentEmail || additionalData.email).toLowerCase().trim()
-        } : {})
+        isVerifiedStudent: isStudentVerified,
+        studentEmail: candidateEmail,
+        institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
+        ...(isStudentVerified ? {
+          studentEmailVerifiedAt: new Date().toISOString()
+        } : {
+          studentEmailVerifiedAt: null
+        })
       } : {})
     };
 
@@ -369,16 +404,25 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
       isVerifiedCompany: additionalData.isVerifiedCompany ?? (additionalData.role === 'empresa' && !!additionalData.cnpj),
       ...(additionalData.role === 'aluno' ? {
-        isVerifiedStudent: isStudentValid || additionalData.isVerifiedStudent || false,
-        ...(isStudentValid ? {
-          institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
-          studentEmailVerifiedAt: new Date().toISOString(),
-          studentEmail: (additionalData.studentEmail || additionalData.email).toLowerCase().trim()
-        } : {})
+        isVerifiedStudent: isStudentVerified,
+        studentEmail: candidateEmail,
+        institution: additionalData.institution || studentCheck?.institution || studentCheck?.shortInstitution || 'IFPR Campus Ivaiporã',
+        ...(isStudentVerified ? {
+          studentEmailVerifiedAt: new Date().toISOString()
+        } : {
+          studentEmailVerifiedAt: null
+        })
       } : {})
     });
 
-    return { success: true, user: updated };
+    // Se informou um e-mail de aluno válido que ainda não é verificado, dispara a verificação em segundo plano
+    if (additionalData.role === 'aluno' && studentCheck.isValid && !isStudentVerified) {
+      try {
+        await sendStudentVerificationEmail(candidateEmail);
+      } catch {}
+    }
+
+    return { success: true, user: updated, verificationPending: (additionalData.role === 'aluno' && !isStudentVerified) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -525,18 +569,44 @@ export function watchAuthState(callback) {
 
           const role = profileRes.profile?.role || 'aluno';
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+          let isVerifiedStudent = profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true);
+
+          // Sincronização em tempo real da Prova de Propriedade:
+          // Se o Firebase Auth confirmar user.emailVerified === true para um aluno com e-mail estudantil válido,
+          // promove automaticamente seu status no Firestore e na sessão.
+          if (role === 'aluno' && !isVerifiedStudent && fbUser.emailVerified) {
+            const studentCheck = validateStudentEmail(fbUser.email);
+            if (studentCheck.isValid) {
+              isVerifiedStudent = true;
+              try {
+                await setDoc(doc(db, 'users', fbUser.uid), {
+                  isVerifiedStudent: true,
+                  emailVerified: true,
+                  studentEmail: fbUser.email.toLowerCase().trim(),
+                  institution: profileRes.profile?.institution || studentCheck.institution,
+                  shortInstitution: profileRes.profile?.shortInstitution || studentCheck.shortInstitution,
+                  studentEmailVerifiedAt: new Date().toISOString()
+                }, { merge: true });
+              } catch (syncErr) {
+                console.warn('[watchAuthState] Erro ao sincronizar status de verificação estudantil:', syncErr);
+              }
+            }
+          }
+
           const sessionUser = {
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
+            emailVerified: fbUser.emailVerified,
             name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
             city: profileRes.profile?.city || 'Ivaiporã',
             role,
             badge: roleMeta.badge,
             avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-            isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
+            isVerifiedStudent,
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-            ...(profileRes.profile || {})
+            ...(profileRes.profile || {}),
+            isVerifiedStudent
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
           callback(sessionUser);
@@ -620,28 +690,11 @@ export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
   };
 }
 
-export function verifyStudentAccount(studentEmail) {
-  const check = validateStudentEmail(studentEmail);
-  if (!check.isValid) {
-    return { success: false, error: check.error || 'E-mail estudantil inválido.' };
-  }
-
-  const cleanEmail = studentEmail.toLowerCase().trim();
-  const updated = updateAuthUser({
-    isVerifiedStudent: true,
-    studentEmail: cleanEmail,
-    institution: check.institution || 'IFPR Campus Ivaiporã',
-    studentEmailVerifiedAt: new Date().toISOString()
-  });
-
-  return {
-    success: true,
-    message: `🎓 Vínculo acadêmico com ${check.institution || 'a Instituição'} comprovado com sucesso! Selo de Estudante Verificado concedido.`,
-    institution: check.institution,
-    shortInstitution: check.shortInstitution,
-    user: updated
-  };
+export async function verifyStudentAccount(studentEmail) {
+  return await sendStudentVerificationEmail(studentEmail);
 }
+
+export { sendStudentVerificationEmail, checkStudentVerification };
 
 export function getSelectedCity() {
   if (typeof localStorage === 'undefined') return 'Todas as Cidades';

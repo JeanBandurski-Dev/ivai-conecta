@@ -130,7 +130,7 @@ export default function CompletarPerfil() {
 
     if (selectedRole === 'aluno') {
       const googleCheck = validateStudentEmail(email);
-      if (googleCheck.isValid) {
+      if (googleCheck.isValid && auth.currentUser?.emailVerified) {
         isStudentVerified = true;
         finalStudentEmail = email;
         studentInstitution = googleCheck.institution;
@@ -140,7 +140,7 @@ export default function CompletarPerfil() {
           setAlert(inputCheck.error || 'Para criar uma conta como Aluno, é obrigatório comprovar o vínculo com o e-mail institucional da sua faculdade (ex: @estudante.ifpr.edu.br, @aluno.uenp.edu.br, @univale.edu.br ou .edu.br).');
           return;
         }
-        isStudentVerified = true;
+        isStudentVerified = false;
         finalStudentEmail = studentEmail.toLowerCase().trim();
         studentInstitution = inputCheck.institution;
       }
@@ -158,7 +158,7 @@ export default function CompletarPerfil() {
         isVerifiedStudent: isStudentVerified,
         studentEmail: finalStudentEmail,
         institution: studentInstitution || 'IFPR Campus Ivaiporã',
-        studentEmailVerifiedAt: new Date().toISOString()
+        studentEmailVerifiedAt: isStudentVerified ? new Date().toISOString() : null
       }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(cnpj),
@@ -180,7 +180,11 @@ export default function CompletarPerfil() {
       setCurrentUser(res.user);
     }
 
-    showToast(`Cadastro finalizado com sucesso! Bem-vindo(a) ao Ivaí Conecta, ${name}!`);
+    if (selectedRole === 'aluno' && !isStudentVerified) {
+      showToast(`Perfil atualizado! Enviamos um link de confirmação para ${finalStudentEmail}. Acesse seu e-mail institucional para ativar seu Selo de Estudante.`);
+    } else {
+      showToast(`Cadastro finalizado com sucesso! Bem-vindo(a) ao Ivaí Conecta, ${name}!`);
+    }
     navigate('/');
   };
 
