@@ -11,7 +11,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithPopup,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
 import { validateStudentEmail } from './studentVerificationService.js';
@@ -39,7 +39,7 @@ export function getUsersDB() {
           return u;
         });
       }
-    } catch {}
+    } catch { }
   }
   return users;
 }
@@ -115,6 +115,14 @@ export async function login(email, password) {
 
     // Buscar perfil adicional no Firestore
     const profileRes = await getUserProfile(fbUser.uid);
+    if (profileRes.profile?.blocked === true || profileRes.profile?.status === 'blocked') {
+      await signOut(auth);
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+      return {
+        success: false,
+        error: `Esta conta foi suspensa pela moderação.${profileRes.profile?.blockedReason ? ' Motivo: ' + profileRes.profile.blockedReason : ' Entre em contato com a administração para mais detalhes.'}`
+      };
+    }
     const role = profileRes.profile?.role || 'aluno';
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
@@ -260,7 +268,7 @@ export async function register(data) {
         users.push({ ...sessionUser });
       }
       localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(users));
-    } catch {}
+    } catch { }
 
     return { success: true, user: sessionUser };
   } catch (error) {
@@ -293,6 +301,14 @@ export async function loginWithGoogle() {
 
     // Checar perfil existente no Firestore
     const profileRes = await getUserProfile(fbUser.uid);
+    if (profileRes.profile?.blocked === true || profileRes.profile?.status === 'blocked') {
+      await signOut(auth);
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+      return {
+        success: false,
+        error: `Esta conta Google foi suspensa pela moderação.${profileRes.profile?.blockedReason ? ' Motivo: ' + profileRes.profile.blockedReason : ' Entre em contato com o suporte.'}`
+      };
+    }
     let needsProfileCompletion = !profileRes.success || !profileRes.profile?.role;
 
     const role = profileRes.profile?.role || 'aluno';
@@ -387,7 +403,7 @@ export async function completeUserProfile(uid, additionalData) {
 export async function logout() {
   try {
     await signOut(auth);
-  } catch {}
+  } catch { }
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY_AUTH_USER);
   }
@@ -511,38 +527,198 @@ export async function updateUserPassword(currentPassword, newPassword) {
 }
 
 export function watchAuthState(callback) {
+  let unsubscribeProfile = null;
+
   try {
     return onAuthStateChanged(auth, async (fbUser) => {
       try {
+        // Cancela o listener anterior quando o usuário muda ou sai
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = null;
+        }
+
         if (fbUser) {
           seedFirestoreIfEmpty();
+
           let profileRes = { success: false, profile: {} };
+
           try {
             profileRes = await getUserProfile(fbUser.uid);
           } catch (pErr) {
-            console.warn('[watchAuthState] Erro ao buscar perfil do Firestore:', pErr);
+            console.warn(
+              '[watchAuthState] Erro ao buscar perfil do Firestore:',
+              pErr
+            );
           }
 
           const role = profileRes.profile?.role || 'aluno';
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+
+          // Verifica bloqueio já existente
+          const isBlocked =
+            profileRes.profile?.blocked === true ||
+            profileRes.profile?.status === 'blocked';
+
+          if (isBlocked) {
+            console.warn(
+              '[watchAuthState] Usuário bloqueado. Encerrando sessão.'
+            );
+
+            localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+
+            await signOut(auth);
+
+            callback(null);
+
+            return;
+          }
+
           const sessionUser = {
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
-            name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
+            name:
+              profileRes.profile?.name ||
+              fbUser.displayName ||
+              'Usuário',
             city: profileRes.profile?.city || 'Ivaiporã',
             role,
             badge: roleMeta.badge,
-            avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-            isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
-            isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
+            avatar:
+              profileRes.profile?.avatar ||
+              fbUser.photoURL ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            isVerifiedStudent:
+              profileRes.profile?.isVerifiedStudent ??
+              (role === 'aluno' ? false : true),
+            isVerifiedCompany:
+              profileRes.profile?.isVerifiedCompany ??
+              (role === 'empresa'),
+            blocked: false,
+            blockedReason: null,
             ...(profileRes.profile || {})
           };
-          localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+
+          localStorage.setItem(
+            STORAGE_KEY_AUTH_USER,
+            JSON.stringify(sessionUser)
+          );
+
           callback(sessionUser);
+
+          // ============================================================
+          // MONITORAMENTO EM TEMPO REAL DO PERFIL
+          // ============================================================
+
+          const userDocRef = doc(db, 'users', fbUser.uid);
+
+          unsubscribeProfile = onSnapshot(
+            userDocRef,
+            async (snapshot) => {
+              try {
+                if (!snapshot.exists()) {
+                  console.warn(
+                    '[watchAuthState] Perfil do usuário não existe mais.'
+                  );
+
+                  localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+
+                  await signOut(auth);
+
+                  callback(null);
+
+                  return;
+                }
+
+                const profile = snapshot.data();
+
+                const blocked =
+                  profile?.blocked === true ||
+                  profile?.status === 'blocked';
+
+                if (blocked) {
+                  const blockedReason =
+                    profile?.blockedReason ||
+                    'Sua conta foi bloqueada pelo administrador.';
+
+                  console.warn(
+                    '[watchAuthState] Bloqueio detectado em tempo real:',
+                    blockedReason
+                  );
+
+                  // Atualiza os dados locais antes de sair
+                  const blockedUser = {
+                    ...sessionUser,
+                    ...profile,
+                    blocked: true,
+                    blockedReason
+                  };
+
+                  localStorage.setItem(
+                    STORAGE_KEY_AUTH_USER,
+                    JSON.stringify(blockedUser)
+                  );
+
+                  // Informa para a aplicação que o usuário foi bloqueado
+                  callback(blockedUser);
+
+                  // Pequeno atraso para permitir que a interface
+                  // mostre a mensagem antes do logout
+                  setTimeout(async () => {
+                    try {
+                      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+                      await signOut(auth);
+                    } catch (logoutError) {
+                      console.warn(
+                        '[watchAuthState] Erro ao encerrar sessão:',
+                        logoutError
+                      );
+                    }
+                  }, 300);
+
+                  return;
+                }
+
+                // Se o usuário foi desbloqueado, atualiza a sessão
+                const updatedUser = {
+                  ...sessionUser,
+                  ...profile,
+                  blocked: false,
+                  blockedReason: null
+                };
+
+                localStorage.setItem(
+                  STORAGE_KEY_AUTH_USER,
+                  JSON.stringify(updatedUser)
+                );
+
+                callback(updatedUser);
+              } catch (snapshotError) {
+                console.warn(
+                  '[watchAuthState] Erro ao processar atualização do perfil:',
+                  snapshotError
+                );
+              }
+            },
+            (snapshotError) => {
+              console.warn(
+                '[watchAuthState] Erro no listener do perfil:',
+                snapshotError
+              );
+            }
+          );
         } else {
           const localUser = getAuthUser();
-          if (localUser && (localUser.id?.startsWith?.('usr_') || localUser.id?.startsWith?.('prof_') || localUser.email?.includes?.('@ivaiconecta.com.br'))) {
+
+          if (
+            localUser &&
+            (
+              localUser.id?.startsWith?.('usr_') ||
+              localUser.id?.startsWith?.('prof_') ||
+              localUser.email?.includes?.('@ivaiconecta.com.br')
+            )
+          ) {
             callback(localUser);
           } else {
             localStorage.removeItem(STORAGE_KEY_AUTH_USER);
@@ -550,17 +726,30 @@ export function watchAuthState(callback) {
           }
         }
       } catch (innerErr) {
-        console.warn('[watchAuthState] Erro no processamento do estado de auth:', innerErr);
+        console.warn(
+          '[watchAuthState] Erro no processamento do estado de auth:',
+          innerErr
+        );
+
         callback(getAuthUser() || null);
       }
     }, (authError) => {
-      console.warn('[watchAuthState] Erro no Firebase onAuthStateChanged:', authError);
+      console.warn(
+        '[watchAuthState] Erro no Firebase onAuthStateChanged:',
+        authError
+      );
+
       callback(getAuthUser() || null);
     });
   } catch (outerErr) {
-    console.warn('[watchAuthState] Falha ao iniciar observador de auth:', outerErr);
+    console.warn(
+      '[watchAuthState] Falha ao iniciar observador de auth:',
+      outerErr
+    );
+
     callback(getAuthUser() || null);
-    return () => {};
+
+    return () => { };
   }
 }
 
@@ -582,7 +771,7 @@ export function updateAuthUser(data) {
         ...data,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => console.warn('[Firestore] Sync erro updateAuthUser:', err.message));
-    } catch {}
+    } catch { }
   }
 
   return updated;

@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
@@ -25,6 +25,16 @@ const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
 const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
 const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
+// Admin Area (Lazy Loaded)
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminUserDetail = lazy(() => import('./pages/admin/AdminUserDetail'));
+const AdminJobs = lazy(() => import('./pages/admin/AdminJobs'));
+const AdminServices = lazy(() => import('./pages/admin/AdminServices'));
+const AdminModeration = lazy(() => import('./pages/admin/AdminModeration'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+
 function MinhasVagasRoute() {
   const { currentUser } = useAppStore();
   if (currentUser?.role === 'empresa') {
@@ -33,8 +43,103 @@ function MinhasVagasRoute() {
   return <MinhasVagas />;
 }
 
-export default function App() {
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
   const { isChatOpen, closeChat } = useAppStore();
+
+  return (
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      {!isAdminRoute && <Navbar />}
+
+      <main className="flex-1">
+        <ErrorBoundary>
+          <Suspense fallback={
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+              <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+              <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
+            </div>
+          }>
+            <Routes>
+              <Route path="/"                 element={<Dashboard />} />
+              <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
+              <Route path="/completar-perfil" element={<CompletarPerfil />} />
+              <Route path="/vagas"            element={<Vagas />} />
+              <Route path="/servicos"         element={<Servicos />} />
+              <Route path="/talentos"         element={<BancoDeTalentos />} />
+              <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+              <Route path="/perfil/:id"       element={<PerfilAluno />} />
+              <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
+              <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+              <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
+              <Route path="/professor/:id"    element={<PerfilProfessor />} />
+              <Route
+                path="/configuracoes"
+                element={
+                  <ProtectedRoute>
+                    <Configuracoes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/minhas-vagas"
+                element={
+                  <ProtectedRoute>
+                    <MinhasVagasRoute />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/gerenciamento-vagas"
+                element={
+                  <ProtectedRoute>
+                    <GerenciamentoVagasEmpresa />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/painel-empresa"
+                element={
+                  <ProtectedRoute>
+                    <GerenciamentoVagasEmpresa />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* ── PAINEL ADMINISTRATIVO (RESTRITO A ROLE 'admin') ── */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="users/:userId" element={<AdminUserDetail />} />
+                <Route path="jobs" element={<AdminJobs />} />
+                <Route path="services" element={<AdminServices />} />
+                <Route path="moderation" element={<AdminModeration />} />
+                <Route path="settings" element={<AdminSettings />} />
+              </Route>
+
+              {/* 404 fallback */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+      </main>
+
+      {!isAdminRoute && <Footer />}
+      <Toast />
+
+      {isChatOpen && <ChatModal onClose={closeChat} />}
+    </div>
+  );
+}
+
+export default function App() {
   const initAuthListener = useAppStore(state => state.initAuthListener);
 
   useEffect(() => {
@@ -70,75 +175,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-        <Navbar />
-
-        <main className="flex-1">
-          <ErrorBoundary>
-            <Suspense fallback={
-              <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
-                <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
-                <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
-              </div>
-            }>
-              <Routes>
-                <Route path="/"                 element={<Dashboard />} />
-                <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
-                <Route path="/completar-perfil" element={<CompletarPerfil />} />
-                <Route path="/vagas"            element={<Vagas />} />
-                <Route path="/servicos"         element={<Servicos />} />
-                <Route path="/talentos"         element={<BancoDeTalentos />} />
-                <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-                <Route path="/perfil/:id"       element={<PerfilAluno />} />
-                <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
-                <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-                <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
-                <Route path="/professor/:id"    element={<PerfilProfessor />} />
-                <Route
-                  path="/configuracoes"
-                  element={
-                    <ProtectedRoute>
-                      <Configuracoes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/minhas-vagas"
-                  element={
-                    <ProtectedRoute>
-                      <MinhasVagasRoute />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/gerenciamento-vagas"
-                  element={
-                    <ProtectedRoute>
-                      <GerenciamentoVagasEmpresa />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/painel-empresa"
-                  element={
-                    <ProtectedRoute>
-                      <GerenciamentoVagasEmpresa />
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* 404 fallback */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </main>
-
-        <Footer />
-        <Toast />
-
-        {isChatOpen && <ChatModal onClose={closeChat} />}
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }

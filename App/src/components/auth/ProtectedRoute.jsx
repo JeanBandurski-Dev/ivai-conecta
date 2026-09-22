@@ -34,6 +34,47 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // 2.1 Se a conta estiver bloqueada pela moderação
+  if (currentUser.blocked === true || currentUser.status === 'blocked') {
+    return (
+      <div className="container max-w-xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 md:p-10 shadow-xl border border-red-200 dark:border-red-900/60 relative overflow-hidden">
+          <div className="w-20 h-20 bg-red-50 dark:bg-red-950/60 rounded-2xl flex items-center justify-center mx-auto mb-6 text-red-600 dark:text-red-400 shadow-inner">
+            <ShieldAlert size={38} />
+          </div>
+
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-300 mb-4">
+            Acesso Suspenso
+          </span>
+
+          <h1 className="text-2xl font-heading font-extrabold text-gray-900 dark:text-white mb-2">
+            Conta Bloqueada pela Moderação
+          </h1>
+
+          <p className="text-gray-600 dark:text-slate-300 text-sm mb-4 max-w-md mx-auto">
+            O acesso desta conta foi suspenso temporariamente pela administração da plataforma.
+          </p>
+
+          {currentUser.blockedReason && (
+            <div className="p-3.5 rounded-xl bg-red-50/80 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-700 dark:text-red-300 text-left mb-6">
+              <strong>Motivo do Bloqueio:</strong> {currentUser.blockedReason}
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              useAppStore.getState().logout();
+              window.location.href = '/login';
+            }}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-sm bg-red-600 hover:bg-red-700 text-white shadow-md transition-all cursor-pointer"
+          >
+            Sair da Conta
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 3. Se houver restrição por role e o usuário atual não tiver permissão
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(currentUser.role)) {
     const roleLabels = {
@@ -42,6 +83,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       professor: 'Professores e Docentes',
       freelancer: 'Freelancers e Autônomos',
       candidato: 'Candidatos Gerais',
+      admin: 'Administradores do Sistema',
     };
 
     const targetRolesText = allowedRoles.map(r => roleLabels[r] || r).join(' ou ');

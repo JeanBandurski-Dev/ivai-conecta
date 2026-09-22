@@ -18,6 +18,7 @@ export const USER_ROLES = {
   candidato:  { id: 'candidato',  name: 'Candidato / Profissional',   badge: 'Candidato / Profissional' },
   empresa:    { id: 'empresa',    name: 'Empresa / Recrutador',       badge: 'Empresa / Recrutador' },
   professor:  { id: 'professor',  name: 'Professor / Docente',        badge: 'Docente (IFPR/UENP/Univale)' },
+  admin:      { id: 'admin',      name: 'Administrador do Sistema',    badge: 'Administrador do Sistema' },
 };
 
 export const CITIES = [

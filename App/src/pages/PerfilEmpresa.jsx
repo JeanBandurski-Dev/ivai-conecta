@@ -3,9 +3,10 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, ArrowLeft,
   Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Image as ImageIcon, Check, Loader2
+  BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Image as ImageIcon, Check, Loader2, ShieldAlert
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
+import { getUserProfile } from '../services/authService';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
@@ -101,8 +102,29 @@ export default function PerfilEmpresa() {
         about:    currentUser.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
         history:  currentUser.history || '',
         perks:    currentUser.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+        blocked:  currentUser.blocked || currentUser.status === 'blocked',
+        blockedReason: currentUser.blockedReason || null,
       });
     } else if (id) {
+      // Busca dados atualizados do perfil no Firestore
+      if (typeof getUserProfile === 'function') {
+        getUserProfile(id).then(res => {
+          if (res && res.success && res.profile) {
+            setCompany(prev => ({
+              ...prev,
+              blocked: res.profile.blocked || res.profile.status === 'blocked',
+              status: res.profile.status || (res.profile.blocked ? 'blocked' : 'active'),
+              blockedReason: res.profile.blockedReason || null,
+              name: res.profile.razaoSocial || res.profile.nomeFantasia || res.profile.name || prev.name,
+              city: res.profile.city || prev.city,
+              sector: res.profile.sector || prev.sector,
+              logo: res.profile.avatar || prev.logo,
+              banner: res.profile.banner || prev.banner,
+              about: res.profile.about || prev.about
+            }));
+          }
+        }).catch(() => {});
+      }
       const allCompanies = getCompanies('Todas as Cidades');
       const decodedId = decodeURIComponent(id).toLowerCase().trim();
       const matchCompany = allCompanies.find(c =>
@@ -386,12 +408,21 @@ export default function PerfilEmpresa() {
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white tracking-tight drop-shadow-sm">
                     {company.name}
                   </h1>
-                  <span
-                    className="bg-green-500/25 text-green-300 border border-green-400/40 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-xs"
-                    title="Empresa credenciada com CNPJ validado no ecossistema Ivaí Conecta"
-                  >
-                    <ShieldCheck size={13} /> Recrutador Verificado
-                  </span>
+                  {company.blocked || company.status === 'blocked' || (isCompanyOwner && (currentUser?.blocked || currentUser?.status === 'blocked')) ? (
+                    <span
+                      className="bg-red-500/30 text-red-300 border border-red-400/50 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-xs"
+                      title="Empresa temporariamente suspensa pela moderação da plataforma"
+                    >
+                      <ShieldAlert size={13} /> Conta Suspensa / Bloqueada
+                    </span>
+                  ) : (
+                    <span
+                      className="bg-green-500/25 text-green-300 border border-green-400/40 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-xs"
+                      title="Empresa credenciada com CNPJ validado no ecossistema Ivaí Conecta"
+                    >
+                      <ShieldCheck size={13} /> Recrutador Verificado
+                    </span>
+                  )}
                 </div>
 
                 <div className="text-accent-sky font-bold text-base sm:text-lg">
@@ -488,6 +519,28 @@ export default function PerfilEmpresa() {
       </div>
 
       <main className="container section space-y-8">
+
+        {/* ── ALERTA DE SUSPENSÃO ADMINISTRATIVA ── */}
+        {(company.blocked || company.status === 'blocked' || (isCompanyOwner && (currentUser?.blocked || currentUser?.status === 'blocked'))) && (
+          <div className="p-5 rounded-2xl bg-red-50 dark:bg-red-950/60 border-2 border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 flex items-start gap-4 shadow-sm animate-in fade-in duration-200">
+            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+              <ShieldAlert size={22} />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-base font-bold text-red-900 dark:text-red-100 flex items-center gap-2">
+                Empresa Suspensa pela Moderação Administrativa
+              </h2>
+              <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
+                As atividades desta empresa foram temporariamente suspensas pela administração do Ivaí Conecta. A publicação de novas vagas e a gestão de processos seletivos estão inativas.
+              </p>
+              {(company.blockedReason || currentUser?.blockedReason) && (
+                <div className="mt-2 text-xs text-red-800 dark:text-red-200 bg-red-100/60 dark:bg-red-900/40 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800/60 inline-block font-medium">
+                  <strong>Justificativa da Moderação:</strong> {company.blockedReason || currentUser?.blockedReason}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── PAINEL DE ANALYTICS DINÂMICO PARA EMPRESAS ── */}
         {isCompanyOwner && (

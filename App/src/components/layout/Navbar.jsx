@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare
+  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, ShieldAlert
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
@@ -64,6 +64,7 @@ export default function Navbar() {
 
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+  const isAdmin = Boolean(currentUser && userRole === 'admin');
 
   const getProfileLink = () => {
     if (!currentUser) return '/login';
@@ -96,6 +97,15 @@ export default function Navbar() {
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>
               {isCompany && (
                 <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
+              )}
+              {isAdmin && (
+                <li>
+                  <NavLink to="/admin" className={navLinkClass}>
+                    <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                      <ShieldAlert size={15} /> Admin
+                    </span>
+                  </NavLink>
+                </li>
               )}
             </ul>
 
@@ -168,6 +178,13 @@ export default function Navbar() {
                       </div>
 
                       <div className="py-2">
+                        {isAdmin && (
+                          <Link to="/admin" onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+                            <ShieldAlert size={15} /> Painel Administrativo
+                          </Link>
+                        )}
+
                         <Link to={getProfileLink()} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
                           <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Painel Freelancer' : 'Meu Perfil'}
@@ -286,6 +303,12 @@ export default function Navbar() {
                       <div className="text-xs text-primary-blue dark:text-blue-400 font-medium truncate">{currentUser.badge}</div>
                     </div>
                   </div>
+
+                  {isAdmin && (
+                    <NavLink to="/admin" className="block px-4 py-3 rounded-xl text-base font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 transition-colors mb-1" onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><ShieldAlert size={16} /> Painel Administrativo</span>
+                    </NavLink>
+                  )}
 
                   <NavLink to={getProfileLink()} className={mobileNavLinkClass} onClick={closeMobile}>
                     <span className="flex items-center gap-2.5"><User size={16} /> Meu Perfil</span>

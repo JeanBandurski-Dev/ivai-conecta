@@ -11,39 +11,57 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        request.auth.token.email == 'admin@ivaiconecta.com.br'
+      );
+    }
+
     // -------------------------------------------------------------
     // 1. Coleção USERS
     // Leitura pública de perfis (para visualização de talentos/profissionais/empresas).
-    // Criação, alteração e deleção permitidas APENAS para o próprio usuário autenticado.
+    // Criação: Usuário autenticado para o próprio id, sem auto-promoção para 'admin'.
+    // Atualização: Admin pode alterar qualquer usuário (inclusive role/status/bloqueio).
+    // Usuário comum só atualiza seu próprio perfil SE não tentar alterar 'role', 'status' ou 'blocked'.
+    // Deleção: Permitida ao próprio usuário ou ao admin.
     // -------------------------------------------------------------
     match /users/{userId} {
       allow read: if true;
-      allow create, update, delete: if isOwner(userId);
+      allow create: if isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin());
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'blocked'])
+      );
+      allow delete: if isAdmin() || isOwner(userId);
     }
 
     // -------------------------------------------------------------
     // 2. Coleção JOBS (Vagas de Emprego)
     // Leitura pública (qualquer um pode visualizar as vagas no mural).
-    // Criação: Usuário autenticado vinculado ao createdBy ou recruiterEmail.
-    // Edição: Apenas a empresa dona da vaga, OU qualquer candidato autenticado
-    // que esteja APENAS incrementando/decrementando o contador 'applicantsCount'.
-    // Exclusão: Apenas a empresa dona da vaga.
+    // Criação: Empresa/recrutador autenticado ou Admin.
+    // Edição: Empresa dona da vaga, Admin, OU candidato atualizando applicantsCount.
+    // Exclusão: Empresa dona da vaga ou Admin.
     // -------------------------------------------------------------
     match /jobs/{jobId} {
       allow read: if true;
       
       allow create: if isAuthenticated() && (
+        isAdmin() ||
         request.resource.data.createdBy == request.auth.uid ||
         request.resource.data.recruiterEmail == request.auth.token.email
       );
       
       allow update: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
         resource.data.recruiterEmail == request.auth.token.email ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount'])
       );
       
       allow delete: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
         resource.data.recruiterEmail == request.auth.token.email
       );
@@ -51,13 +69,14 @@ service cloud.firestore {
 
     // -------------------------------------------------------------
     // 3. Coleção APPLICATIONS (Candidaturas)
-    // Leitura: Apenas o próprio candidato OU o recrutador da vaga.
-    // Criação: Apenas o candidato para si mesmo.
-    // Atualização: Candidato (desistência) ou Recrutador (avanço de etapas no funil).
-    // Exclusão: Candidato ou Recrutador.
+    // Leitura: Próprio candidato, recrutador da vaga OU Admin para auditoria.
+    // Criação: Candidato para si mesmo.
+    // Atualização: Candidato, Recrutador ou Admin.
+    // Exclusão: Candidato, Recrutador ou Admin.
     // -------------------------------------------------------------
     match /applications/{applicationId} {
       allow read: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.candidateUid == request.auth.uid ||
         resource.data.candidateEmail == request.auth.token.email ||
         resource.data.recruiterUid == request.auth.uid ||
@@ -70,6 +89,7 @@ service cloud.firestore {
       );
 
       allow update: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.candidateUid == request.auth.uid ||
         resource.data.candidateEmail == request.auth.token.email ||
         resource.data.recruiterUid == request.auth.uid ||
@@ -77,6 +97,7 @@ service cloud.firestore {
       );
 
       allow delete: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.candidateUid == request.auth.uid ||
         resource.data.recruiterUid == request.auth.uid ||
         resource.data.recruiterEmail == request.auth.token.email
@@ -86,25 +107,28 @@ service cloud.firestore {
     // -------------------------------------------------------------
     // 4. Coleção SERVICES (Marketplace de Serviços Autônomos)
     // Leitura pública.
-    // Criação: Prestador autenticado.
-    // Edição: Prestador proprietário, OU qualquer usuário atualizando o 'analytics' (cliques no WhatsApp).
-    // Exclusão: Apenas o prestador proprietário.
+    // Criação: Prestador autenticado ou Admin.
+    // Edição: Prestador proprietário, Admin, OU qualquer usuário atualizando analytics.
+    // Exclusão: Prestador proprietário ou Admin.
     // -------------------------------------------------------------
     match /services/{serviceId} {
       allow read: if true;
 
       allow create: if isAuthenticated() && (
+        isAdmin() ||
         request.resource.data.createdBy == request.auth.uid ||
         request.resource.data.providerEmail == request.auth.token.email
       );
 
       allow update: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics'])
       );
 
       allow delete: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email
       );
