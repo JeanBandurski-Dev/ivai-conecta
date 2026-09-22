@@ -166,7 +166,7 @@ export default function Login() {
       if (selectedRole === 'aluno') {
         showToast('🎉 Conta criada! Enviamos um link de confirmação para o seu e-mail institucional. Acesse sua caixa postal e clique no link para ativar seu Selo de Estudante.');
       } else {
-        showToast('🎉 Conta criada com sucesso! Bem-vindo(a) ao Ivaí Conecta.');
+        showToast('🎉 Conta criada com sucesso! Enviamos um link de ativação para o seu e-mail.');
       }
       navigate(redirectTarget, { replace: true });
     } else {

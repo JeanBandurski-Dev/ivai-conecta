@@ -11,6 +11,8 @@ import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
+import { auth } from './lib/firebase';
+
 // Lazy-loaded pages for fast initial page load & code-splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Login = lazy(() => import('./pages/Login'));
@@ -31,6 +33,70 @@ function MinhasVagasRoute() {
     return <GerenciamentoVagasEmpresa />;
   }
   return <MinhasVagas />;
+}
+
+function AppRoutes() {
+  const { currentUser } = useAppStore();
+  const isLogged = Boolean(currentUser || auth.currentUser);
+  const isVerified = Boolean(auth.currentUser?.emailVerified ?? currentUser?.emailVerified);
+
+  // Se o usuário estiver logado, mas NÃO confirmou o e-mail:
+  // Intercepta a navegação e renderiza a tela de bloqueio obrigatória
+  if (isLogged && !isVerified) {
+    return <ProtectedRoute />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/"                 element={<Dashboard />} />
+      <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
+      <Route path="/completar-perfil" element={<CompletarPerfil />} />
+      <Route path="/vagas"            element={<Vagas />} />
+      <Route path="/servicos"         element={<Servicos />} />
+      <Route path="/talentos"         element={<BancoDeTalentos />} />
+      <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+      <Route path="/perfil/:id"       element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+      <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
+      <Route path="/empresa/:id"      element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
+      <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
+      <Route path="/professor/:id"    element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
+      <Route
+        path="/configuracoes"
+        element={
+          <ProtectedRoute>
+            <Configuracoes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/minhas-vagas"
+        element={
+          <ProtectedRoute>
+            <MinhasVagasRoute />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gerenciamento-vagas"
+        element={
+          <ProtectedRoute>
+            <GerenciamentoVagasEmpresa />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/painel-empresa"
+        element={
+          <ProtectedRoute>
+            <GerenciamentoVagasEmpresa />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 404 fallback */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
 }
 
 export default function App() {
@@ -81,55 +147,7 @@ export default function App() {
                 <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
               </div>
             }>
-              <Routes>
-                <Route path="/"                 element={<Dashboard />} />
-                <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
-                <Route path="/completar-perfil" element={<CompletarPerfil />} />
-                <Route path="/vagas"            element={<Vagas />} />
-                <Route path="/servicos"         element={<Servicos />} />
-                <Route path="/talentos"         element={<BancoDeTalentos />} />
-                <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-                <Route path="/perfil/:id"       element={<PerfilAluno />} />
-                <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
-                <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-                <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
-                <Route path="/professor/:id"    element={<PerfilProfessor />} />
-                <Route
-                  path="/configuracoes"
-                  element={
-                    <ProtectedRoute>
-                      <Configuracoes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/minhas-vagas"
-                  element={
-                    <ProtectedRoute>
-                      <MinhasVagasRoute />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/gerenciamento-vagas"
-                  element={
-                    <ProtectedRoute>
-                      <GerenciamentoVagasEmpresa />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/painel-empresa"
-                  element={
-                    <ProtectedRoute>
-                      <GerenciamentoVagasEmpresa />
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* 404 fallback */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <AppRoutes />
             </Suspense>
           </ErrorBoundary>
         </main>

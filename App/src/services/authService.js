@@ -134,7 +134,8 @@ export async function login(email, password) {
       avatar: profileRes.profile?.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-      ...(profileRes.profile || {})
+      ...(profileRes.profile || {}),
+      emailVerified: Boolean(fbUser.emailVerified || profileRes.profile?.emailVerified)
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -233,17 +234,15 @@ export async function register(data) {
     const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
 
-    // 2. Disparar link de Prova de Propriedade se for Aluno
+    // 2. Disparar link de verificação de e-mail do Firebase Auth
     let emailVerificationSent = false;
     let emailVerificationError = null;
-    if (selectedRole === 'aluno') {
-      try {
-        await sendEmailVerification(fbUser);
-        emailVerificationSent = true;
-      } catch (eErr) {
-        console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
-        emailVerificationError = eErr.message;
-      }
+    try {
+      await sendEmailVerification(fbUser);
+      emailVerificationSent = true;
+    } catch (eErr) {
+      console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
+      emailVerificationError = eErr.message;
     }
 
     // 3. Salvar documento completo no Firestore em users/{uid}
@@ -606,6 +605,7 @@ export function watchAuthState(callback) {
             isVerifiedStudent,
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
             ...(profileRes.profile || {}),
+            emailVerified: fbUser.emailVerified,
             isVerifiedStudent
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -705,3 +705,60 @@ export function setSelectedCity(city) {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(STORAGE_KEY_CITY, city);
 }
+
+/**
+ * Força a atualização do token do usuário atual no Firebase Auth e sincroniza status de emailVerified.
+ * Dispara auth.currentUser.reload() e atualiza Firestore e o cache local.
+ */
+export async function reloadAuthUser() {
+  if (!auth.currentUser) {
+    return { success: false, verified: false, error: 'Nenhuma sessão ativa encontrada.' };
+  }
+  try {
+    await auth.currentUser.reload();
+    await auth.currentUser.getIdToken(true);
+    const verified = Boolean(auth.currentUser.emailVerified);
+
+    if (verified) {
+      try {
+        await setDoc(doc(db, 'users', auth.currentUser.uid), {
+          emailVerified: true,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[reloadAuthUser] Erro ao sincronizar status no Firestore:', err);
+      }
+
+      const localUser = getAuthUser();
+      if (localUser) {
+        const updated = { ...localUser, emailVerified: true };
+        localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(updated));
+      }
+    }
+
+    return { success: true, verified, user: auth.currentUser };
+  } catch (error) {
+    console.error('[reloadAuthUser] Erro ao recarregar auth.currentUser:', error);
+    return { success: false, verified: false, error: error.message };
+  }
+}
+
+/**
+ * Reenvia o e-mail de verificação oficial do Firebase Auth para o usuário logado.
+ */
+export async function resendVerificationEmail() {
+  if (!auth.currentUser) {
+    return { success: false, error: 'Nenhum usuário logado no momento.' };
+  }
+  try {
+    await sendEmailVerification(auth.currentUser);
+    return { success: true };
+  } catch (error) {
+    let msg = 'Erro ao reenviar e-mail de verificação.';
+    if (error.code === 'auth/too-many-requests') {
+      msg = 'Muitas solicitações seguidas. Aguarde alguns instantes antes de tentar novamente.';
+    }
+    return { success: false, error: msg, errorCode: error.code };
+  }
+}
+

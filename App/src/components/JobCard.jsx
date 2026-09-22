@@ -70,7 +70,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
     e.preventDefault();
     e.stopPropagation();
     const added = toggleFavoriteJob(job);
-    showToast(added ? 'Vaga salva nos seus Favoritos!' : 'Vaga removida dos Favoritos.');
+    showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 
   return (
