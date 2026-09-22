@@ -328,17 +328,24 @@ export default function GerenciamentoVagasEmpresa() {
     const fromStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_selected_job') : null;
     return fromStorage || allCompanyJobs[0]?.id || 'default';
   });
-  const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
+  const currentJob = allCompanyJobs.find(j => 
+    String(j.id) === String(selectedJobId) ||
+    (j.firestoreId && String(j.firestoreId) === String(selectedJobId)) ||
+    (j.id === Number(selectedJobId))
+  ) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
 
   useEffect(() => {
     if (allCompanyJobs && allCompanyJobs.length > 0) {
       if (selectedJobId !== 'default') {
-        const exists = allCompanyJobs.some(j => String(j.id) === String(selectedJobId));
+        const exists = allCompanyJobs.some(j => 
+          String(j.id) === String(selectedJobId) ||
+          (j.firestoreId && String(j.firestoreId) === String(selectedJobId))
+        );
         if (!exists) {
-          setSelectedJobId(allCompanyJobs[0].id);
+          setSelectedJobId(allCompanyJobs[0].firestoreId || allCompanyJobs[0].id);
         }
       } else {
-        setSelectedJobId(allCompanyJobs[0].id);
+        setSelectedJobId(allCompanyJobs[0].firestoreId || allCompanyJobs[0].id);
       }
     } else {
       setSelectedJobId('default');
@@ -446,7 +453,7 @@ export default function GerenciamentoVagasEmpresa() {
   // Candidates for selected job
   const jobCandidates = useMemo(() => {
     if (!currentJob) return [];
-    return getJobCandidates(currentJob.id);
+    return getJobCandidates(currentJob);
   }, [currentJob, selectedJobId, updateCount]);
 
   const interviewsNow = useMemo(() => {

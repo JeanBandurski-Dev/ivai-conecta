@@ -1,6 +1,6 @@
 // Talents & Teachers Service for Ivaí Conecta (Firestore 'users' and 'endorsement_requests' collections)
 import { db } from '../lib/firebase.js';
-import { collection, getDocs, doc, setDoc, addDoc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, addDoc, updateDoc, arrayUnion, increment, query, where, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
@@ -93,26 +93,106 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
   }
 }
 
+export const INSTITUTIONAL_FACULTY = [
+  {
+    id: 'prof_ronan_silva',
+    name: 'Prof. Dr. Ronan Silva',
+    email: 'ronan.silva@ifpr.edu.br',
+    institution: 'IFPR Campus Ivaiporã',
+    discipline: 'Programação de Computadores',
+    classes: ['Programação de Computadores', 'Desenvolvimento Web', 'Estrutura de Dados', 'Algoritmos'],
+    degree: 'Doutorado em Ciência da Computação',
+    role: 'professor',
+    verified: true,
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    bio: 'Docente da área de Informática e Desenvolvimento de Software no IFPR Campus Ivaiporã.'
+  },
+  {
+    id: 'prof_mariana_santos',
+    name: 'Prof.ª Dr.ª Mariana Santos',
+    email: 'mariana.santos@ifpr.edu.br',
+    institution: 'IFPR Campus Ivaiporã',
+    discipline: 'Engenharia de Software',
+    classes: ['Engenharia de Software', 'Banco de Dados', 'Gestão de Projetos de TI'],
+    degree: 'Doutora em Engenharia de Software',
+    role: 'professor',
+    verified: true,
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+    bio: 'Professora titular do IFPR Campus Ivaiporã em Engenharia de Software e Banco de Dados.'
+  },
+  {
+    id: 'prof_carlos_lima',
+    name: 'Prof. Me. Carlos Eduardo Lima',
+    email: 'carlos.lima@univale.edu.br',
+    institution: 'Univale Ivaiporã',
+    discipline: 'Redes de Computadores',
+    classes: ['Redes de Computadores', 'Sistemas Operacionais', 'Segurança da Informação'],
+    degree: 'Mestre em Redes e Sistemas',
+    role: 'professor',
+    verified: true,
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    bio: 'Professor na Univale Ivaiporã em infraestrutura de redes e segurança.'
+  },
+  {
+    id: 'prof_juliana_oliveira',
+    name: 'Prof.ª Ma. Juliana Oliveira',
+    email: 'juliana.oliveira@uenp.edu.br',
+    institution: 'UENP Campus Luiz Meneghel',
+    discipline: 'Inteligência Artificial & Ciência de Dados',
+    classes: ['Inteligência Artificial', 'Ciência de Dados', 'Estatística Aplicada'],
+    degree: 'Mestre em Ciência da Computação',
+    role: 'professor',
+    verified: true,
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+    bio: 'Docente pesquisadora da UENP em Inteligência Artificial e Ciência de Dados.'
+  }
+];
+
+export function mergeWithInstitutionalFaculty(remoteTeachers = []) {
+  const map = new Map();
+  // Inicia com o corpo docente institucional credenciado
+  for (const f of INSTITUTIONAL_FACULTY) {
+    map.set(f.email.toLowerCase().trim(), f);
+  }
+  // Mescla e prioriza professores cadastrados dinamicamente no Firestore
+  for (const t of remoteTeachers) {
+    const email = (t.email || '').toLowerCase().trim();
+    if (email) {
+      map.set(email, { ...(map.get(email) || {}), ...t });
+    } else if (t.id) {
+      map.set(String(t.id), t);
+    }
+  }
+  return Array.from(map.values());
+}
+
 /**
  * Escuta corpo docente em tempo real via Firestore onSnapshot da coleção 'users'
  */
 export function subscribeToTeachers(callback) {
+  // Callback imediato com dados disponíveis
+  callback(getVerifiedTeachers());
+
   try {
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', '==', 'professor'));
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(usersRef, (snapshot) => {
       const remoteTeachers = snapshot.docs
         .map(d => normalizeTeacherDoc(d.data(), d.id))
-        .filter(u => u.role === 'professor');
+        .filter(u => {
+          const r = String(u.role || '').toLowerCase().trim();
+          return r === 'professor' || r === 'docente';
+        });
+
+      const merged = mergeWithInstitutionalFaculty(remoteTeachers);
 
       if (typeof localStorage !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remoteTeachers));
+          localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(merged));
         } catch {}
       }
 
-      callback(remoteTeachers);
+      callback(merged);
     }, (error) => {
       console.warn('[Firestore Teachers Listener] Offline fallback:', error.message);
       callback(getVerifiedTeachers());
@@ -166,6 +246,44 @@ export function getTalentById(id) {
   return null;
 }
 
+/**
+ * Escuta dados de um perfil de talento em tempo real no Firestore
+ */
+export function subscribeToTalentById(talentId, callback) {
+  if (!talentId) return () => {};
+  const idStr = String(talentId);
+
+  // Retorno imediato do cache local
+  const local = getTalentById(idStr);
+  if (local) callback(local);
+
+  try {
+    const userDocRef = doc(db, 'users', idStr);
+    return onSnapshot(userDocRef, (snap) => {
+      if (snap.exists()) {
+        const normalized = normalizeUserDoc(snap.data(), snap.id);
+        updateTalentProfile(idStr, normalized);
+        callback(normalized);
+      } else {
+        const talentDocRef = doc(db, 'talents', idStr);
+        getDoc(talentDocRef).then(tSnap => {
+          if (tSnap.exists()) {
+            const normalized = normalizeUserDoc(tSnap.data(), tSnap.id);
+            callback(normalized);
+          }
+        }).catch(() => {});
+      }
+    }, (err) => {
+      console.warn('[Firestore] subscribeToTalentById offline fallback:', err.message);
+      callback(getTalentById(idStr));
+    });
+  } catch (err) {
+    console.warn('[Firestore] subscribeToTalentById falha:', err.message);
+    callback(getTalentById(idStr));
+    return () => {};
+  }
+}
+
 export function submitStudentVerification(raNumber, fileData) {
   const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : String(fileData || 'Declaracao_Matricula.pdf');
   const filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '1.20';
@@ -192,29 +310,34 @@ export function getVerifiedTeachers() {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          teachers = parsed.filter(t => t.role === 'professor');
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          teachers = parsed.filter(t => (t.role || '').toLowerCase() === 'professor');
         }
       } catch {}
     }
   }
 
+  const merged = mergeWithInstitutionalFaculty(teachers);
+
   // Background sync com o Firestore (coleção 'users' role 'professor')
   try {
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', '==', 'professor'));
-    getDocs(q).then(snapshot => {
+    getDocs(usersRef).then(snapshot => {
       const remote = snapshot.docs
         .map(d => normalizeTeacherDoc(d.data(), d.id))
-        .filter(u => u.role === 'professor');
+        .filter(u => {
+          const r = String(u.role || '').toLowerCase().trim();
+          return r === 'professor' || r === 'docente';
+        });
 
+      const finalMerged = mergeWithInstitutionalFaculty(remote);
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(remote));
+        localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(finalMerged));
       }
     }).catch(err => console.warn('[Firestore] getVerifiedTeachers offline:', err.message));
   } catch {}
 
-  return teachers;
+  return merged;
 }
 
 export function getTeacherById(id) {
@@ -333,47 +456,108 @@ export function getEndorsementRequests() {
 }
 
 /**
- * Escuta solicitações de recomendação em tempo real no Firestore
+ * Escuta solicitações de recomendação para um professor em tempo real no Firestore
  */
 export function subscribeToEndorsementRequests(teacherEmail, callback) {
+  const cleanEmail = teacherEmail ? String(teacherEmail).toLowerCase().trim() : '';
+
   try {
     const reqsRef = collection(db, 'endorsement_requests');
-    let q = reqsRef;
-    if (teacherEmail) {
-      const cleanEmail = String(teacherEmail).toLowerCase().trim();
-      q = query(reqsRef, where('profEmail', '==', cleanEmail));
-    }
 
-    return onSnapshot(q, (snapshot) => {
-      const requests = snapshot.docs.map(d => ({
+    return onSnapshot(reqsRef, (snapshot) => {
+      const allRequests = snapshot.docs.map(d => ({
         id: d.id,
         firestoreId: d.id,
         ...d.data()
       }));
 
+      const filtered = cleanEmail
+        ? allRequests.filter(r => (r.profEmail || '').toLowerCase().trim() === cleanEmail)
+        : allRequests;
+
+      filtered.sort((a, b) => (b.requestedTimestamp || 0) - (a.requestedTimestamp || 0));
+
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(requests));
+        try {
+          localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(allRequests));
+        } catch {}
       }
 
-      callback(requests);
+      callback(filtered);
     }, (err) => {
       console.warn('[Firestore Endorsement Listener] Offline fallback:', err.message);
-      callback(getEndorsementRequests());
+      const local = getEndorsementRequests();
+      const filtered = cleanEmail
+        ? local.filter(r => (r.profEmail || '').toLowerCase().trim() === cleanEmail)
+        : local;
+      callback(filtered);
     });
   } catch (err) {
     console.warn('[Firestore Endorsement Listener] Falha ao assinar:', err.message);
-    callback(getEndorsementRequests());
+    const local = getEndorsementRequests();
+    const filtered = cleanEmail
+      ? local.filter(r => (r.profEmail || '').toLowerCase().trim() === cleanEmail)
+      : local;
+    callback(filtered);
+    return () => {};
+  }
+}
+
+/**
+ * Escuta solicitações de recomendação enviadas por um aluno específico em tempo real no Firestore
+ */
+export function subscribeToStudentEndorsementRequests(studentId, callback) {
+  if (!studentId) {
+    callback([]);
+    return () => {};
+  }
+  const idStr = String(studentId);
+
+  try {
+    const reqsRef = collection(db, 'endorsement_requests');
+
+    return onSnapshot(reqsRef, (snapshot) => {
+      const allRequests = snapshot.docs.map(d => ({
+        id: d.id,
+        firestoreId: d.id,
+        ...d.data()
+      }));
+
+      const studentRequests = allRequests.filter(r => String(r.studentId) === idStr);
+      studentRequests.sort((a, b) => (b.requestedTimestamp || 0) - (a.requestedTimestamp || 0));
+
+      callback(studentRequests);
+    }, (err) => {
+      console.warn('[Firestore Student Endorsements] Offline fallback:', err.message);
+      const local = getEndorsementRequests().filter(r => String(r.studentId) === idStr);
+      callback(local);
+    });
+  } catch (err) {
+    console.warn('[Firestore Student Endorsements] Falha ao assinar:', err.message);
+    const local = getEndorsementRequests().filter(r => String(r.studentId) === idStr);
+    callback(local);
     return () => {};
   }
 }
 
 export async function requestTeacherEndorsement(profEmail, profName, discipline, studentUser) {
-  const cleanEmail = profEmail.toLowerCase().trim();
+  const cleanEmail = (profEmail || '').toLowerCase().trim();
   const studentId = studentUser?.uid || studentUser?.id || '';
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return {
+      success: false,
+      message: 'Por favor, informe um e-mail educacional válido.'
+    };
+  }
 
   // 1. Impedir solicitação se o aluno já possui recomendação deste professor
   const talent = getTalentById(studentId);
-  const alreadyEndorsed = (talent?.endorsements || []).some(e => 
+  const studentEndorsements = [
+    ...(studentUser?.endorsements || []),
+    ...(talent?.endorsements || [])
+  ];
+  const alreadyEndorsed = studentEndorsements.some(e => 
     (e.profEmail || '').toLowerCase().trim() === cleanEmail
   );
   if (alreadyEndorsed) {
@@ -385,14 +569,16 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
 
   // 2. Impedir solicitação duplicada pendente no Firestore
   try {
-    const q = query(
-      collection(db, 'endorsement_requests'),
-      where('studentId', '==', studentId),
-      where('profEmail', '==', cleanEmail),
-      where('status', '==', 'Pendente')
-    );
-    const snap = await getDocs(q);
-    if (!snap.empty) {
+    const snap = await getDocs(collection(db, 'endorsement_requests'));
+    const pendingDup = snap.docs.find(d => {
+      const data = d.data();
+      return (
+        String(data.studentId) === String(studentId) &&
+        (data.profEmail || '').toLowerCase().trim() === cleanEmail &&
+        data.status === 'Pendente'
+      );
+    });
+    if (pendingDup) {
       return {
         success: false,
         message: `Você já possui uma solicitação pendente aguardando avaliação do professor ${profName}.`
@@ -403,13 +589,13 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
   }
 
   const newReq = {
-    studentId,
+    studentId: String(studentId),
     studentName: studentUser?.name || 'Estudante',
-    studentEmail: studentUser?.email || '',
+    studentEmail: (studentUser?.email || '').toLowerCase().trim(),
     studentCourse: studentUser?.course || studentUser?.badge || 'Ensino Superior / Técnico',
     profEmail: cleanEmail,
-    profName: profName.trim(),
-    discipline: discipline.trim(),
+    profName: (profName || 'Professor Docente').trim(),
+    discipline: (discipline || 'Formação Acadêmica').trim(),
     requestedAt: new Date().toLocaleDateString('pt-BR'),
     requestedTimestamp: Date.now(),
     message: `Solicitação de recomendação acadêmica referente à disciplina ${discipline}.`,
@@ -426,21 +612,27 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
   }
 
   const local = getEndorsementRequests();
-  const updated = [newReq, ...local.filter(r => r.id !== newReq.id)];
+  const updated = [newReq, ...local.filter(r => r.id !== newReq.id && r.firestoreId !== newReq.id)];
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updated));
+    try {
+      localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updated));
+    } catch {}
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_endorsements_updated', { detail: newReq }));
   }
 
   return {
     success: true,
-    message: `Solicitação enviada para o professor ${profName} (${profEmail})! Ele receberá em seu Painel do Docente.`
+    message: `Solicitação enviada com sucesso para o professor ${profName} (${cleanEmail})! Ele receberá em seu Painel do Docente.`
   };
 }
 
 export async function approveEndorsementRequest(requestId, quote, profUser) {
   let req = null;
+  const reqIdStr = String(requestId);
   try {
-    const snap = await getDoc(doc(db, 'endorsement_requests', String(requestId)));
+    const snap = await getDoc(doc(db, 'endorsement_requests', reqIdStr));
     if (snap.exists()) {
       req = { id: snap.id, firestoreId: snap.id, ...snap.data() };
     }
@@ -448,27 +640,12 @@ export async function approveEndorsementRequest(requestId, quote, profUser) {
 
   if (!req) {
     const requests = getEndorsementRequests();
-    req = requests.find(r => r.id === requestId || String(r.id) === String(requestId) || r.firestoreId === requestId);
+    req = requests.find(r => r.id === requestId || String(r.id) === reqIdStr || r.firestoreId === requestId);
   }
 
   if (!req) return { success: false, error: 'Solicitação não encontrada.' };
 
-  // 1. Impedir aprovação se já houver recomendação concedida
-  const talent = getTalentById(req.studentId);
   const cleanEmail = (req.profEmail || profUser?.email || '').toLowerCase().trim();
-  const alreadyEndorsed = (talent?.endorsements || []).some(e =>
-    (e.profEmail || '').toLowerCase().trim() === cleanEmail
-  );
-
-  if (alreadyEndorsed) {
-    const targetDocId = req.firestoreId || req.id;
-    if (targetDocId) {
-      try {
-        await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), { status: 'Aprovado' });
-      } catch {}
-    }
-    return { success: false, error: 'Este aluno já possui uma recomendação sua cadastrada.' };
-  }
 
   const newEndorsement = {
     id: `end_${Date.now()}`,
@@ -477,46 +654,66 @@ export async function approveEndorsementRequest(requestId, quote, profUser) {
     profEmail: cleanEmail,
     institution: profUser?.institution || 'IFPR Campus Ivaiporã',
     discipline: req.discipline || profUser?.discipline || 'Formação Acadêmica',
-    quote: quote || 'Estudante dedicado, com forte raciocínio prático e ótimo trabalho em equipe.',
+    quote: quote?.trim() || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio em projetos práticos.',
     isVerified: true,
-    date: new Date().toLocaleDateString('pt-BR')
+    date: new Date().toLocaleDateString('pt-BR'),
+    timestamp: Date.now()
   };
 
+  // Atualiza perfil do aluno com o parecer verificado no Firestore e no cache local
   await addEndorsementToTalent(req.studentId, newEndorsement);
 
+  // Atualiza status do pedido no Firestore
   const targetDocId = req.firestoreId || req.id;
   if (targetDocId) {
     try {
       await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), {
         status: 'Aprovado',
-        approvedAt: new Date().toISOString()
+        approvedAt: new Date().toISOString(),
+        quote: newEndorsement.quote,
+        endorsementId: newEndorsement.id
       });
-    } catch {}
+    } catch (err) {
+      console.warn('[Firestore] Erro ao atualizar status do pedido para Aprovado:', err.message);
+    }
   }
 
+  // Atualiza cache local
   const local = getEndorsementRequests();
-  const updatedReqs = local.map(r => (r.id === req.id || r.firestoreId === req.id) ? { ...r, status: 'Aprovado' } : r);
+  const updatedReqs = local.map(r => (r.id === req.id || r.firestoreId === req.id || String(r.id) === String(targetDocId)) ? { ...r, status: 'Aprovado', quote: newEndorsement.quote } : r);
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+    try {
+      localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+    } catch {}
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_endorsements_updated'));
   }
 
   return { success: true, endorsement: newEndorsement };
 }
 
 export async function rejectEndorsementRequest(requestId) {
-  const targetDocId = requestId;
+  const targetDocId = String(requestId);
   if (targetDocId) {
     try {
-      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), {
+      await updateDoc(doc(db, 'endorsement_requests', targetDocId), {
         status: 'Recusado',
         rejectedAt: new Date().toISOString()
       });
-    } catch {}
+    } catch (err) {
+      console.warn('[Firestore] Erro ao rejeitar solicitação:', err.message);
+    }
   }
   const requests = getEndorsementRequests();
-  const updatedReqs = requests.map(r => (String(r.id) === String(requestId) || r.firestoreId === requestId) ? { ...r, status: 'Recusado' } : r);
+  const updatedReqs = requests.map(r => (String(r.id) === targetDocId || r.firestoreId === targetDocId) ? { ...r, status: 'Recusado' } : r);
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+    try {
+      localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(updatedReqs));
+    } catch {}
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_endorsements_updated'));
   }
   return { success: true };
 }
@@ -563,19 +760,44 @@ export function updateTalentProfile(talentId, updatedData) {
   return updated;
 }
 
-export function addEndorsementToTalent(talentId, endorsement) {
-  const talent = getTalentById(talentId);
-  if (!talent) return false;
-  const endorsements = talent.endorsements || [];
-  const updated = [endorsement, ...endorsements];
-  updateTalentProfile(talentId, { endorsements: updated });
+export async function addEndorsementToTalent(talentId, endorsement) {
+  const idStr = String(talentId);
+  if (!idStr) return false;
 
+  // 1. Atualiza no Firestore coleção 'users'
   try {
-    setDoc(doc(db, 'users', String(talentId)), {
+    const userDocRef = doc(db, 'users', idStr);
+    await setDoc(userDocRef, {
       endorsements: arrayUnion(endorsement),
+      endorsementCount: increment(1),
       updatedAt: new Date().toISOString()
-    }, { merge: true }).catch(err => console.warn('[Firestore] Sync erro addEndorsementToTalent:', err.message));
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore] Sync erro addEndorsementToTalent (users):', err.message);
+  }
+
+  // 2. Atualiza no Firestore coleção 'talents' caso exista
+  try {
+    const talentDocRef = doc(db, 'talents', idStr);
+    await setDoc(talentDocRef, {
+      endorsements: arrayUnion(endorsement),
+      endorsementCount: increment(1),
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
   } catch {}
+
+  // 3. Atualiza cache local de talentos se o talento estiver registrado
+  const talent = getTalentById(idStr);
+  if (talent) {
+    const endorsements = talent.endorsements || [];
+    const updated = [endorsement, ...endorsements.filter(e => (e.profEmail || '').toLowerCase().trim() !== (endorsement.profEmail || '').toLowerCase().trim())];
+    updateTalentProfile(idStr, { endorsements: updated, endorsementCount: updated.length });
+  }
+
+  // 4. Emite evento global para que qualquer componente em escuta atualize
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_talent_endorsed', { detail: { talentId: idStr, endorsement } }));
+  }
 
   return true;
 }

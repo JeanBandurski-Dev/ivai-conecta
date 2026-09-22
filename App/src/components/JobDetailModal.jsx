@@ -89,7 +89,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     }
 
     // Assinatura em tempo real de candidaturas
-    const unsub = subscribeToApplications(userUid, (apps) => {
+    const unsub = subscribeToApplications(currentUser, (apps) => {
       if (checkIsApplied(apps)) {
         setApplied(true);
       }

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Award, Building2, MapPin, CheckCircle2, ShieldCheck,
   Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare, Calendar
 } from 'lucide-react';
-import { getTeacherById, getTeacherEndorsedStudents, updateTeacherProfile } from '../lib/ivaiConecta';
+import { getTeacherById, getTalents, subscribeToTalents, updateTeacherProfile } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
 import useAppStore from '../store/useAppStore';
 
@@ -29,7 +29,20 @@ export default function PerfilProfessor() {
     education: currentUser.education || [],
   } : null);
 
-  const endorsedStudents = getTeacherEndorsedStudents(teacher?.email);
+  const [liveTalents, setLiveTalents] = useState(() => getTalents('Todas as Cidades'));
+
+  useEffect(() => {
+    const unsub = subscribeToTalents('Todas as Cidades', (data) => {
+      if (Array.isArray(data)) setLiveTalents(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const endorsedStudents = useMemo(() => {
+    const profEmail = (teacher?.email || '').toLowerCase().trim();
+    if (!profEmail) return [];
+    return liveTalents.filter(t => t.endorsements?.some(e => (e.profEmail || '').toLowerCase().trim() === profEmail));
+  }, [liveTalents, teacher]);
 
   const isOwner = Boolean(
     currentUser && teacher && (

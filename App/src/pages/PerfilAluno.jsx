@@ -3,9 +3,13 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, Clock
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
+import {
+  getTalentById, requestTeacherEndorsement, updateTalentProfile,
+  proactiveEndorseStudent, uploadUserProfilePicture, subscribeToTalentById,
+  subscribeToStudentEndorsementRequests, getVerifiedTeachers, subscribeToTeachers
+} from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -17,7 +21,7 @@ export default function PerfilAluno() {
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const talentId = id || currentUser?.uid || currentUser?.id;
-  const talent = getTalentById(talentId) || (currentUser ? {
+  const [liveTalent, setLiveTalent] = useState(() => getTalentById(talentId) || (currentUser ? {
     id: currentUser.uid || currentUser.id,
     firestoreId: currentUser.uid || currentUser.id,
     name: currentUser.name || 'Estudante / Profissional',
@@ -36,7 +40,36 @@ export default function PerfilAluno() {
     projects: currentUser.projects || [],
     education: currentUser.education || [],
     endorsements: currentUser.endorsements || []
-  } : null);
+  } : null));
+
+  useEffect(() => {
+    if (!talentId) return;
+    const unsub = subscribeToTalentById(talentId, (remote) => {
+      if (remote) setLiveTalent(remote);
+    });
+    return () => unsub();
+  }, [talentId]);
+
+  const talent = liveTalent;
+
+  // Real-time student endorsement requests
+  const [studentRequests, setStudentRequests] = useState([]);
+  useEffect(() => {
+    if (!talentId) return;
+    const unsub = subscribeToStudentEndorsementRequests(talentId, (reqs) => {
+      setStudentRequests(reqs);
+    });
+    return () => unsub();
+  }, [talentId]);
+
+  // Verified teachers list for quick selection
+  const [availableTeachers, setAvailableTeachers] = useState(() => getVerifiedTeachers());
+  useEffect(() => {
+    const unsub = subscribeToTeachers((teachers) => {
+      if (Array.isArray(teachers)) setAvailableTeachers(teachers);
+    });
+    return () => unsub();
+  }, []);
 
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
@@ -83,6 +116,8 @@ export default function PerfilAluno() {
   const [proactiveDiscipline, setProactiveDiscipline] = useState(currentUser?.discipline || 'Programação de Computadores');
 
   const [requestForm, setRequestForm] = useState({ profName: '', profEmail: '', discipline: '', message: '' });
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [nameInputFocused, setNameInputFocused] = useState(false);
   const [error, setError] = useState('');
 
   // Comprehensive edit form state
@@ -120,6 +155,8 @@ export default function PerfilAluno() {
       setRequestModal(false);
       showToast(res.message || `Solicitação enviada para o professor ${requestForm.profName}!`);
       setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+      setSelectedTeacher(null);
+      setNameInputFocused(false);
     } else {
       setError(res.message || 'Erro ao enviar solicitação.');
       showToast(res.message || 'Erro ao enviar solicitação.');
@@ -544,9 +581,35 @@ export default function PerfilAluno() {
                   ) : null}
                 </div>
 
+                {/* Solicitações Pendentes Enviadas pelo Aluno (Visível para o dono do perfil) */}
+                {isOwner && studentRequests.filter(r => r.status === 'Pendente').length > 0 && (
+                  <div className="mb-5 space-y-2.5">
+                    <div className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                      <Clock size={14} className="text-amber-500 animate-pulse" /> Solicitações Pendentes de Avaliação ({studentRequests.filter(r => r.status === 'Pendente').length})
+                    </div>
+                    <div className="space-y-2">
+                      {studentRequests.filter(r => r.status === 'Pendente').map(req => (
+                        <div key={req.id} className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <div className="font-bold text-amber-950 dark:text-amber-200">
+                              {req.profName} <span className="font-normal text-amber-800/80 dark:text-amber-400">({req.profEmail})</span>
+                            </div>
+                            <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                              Disciplina: <strong>{req.discipline}</strong> · Solicitado em {req.requestedAt}
+                            </div>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-full font-bold bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[10px] shrink-0 inline-flex items-center gap-1">
+                            <Clock size={11} /> Aguardando Docente
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {!talent.endorsements || talent.endorsements.length === 0 ? (
                   <div className="text-center py-6 text-gray-400 dark:text-slate-500">
-                    <p className="font-semibold text-sm">Nenhuma recomendação ainda.</p>
+                    <p className="font-semibold text-sm">Nenhuma recomendação avaliada ainda.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -711,32 +774,172 @@ export default function PerfilAluno() {
       {/* Modal: Pedir Recomendação a Professor (Para Alunos) */}
       {requestModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setRequestModal(false)}>
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
+          onClick={() => { setRequestModal(false); setNameInputFocused(false); }}>
+          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-6 sm:p-7 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                 <Send size={18} className="text-primary-blue dark:text-blue-400" /> Pedir Recomendação a Professor
               </h3>
-              <button onClick={() => setRequestModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
+              <button onClick={() => { setRequestModal(false); setNameInputFocused(false); }}>
+                <X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" />
+              </button>
             </div>
 
             {error && <div className="mb-4 text-xs bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded-xl">{error}</div>}
 
             <form onSubmit={handleRequestSubmit} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Nome do Professor(a)</label>
+              {/* Seletor Principal de Professores Disponíveis */}
+              <div className="form-group bg-blue-50/70 dark:bg-slate-800/90 p-4 rounded-2xl border border-blue-200/80 dark:border-slate-700 space-y-2.5">
+                <label className="form-label text-xs font-bold flex items-center justify-between text-primary-dark dark:text-white">
+                  <span className="flex items-center gap-1.5">
+                    <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" /> Selecione o Professor(a) Disponível:
+                  </span>
+                  <span className="text-[10px] bg-blue-100 dark:bg-blue-950/80 text-primary-blue dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
+                    {availableTeachers.length} disponíveis
+                  </span>
+                </label>
+
+                <select
+                  className="form-control text-xs font-semibold bg-white dark:bg-slate-900 border-primary-blue/30 focus:border-primary-blue"
+                  value={selectedTeacher ? (selectedTeacher.email || selectedTeacher.id) : (requestForm.profEmail || '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!val) {
+                      setSelectedTeacher(null);
+                      return;
+                    }
+                    if (val === '__manual__') {
+                      setSelectedTeacher(null);
+                      setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+                      return;
+                    }
+                    const prof = availableTeachers.find(t => 
+                      (t.email || '').toLowerCase().trim() === val.toLowerCase().trim() || 
+                      String(t.id) === val
+                    );
+                    if (prof) {
+                      setSelectedTeacher(prof);
+                      setRequestForm(f => ({
+                        ...f,
+                        profName: prof.name,
+                        profEmail: prof.email,
+                        discipline: prof.discipline || prof.classes?.[0] || 'Programação de Computadores'
+                      }));
+                    }
+                  }}
+                >
+                  <option value="">-- Escolha um Professor para Preenchimento Automático --</option>
+                  {availableTeachers.map(t => (
+                    <option key={t.id || t.email} value={t.email || t.id}>
+                      {t.name} · {t.institution || 'IFPR'} ({t.discipline || 'Docente'})
+                    </option>
+                  ))}
+                  <option value="__manual__">✍️ Outro Professor (Preencher manualmente)</option>
+                </select>
+
+                {/* Card de Dados do Professor Vinculado */}
+                {selectedTeacher && (
+                  <div className="pt-2 border-t border-blue-200/60 dark:border-slate-700/80 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-gray-700 dark:text-slate-300">
+                      <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
+                        <CheckCircle size={13} /> Dados vinculados: {selectedTeacher.institution}
+                      </span>
+                      <span className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
+                        {selectedTeacher.degree || 'Docente'}
+                      </span>
+                    </div>
+
+                    {Array.isArray(selectedTeacher.classes) && selectedTeacher.classes.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-gray-500 dark:text-slate-400 font-semibold block mb-1">
+                          Disciplinas ministradas pelo docente (clique para selecionar):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedTeacher.classes.map(cls => (
+                            <button
+                              key={cls}
+                              type="button"
+                              onClick={() => setRequestForm(f => ({ ...f, discipline: cls }))}
+                              className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold border transition-all cursor-pointer ${
+                                requestForm.discipline === cls
+                                  ? 'bg-primary-blue text-white border-primary-blue shadow-2xs font-bold'
+                                  : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue'
+                              }`}
+                            >
+                              {cls}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Campo: Nome do Professor com Sugestões Inteligentes ao Digitar */}
+              <div className="form-group relative">
+                <label className="form-label text-xs font-semibold">Nome do Professor(a)</label>
                 <input
                   type="text"
                   value={requestForm.profName}
-                  onChange={e => setRequestForm(f => ({ ...f, profName: e.target.value }))}
+                  onFocus={() => setNameInputFocused(true)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setRequestForm(f => ({ ...f, profName: val }));
+                    setNameInputFocused(true);
+                  }}
                   className="form-control"
                   placeholder="Ex: Prof. Dr. Ronan Silva"
                   required
                 />
+
+                {/* Sugestões ao digitar */}
+                {nameInputFocused && requestForm.profName && requestForm.profName.trim().length >= 2 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-1.5 space-y-1 max-h-48 overflow-y-auto">
+                    <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 px-2 py-0.5">
+                      Docentes Disponíveis Correspondentes:
+                    </div>
+                    {availableTeachers
+                      .filter(t =>
+                        t.name.toLowerCase().includes(requestForm.profName.toLowerCase()) ||
+                        t.email.toLowerCase().includes(requestForm.profName.toLowerCase()) ||
+                        (t.discipline && t.discipline.toLowerCase().includes(requestForm.profName.toLowerCase()))
+                      )
+                      .slice(0, 4)
+                      .map(t => (
+                        <button
+                          key={t.id || t.email}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSelectedTeacher(t);
+                            setRequestForm(f => ({
+                              ...f,
+                              profName: t.name,
+                              profEmail: t.email,
+                              discipline: t.discipline || t.classes?.[0] || 'Programação de Computadores'
+                            }));
+                            setNameInputFocused(false);
+                          }}
+                          className="w-full text-left p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors cursor-pointer"
+                        >
+                          <div>
+                            <div className="font-bold text-gray-900 dark:text-white">{t.name}</div>
+                            <div className="text-[11px] text-gray-500 dark:text-slate-400">{t.email} · {t.institution}</div>
+                            <div className="text-[10px] text-primary-blue dark:text-blue-400 font-semibold">{t.discipline}</div>
+                          </div>
+                          <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300 px-2.5 py-1 rounded-full shrink-0">
+                            Selecionar
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
 
+              {/* Campo: E-mail Educacional do Professor */}
               <div className="form-group">
-                <label className="form-label">E-mail Educacional do Professor</label>
+                <label className="form-label text-xs font-semibold">E-mail Educacional do Professor</label>
                 <input
                   type="email"
                   value={requestForm.profEmail}
@@ -747,8 +950,9 @@ export default function PerfilAluno() {
                 />
               </div>
 
+              {/* Campo: Disciplina / Matéria Ministrada */}
               <div className="form-group">
-                <label className="form-label">Disciplina / Matéria Ministrada</label>
+                <label className="form-label text-xs font-semibold">Disciplina / Matéria Ministrada</label>
                 <input
                   type="text"
                   value={requestForm.discipline}
@@ -760,7 +964,7 @@ export default function PerfilAluno() {
               </div>
 
               <div className="flex gap-3 justify-end pt-3">
-                <button type="button" onClick={() => setRequestModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
+                <button type="button" onClick={() => { setRequestModal(false); setNameInputFocused(false); }} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
                 <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">Enviar Solicitação</button>
               </div>
             </form>

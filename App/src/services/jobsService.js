@@ -239,58 +239,119 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
 /**
  * Escuta candidaturas de um usuário em tempo real via Firestore onSnapshot
  */
-export function subscribeToApplications(candidateUid, callback) {
+export function subscribeToApplications(candidateUserOrUid, callback) {
+  const candidateUid = typeof candidateUserOrUid === 'string'
+    ? candidateUserOrUid
+    : (candidateUserOrUid?.uid || candidateUserOrUid?.id || '');
+  const candidateEmail = typeof candidateUserOrUid === 'object'
+    ? String(candidateUserOrUid?.email || '').toLowerCase().trim()
+    : '';
+
   try {
     const appsRef = collection(db, 'applications');
-    const q = candidateUid ? query(appsRef, where('candidateUid', '==', candidateUid)) : appsRef;
-
-    return onSnapshot(q, (snapshot) => {
-      const remoteApps = snapshot.docs.map(d => ({
+    return onSnapshot(appsRef, (snapshot) => {
+      const allRemote = snapshot.docs.map(d => ({
         id: d.id,
         firestoreId: d.id,
         ...d.data()
       }));
 
+      const myApps = allRemote.filter(a => {
+        const aUid = String(a.candidateUid || '');
+        const aId = String(a.candidateId || '');
+        const aEmail = String(a.candidateEmail || '').toLowerCase().trim();
+        const matchesUid = candidateUid && (aUid === candidateUid || aId === candidateUid);
+        const matchesEmail = candidateEmail && (aEmail === candidateEmail);
+        return matchesUid || matchesEmail;
+      });
+
+      // Mescla com cache local de applications sem apagar candidaturas de outros contextos
+      const currentLocal = getUserApplications();
+      const others = currentLocal.filter(loc => !myApps.some(m => m.id === loc.id || (m.firestoreId && m.firestoreId === loc.id)));
+      const updated = [...myApps, ...others];
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(remoteApps));
+        try {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updated));
+        } catch {}
       }
 
-      callback(remoteApps);
+      callback(myApps);
     }, (error) => {
       console.warn('[Firestore Applications Listener] Offline fallback:', error.message);
-      callback(getUserApplications(candidateUid));
+      callback(getUserApplications(candidateUid || candidateEmail));
     });
   } catch (error) {
     console.warn('[Firestore Applications Listener] Falha ao assinar candidaturas:', error.message);
-    callback(getUserApplications(candidateUid));
+    callback(getUserApplications(candidateUid || candidateEmail));
     return () => {};
   }
 }
 
 /**
- * Escuta todos os candidatos de uma vaga específica em tempo real
+ * Escuta todos os candidatos de uma vaga específica em tempo real via Firestore
  */
-export function subscribeToJobApplicants(jobId, callback) {
-  if (!jobId) {
+export function subscribeToJobApplicants(jobOrId, callback) {
+  if (!jobOrId) {
     callback([]);
     return () => {};
   }
 
+  let targetIds = [];
+  let targetJob = null;
+  if (typeof jobOrId === 'object' && jobOrId !== null) {
+    targetJob = jobOrId;
+    if (jobOrId.id) targetIds.push(String(jobOrId.id));
+    if (jobOrId.firestoreId) targetIds.push(String(jobOrId.firestoreId));
+    if (jobOrId.originalJobId) targetIds.push(String(jobOrId.originalJobId));
+  } else {
+    const str = String(jobOrId).trim();
+    targetIds.push(str);
+    targetJob = getJobById(str);
+    if (targetJob) {
+      if (targetJob.id) targetIds.push(String(targetJob.id));
+      if (targetJob.firestoreId) targetIds.push(String(targetJob.firestoreId));
+      if (targetJob.originalJobId) targetIds.push(String(targetJob.originalJobId));
+    }
+  }
+  const cleanIds = Array.from(new Set(targetIds.filter(Boolean)));
+
   try {
     const appsRef = collection(db, 'applications');
-    const q = query(appsRef, where('jobId', 'in', [jobId, Number(jobId) || jobId, String(jobId)]));
+    return onSnapshot(appsRef, (snapshot) => {
+      const applicants = snapshot.docs
+        .map(d => ({
+          id: d.id,
+          firestoreId: d.id,
+          firestoreApplicationId: d.id,
+          ...d.data()
+        }))
+        .filter(app => {
+          const aJobId = String(app.jobId || '');
+          const aFsId = app.firestoreJobId ? String(app.firestoreJobId) : '';
+          const aOrigId = app.originalJobId ? String(app.originalJobId) : '';
+          return cleanIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId);
+        });
 
-    return onSnapshot(q, (snapshot) => {
-      const applicants = snapshot.docs.map(d => ({
-        id: d.id,
-        firestoreId: d.id,
-        ...d.data()
-      }));
+      // Também sincroniza com cache local de applications
+      const currentLocal = getUserApplications();
+      const nonMatching = currentLocal.filter(loc => !applicants.some(a => a.id === loc.id || (a.firestoreId && a.firestoreId === loc.id)));
+      const merged = [...applicants, ...nonMatching];
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(merged));
+        } catch {}
+      }
+
       callback(applicants);
     }, (error) => {
       console.warn('[Firestore Job Applicants Listener] Erro:', error.message);
       const allApps = getUserApplications();
-      const matched = allApps.filter(a => String(a.jobId) === String(jobId));
+      const matched = allApps.filter(a => {
+        const aJobId = String(a.jobId || '');
+        const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
+        const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
+        return cleanIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId);
+      });
       callback(matched);
     });
   } catch (error) {
@@ -313,24 +374,58 @@ export function subscribeToCompanyApplications(companyUserOrUid, callback) {
         ...d.data()
       }));
 
+      // Identificadores da empresa
+      let companyApps = allApps;
+      if (companyUserOrUid) {
+        const uid = typeof companyUserOrUid === 'string'
+          ? companyUserOrUid
+          : (companyUserOrUid.uid || companyUserOrUid.id || '');
+        const email = typeof companyUserOrUid === 'object'
+          ? String(companyUserOrUid.email || '').toLowerCase().trim()
+          : '';
+        const name = typeof companyUserOrUid === 'object'
+          ? (companyUserOrUid.company || companyUserOrUid.razaoSocial || companyUserOrUid.nomeFantasia || companyUserOrUid.name || '').toLowerCase().trim()
+          : '';
+
+        // Vagas associadas a esta empresa
+        const allJobs = getJobs('Todas as Cidades');
+        const companyJobIds = new Set();
+        allJobs.forEach(j => {
+          if (!j) return;
+          const jCreatedBy = String(j.createdBy || '');
+          const jRecruiterEmail = String(j.recruiterEmail || '').toLowerCase().trim();
+          const jCompany = String(j.company || '').toLowerCase().trim();
+          const matchesUid = uid && jCreatedBy === String(uid);
+          const matchesEmail = email && (jCreatedBy.toLowerCase() === email || jRecruiterEmail === email);
+          const matchesName = name && (jCompany === name || jCompany.includes(name));
+          if (matchesUid || matchesEmail || matchesName) {
+            if (j.id) companyJobIds.add(String(j.id));
+            if (j.firestoreId) companyJobIds.add(String(j.firestoreId));
+            if (j.originalJobId) companyJobIds.add(String(j.originalJobId));
+          }
+        });
+
+        companyApps = allApps.filter(a => {
+          const aCompanyUid = String(a.companyUid || a.createdBy || '');
+          const aRecruiterEmail = String(a.recruiterEmail || '').toLowerCase().trim();
+          const aCompany = String(a.company || '').toLowerCase().trim();
+          const aJobId = String(a.jobId || '');
+          const aFsJobId = a.firestoreJobId ? String(a.firestoreJobId) : '';
+          const aOrigJobId = a.originalJobId ? String(a.originalJobId) : '';
+
+          if (uid && aCompanyUid === String(uid)) return true;
+          if (email && aRecruiterEmail === email) return true;
+          if (name && (aCompany === name || aCompany.includes(name))) return true;
+          if (companyJobIds.has(aJobId) || (aFsJobId && companyJobIds.has(aFsJobId)) || (aOrigJobId && companyJobIds.has(aOrigJobId))) return true;
+          return false;
+        });
+      }
+
+      // Persiste todas as aplicações reais do Firestore no cache do navegador
       if (typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(allApps));
         } catch {}
-      }
-
-      let companyApps = allApps;
-      if (companyUserOrUid) {
-        const uid = typeof companyUserOrUid === 'string' ? companyUserOrUid : (companyUserOrUid.uid || companyUserOrUid.id);
-        const email = typeof companyUserOrUid === 'object' ? (companyUserOrUid.email || '').toLowerCase() : '';
-        const name = typeof companyUserOrUid === 'object' ? (companyUserOrUid.name || companyUserOrUid.company || companyUserOrUid.razaoSocial || companyUserOrUid.nomeFantasia || '').toLowerCase().trim() : '';
-
-        companyApps = allApps.filter(a => {
-          if (uid && String(a.companyUid || '') === String(uid)) return true;
-          if (email && String(a.recruiterEmail || '').toLowerCase() === email) return true;
-          if (name && a.company && (a.company.toLowerCase().trim() === name || a.company.toLowerCase().includes(name))) return true;
-          return false;
-        });
       }
 
       if (typeof window !== 'undefined') {
@@ -797,9 +892,17 @@ export async function applyToJob(jobId, user) {
     ]
   };
 
+  // Sanitiza dados para o Firestore removendo chaves com valores undefined
+  const cleanApp = {};
+  Object.keys(newApp).forEach(key => {
+    if (newApp[key] !== undefined) {
+      cleanApp[key] = newApp[key];
+    }
+  });
+
   // Grava candidatura no Firestore
   try {
-    const docRef = await addDoc(collection(db, 'applications'), newApp);
+    const docRef = await addDoc(collection(db, 'applications'), cleanApp);
     newApp.id = docRef.id;
     newApp.firestoreId = docRef.id;
 
@@ -981,10 +1084,31 @@ export function getAllJobCandidatesMap() {
   return {};
 }
 
-export function getJobCandidates(jobId) {
+export function getJobCandidates(jobOrId) {
   const map = getAllJobCandidatesMap();
-  const idStr = String(jobId || '');
-  let list = map[jobId] || (jobId ? map[Number(jobId)] : null) || (idStr ? map[idStr] : null) || [];
+  let targetJob = null;
+  let targetIds = [];
+
+  if (typeof jobOrId === 'object' && jobOrId !== null) {
+    targetJob = jobOrId;
+    if (jobOrId.id) targetIds.push(String(jobOrId.id));
+    if (jobOrId.firestoreId) targetIds.push(String(jobOrId.firestoreId));
+    if (jobOrId.originalJobId) targetIds.push(String(jobOrId.originalJobId));
+  } else if (jobOrId) {
+    const str = String(jobOrId).trim();
+    targetIds.push(str);
+    targetJob = getJobById(str);
+    if (targetJob) {
+      if (targetJob.id) targetIds.push(String(targetJob.id));
+      if (targetJob.firestoreId) targetIds.push(String(targetJob.firestoreId));
+      if (targetJob.originalJobId) targetIds.push(String(targetJob.originalJobId));
+    }
+  }
+
+  targetIds = Array.from(new Set(targetIds.filter(Boolean)));
+  const primaryId = targetIds[0] || '';
+
+  let list = (primaryId && map[primaryId]) || (targetJob?.id ? map[targetJob.id] : null) || [];
   list = deepSanitizeMojibake(list);
 
   // 1. Incorpora candidaturas reais gravadas no sistema (Firestore / LocalStorage)
@@ -994,14 +1118,14 @@ export function getJobCandidates(jobId) {
       const aJobId = String(a.jobId || '');
       const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
       const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
-      return aJobId === idStr || aFsId === idStr || aOrigId === idStr || (jobId && (a.jobId == jobId || a.firestoreJobId == jobId || a.originalJobId == jobId));
+      return targetIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId);
     });
 
     if (jobApps.length > 0) {
       const merged = [...list];
       jobApps.forEach(app => {
-        const candId = app.id || app.candidateUid;
-        if (!merged.find(c => String(c.id) === String(candId))) {
+        const candId = app.id || app.firestoreId || app.candidateUid;
+        if (!merged.find(c => String(c.id) === String(candId) || String(c.firestoreApplicationId) === String(candId))) {
           const stageMap = {
             'Candidatura Enviada': 'triagem',
             'Triagem de Currículo': 'analise',
@@ -1012,7 +1136,6 @@ export function getJobCandidates(jobId) {
             'Banco de Talentos': 'reprovado'
           };
           const candSkills = safeSkillsArray(app.skills || app.candidateSkills || ['React', 'JavaScript']);
-          const targetJob = getJobById(jobId);
           const computedScore = typeof app.matchScore === 'number' && app.matchScore > 0
             ? app.matchScore
             : calculateMatchScore(candSkills, targetJob ? targetJob.requiredSkills : [], {
