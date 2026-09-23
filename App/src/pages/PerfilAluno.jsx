@@ -5,7 +5,7 @@ import {
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
   Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
+import { getTalentById, fetchTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -17,7 +17,7 @@ export default function PerfilAluno() {
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const talentId = id || currentUser?.uid || currentUser?.id;
-  const talent = getTalentById(talentId) || (currentUser ? {
+  const [talent, setTalent] = useState(() => getTalentById(talentId) || (currentUser && (!id || id === currentUser.uid || id === currentUser.id) ? {
     id: currentUser.uid || currentUser.id,
     firestoreId: currentUser.uid || currentUser.id,
     name: currentUser.name || 'Estudante / Profissional',
@@ -36,7 +36,43 @@ export default function PerfilAluno() {
     projects: currentUser.projects || [],
     education: currentUser.education || [],
     endorsements: currentUser.endorsements || []
-  } : null);
+  } : null));
+
+  useEffect(() => {
+    let isMounted = true;
+    const local = getTalentById(talentId);
+    if (local) {
+      setTalent(local);
+    } else if (currentUser && (!id || id === currentUser.uid || id === currentUser.id)) {
+      setTalent({
+        id: currentUser.uid || currentUser.id,
+        firestoreId: currentUser.uid || currentUser.id,
+        name: currentUser.name || 'Estudante / Profissional',
+        course: currentUser.course || (currentUser.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
+        institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+        period: currentUser.period || 'Em andamento',
+        city: currentUser.city || 'Ivaiporã',
+        avatar: currentUser.avatar || '',
+        skills: currentUser.skills || [],
+        isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
+        raNumber: currentUser.raNumber || '',
+        linkedin: currentUser.linkedin || '',
+        github: currentUser.github || '',
+        bio: currentUser.bio || '',
+        experiences: currentUser.experiences || [],
+        projects: currentUser.projects || [],
+        education: currentUser.education || [],
+        endorsements: currentUser.endorsements || []
+      });
+    } else if (talentId) {
+      fetchTalentById(talentId).then(remote => {
+        if (isMounted && remote) {
+          setTalent(remote);
+        }
+      });
+    }
+    return () => { isMounted = false; };
+  }, [talentId, id, currentUser]);
 
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
@@ -94,6 +130,27 @@ export default function PerfilAluno() {
     education: [...(talent?.education || [])],
     newSkill: ''
   });
+
+  useEffect(() => {
+    if (talent) {
+      setEditData({
+        name: talent.name || '',
+        avatar: talent.avatar || '',
+        city: talent.city || 'Ivaiporã',
+        institution: talent.institution || '',
+        course: talent.course || '',
+        period: talent.period || '',
+        bio: talent.bio || '',
+        linkedin: talent.linkedin || '',
+        github: talent.github || '',
+        skills: [...(talent.skills || [])],
+        experiences: [...(talent.experiences || [])],
+        projects: [...(talent.projects || [])],
+        education: [...(talent.education || [])],
+        newSkill: ''
+      });
+    }
+  }, [talent]);
 
   // Forms to add new experience, project, and education
   const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
@@ -231,6 +288,16 @@ export default function PerfilAluno() {
   const removeProject = (projId) => {
     setEditData(prev => ({ ...prev, projects: prev.projects.filter(p => p.id !== projId) }));
   };
+
+  if (!talent) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-4" />
+        <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">Carregando perfil do estudante...</h2>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Obtendo dados atualizados da plataforma Ivaí Conecta</p>
+      </div>
+    );
+  }
 
   return (
     <>

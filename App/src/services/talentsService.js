@@ -1,6 +1,6 @@
 // Talents & Teachers Service for Ivaí Conecta (Firestore 'users' and 'endorsement_requests' collections)
 import { db } from '../lib/firebase.js';
-import { collection, getDocs, doc, setDoc, addDoc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, addDoc, updateDoc, arrayUnion, query, where, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
@@ -161,6 +161,24 @@ export function getTalentById(id) {
         }
       } catch {}
     }
+  }
+
+  return null;
+}
+
+export async function fetchTalentById(id) {
+  if (!id) return null;
+  const local = getTalentById(id);
+  if (local) return local;
+
+  try {
+    const docRef = doc(db, 'users', String(id));
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return normalizeUserDoc(snap.data(), snap.id);
+    }
+  } catch (err) {
+    console.warn('[talentsService] Falha ao buscar talento no Firestore:', err.message);
   }
 
   return null;

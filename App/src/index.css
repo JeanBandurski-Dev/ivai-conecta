@@ -598,6 +598,59 @@
   }
 }
 
+/* ── Estilos de Impressão e Download em PDF ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Ocultar navegação, rodapé, notificações e botões de interface */
+  nav, footer, .print\:hidden, #toast-container, header {
+    display: none !important;
+  }
+
+  /* Se o modal de currículo estiver aberto, ocultar todo o restante da página */
+  body:has(#printable-cv) > #root > div > *:not(main),
+  body:has(#printable-cv) main > div > *:not(.fixed) {
+    display: none !important;
+  }
+
+  body, html {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #printable-cv,
+  #printable-cv * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  .cv-section,
+  .cv-item,
+  .cv-endorsement {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #printable-cv {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 10mm 14mm !important;
+    background-color: #ffffff !important;
+    border-radius: 0 !important;
+  }
+}
+
 
 
 
