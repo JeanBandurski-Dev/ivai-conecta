@@ -69,6 +69,18 @@ const KNOWN_INSTITUTIONS = [
     name: 'UEL - Universidade Estadual de Londrina',
     shortName: 'UEL',
     badge: 'Estadual'
+  },
+  {
+    pattern: /(escola\.pr\.gov\.br|seed\.pr\.gov\.br|estudante\.seed\.pr\.gov\.br)$/i,
+    name: 'SEED-PR - Secretaria de Estado da Educação do Paraná',
+    shortName: 'SEED-PR Estudante',
+    badge: 'Estadual'
+  },
+  {
+    pattern: /(^|\.)(estudantes?|alunos?)\./i,
+    name: 'Instituição de Ensino Estudantil',
+    shortName: 'Estudante',
+    badge: 'Acadêmica'
   }
 ];
 
@@ -200,16 +212,16 @@ export function validateStudentEmail(email) {
 
   // 3. Checa regras genéricas de e-mail educacional:
   // - Termina em .edu.br ou .edu
-  // - Contém subdomínio "aluno.", "alunos.", "estudante.", "pos."
+  // - Contém termo "aluno", "alunos", "estudante", "estudantes", "academico", "escola"
   const isEduDomain = domain.endsWith('.edu.br') || domain.endsWith('.edu');
-  const hasStudentSubdomain = /(^|\.)(aluno|alunos|estudante|estudantes|academico|pos)\./i.test(domain);
+  const hasStudentSubdomain = /(^|\.)(aluno|alunos|estudante|estudantes|academico|pos|escola)/i.test(domain) || /estudantes?/i.test(domain);
 
   if (isEduDomain || hasStudentSubdomain) {
     return {
       isValid: true,
       isPublicPersonalDomain: false,
-      institution: 'Instituição de Ensino Superior Reconhecida',
-      shortInstitution: 'Ensino Superior',
+      institution: 'Instituição de Ensino Reconhecida',
+      shortInstitution: 'Estudante',
       domain,
       badge: 'Acadêmica'
     };

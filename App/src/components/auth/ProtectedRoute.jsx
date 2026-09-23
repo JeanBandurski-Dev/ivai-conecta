@@ -44,8 +44,9 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Estado local para controle imediato de verificação
   const [isVerified, setIsVerified] = useState(() => {
     if (currentUser && currentUser.role !== 'aluno') return true;
+    if (currentUser?.isVerifiedStudent || currentUser?.emailVerified) return true;
     if (auth.currentUser) return Boolean(auth.currentUser.emailVerified);
-    return Boolean(currentUser?.emailVerified);
+    return false;
   });
 
   const [isChecking, setIsChecking] = useState(false);
@@ -59,10 +60,12 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       setIsVerified(true);
       return;
     }
+    if (currentUser?.isVerifiedStudent || currentUser?.emailVerified) {
+      setIsVerified(true);
+      return;
+    }
     if (auth.currentUser) {
       setIsVerified(Boolean(auth.currentUser.emailVerified));
-    } else if (currentUser) {
-      setIsVerified(Boolean(currentUser.emailVerified));
     }
   }, [currentUser, auth.currentUser?.emailVerified]);
 
@@ -279,8 +282,14 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     navigate('/login', { replace: true });
   };
 
-  // 3. SE O E-MAIL NÃO ESTIVER VERIFICADO E FOR CONTA DE ALUNO: Renderiza a Tela de Bloqueio Obrigatória
-  if (requiresEmailVerification && !isVerified) {
+  // Rotas de visualização do próprio perfil e configurações são liberadas para consulta e validação
+  const isProfileOrSettingsRoute =
+    location.pathname === '/perfil' ||
+    location.pathname.startsWith('/perfil/') ||
+    location.pathname === '/configuracoes';
+
+  // 3. SE O E-MAIL NÃO ESTIVER VERIFICADO E FOR CONTA DE ALUNO (em rotas que exigem confirmação ativa):
+  if (requiresEmailVerification && !isVerified && !isProfileOrSettingsRoute) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-12 md:py-20 text-center">
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 sm:p-10 md:p-12 shadow-2xl border border-gray-100 dark:border-slate-700/60 relative overflow-hidden">

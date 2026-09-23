@@ -48,29 +48,7 @@ function MinhasVagasRoute() {
 function AppContent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
-  const { isChatOpen, closeChat, currentUser } = useAppStore();
-
-  const isLogged = Boolean(currentUser || auth.currentUser);
-
-  // A verificação obrigatória de e-mail aplica-se exclusivamente a contas de alunos (estudantes)
-  // Contas de empresa e professor não possuem bloqueio de e-mail
-  const requiresEmailVerification = currentUser?.role === 'aluno';
-  const isVerified = Boolean(auth.currentUser?.emailVerified ?? currentUser?.emailVerified);
-
-  // Se for aluno logado e ainda não tiver confirmado o e-mail:
-  // Intercepta a navegação e renderiza a tela de bloqueio obrigatória
-  if (isLogged && requiresEmailVerification && !isVerified) {
-    return (
-      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-        <Navbar />
-        <main className="flex-1">
-          <ProtectedRoute />
-        </main>
-        <Footer />
-        <Toast />
-      </div>
-    );
-  }
+  const { isChatOpen, closeChat } = useAppStore();
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">

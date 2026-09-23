@@ -3,8 +3,10 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, Loader2
 } from 'lucide-react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture, validateStudentEmail } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
@@ -17,35 +19,138 @@ export default function PerfilAluno() {
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const talentId = id || currentUser?.uid || currentUser?.id;
-  const talent = getTalentById(talentId) || (currentUser ? {
-    id: currentUser.uid || currentUser.id,
-    firestoreId: currentUser.uid || currentUser.id,
-    name: currentUser.name || 'Estudante / Profissional',
-    course: currentUser.course || (currentUser.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
-    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
-    period: currentUser.period || 'Em andamento',
-    city: currentUser.city || 'Ivaiporã',
-    avatar: currentUser.avatar || '',
-    skills: currentUser.skills || [],
-    isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
-    studentEmail: currentUser.studentEmail || (currentUser.role === 'aluno' && validateStudentEmail(currentUser.email)?.isValid ? currentUser.email : ''),
-    raNumber: currentUser.raNumber || '',
-    linkedin: currentUser.linkedin || '',
-    github: currentUser.github || '',
-    bio: currentUser.bio || '',
-    experiences: currentUser.experiences || [],
-    projects: currentUser.projects || [],
-    education: currentUser.education || [],
-    endorsements: currentUser.endorsements || []
-  } : null);
 
-  // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
+  // Estado reativo do talento com fallback local imediato
+  const [talent, setTalent] = useState(() => {
+    const local = getTalentById(talentId);
+    if (local) return local;
+    if (currentUser) {
+      return {
+        id: currentUser.uid || currentUser.id,
+        firestoreId: currentUser.uid || currentUser.id,
+        name: currentUser.name || 'Estudante',
+        course: currentUser.course || 'Graduação / Ensino Técnico',
+        institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+        period: currentUser.period || 'Em andamento',
+        city: currentUser.city || 'Ivaiporã',
+        avatar: currentUser.avatar || '',
+        skills: currentUser.skills || [],
+        isVerifiedStudent: Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified),
+        studentEmail: currentUser.studentEmail || (validateStudentEmail(currentUser.email)?.isValid ? currentUser.email : ''),
+        raNumber: currentUser.raNumber || '',
+        linkedin: currentUser.linkedin || '',
+        github: currentUser.github || '',
+        bio: currentUser.bio || '',
+        experiences: currentUser.experiences || [],
+        projects: currentUser.projects || [],
+        education: currentUser.education || [],
+        endorsements: currentUser.endorsements || []
+      };
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState(!talent);
+
+  // Sincronização em tempo real do perfil direto do Cloud Firestore (multi-navegador e offline resilient)
+  useEffect(() => {
+    const targetId = id || currentUser?.uid || currentUser?.id;
+    if (!targetId) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const docRef = doc(db, 'users', String(targetId));
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (!isMounted) return;
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const mergedTalent = {
+          id: docSnap.id,
+          firestoreId: docSnap.id,
+          name: data.name || data.displayName || (currentUser && String(currentUser.uid) === String(docSnap.id) ? currentUser.name : 'Estudante'),
+          course: data.course || (currentUser?.course) || 'Graduação / Ensino Técnico',
+          institution: data.institution || (currentUser?.institution) || 'IFPR Campus Ivaiporã',
+          period: data.period || (currentUser?.period) || 'Em andamento',
+          city: data.city || (currentUser?.city) || 'Ivaiporã',
+          avatar: data.avatar || data.photoURL || (currentUser?.avatar) || '',
+          skills: Array.isArray(data.skills) ? data.skills : (currentUser?.skills || []),
+          isVerifiedStudent: Boolean(data.isVerifiedStudent || data.emailVerified || currentUser?.isVerifiedStudent || currentUser?.emailVerified),
+          studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (currentUser?.studentEmail || '')),
+          email: data.email || (currentUser?.email) || '',
+          raNumber: data.raNumber || (currentUser?.raNumber) || '',
+          linkedin: data.linkedin || (currentUser?.linkedin) || '',
+          github: data.github || (currentUser?.github) || '',
+          bio: data.bio || (currentUser?.bio) || '',
+          experiences: Array.isArray(data.experiences) ? data.experiences : (currentUser?.experiences || []),
+          projects: Array.isArray(data.projects) ? data.projects : (currentUser?.projects || []),
+          education: Array.isArray(data.education) ? data.education : (currentUser?.education || []),
+          endorsements: Array.isArray(data.endorsements) ? data.endorsements : (currentUser?.endorsements || [])
+        };
+
+        setTalent(mergedTalent);
+        setEditData({
+          name: mergedTalent.name,
+          avatar: mergedTalent.avatar,
+          city: mergedTalent.city,
+          institution: mergedTalent.institution,
+          course: mergedTalent.course,
+          period: mergedTalent.period,
+          bio: mergedTalent.bio,
+          linkedin: mergedTalent.linkedin,
+          github: mergedTalent.github,
+          skills: [...mergedTalent.skills],
+          experiences: [...mergedTalent.experiences],
+          projects: [...mergedTalent.projects],
+          education: [...mergedTalent.education],
+          newSkill: ''
+        });
+      } else {
+        // Fallback para cache local se ainda não existir documento no Firestore
+        const fallback = getTalentById(targetId) || (currentUser ? {
+          id: currentUser.uid || currentUser.id,
+          firestoreId: currentUser.uid || currentUser.id,
+          name: currentUser.name || 'Estudante',
+          course: currentUser.course || 'Graduação / Ensino Técnico',
+          institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+          period: currentUser.period || 'Em andamento',
+          city: currentUser.city || 'Ivaiporã',
+          avatar: currentUser.avatar || '',
+          skills: currentUser.skills || [],
+          isVerifiedStudent: Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified),
+          studentEmail: currentUser.studentEmail || '',
+          raNumber: currentUser.raNumber || '',
+          linkedin: currentUser.linkedin || '',
+          github: currentUser.github || '',
+          bio: currentUser.bio || '',
+          experiences: currentUser.experiences || [],
+          projects: currentUser.projects || [],
+          education: currentUser.education || [],
+          endorsements: currentUser.endorsements || []
+        } : null);
+        if (fallback) setTalent(fallback);
+      }
+      setLoading(false);
+    }, (err) => {
+      console.warn('[PerfilAluno] Erro na sincronização com Firestore:', err);
+      if (isMounted) setLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [id, currentUser?.uid, currentUser?.id]);
+
+  // Permissão estrita do proprietário: id, uid, e-mail ou correspondência com usuário logado
   const isOwner = Boolean(
     currentUser && talent && (
       (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
       (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
       (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
-      (currentUser.name && talent.name && currentUser.name.trim().toLowerCase() === talent.name.trim().toLowerCase())
+      (!id) // Rota "/perfil" direta sem ID é sempre do usuário logado
     )
   );
 
@@ -140,29 +245,33 @@ export default function PerfilAluno() {
     }
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
-    updateTalentProfile(talent.id, editData);
+    const targetId = talent?.id || currentUser?.uid || currentUser?.id;
+    if (targetId) {
+      updateTalentProfile(targetId, editData);
+      try {
+        await setDoc(doc(db, 'users', String(targetId)), {
+          ...editData,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn('[PerfilAluno] Erro ao sincronizar edição no Firestore:', dbErr);
+      }
+    }
 
-    // If owner is currently logged in, update app store state
+    // Se o usuário logado for o proprietário, atualiza a store global
     if (isOwner && currentUser) {
       setCurrentUser({
         ...currentUser,
-        name: editData.name,
-        avatar: editData.avatar,
-        city: editData.city,
-        course: editData.course,
-        institution: editData.institution,
-        period: editData.period,
-        bio: editData.bio,
-        skills: editData.skills,
-        experiences: editData.experiences,
-        projects: editData.projects,
-        education: editData.education,
-        linkedin: editData.linkedin,
-        github: editData.github,
+        ...editData
       });
     }
+
+    setTalent(prev => ({
+      ...(prev || {}),
+      ...editData
+    }));
 
     showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
     handleCloseEditModal();
@@ -233,6 +342,27 @@ export default function PerfilAluno() {
     setEditData(prev => ({ ...prev, projects: prev.projects.filter(p => p.id !== projId) }));
   };
 
+  if (loading && !talent) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+        <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium animate-pulse">Carregando dados do perfil...</p>
+      </div>
+    );
+  }
+
+  if (!talent) {
+    return (
+      <div className="container section text-center py-20">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Perfil não encontrado</h2>
+        <p className="text-gray-500 text-sm mb-6">O perfil solicitado não existe ou ainda não foi configurado.</p>
+        <button onClick={() => navigate('/')} className="btn btn-primary">Voltar ao Início</button>
+      </div>
+    );
+  }
+
+  const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
+
   return (
     <>
       {/* Alerta de Perfil Não Verificado para o próprio aluno */}
@@ -267,7 +397,7 @@ export default function PerfilAluno() {
             <div className="flex flex-wrap items-center gap-5 sm:gap-6">
               <div className="relative group shrink-0">
                 <img
-                  src={talent.avatar}
+                  src={talent.avatar || defaultAvatar}
                   alt={talent.name}
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
                 />

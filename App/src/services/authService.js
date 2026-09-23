@@ -655,11 +655,18 @@ export function watchAuthState(callback) {
             return;
           }
 
+          const isStudentVerified = Boolean(
+            profileRes.profile?.isVerifiedStudent ||
+            profileRes.profile?.emailVerified ||
+            fbUser.emailVerified ||
+            isVerifiedStudent
+          );
+
           const sessionUser = {
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
-            emailVerified: role === 'aluno' ? fbUser.emailVerified : true,
+            emailVerified: role === 'aluno' ? isStudentVerified : true,
             name:
               profileRes.profile?.name ||
               fbUser.displayName ||
@@ -671,15 +678,15 @@ export function watchAuthState(callback) {
               profileRes.profile?.avatar ||
               fbUser.photoURL ||
               'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-            isVerifiedStudent,
+            isVerifiedStudent: isStudentVerified,
             isVerifiedCompany:
               profileRes.profile?.isVerifiedCompany ??
               (role === 'empresa'),
             blocked: false,
             blockedReason: null,
             ...(profileRes.profile || {}),
-            emailVerified: role === 'aluno' ? fbUser.emailVerified : true,
-            isVerifiedStudent
+            emailVerified: role === 'aluno' ? isStudentVerified : true,
+            isVerifiedStudent: isStudentVerified
           };
 
           localStorage.setItem(

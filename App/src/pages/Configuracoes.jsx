@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
@@ -6,6 +6,8 @@ import {
   Building2, Camera, GraduationCap,
   Search, Loader2, AlertCircle, RefreshCw, Check
 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import useAppStore from '../store/useAppStore';
 import {
   updateAuthUser,
@@ -42,10 +44,61 @@ export default function Configuracoes() {
   // Verification form (Student)
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
   const [verificationSubmitted, setVerificationSubmitted] = useState(currentUser?.isVerifiedStudent || false);
-  const [studentInstEmail, setStudentInstEmail] = useState(currentUser?.studentEmail || (currentUser?.email?.includes?.('.edu') ? currentUser.email : ''));
+  const [studentInstEmail, setStudentInstEmail] = useState(
+    currentUser?.studentEmail || (currentUser?.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu')) ? currentUser.email : '')
+  );
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
   const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
+
+  // Sincroniza estados do formulário sempre que o currentUser é carregado ou atualizado
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.name) setName(currentUser.name);
+    if (currentUser.email) setEmail(currentUser.email);
+    if (currentUser.linkedin) setLinkedin(currentUser.linkedin);
+    if (currentUser.github) setGithub(currentUser.github);
+    if (currentUser.avatar) setAvatar(currentUser.avatar);
+    if (currentUser.raNumber) setRaNumber(currentUser.raNumber);
+    if (currentUser.isVerifiedStudent != null) setVerificationSubmitted(Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified));
+    if (currentUser.studentEmail) {
+      setStudentInstEmail(currentUser.studentEmail);
+    } else if (currentUser.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu'))) {
+      setStudentInstEmail(currentUser.email);
+    }
+    if (currentUser.studentEmailVerificationSentAt) {
+      setVerificationEmailSent(true);
+    }
+  }, [currentUser]);
+
+  // Consulta direta ao Firestore para garantir consistência em navegadores novos ou abas anônimas
+  useEffect(() => {
+    const uid = currentUser?.uid || currentUser?.id;
+    if (!uid) return;
+
+    let isMounted = true;
+    const userDocRef = doc(db, 'users', String(uid));
+    getDoc(userDocRef).then((snap) => {
+      if (!isMounted || !snap.exists()) return;
+      const data = snap.data();
+      if (data.name) setName(data.name);
+      if (data.email) setEmail(data.email);
+      if (data.linkedin) setLinkedin(data.linkedin);
+      if (data.github) setGithub(data.github);
+      if (data.avatar) setAvatar(data.avatar);
+      if (data.raNumber) setRaNumber(data.raNumber);
+      if (data.isVerifiedStudent != null) setVerificationSubmitted(Boolean(data.isVerifiedStudent || data.emailVerified));
+      if (data.studentEmail) {
+        setStudentInstEmail(data.studentEmail);
+      } else if (data.email && (validateStudentEmail(data.email)?.isValid || data.email.includes('estudante'))) {
+        setStudentInstEmail(data.email);
+      }
+    }).catch((err) => console.warn('[Configuracoes] Erro ao sincronizar dados com Firestore:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid, currentUser?.id]);
 
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
