@@ -181,7 +181,7 @@ export default function Login() {
     setLoading(false);
 
     if (res.success) {
-      if (res.isNewUser) {
+      if (res.needsProfileCompletion || res.isNewUser) {
         showToast('Conta Google conectada! Complete seu cadastro para continuar.');
         navigate('/completar-perfil');
       } else {

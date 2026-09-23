@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, ShieldAlert
+  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
 import { subscribeToUnreadCount } from '../../services/chatService';
+import { normalizeUserRole } from '../../services/authService';
 
 export default function Navbar() {
   const { currentUser, theme, toggleTheme, logout, showToast, openChat, favoriteJobs = [] } = useAppStore();
@@ -62,15 +63,16 @@ export default function Navbar() {
       : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-primary-blue'
     }`;
 
-  const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+  const userRole = normalizeUserRole(currentUser?.role);
+  const isCompany = Boolean(currentUser && userRole === 'empresa');
   const isAdmin = Boolean(currentUser && userRole === 'admin');
+  const isStudentOrCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato'));
 
   const getProfileLink = () => {
     if (!currentUser) return '/login';
     const userIdentifier = currentUser.uid || currentUser.id;
     if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
-    if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
+    if (userRole === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
     if (userRole === 'freelancer') return '/servicos?view=dashboard';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
@@ -190,7 +192,7 @@ export default function Navbar() {
                           <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Painel Freelancer' : 'Meu Perfil'}
                         </Link>
 
-                        {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
+                        {isStudentOrCandidate && (
                           <>
                             <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
@@ -342,7 +344,7 @@ export default function Navbar() {
                     )}
                   </button>
 
-                  {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
+                  {isStudentOrCandidate && (
                     <>
                       <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                         <span className="flex items-center gap-2.5"><Briefcase size={16} /> Minhas Candidaturas</span>

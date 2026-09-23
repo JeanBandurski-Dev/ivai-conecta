@@ -98,6 +98,107 @@ export function getAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+/**
+ * Normaliza o papel (role) do usuário, unificando aliases antigos ou variações para o padrão da plataforma.
+ */
+export function normalizeUserRole(role) {
+  const value = String(role || '').toLowerCase().trim();
+  const aliases = {
+    aluno: 'aluno',
+    estudante: 'aluno',
+    estudantes: 'aluno',
+    student: 'aluno',
+    students: 'aluno',
+
+    candidate: 'candidato',
+    candidato: 'candidato',
+    profissional: 'candidato',
+
+    freelancer: 'freelancer',
+    autonomo: 'freelancer',
+    autônomo: 'freelancer',
+
+    empresa: 'empresa',
+    company: 'empresa',
+    recrutador: 'empresa',
+    recruiter: 'empresa',
+
+    professor: 'professor',
+    docente: 'professor',
+    teacher: 'professor',
+
+    admin: 'admin',
+    administrador: 'admin',
+    moderador: 'moderador',
+    moderator: 'moderador',
+  };
+
+  return aliases[value] || value || 'aluno';
+}
+
+/**
+ * Infere o papel sugerido a partir das informações básicas do Firebase Auth.
+ */
+function inferRoleFromFirebaseUser(fbUser) {
+  const email = String(fbUser?.email || '').toLowerCase().trim();
+  if (!email) return 'aluno';
+  const studentCheck = validateStudentEmail(email);
+  if (studentCheck.isValid) return 'aluno';
+  return 'aluno';
+}
+
+/**
+ * Cria a estrutura padrão de perfil de usuário quando a conta existe no Auth mas não no Firestore.
+ */
+function buildDefaultProfileForFirebaseUser(fbUser, preferredRole = null) {
+  const studentCheck = validateStudentEmail(fbUser?.email || '');
+  const role = normalizeUserRole(preferredRole || inferRoleFromFirebaseUser(fbUser));
+  const now = new Date().toISOString();
+  const isInstitutionalStudent = role === 'aluno' && studentCheck.isValid;
+  const isVerified = isInstitutionalStudent && Boolean(fbUser?.emailVerified);
+  const displayName = fbUser?.displayName || (fbUser?.email ? fbUser.email.split('@')[0] : 'Usuário');
+
+  return {
+    id: fbUser.uid,
+    uid: fbUser.uid,
+    name: displayName,
+    email: (fbUser.email || '').toLowerCase().trim(),
+    emailVerified: role === 'aluno' ? isVerified : true,
+    city: 'Ivaiporã',
+    role,
+    badge: (USER_ROLES[role] || USER_ROLES.aluno).badge,
+    avatar: fbUser.photoURL || '',
+    isVerifiedStudent: isVerified,
+    isVerifiedCompany: role === 'empresa',
+    createdAt: now,
+    updatedAt: now,
+    ...(role === 'aluno' ? {
+      course: '',
+      institution: studentCheck.institution || 'IFPR Campus Ivaiporã',
+      shortInstitution: studentCheck.shortInstitution || 'IFPR Campus Ivaiporã',
+      period: '',
+      skills: [],
+      studentEmail: (fbUser.email || '').toLowerCase().trim(),
+      studentEmailDomain: studentCheck.domain || null,
+      studentEmailVerifiedAt: isVerified ? now : null,
+      bio: '',
+      experiences: [],
+      projects: [],
+      education: [],
+      endorsements: []
+    } : {})
+  };
+}
+
+/**
+ * Garante que o documento users/{uid} exista no Firestore, evitando que contas criadas anteriormente sejam deslogadas.
+ */
+async function ensureUserProfile(fbUser, preferredRole = null) {
+  const profile = buildDefaultProfileForFirebaseUser(fbUser, preferredRole);
+  await setDoc(doc(db, 'users', fbUser.uid), profile, { merge: true });
+  return profile;
+}
+
 export async function getUserProfile(uid) {
   try {
     const userDocRef = doc(db, 'users', uid);
@@ -118,8 +219,17 @@ export async function login(email, password) {
     const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
 
-    // Buscar perfil adicional no Firestore
-    const profileRes = await getUserProfile(fbUser.uid);
+    // Buscar perfil adicional no Firestore ou criar se ausente
+    let profileRes = await getUserProfile(fbUser.uid);
+    if (profileRes.errorCode === 'profile/not-found') {
+      try {
+        const createdProfile = await ensureUserProfile(fbUser, inferRoleFromFirebaseUser(fbUser));
+        profileRes = { success: true, profile: createdProfile };
+      } catch (profileErr) {
+        console.warn('[login] Não foi possível criar o perfil inicial no Firestore:', profileErr);
+      }
+    }
+
     if (profileRes.profile?.blocked === true || profileRes.profile?.status === 'blocked') {
       await signOut(auth);
       localStorage.removeItem(STORAGE_KEY_AUTH_USER);
@@ -128,7 +238,7 @@ export async function login(email, password) {
         error: `Esta conta foi suspensa pela moderação.${profileRes.profile?.blockedReason ? ' Motivo: ' + profileRes.profile.blockedReason : ' Entre em contato com a administração para mais detalhes.'}`
       };
     }
-    const role = profileRes.profile?.role || 'aluno';
+    const role = normalizeUserRole(profileRes.profile?.role || 'aluno');
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
@@ -327,8 +437,19 @@ export async function loginWithGoogle() {
     const userCredential = await signInWithPopup(auth, googleProvider);
     const fbUser = userCredential.user;
 
-    // Checar perfil existente no Firestore
-    const profileRes = await getUserProfile(fbUser.uid);
+    // Checar perfil existente no Firestore ou criar se ausente
+    let profileRes = await getUserProfile(fbUser.uid);
+    const needsProfileCompletion = !profileRes.success || !profileRes.profile?.role;
+
+    if (profileRes.errorCode === 'profile/not-found') {
+      try {
+        const createdProfile = await ensureUserProfile(fbUser, inferRoleFromFirebaseUser(fbUser));
+        profileRes = { success: true, profile: createdProfile };
+      } catch (profileErr) {
+        console.warn('[loginWithGoogle] Não foi possível criar o perfil inicial no Firestore:', profileErr);
+      }
+    }
+
     if (profileRes.profile?.blocked === true || profileRes.profile?.status === 'blocked') {
       await signOut(auth);
       localStorage.removeItem(STORAGE_KEY_AUTH_USER);
@@ -337,9 +458,8 @@ export async function loginWithGoogle() {
         error: `Esta conta Google foi suspensa pela moderação.${profileRes.profile?.blockedReason ? ' Motivo: ' + profileRes.profile.blockedReason : ' Entre em contato com o suporte.'}`
       };
     }
-    let needsProfileCompletion = !profileRes.success || !profileRes.profile?.role;
 
-    const role = profileRes.profile?.role || 'aluno';
+    const role = normalizeUserRole(profileRes.profile?.role || 'aluno');
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
     const studentCheck = validateStudentEmail(fbUser.email);
     const isGoogleStudent = Boolean(studentCheck?.isValid && fbUser.emailVerified);
@@ -587,9 +707,11 @@ export function watchAuthState(callback) {
           seedFirestoreIfEmpty();
 
           let profileRes = { success: false, profile: {} };
+          let profileWasMissing = false;
 
           try {
             profileRes = await getUserProfile(fbUser.uid);
+            profileWasMissing = profileRes.errorCode === 'profile/not-found';
           } catch (pErr) {
             console.warn(
               '[watchAuthState] Erro ao buscar perfil do Firestore:',
@@ -597,7 +719,20 @@ export function watchAuthState(callback) {
             );
           }
 
-          const role = profileRes.profile?.role || 'aluno';
+          if (profileWasMissing) {
+            try {
+              const createdProfile = await ensureUserProfile(
+                fbUser,
+                inferRoleFromFirebaseUser(fbUser)
+              );
+              profileRes = { success: true, profile: createdProfile };
+              profileWasMissing = false;
+            } catch (createErr) {
+              console.warn('[watchAuthState] Falha ao criar perfil inicial:', createErr);
+            }
+          }
+
+          const role = normalizeUserRole(profileRes.profile?.role || 'aluno');
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
           let isVerifiedStudent =
             profileRes.profile?.isVerifiedStudent ??
@@ -707,6 +842,21 @@ export function watchAuthState(callback) {
             async (snapshot) => {
               try {
                 if (!snapshot.exists()) {
+                  if (profileWasMissing) {
+                    try {
+                      const recreated = await ensureUserProfile(fbUser, role);
+                      const recreatedSession = {
+                        ...sessionUser,
+                        ...recreated
+                      };
+                      localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(recreatedSession));
+                      callback(recreatedSession);
+                      return;
+                    } catch (recreateError) {
+                      console.warn('[watchAuthState] Falha ao recriar perfil ausente:', recreateError);
+                    }
+                  }
+
                   console.warn(
                     '[watchAuthState] Perfil do usuário não existe mais.'
                   );

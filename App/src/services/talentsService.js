@@ -14,6 +14,15 @@ let _memTalentsCache = null;
 /**
  * Normaliza um documento de usuário para uso no Banco de Talentos / Perfis
  */
+function normalizeTalentRole(role) {
+  const value = String(role || '').toLowerCase().trim();
+  if (['estudante', 'estudantes', 'student', 'students', 'aluno'].includes(value)) return 'aluno';
+  if (['candidate', 'profissional'].includes(value)) return 'candidato';
+  if (['company', 'recrutador'].includes(value)) return 'empresa';
+  if (['teacher', 'docente'].includes(value)) return 'professor';
+  return value || 'aluno';
+}
+
 function normalizeUserDoc(docData, docId) {
   const data = docData || {};
   return {
@@ -21,7 +30,7 @@ function normalizeUserDoc(docData, docId) {
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Usuário',
-    role: data.role || 'aluno',
+    role: normalizeTalentRole(data.role),
     city: data.city || '',
     avatar: data.avatar || '',
     skills: data.skills || [],
@@ -71,7 +80,7 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
 
     return onSnapshot(usersRef, (snapshot) => {
       const allUsers = snapshot.docs.map(d => normalizeUserDoc(d.data(), d.id));
-      const remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
+      const remoteTalents = allUsers.filter(u => ['aluno', 'candidato', 'freelancer'].includes(u.role));
 
       _memTalentsCache = remoteTalents;
       if (typeof localStorage !== 'undefined') {

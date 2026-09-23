@@ -17,6 +17,7 @@ import { auth, db } from '../../lib/firebase';
 import { sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { validateStudentEmail } from '../../services/studentVerificationService';
+import { normalizeUserRole } from '../../services/authService';
 
 /**
  * ProtectedRoute Component
@@ -39,11 +40,12 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   // A verificação obrigatória de e-mail aplica-se exclusivamente a contas de alunos (estudantes)
   // Empresas e professores não possuem esse bloqueio
-  const requiresEmailVerification = currentUser?.role === 'aluno';
+  const userRole = normalizeUserRole(currentUser?.role);
+  const requiresEmailVerification = userRole === 'aluno';
 
   // Estado local para controle imediato de verificação
   const [isVerified, setIsVerified] = useState(() => {
-    if (currentUser && currentUser.role !== 'aluno') return true;
+    if (currentUser && userRole !== 'aluno') return true;
     if (currentUser?.isVerifiedStudent || currentUser?.emailVerified) return true;
     if (auth.currentUser) return Boolean(auth.currentUser.emailVerified);
     return false;
@@ -56,7 +58,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   // Sincroniza estado de verificação com Firebase Auth e store
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'aluno') {
+    if (currentUser && userRole !== 'aluno') {
       setIsVerified(true);
       return;
     }
@@ -73,7 +75,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   useEffect(() => {
     let isMounted = true;
     async function checkSilently() {
-      if (currentUser?.role === 'aluno' && auth.currentUser && !auth.currentUser.emailVerified) {
+      if (userRole === 'aluno' && auth.currentUser && !auth.currentUser.emailVerified) {
         try {
           await auth.currentUser.reload();
           if (auth.currentUser.emailVerified && isMounted) {
@@ -196,7 +198,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
         // Se for estudante institucional, já valida e promove o status estudantil
         let isStudentVerified = currentUser?.isVerifiedStudent || false;
-        if (currentUser?.role === 'aluno') {
+        if (userRole === 'aluno') {
           const studentCheck = validateStudentEmail(user.email);
           if (studentCheck.isValid) {
             isStudentVerified = true;
@@ -414,7 +416,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   // 4. Se houver restrição por role e o usuário atual não tiver permissão
-  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(currentUser.role)) {
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.map(normalizeUserRole).includes(userRole)) {
     const roleLabels = {
       empresa: 'Empresas e Recrutadores',
       aluno: 'Estudantes',
@@ -424,7 +426,10 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       admin: 'Administradores do Sistema',
     };
 
-    const targetRolesText = allowedRoles.map((r) => roleLabels[r] || r).join(' ou ');
+    const targetRolesText = allowedRoles.map((r) => {
+      const normalized = normalizeUserRole(r);
+      return roleLabels[normalized] || normalized;
+    }).join(' ou ');
 
     return (
       <div className="container max-w-2xl mx-auto px-4 py-16 text-center">
@@ -444,7 +449,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
           <p className="text-gray-600 dark:text-slate-300 text-sm md:text-base mb-6 max-w-lg mx-auto">
             Sua conta atual está configurada como{' '}
             <strong className="text-primary-blue dark:text-sky-400 capitalize">
-              {roleLabels[currentUser.role] || currentUser.role}
+              {roleLabels[userRole] || userRole}
             </strong>
             . Para acessar este recurso, é necessário um perfil compatível.
           </p>
