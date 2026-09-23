@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
-  Globe, CheckCircle2, Sparkles, Save, FolderGit2, Link2,
-  User, Code2, Check, ExternalLink, AlertCircle
+  Globe, Sparkles, Save, FolderGit2,
+  User, ExternalLink, AlertCircle
 } from 'lucide-react';
 import { validateSkill } from '../lib/ivaiConecta';
 
@@ -27,20 +27,21 @@ export default function EditProfileModal({
   onClose,
   editData,
   setEditData,
+  role = 'aluno',
   handleSaveProfile,
   handleAvatarFileChange,
   addExperience,
   removeExperience,
   addProject,
   removeProject,
-  addEducation,
-  removeEducation,
+  addEducation: _addEducation,
+  removeEducation: _removeEducation,
   newExp = { role: '', company: '', period: '', description: '' },
   setNewExp,
   newProj = { title: '', tech: '', link: '', description: '' },
   setNewProj,
-  newEdu = { degree: '', institution: '', period: '' },
-  setNewEdu
+  newEdu: _newEdu = { degree: '', institution: '', period: '' },
+  setNewEdu: _setNewEdu
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const [skillInputError, setSkillInputError] = useState('');
@@ -113,13 +114,25 @@ export default function EditProfileModal({
               </div>
               <div>
                 <h2 className="font-heading text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                  <span>Editar Meu Perfil Profissional</span>
+                  <span>
+                    {role === 'freelancer'
+                      ? 'Editar Meu Perfil & Portfólio'
+                      : role === 'candidato'
+                      ? 'Editar Meu Perfil Profissional'
+                      : 'Editar Meu Perfil Profissional'}
+                  </span>
                   <span className="text-[10px] uppercase tracking-wider bg-white/15 px-2 py-0.5 rounded-full text-cyan-200 font-bold hidden sm:inline-block">
-                    Padrão Gupy
+                    {role === 'freelancer'
+                      ? 'Freelancer & Prestador'
+                      : role === 'candidato'
+                      ? 'Padrão Gupy'
+                      : 'Padrão Gupy'}
                   </span>
                 </h2>
                 <p className="text-xs text-slate-300 line-clamp-1">
-                  Mantenha suas informações sempre atualizadas para aumentar suas chances de match com vagas
+                  {role === 'freelancer'
+                    ? 'Mantenha seus serviços, portfólio e contatos atualizados para receber solicitações'
+                    : 'Mantenha suas informações sempre atualizadas para aumentar suas chances de match com vagas'}
                 </p>
               </div>
             </div>
@@ -285,43 +298,64 @@ export default function EditProfileModal({
                 </div>
               </div>
 
-              {/* Curso & Instituição */}
+              {/* Curso & Instituição ou Especialidade Profissional */}
               <div className="grid sm:grid-cols-3 gap-3.5">
                 <div className="form-group sm:col-span-2">
                   <label className="form-label text-xs font-bold flex items-center gap-1.5">
-                    <GraduationCap size={14} className="text-primary-blue" /> Curso ou Formação Principal
+                    {role === 'freelancer' ? <Briefcase size={14} className="text-primary-blue" /> : <GraduationCap size={14} className="text-primary-blue" />}
+                    {role === 'freelancer' ? 'Área de Atuação / Especialidade Principal *' : role === 'candidato' ? 'Área de Atuação / Formação Principal' : 'Curso ou Formação Principal'}
                   </label>
                   <input
                     type="text"
                     value={editData.course || ''}
                     onChange={e => setEditData(d => ({ ...d, course: e.target.value }))}
                     className="form-control text-xs sm:text-sm"
-                    placeholder="Ex: Análise e Desenvolvimento de Sistemas"
+                    placeholder={role === 'freelancer' ? 'Ex: Desenvolvimento Web, Design Gráfico, Instalações Elétricas' : 'Ex: Análise e Desenvolvimento de Sistemas'}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label text-xs font-bold">Período / Semestre</label>
+                  <label className="form-label text-xs font-bold">
+                    {role === 'freelancer' ? 'Valor / Hora ou Diária' : 'Período / Semestre'}
+                  </label>
                   <input
                     type="text"
-                    value={editData.period || ''}
-                    onChange={e => setEditData(d => ({ ...d, period: e.target.value }))}
+                    value={role === 'freelancer' ? (editData.hourlyRate || editData.period || '') : (editData.period || '')}
+                    onChange={e => setEditData(d => ({
+                      ...d,
+                      ...(role === 'freelancer' ? { hourlyRate: e.target.value, period: e.target.value } : { period: e.target.value })
+                    }))}
                     className="form-control text-xs sm:text-sm"
-                    placeholder="Ex: 4º Semestre"
+                    placeholder={role === 'freelancer' ? 'Ex: R$ 60/h ou A combinar' : 'Ex: 4º Semestre'}
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label text-xs font-bold">Instituição de Ensino / Faculdade</label>
-                <input
-                  type="text"
-                  value={editData.institution || ''}
-                  onChange={e => setEditData(d => ({ ...d, institution: e.target.value }))}
-                  className="form-control text-xs sm:text-sm"
-                  placeholder="Ex: IFPR Campus Ivaiporã, UNIVALE, UENP..."
-                />
-              </div>
+              {role === 'freelancer' ? (
+                <div className="form-group">
+                  <label className="form-label text-xs font-bold">Região / Cidades de Atendimento Presencial</label>
+                  <input
+                    type="text"
+                    value={editData.institution || ''}
+                    onChange={e => setEditData(d => ({ ...d, institution: e.target.value }))}
+                    className="form-control text-xs sm:text-sm"
+                    placeholder="Ex: Ivaiporã e Vale do Ivaí (ou 100% Remoto)"
+                  />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label text-xs font-bold">
+                    {role === 'candidato' ? 'Instituição de Ensino / Última Formação' : 'Instituição de Ensino / Faculdade'}
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.institution || ''}
+                    onChange={e => setEditData(d => ({ ...d, institution: e.target.value }))}
+                    className="form-control text-xs sm:text-sm"
+                    placeholder="Ex: IFPR Campus Ivaiporã, UNIVALE, UENP..."
+                  />
+                </div>
+              )}
 
               {/* Bio / Resumo */}
               <div className="form-group">

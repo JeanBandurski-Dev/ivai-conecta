@@ -1,15 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, Clock
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, CheckCircle2, Clock, ChevronDown, User, Mail
 } from 'lucide-react';
 import {
   getTalentById, requestTeacherEndorsement, updateTalentProfile,
   proactiveEndorseStudent, uploadUserProfilePicture, subscribeToTalentById,
-  subscribeToStudentEndorsementRequests, getVerifiedTeachers, subscribeToTeachers
+  subscribeToStudentEndorsementRequests, getVerifiedTeachers, subscribeToTeachers,
+  hasTeacherEndorsedStudent, sanitizeUniqueEndorsements, getEndorsementRequests,
+  deduplicateRequestsByTeacher, isSameProfessor, STORAGE_KEY_ENDORSEMENT_REQUESTS
 } from '../lib/ivaiConecta';
+import { db } from '../lib/firebase.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -55,12 +59,13 @@ export default function PerfilAluno() {
   // Real-time student endorsement requests
   const [studentRequests, setStudentRequests] = useState([]);
   useEffect(() => {
-    if (!talentId) return;
-    const unsub = subscribeToStudentEndorsementRequests(talentId, (reqs) => {
-      setStudentRequests(reqs);
+    const studentUid = String(talentId || currentUser?.uid || currentUser?.id || '');
+    if (!studentUid) return;
+    const unsub = subscribeToStudentEndorsementRequests(studentUid, (reqs) => {
+      setStudentRequests(deduplicateRequestsByTeacher(reqs));
     });
     return () => unsub();
-  }, [talentId]);
+  }, [talentId, currentUser]);
 
   // Verified teachers list for quick selection
   const [availableTeachers, setAvailableTeachers] = useState(() => getVerifiedTeachers());
@@ -70,6 +75,79 @@ export default function PerfilAluno() {
     });
     return () => unsub();
   }, []);
+
+  const platformTeachers = useMemo(() => {
+    return availableTeachers.filter(t => t.firestoreId || (t.id && !String(t.id).startsWith('prof_')));
+  }, [availableTeachers]);
+
+  const institutionalTeachers = useMemo(() => {
+    return availableTeachers.filter(t => t.id && String(t.id).startsWith('prof_'));
+  }, [availableTeachers]);
+
+  // Sincroniza e higieniza pedidos de recomendação no documento do aluno no Firestore (deduplicação estrita)
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== 'aluno' && currentUser.role !== 'candidato')) return;
+    const studentUid = String(currentUser.uid || currentUser.id || '');
+    if (!studentUid) return;
+
+    try {
+      const studentDocRef = doc(db, 'users', studentUid);
+      getDoc(studentDocRef).then(snap => {
+        if (snap.exists()) {
+          const remoteReqs = snap.data().pendingEndorsementRequests || [];
+          const localReqs = getEndorsementRequests().filter(r => String(r.studentId) === studentUid);
+          const cleaned = deduplicateRequestsByTeacher([...remoteReqs, ...localReqs]);
+
+          // Se havia duplicatas (ou diferenças em relação ao remoto), atualiza o Firestore e o cache local
+          if (cleaned.length !== remoteReqs.length || JSON.stringify(cleaned) !== JSON.stringify(remoteReqs)) {
+            setDoc(studentDocRef, { pendingEndorsementRequests: cleaned }, { merge: true });
+          }
+
+          // Atualiza também o cache local
+          const allOtherLocal = getEndorsementRequests().filter(r => String(r.studentId) !== studentUid);
+          try {
+            localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify([...cleaned, ...allOtherLocal]));
+          } catch {}
+        }
+      }).catch(() => {});
+    } catch {}
+  }, [currentUser]);
+
+  // Sincroniza pareceres aprovados pelos professores diretamente no documento do aluno logado
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== 'aluno' && currentUser.role !== 'candidato')) return;
+    const studentUid = String(currentUser.uid || currentUser.id || '');
+    if (!studentUid) return;
+
+    const approvedList = studentRequests.filter(r => r.status === 'Aprovado');
+    if (approvedList.length === 0) return;
+
+    const currentEndorsements = Array.isArray(talent?.endorsements) ? talent.endorsements : [];
+    const synthesized = approvedList.map(r => ({
+      id: `end_${r.id || r.firestoreId || Date.now()}`,
+      profUid: r.profUid || r.targetTeacherId || '',
+      profName: r.profName || 'Professor Docente',
+      profEmail: r.profEmail || '',
+      institution: r.studentInstitution || 'IFPR Campus Ivaiporã',
+      discipline: r.discipline || 'Formação Acadêmica',
+      quote: r.quote || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio em projetos práticos.',
+      isVerified: true,
+      date: r.resolvedAt || r.requestedAt || new Date().toLocaleDateString('pt-BR'),
+      timestamp: r.requestedTimestamp || Date.now()
+    }));
+
+    const merged = sanitizeUniqueEndorsements([...currentEndorsements, ...synthesized]);
+    if (merged.length > currentEndorsements.length || !talent?.isVerifiedStudent) {
+      try {
+        const studentDocRef = doc(db, 'users', studentUid);
+        setDoc(studentDocRef, {
+          endorsements: merged,
+          endorsementCount: merged.length,
+          isVerifiedStudent: true
+        }, { merge: true }).catch(() => {});
+      } catch {}
+    }
+  }, [currentUser, studentRequests, talent?.endorsements, talent?.isVerifiedStudent]);
 
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
@@ -83,13 +161,29 @@ export default function PerfilAluno() {
 
   const isProfessor = currentUser?.role === 'professor';
 
-  const hasAlreadyEndorsed = Boolean(isProfessor && (talent?.endorsements || []).some(e => {
-    const pEmail = (currentUser?.email || '').toLowerCase().trim();
-    const eEmail = (e.profEmail || '').toLowerCase().trim();
-    const pUid = currentUser?.uid || currentUser?.id;
-    const eUid = e.profUid || e.profId;
-    return (pEmail && eEmail === pEmail) || (pUid && eUid && String(pUid) === String(eUid));
-  }));
+  const uniqueEndorsements = useMemo(() => {
+    const fromTalent = Array.isArray(talent?.endorsements) ? talent.endorsements : [];
+    const fromApprovedRequests = (studentRequests || [])
+      .filter(r => r.status === 'Aprovado')
+      .map(r => ({
+        id: `end_${r.id || r.firestoreId || Date.now()}`,
+        profUid: r.profUid || r.targetTeacherId || '',
+        profName: r.profName || 'Professor Docente',
+        profEmail: r.profEmail || '',
+        institution: r.studentInstitution || 'IFPR Campus Ivaiporã',
+        discipline: r.discipline || 'Formação Acadêmica',
+        quote: r.quote || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio em projetos práticos.',
+        isVerified: true,
+        date: r.resolvedAt || r.requestedAt || new Date().toLocaleDateString('pt-BR'),
+        timestamp: r.requestedTimestamp || Date.now()
+      }));
+
+    return sanitizeUniqueEndorsements([...fromTalent, ...fromApprovedRequests]);
+  }, [talent?.endorsements, studentRequests]);
+
+  const hasAlreadyEndorsed = Boolean(
+    isProfessor && hasTeacherEndorsedStudent(uniqueEndorsements, currentUser)
+  );
 
   const [activeTab, setActiveTab] = useState('overview');
   const [editModalOpen, setEditModalOpen] = useState(Boolean(searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true'));
@@ -110,6 +204,14 @@ export default function PerfilAluno() {
   const [requestModal, setRequestModal] = useState(false);
   const [proactiveEndorseModal, setProactiveEndorseModal] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [successBanner, setSuccessBanner] = useState(null);
+
+  useEffect(() => {
+    if (!successBanner) return;
+    const timer = setTimeout(() => setSuccessBanner(null), 8000);
+    return () => clearTimeout(timer);
+  }, [successBanner]);
 
   // Form for proactive endorsement by teacher
   const [proactiveQuote, setProactiveQuote] = useState('');
@@ -143,28 +245,88 @@ export default function PerfilAluno() {
   const [newProj, setNewProj] = useState({ title: '', tech: '', link: '', description: '' });
   const [newEdu, setNewEdu] = useState({ degree: '', institution: '', period: '' });
 
+  const isTargetTeacherAlreadyEndorsed = Boolean(
+    (requestForm.profEmail || selectedTeacher) &&
+    hasTeacherEndorsedStudent(uniqueEndorsements, selectedTeacher || requestForm.profEmail)
+  );
+
+  const hasPendingRequestForTeacher = Boolean(
+    (requestForm.profEmail || selectedTeacher) &&
+    studentRequests.some(r =>
+      (isSameProfessor(r, selectedTeacher || requestForm.profEmail) ||
+        (requestForm.profEmail && String(r.profEmail || '').toLowerCase().trim() === requestForm.profEmail.toLowerCase().trim())) &&
+      r.status === 'Pendente'
+    )
+  );
+
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
     if (!requestForm.profEmail.toLowerCase().includes('@')) {
       setError('Por favor, informe um e-mail educacional válido.');
       return;
     }
+    if (isTargetTeacherAlreadyEndorsed) {
+      setError('Este professor(a) já concedeu uma recomendação para você. É permitida apenas uma recomendação por docente.');
+      return;
+    }
+    if (hasPendingRequestForTeacher) {
+      setError('Você já possui uma solicitação pendente enviada para este professor(a). Aguarde a avaliação.');
+      return;
+    }
     setError('');
-    const res = await requestTeacherEndorsement(requestForm.profEmail, requestForm.profName, requestForm.discipline, currentUser);
-    if (res.success) {
-      setRequestModal(false);
-      showToast(res.message || `Solicitação enviada para o professor ${requestForm.profName}!`);
-      setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
-      setSelectedTeacher(null);
-      setNameInputFocused(false);
-    } else {
-      setError(res.message || 'Erro ao enviar solicitação.');
-      showToast(res.message || 'Erro ao enviar solicitação.');
+    setIsSubmittingRequest(true);
+
+    try {
+      const studentData = {
+        ...currentUser,
+        ...talent,
+        id: String(talentId || currentUser?.uid || currentUser?.id || ''),
+        uid: String(currentUser?.uid || talentId || ''),
+        name: talent?.name || currentUser?.name || 'Estudante',
+        course: talent?.course || currentUser?.course || 'Graduação / Ensino Técnico',
+        institution: talent?.institution || currentUser?.institution || 'IFPR Campus Ivaiporã',
+        avatar: talent?.avatar || currentUser?.avatar || '',
+        email: currentUser?.email || talent?.email || ''
+      };
+
+      const res = await requestTeacherEndorsement(
+        requestForm.profEmail,
+        requestForm.profName,
+        requestForm.discipline,
+        studentData,
+        selectedTeacher
+      );
+
+      setIsSubmittingRequest(false);
+
+      if (res.success) {
+        // Sai da tela imediatamente
+        setRequestModal(false);
+        const msg = res.message || `Solicitação enviada com sucesso para o professor ${requestForm.profName}!`;
+        // Mensagem clara e verde em destaque
+        setSuccessBanner(msg);
+        showToast(msg, 'success');
+        setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+        setSelectedTeacher(null);
+        setNameInputFocused(false);
+      } else {
+        setError(res.message || 'Erro ao enviar solicitação.');
+        showToast(res.message || 'Erro ao enviar solicitação.', 'error');
+      }
+    } catch (err) {
+      setIsSubmittingRequest(false);
+      setError(err.message || 'Erro ao enviar solicitação.');
+      showToast(err.message || 'Erro ao processar solicitação.', 'error');
     }
   };
 
   const handleProactiveEndorseSubmit = async (e) => {
     e.preventDefault();
+    if (hasAlreadyEndorsed) {
+      showToast('Você já recomendou este aluno. É permitida apenas uma recomendação por professor para cada aluno.');
+      setProactiveEndorseModal(false);
+      return;
+    }
     const res = await proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
     if (res.success) {
       showToast(`Recomendação concedida com sucesso para ${talent.name}!`);
@@ -503,7 +665,7 @@ export default function PerfilAluno() {
                 activeTab === 'endorsements' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
-              Recomendações ({talent.endorsements?.length || 0})
+              Recomendações ({uniqueEndorsements.length})
             </button>
           </div>
 
@@ -575,9 +737,15 @@ export default function PerfilAluno() {
                     <Award size={18} className="text-primary-blue dark:text-blue-400" /> Parecer Pedagógico &amp; Recomendações
                   </h3>
                   {isProfessor ? (
-                    <button onClick={() => setProactiveEndorseModal(true)} className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5">
-                      <Award size={13} /> Recomendar Aluno
-                    </button>
+                    hasAlreadyEndorsed ? (
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                        <CheckCircle size={13} /> Recomendação já Concedida
+                      </span>
+                    ) : (
+                      <button onClick={() => setProactiveEndorseModal(true)} className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5">
+                        <Award size={13} /> Recomendar Aluno
+                      </button>
+                    )
                   ) : null}
                 </div>
 
@@ -607,13 +775,13 @@ export default function PerfilAluno() {
                   </div>
                 )}
 
-                {!talent.endorsements || talent.endorsements.length === 0 ? (
+                {uniqueEndorsements.length === 0 ? (
                   <div className="text-center py-6 text-gray-400 dark:text-slate-500">
                     <p className="font-semibold text-sm">Nenhuma recomendação avaliada ainda.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {talent.endorsements.map((e, i) => (
+                    {uniqueEndorsements.map((e, i) => (
                       <div key={e.id || i} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 gap-2">
                         <div className="flex items-start justify-between">
                           <div>
@@ -692,11 +860,11 @@ export default function PerfilAluno() {
             <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
               <Award size={20} className="text-amber-500 fill-amber-500" /> Pareceres Pedagógicos Autenticados
             </h3>
-            {!talent.endorsements || talent.endorsements.length === 0 ? (
+            {uniqueEndorsements.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-slate-500">Nenhuma recomendação registrada ainda.</p>
             ) : (
               <div className="space-y-4">
-                {talent.endorsements.map((e, i) => (
+                {uniqueEndorsements.map((e, i) => (
                   <div key={e.id || i} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -771,78 +939,147 @@ export default function PerfilAluno() {
         </div>
       )}
 
+      {/* Banner Verde Claro de Sucesso Após Envio de Solicitação - Canto Esquerdo */}
+      {successBanner && (
+        <div className="fixed bottom-6 left-6 z-[300] max-w-sm w-full bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl border border-emerald-400 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={20} className="text-white" />
+            </div>
+            <div>
+              <div className="font-bold text-xs sm:text-sm leading-tight">Solicitação Enviada!</div>
+              <div className="text-[11px] sm:text-xs text-emerald-100 mt-0.5 leading-snug">{successBanner}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setSuccessBanner(null)}
+            className="p-1 hover:bg-white/20 rounded-lg transition-colors shrink-0 text-white cursor-pointer"
+            title="Fechar notificação"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Modal: Pedir Recomendação a Professor (Para Alunos) */}
       {requestModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => { setRequestModal(false); setNameInputFocused(false); }}>
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-6 sm:p-7 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                <Send size={18} className="text-primary-blue dark:text-blue-400" /> Pedir Recomendação a Professor
-              </h3>
-              <button onClick={() => { setRequestModal(false); setNameInputFocused(false); }}>
-                <X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" />
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-6 sm:p-7 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-5 border-b border-gray-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-primary-blue dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200/50 dark:border-blue-900/50">
+                  <Send size={18} />
+                </div>
+                <div>
+                  <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">
+                    Pedir Recomendação a Professor
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    Solicite um parecer acadêmico institucional para valorizar seu currículo.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setRequestModal(false); setNameInputFocused(false); }}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X size={20} />
               </button>
             </div>
 
-            {error && <div className="mb-4 text-xs bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded-xl">{error}</div>}
+            {error && (
+              <div className="mb-4 text-xs bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-3.5 rounded-2xl flex items-center gap-2">
+                <X size={16} className="text-red-500 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {isTargetTeacherAlreadyEndorsed && (
+              <div className="mb-4 text-xs bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 p-3.5 rounded-2xl flex items-center gap-2">
+                <CheckCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Você já possui um parecer registrado deste professor(a). É permitida apenas uma recomendação por docente para cada aluno.</span>
+              </div>
+            )}
 
             <form onSubmit={handleRequestSubmit} className="space-y-4">
               {/* Seletor Principal de Professores Disponíveis */}
-              <div className="form-group bg-blue-50/70 dark:bg-slate-800/90 p-4 rounded-2xl border border-blue-200/80 dark:border-slate-700 space-y-2.5">
-                <label className="form-label text-xs font-bold flex items-center justify-between text-primary-dark dark:text-white">
-                  <span className="flex items-center gap-1.5">
-                    <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" /> Selecione o Professor(a) Disponível:
-                  </span>
-                  <span className="text-[10px] bg-blue-100 dark:bg-blue-950/80 text-primary-blue dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold flex items-center gap-2 text-primary-dark dark:text-white">
+                    <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" />
+                    Selecione o Professor(a) Credenciado:
+                  </label>
+                  <span className="text-[10px] bg-blue-100 dark:bg-blue-950/90 text-primary-blue dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
                     {availableTeachers.length} disponíveis
                   </span>
-                </label>
+                </div>
 
-                <select
-                  className="form-control text-xs font-semibold bg-white dark:bg-slate-900 border-primary-blue/30 focus:border-primary-blue"
-                  value={selectedTeacher ? (selectedTeacher.email || selectedTeacher.id) : (requestForm.profEmail || '')}
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (!val) {
-                      setSelectedTeacher(null);
-                      return;
-                    }
-                    if (val === '__manual__') {
-                      setSelectedTeacher(null);
-                      setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
-                      return;
-                    }
-                    const prof = availableTeachers.find(t => 
-                      (t.email || '').toLowerCase().trim() === val.toLowerCase().trim() || 
-                      String(t.id) === val
-                    );
-                    if (prof) {
-                      setSelectedTeacher(prof);
-                      setRequestForm(f => ({
-                        ...f,
-                        profName: prof.name,
-                        profEmail: prof.email,
-                        discipline: prof.discipline || prof.classes?.[0] || 'Programação de Computadores'
-                      }));
-                    }
-                  }}
-                >
-                  <option value="">-- Escolha um Professor para Preenchimento Automático --</option>
-                  {availableTeachers.map(t => (
-                    <option key={t.id || t.email} value={t.email || t.id}>
-                      {t.name} · {t.institution || 'IFPR'} ({t.discipline || 'Docente'})
-                    </option>
-                  ))}
-                  <option value="__manual__">✍️ Outro Professor (Preencher manualmente)</option>
-                </select>
+                <div className="relative">
+                  <select
+                    className="w-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 focus:border-primary-blue transition-all cursor-pointer appearance-none pr-10"
+                    style={{ backgroundImage: 'none' }}
+                    value={selectedTeacher ? (selectedTeacher.email || selectedTeacher.id) : (requestForm.profEmail || '')}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setSelectedTeacher(null);
+                        return;
+                      }
+                      if (val === '__manual__') {
+                        setSelectedTeacher(null);
+                        setRequestForm({ profName: '', profEmail: '', discipline: '', message: '' });
+                        return;
+                      }
+                      const prof = availableTeachers.find(t => 
+                        (t.email || '').toLowerCase().trim() === val.toLowerCase().trim() || 
+                        String(t.id) === val
+                      );
+                      if (prof) {
+                        setSelectedTeacher(prof);
+                        setRequestForm(f => ({
+                          ...f,
+                          profName: prof.name,
+                          profEmail: prof.email,
+                          discipline: prof.discipline || prof.classes?.[0] || 'Programação de Computadores'
+                        }));
+                      }
+                    }}
+                  >
+                    <option value="">-- Escolha um Professor para Preenchimento Automático --</option>
+                    {platformTeachers.length > 0 && (
+                      <optgroup label="🌟 Professores Cadastrados na Plataforma">
+                        {platformTeachers.map(t => {
+                          const alreadyDone = hasTeacherEndorsedStudent(uniqueEndorsements, t);
+                          return (
+                            <option key={t.id || t.email} value={t.email || t.id} disabled={alreadyDone}>
+                              {t.name} ({t.email}) · {t.institution || 'IFPR'} {alreadyDone ? '— ⚠️ (Já Recomendado)' : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    )}
+                    <optgroup label="🏛️ Corpo Docente Institucional Credenciado">
+                      {institutionalTeachers.map(t => {
+                        const alreadyDone = hasTeacherEndorsedStudent(uniqueEndorsements, t);
+                        return (
+                          <option key={t.id || t.email} value={t.email || t.id} disabled={alreadyDone}>
+                            {t.name} · {t.institution || 'IFPR'} ({t.discipline || 'Docente'}) {alreadyDone ? '— ⚠️ (Já Recomendado)' : ''}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                    <option value="__manual__">✍️ Outro Professor (Preencher manualmente)</option>
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
 
                 {/* Card de Dados do Professor Vinculado */}
                 {selectedTeacher && (
-                  <div className="pt-2 border-t border-blue-200/60 dark:border-slate-700/80 space-y-2">
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
                     <div className="flex items-center justify-between text-[11px] text-gray-700 dark:text-slate-300">
-                      <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
-                        <CheckCircle size={13} /> Dados vinculados: {selectedTeacher.institution}
+                      <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-bold">
+                        <CheckCircle size={13} /> Vinculado: {selectedTeacher.institution}
                       </span>
                       <span className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
                         {selectedTeacher.degree || 'Docente'}
@@ -852,7 +1089,7 @@ export default function PerfilAluno() {
                     {Array.isArray(selectedTeacher.classes) && selectedTeacher.classes.length > 0 && (
                       <div>
                         <span className="text-[10px] text-gray-500 dark:text-slate-400 font-semibold block mb-1">
-                          Disciplinas ministradas pelo docente (clique para selecionar):
+                          Disciplinas ministradas pelo docente (clique para escolher):
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {selectedTeacher.classes.map(cls => (
@@ -860,7 +1097,7 @@ export default function PerfilAluno() {
                               key={cls}
                               type="button"
                               onClick={() => setRequestForm(f => ({ ...f, discipline: cls }))}
-                              className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold border transition-all cursor-pointer ${
+                              className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold border transition-all cursor-pointer ${
                                 requestForm.discipline === cls
                                   ? 'bg-primary-blue text-white border-primary-blue shadow-2xs font-bold'
                                   : 'bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue'
@@ -876,9 +1113,11 @@ export default function PerfilAluno() {
                 )}
               </div>
 
-              {/* Campo: Nome do Professor com Sugestões Inteligentes ao Digitar */}
-              <div className="form-group relative">
-                <label className="form-label text-xs font-semibold">Nome do Professor(a)</label>
+              {/* Campo: Nome do Professor */}
+              <div className="space-y-1.5 relative">
+                <label className="text-xs font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <User size={13} className="text-gray-400" /> Nome do Professor(a)
+                </label>
                 <input
                   type="text"
                   value={requestForm.profName}
@@ -888,7 +1127,7 @@ export default function PerfilAluno() {
                     setRequestForm(f => ({ ...f, profName: val }));
                     setNameInputFocused(true);
                   }}
-                  className="form-control"
+                  className="w-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 focus:border-primary-blue transition-all"
                   placeholder="Ex: Prof. Dr. Ronan Silva"
                   required
                 />
@@ -906,66 +1145,113 @@ export default function PerfilAluno() {
                         (t.discipline && t.discipline.toLowerCase().includes(requestForm.profName.toLowerCase()))
                       )
                       .slice(0, 4)
-                      .map(t => (
-                        <button
-                          key={t.id || t.email}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setSelectedTeacher(t);
-                            setRequestForm(f => ({
-                              ...f,
-                              profName: t.name,
-                              profEmail: t.email,
-                              discipline: t.discipline || t.classes?.[0] || 'Programação de Computadores'
-                            }));
-                            setNameInputFocused(false);
-                          }}
-                          className="w-full text-left p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors cursor-pointer"
-                        >
-                          <div>
-                            <div className="font-bold text-gray-900 dark:text-white">{t.name}</div>
-                            <div className="text-[11px] text-gray-500 dark:text-slate-400">{t.email} · {t.institution}</div>
-                            <div className="text-[10px] text-primary-blue dark:text-blue-400 font-semibold">{t.discipline}</div>
-                          </div>
-                          <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300 px-2.5 py-1 rounded-full shrink-0">
-                            Selecionar
-                          </span>
-                        </button>
-                      ))}
+                      .map(t => {
+                        const alreadyDone = hasTeacherEndorsedStudent(uniqueEndorsements, t);
+                        return (
+                          <button
+                            key={t.id || t.email}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setSelectedTeacher(t);
+                              setRequestForm(f => ({
+                                ...f,
+                                profName: t.name,
+                                profEmail: t.email,
+                                discipline: t.discipline || t.classes?.[0] || 'Programação de Computadores'
+                              }));
+                              setNameInputFocused(false);
+                            }}
+                            className="w-full text-left p-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors cursor-pointer"
+                          >
+                            <div>
+                              <div className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                {t.name}
+                                {alreadyDone && (
+                                  <span className="text-[9px] bg-amber-100 dark:bg-amber-900/80 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                                    Já Recomendou
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-gray-500 dark:text-slate-400">{t.email} · {t.institution}</div>
+                              <div className="text-[10px] text-primary-blue dark:text-blue-400 font-semibold">{t.discipline}</div>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                              alreadyDone
+                                ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                                : 'bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300'
+                            }`}>
+                              {alreadyDone ? 'Já Avaliado' : 'Selecionar'}
+                            </span>
+                          </button>
+                        );
+                      })}
                   </div>
                 )}
               </div>
 
               {/* Campo: E-mail Educacional do Professor */}
-              <div className="form-group">
-                <label className="form-label text-xs font-semibold">E-mail Educacional do Professor</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Mail size={13} className="text-gray-400" /> E-mail Educacional do Professor
+                </label>
                 <input
                   type="email"
                   value={requestForm.profEmail}
                   onChange={e => setRequestForm(f => ({ ...f, profEmail: e.target.value }))}
-                  className="form-control"
+                  className="w-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 focus:border-primary-blue transition-all"
                   placeholder="Ex: ronan.silva@ifpr.edu.br"
                   required
                 />
               </div>
 
               {/* Campo: Disciplina / Matéria Ministrada */}
-              <div className="form-group">
-                <label className="form-label text-xs font-semibold">Disciplina / Matéria Ministrada</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <BookOpen size={13} className="text-gray-400" /> Disciplina / Matéria Ministrada
+                </label>
                 <input
                   type="text"
                   value={requestForm.discipline}
                   onChange={e => setRequestForm(f => ({ ...f, discipline: e.target.value }))}
-                  className="form-control"
+                  className="w-full text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 focus:border-primary-blue transition-all"
                   placeholder="Ex: Programação de Computadores"
                   required
                 />
               </div>
 
-              <div className="flex gap-3 justify-end pt-3">
-                <button type="button" onClick={() => { setRequestModal(false); setNameInputFocused(false); }} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">Enviar Solicitação</button>
+              {/* Alerta se já existe solicitação pendente para este professor */}
+              {hasPendingRequestForTeacher && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-200 text-xs flex items-center gap-2">
+                  <Clock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Você já possui uma solicitação pendente aguardando avaliação deste docente. Não é necessário enviar novamente.</span>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => { setRequestModal(false); setNameInputFocused(false); }}
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-gray-200 dark:border-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isTargetTeacherAlreadyEndorsed || hasPendingRequestForTeacher || isSubmittingRequest}
+                  className="btn btn-teal text-xs font-bold px-6 py-2.5 rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+                >
+                  {isSubmittingRequest ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} /> Enviar Solicitação
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -983,6 +1269,7 @@ export default function PerfilAluno() {
         onClose={() => setEditModalOpen(false)}
         editData={editData}
         setEditData={setEditData}
+        role={currentUser?.role || talent?.role || 'aluno'}
         handleSaveProfile={handleSaveProfile}
         handleAvatarFileChange={handleAvatarFileChange}
         addExperience={addExperience}

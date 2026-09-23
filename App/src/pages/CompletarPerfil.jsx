@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, isInstitutionalEmail } from '../lib/ivaiConecta';
+import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, isInstitutionalEmail, inferInstitutionFromEmail } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
-import { User, MapPin, CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: GraduationCap, desc: 'Acesse vagas de estágio e endossos acadêmicos' },
@@ -120,7 +120,7 @@ export default function CompletarPerfil() {
 
     if (selectedRole === 'professor') {
       if (!isInstitutionalEmail(email)) {
-        setAlert('Para atuar com o perfil de Professor/Docente, sua conta Google/e-mail deve utilizar um domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br ou domínio .edu.br).');
+        setAlert('Para atuar com o perfil de Professor/Docente, sua conta Google/e-mail deve utilizar um domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer domínio .edu.br).');
         return;
       }
     }
@@ -133,6 +133,12 @@ export default function CompletarPerfil() {
       city: city,
       role: selectedRole,
       avatar: auth.currentUser?.photoURL || currentUser?.avatar,
+      ...(selectedRole === 'professor' && {
+        institution: inferInstitutionFromEmail(email),
+        degree: 'Docente / Pesquisador',
+        discipline: 'Docência & Orientação Acadêmica',
+        verified: true
+      }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(cnpj),
         razaoSocial: cnpjData?.razaoSocial || name.trim(),
