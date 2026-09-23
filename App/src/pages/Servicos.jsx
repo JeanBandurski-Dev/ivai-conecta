@@ -3,8 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, HelpCircle, FileText, Check,
-  Clock, Play, Inbox, ShieldCheck, DollarSign, Calendar
+  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -157,7 +156,7 @@ export default function Servicos() {
         concluido: 'Serviço marcado como concluído!'
       };
       showToast(statusNames[nextStatus] || `Status atualizado para: ${nextStatus}`);
-    } catch (err) {
+    } catch {
       showToast('Erro ao atualizar status do serviço.');
     }
   };

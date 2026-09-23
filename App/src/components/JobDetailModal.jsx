@@ -144,7 +144,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     setIsSubmitting(true);
 
     try {
-      const res = await applyToJob(jobId, currentUser);
+      const res = await applyToJob(job || jobId, currentUser);
       if (res?.success) {
         setApplied(true);
         showToast('Candidatura realizada com sucesso!');

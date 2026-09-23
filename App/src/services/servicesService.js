@@ -2,13 +2,10 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
-  getDocs,
   addDoc,
   doc,
   updateDoc,
   deleteDoc,
-  query,
-  where,
   onSnapshot
 } from 'firebase/firestore';
 import { STORAGE_KEY_SERVICES } from '../data/seedData.js';
@@ -98,7 +95,7 @@ export async function incrementServiceContact(id) {
   const newConversion = `${Math.min(100, Math.round((newContacts / Math.max(1, views)) * 100))}%`;
 
   const updatedAnalytics = {
-    ...(target?.analytics || {}),
+    ...target?.analytics,
     contacts: newContacts,
     conversionRate: newConversion
   };

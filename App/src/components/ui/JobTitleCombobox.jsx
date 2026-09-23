@@ -11,6 +11,7 @@ export default function JobTitleCombobox({
   value = '',
   onChange,
   onSelect = null,
+  onBlur = null,
   placeholder = 'Ex: Desenvolvedor Front-end, Auxiliar Administrativo, Vendedor(a)...',
   required = false,
   error = ''
@@ -119,6 +120,7 @@ export default function JobTitleCombobox({
           }}
           onClick={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
+          onBlur={onBlur}
           placeholder={placeholder}
           required={required}
           className={`form-control pl-10 pr-20 text-sm font-semibold transition-all ${

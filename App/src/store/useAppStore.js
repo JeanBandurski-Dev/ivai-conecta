@@ -254,12 +254,20 @@ const useAppStore = create((set, get) => ({
     }
   },
 
-  showToast: (message, duration = 3500) => {
-    const id = Date.now();
-    set(state => ({ toasts: [...state.toasts, { id, message }] }));
+  showToast: (message, typeOrDuration = 'info', duration = 3800) => {
+    const id = Date.now() + Math.random();
+    let type = 'info';
+    let dur = 3800;
+    if (typeof typeOrDuration === 'number') {
+      dur = typeOrDuration;
+    } else if (typeof typeOrDuration === 'string') {
+      type = typeOrDuration;
+      if (typeof duration === 'number') dur = duration;
+    }
+    set(state => ({ toasts: [...state.toasts, { id, message, type }] }));
     setTimeout(() => {
       set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
-    }, duration);
+    }, dur);
   },
 }));
 

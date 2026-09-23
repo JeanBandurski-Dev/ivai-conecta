@@ -159,7 +159,7 @@ export default function Vagas() {
         const matchScoreOk = !canSeeMatch || minMatch === 0 || (typeof j.calculatedScore === 'number' && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => 
+        const matchSkillsOk = selectedSkills.every(sk => 
           (j.requiredSkills || []).some(r => r && String(r).toLowerCase().includes(String(sk).toLowerCase()))
         );
 

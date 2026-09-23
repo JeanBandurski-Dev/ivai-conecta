@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Send, Sparkles, AlertCircle, Building2, MapPin, DollarSign, Calendar, Phone } from 'lucide-react';
+import { X, Send, Sparkles, AlertCircle, MapPin, DollarSign, Calendar, Phone } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { createServiceOrder, maskPhone, CITIES } from '../lib/ivaiConecta';
 

@@ -6,8 +6,8 @@ export default function JobFormModal({
   onClose,
   onSave,
   onJobCreated,
-  initialJob = null,
-  currentUser = null
+  initialJob: _initialJob = null,
+  currentUser: _currentUser = null
 }) {
   const handleCreated = (job) => {
     if (onJobCreated && typeof onJobCreated === 'function') {

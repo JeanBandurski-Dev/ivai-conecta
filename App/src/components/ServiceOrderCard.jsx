@@ -1,4 +1,4 @@
-import { MapPin, Phone, DollarSign, Calendar, Star, Check, Play, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Phone, DollarSign, Calendar, Star, Check, Play, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
 const LIFECYCLE_STEPS = [
   { key: 'solicitado', label: '1. Solicitado' },

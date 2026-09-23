@@ -43,7 +43,7 @@ export default function App() {
       const testKey = '__ivai_ls_test__';
       localStorage.setItem(testKey, '1');
       localStorage.removeItem(testKey);
-    } catch (e) {
+    } catch {
       // localStorage cheio — limpa dados de cache pesados para liberar espaço
       const cacheKeys = [
         'ivai_conecta_db_jobs',

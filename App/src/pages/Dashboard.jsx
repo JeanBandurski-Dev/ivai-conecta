@@ -1,16 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Search, X, Sparkles, MapPin, Briefcase, Users, Wrench,
-  Building2, ArrowRight, RotateCcw, Filter, CheckCircle2, ChevronRight
+  Building2, ArrowRight, RotateCcw
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   getTalents, getJobs, getServices, getCompanies,
   subscribeToTalents, subscribeToJobs, subscribeToServices,
   subscribeToCompanies, subscribeToPlatformMetrics,
-  tokenizeQuery, scoreTalentMatch, scoreJobMatch, scoreServiceMatch,
-  normalizeSearchText
+  tokenizeQuery, scoreTalentMatch, scoreJobMatch, scoreServiceMatch
 } from '../lib/ivaiConecta';
 import TalentsCarousel from '../components/TalentsCarousel';
 import EmpresasCarousel from '../components/EmpresasCarousel';
@@ -36,7 +35,6 @@ export default function Dashboard() {
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedSector, setSelectedSector] = useState('todos'); // 'todos' | 'vagas' | 'talentos' | 'servicos'
   const resultsRef = useRef(null);
-  const navigate = useNavigate();
 
   const [talents, setTalents]     = useState(() => getTalents(selectedCity));
   const [jobs, setJobs]           = useState(() => getJobs(selectedCity));
@@ -103,17 +101,6 @@ export default function Dashboard() {
       .map(x => x.item);
   }, [services, searchTokens]);
 
-  const filteredCompanies = useMemo(() => {
-    if (searchTokens.length === 0) return companies;
-    const q = normalizeSearchText(activeSearch);
-    return companies.filter(c => {
-      const name = normalizeSearchText(c.name);
-      const sector = normalizeSearchText(c.sector);
-      const about = normalizeSearchText(c.about);
-      return name.includes(q) || sector.includes(q) || about.includes(q);
-    });
-  }, [companies, activeSearch, searchTokens]);
-
   const totalMatches = filteredTalents.length + filteredJobs.length + filteredServices.length;
 
   const handleExecuteSearch = (termToSearch) => {
@@ -155,9 +142,6 @@ export default function Dashboard() {
       color: 'text-[#FBBF24]'
     },
   ];
-
-  const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
 
   return (
     <>
