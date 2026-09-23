@@ -135,7 +135,7 @@ export async function login(email, password) {
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
       ...(profileRes.profile || {}),
-      emailVerified: Boolean(fbUser.emailVerified || profileRes.profile?.emailVerified)
+      emailVerified: role === 'aluno' ? Boolean(fbUser.emailVerified || profileRes.profile?.emailVerified) : true
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -234,15 +234,17 @@ export async function register(data) {
     const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
 
-    // 2. Disparar link de verificação de e-mail do Firebase Auth
+    // 2. Disparar link de verificação de e-mail do Firebase Auth (apenas para alunos)
     let emailVerificationSent = false;
     let emailVerificationError = null;
-    try {
-      await sendEmailVerification(fbUser);
-      emailVerificationSent = true;
-    } catch (eErr) {
-      console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
-      emailVerificationError = eErr.message;
+    if (selectedRole === 'aluno') {
+      try {
+        await sendEmailVerification(fbUser);
+        emailVerificationSent = true;
+      } catch (eErr) {
+        console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
+        emailVerificationError = eErr.message;
+      }
     }
 
     // 3. Salvar documento completo no Firestore em users/{uid}
@@ -251,7 +253,7 @@ export async function register(data) {
       uid: fbUser.uid,
       name,
       email: cleanEmail,
-      emailVerified: false,
+      emailVerified: selectedRole === 'aluno' ? false : true,
       city: city || 'Ivaiporã',
       role: selectedRole,
       badge: roleMeta.badge,
@@ -596,7 +598,7 @@ export function watchAuthState(callback) {
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
-            emailVerified: fbUser.emailVerified,
+            emailVerified: role === 'aluno' ? fbUser.emailVerified : true,
             name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
             city: profileRes.profile?.city || 'Ivaiporã',
             role,
@@ -605,7 +607,7 @@ export function watchAuthState(callback) {
             isVerifiedStudent,
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
             ...(profileRes.profile || {}),
-            emailVerified: fbUser.emailVerified,
+            emailVerified: role === 'aluno' ? fbUser.emailVerified : true,
             isVerifiedStudent
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));

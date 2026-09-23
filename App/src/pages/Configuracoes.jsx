@@ -3,13 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, FileText, Camera, GraduationCap,
+  Building2, Camera, GraduationCap,
   Search, Loader2, AlertCircle, RefreshCw, Check
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   updateAuthUser,
-  submitStudentVerification,
   submitCompanyVerification,
   verifyStudentAccount,
   sendStudentVerificationEmail,
@@ -42,14 +41,11 @@ export default function Configuracoes() {
 
   // Verification form (Student)
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(currentUser?.isVerifiedStudent || false);
   const [studentInstEmail, setStudentInstEmail] = useState(currentUser?.studentEmail || (currentUser?.email?.includes?.('.edu') ? currentUser.email : ''));
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
   const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
-  const fileInputRef = useRef(null);
 
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
@@ -118,7 +114,6 @@ export default function Configuracoes() {
   const [submittingPassword, setSubmittingPassword] = useState(false);
   const [passwordReauthRequired, setPasswordReauthRequired] = useState(false);
 
-  const [submittingStudent, setSubmittingStudent] = useState(false);
   const [submittingCompany, setSubmittingCompany] = useState(false);
 
   if (!currentUser) {
@@ -153,88 +148,17 @@ export default function Configuracoes() {
 
   const handleSaveAccount = (e) => {
     e.preventDefault();
-    updateAuthUser({ name, email, linkedin, github, avatar });
-    setCurrentUser({ ...currentUser, name, email, linkedin, github, avatar });
-    showToast('Dados da conta e foto atualizados com sucesso!');
-  };
-
-  // Student file drop / select
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processStudentFile(file);
-  };
-
-  const processStudentFile = (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('O arquivo selecionado excede o limite máximo de 5MB.');
-      return;
-    }
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
-      showToast('Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
-      return;
-    }
-    setSelectedFile(file);
-    showToast(`Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
-    else if (e.type === 'dragleave') setDragActive(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processStudentFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleVerificationSubmit = async (e) => {
-    e.preventDefault();
-    if (!raNumber.trim()) {
-      showToast('Por favor, informe seu RA / Número de Matrícula.');
-      return;
-    }
-    if (!selectedFile && !currentUser?.isVerifiedStudent) {
-      showToast('Por favor, selecione o arquivo PDF ou imagem da sua declaração de matrícula.');
-      return;
-    }
-
-    setSubmittingStudent(true);
-    showToast('Processando e autenticando declaração...');
-
-    try {
-      let uploadedDocUrl = null;
-      if (selectedFile) {
-        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
-        if (uploadRes.success) {
-          uploadedDocUrl = uploadRes.url;
-        }
-      }
-
-      const res = submitStudentVerification(raNumber, selectedFile);
-      if (res.success) {
-        setVerificationSubmitted(true);
-        const updated = updateAuthUser({
-          isVerifiedStudent: true,
-          raNumber,
-          studentProofUrl: uploadedDocUrl,
-          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
-        });
-        if (updated) {
-          setCurrentUser(updated);
-        }
-        showToast('Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
-      }
-    } finally {
-      setSubmittingStudent(false);
-    }
+    const updatedData = {
+      name,
+      email,
+      linkedin,
+      github,
+      avatar,
+      ...(currentUser?.role === 'aluno' ? { raNumber } : {})
+    };
+    updateAuthUser(updatedData);
+    setCurrentUser({ ...currentUser, ...updatedData });
+    showToast('Dados da conta atualizados com sucesso!');
   };
 
   const handleCnpjChange = (e) => {
@@ -552,6 +476,22 @@ export default function Configuracoes() {
                   </div>
                 </div>
 
+                {currentUser?.role === 'aluno' && (
+                  <div className="form-group">
+                    <label className="form-label">RA / Matrícula Acadêmica (Opcional)</label>
+                    <input
+                      type="text"
+                      value={raNumber}
+                      onChange={e => setRaNumber(e.target.value)}
+                      className="form-control"
+                      placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
+                    />
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
+                      Identificador acadêmico opcional exibido no seu currículo e para recrutadores.
+                    </p>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Tipo de Conta</label>
                   <input
@@ -571,15 +511,15 @@ export default function Configuracoes() {
             </div>
           )}
 
-          {/* ── ABA 2: VERIFICAÇÃO DE MATRÍCULA (ALUNOS) ── */}
+          {/* ── ABA 2: VERIFICAÇÃO DE ESTUDANTE (ALUNOS) ── */}
           {activeTab === 'verification' && currentUser.role === 'aluno' && (
             <div className="card p-6 sm:p-8 space-y-6">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
                 <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <ShieldCheck size={22} className="text-green-600 dark:text-green-400" /> Autenticação e Vínculo Estudantil
+                  <GraduationCap size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação Oficial de Estudante
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">
-                  Comprove seu vínculo acadêmico com o IFPR, Univale, UENP ou faculdades parceiras para **liberar candidaturas a vagas** e destacar seu perfil no Banco de Talentos.
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  Confirme seu e-mail institucional oficial (IFPR, Univale, UENP, UTFPR ou qualquer faculdade parceira com domínio <strong>.edu.br</strong>) para liberar candidaturas e ativar o <strong>Selo de Estudante Verificado</strong>.
                 </p>
               </div>
 
@@ -590,7 +530,7 @@ export default function Configuracoes() {
                   </div>
                   <h4 className="font-heading font-bold text-lg text-emerald-900 dark:text-emerald-300">Estudante Autenticado com Sucesso!</h4>
                   <p className="text-sm text-emerald-800 dark:text-emerald-200 max-w-md mx-auto leading-relaxed">
-                    Seu vínculo acadêmico foi confirmado pelo sistema. Seu perfil está <strong>VISÍVEL</strong> para recrutadores e você pode se candidatar a todas as vagas do ecossistema.
+                    Seu vínculo acadêmico foi confirmado oficialmente via Firebase Auth. Seu perfil está <strong>VISÍVEL</strong> para recrutadores e você pode se candidatar a todas as vagas do ecossistema.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     {(currentUser.studentEmail || validateStudentEmail(currentUser.email)?.isValid) && (
@@ -613,12 +553,12 @@ export default function Configuracoes() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Opção 1: Autenticação por E-mail Estudantil (Prova de Propriedade) */}
+                  {/* Autenticação Oficial por E-mail Estudantil (Prova de Propriedade) */}
                   <div className="p-5 sm:p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <GraduationCap size={18} className="text-primary-blue dark:text-blue-400" />
-                        Opção 1: Autenticação por E-mail Estudantil (Prova de Propriedade)
+                        Validação Direta por E-mail Institucional
                       </h4>
                       <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
                         Oficial Firebase Auth
@@ -626,7 +566,7 @@ export default function Configuracoes() {
                     </div>
 
                     <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                      Informe seu e-mail institucional oficial (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal para comprovar a titularidade da conta.
+                      Informe seu e-mail institucional acadêmico (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong>, <strong>@utfpr.edu.br</strong> ou qualquer domínio <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal institucional para validar sua titularidade instantaneamente.
                     </p>
 
                     <form onSubmit={handleSendVerificationEmail} className="flex flex-col sm:flex-row gap-2">
@@ -704,81 +644,6 @@ export default function Configuracoes() {
                       </div>
                     )}
                   </div>
-
-                  {/* Divisor */}
-                  <div className="relative flex items-center justify-center">
-                    <div className="border-t border-gray-200 dark:border-slate-800 w-full" />
-                    <span className="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider absolute">
-                      ou envie sua declaração em PDF
-                    </span>
-                  </div>
-
-                  {/* Opção 2: Declaração de Matrícula (PDF) */}
-                  <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-1">
-                    <div className="form-group">
-                      <label className="form-label">RA / Número de Matrícula Acadêmica</label>
-                      <input
-                        type="text"
-                        value={raNumber}
-                        onChange={e => setRaNumber(e.target.value)}
-                        className="form-control"
-                        placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
-                        required
-                      />
-                    </div>
-
-                    {/* Input de Arquivo Real com Drag & Drop */}
-                    <div className="form-group">
-                      <label className="form-label">Anexar Declaração de Matrícula (PDF, PNG ou JPG - Máx. 5MB)</label>
-                      
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        accept=".pdf,.png,.jpg,.jpeg"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-
-                      <div
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
-                          dragActive
-                            ? 'border-primary-blue bg-blue-50/50 dark:bg-blue-950/40'
-                            : 'border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <Upload size={32} className="mx-auto mb-2 text-gray-400 dark:text-slate-500" />
-                        
-                        {selectedFile ? (
-                          <div className="space-y-1">
-                            <p className="text-sm font-bold text-green-600 dark:text-green-400 flex items-center justify-center gap-1.5">
-                              <FileText size={16} /> {selectedFile.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-slate-400">
-                              Tamanho: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · Clique para alterar o arquivo
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                              Arraste seu arquivo PDF/Imagem aqui ou clique para selecionar
-                            </p>
-                            <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Formatos aceitos: PDF, PNG, JPG (Máx. 5MB)</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-2">
-                      <button type="submit" disabled={submittingStudent} className="btn btn-teal btn-sm font-bold shadow-md">
-                        <ShieldCheck size={16} /> {submittingStudent ? 'Autenticando...' : 'Enviar Comprovante & Ativar Perfil'}
-                      </button>
-                    </div>
-                  </form>
                 </div>
               )}
             </div>

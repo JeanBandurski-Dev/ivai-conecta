@@ -36,8 +36,13 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // A verificação obrigatória de e-mail aplica-se exclusivamente a contas de alunos (estudantes)
+  // Empresas e professores não possuem esse bloqueio
+  const requiresEmailVerification = currentUser?.role === 'aluno';
+
   // Estado local para controle imediato de verificação
   const [isVerified, setIsVerified] = useState(() => {
+    if (currentUser && currentUser.role !== 'aluno') return true;
     if (auth.currentUser) return Boolean(auth.currentUser.emailVerified);
     return Boolean(currentUser?.emailVerified);
   });
@@ -49,6 +54,10 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   // Sincroniza estado de verificação com Firebase Auth e store
   useEffect(() => {
+    if (currentUser && currentUser.role !== 'aluno') {
+      setIsVerified(true);
+      return;
+    }
     if (auth.currentUser) {
       setIsVerified(Boolean(auth.currentUser.emailVerified));
     } else if (currentUser) {
@@ -56,11 +65,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     }
   }, [currentUser, auth.currentUser?.emailVerified]);
 
-  // Checagem silenciosa automática ao montar o componente
+  // Checagem silenciosa automática ao montar o componente (apenas para alunos)
   useEffect(() => {
     let isMounted = true;
     async function checkSilently() {
-      if (auth.currentUser && !auth.currentUser.emailVerified) {
+      if (currentUser?.role === 'aluno' && auth.currentUser && !auth.currentUser.emailVerified) {
         try {
           await auth.currentUser.reload();
           if (auth.currentUser.emailVerified && isMounted) {
@@ -68,7 +77,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
             const updated = {
               ...(currentUser || {}),
               emailVerified: true,
-              ...(currentUser?.role === 'aluno' ? { isVerifiedStudent: true } : {})
+              isVerifiedStudent: true
             };
             setCurrentUser(updated);
           }
@@ -81,7 +90,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser?.role]);
 
   // Timer regressivo para o botão de reenvio
   useEffect(() => {
@@ -228,8 +237,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     navigate('/login', { replace: true });
   };
 
-  // 3. SE O E-MAIL NÃO ESTIVER VERIFICADO: Renderiza a Tela de Bloqueio Obrigatória
-  if (!isVerified) {
+  // 3. SE O E-MAIL NÃO ESTIVER VERIFICADO E FOR CONTA DE ALUNO: Renderiza a Tela de Bloqueio Obrigatória
+  if (requiresEmailVerification && !isVerified) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-12 md:py-20 text-center">
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 sm:p-10 md:p-12 shadow-2xl border border-gray-100 dark:border-slate-700/60 relative overflow-hidden">
@@ -248,7 +257,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
           {/* Badge informativa */}
           <span className="inline-block px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 mb-4">
-            Confirmação Obrigatória
+            Confirmação Estudantil Obrigatória
           </span>
 
           {/* Mensagem exigida no requisito */}
@@ -263,7 +272,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
           </div>
 
           <p className="text-gray-600 dark:text-slate-300 text-sm sm:text-base mb-8 max-w-lg mx-auto leading-relaxed">
-            Enviamos um link de ativação para a sua caixa de entrada. Para garantir a integridade da sua conta e desbloquear o acesso aos recursos do <strong>Ivaí Conecta</strong>, clique no link de verificação.
+            Enviamos um link de ativação para a sua caixa de entrada. Para garantir a integridade da sua conta estudantil e desbloquear o acesso aos recursos do <strong>Ivaí Conecta</strong>, clique no link de verificação.
           </p>
 
           {/* Bloco de Ações Principais */}

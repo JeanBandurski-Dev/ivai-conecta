@@ -242,7 +242,7 @@ export default function PerfilAluno() {
             <div className="flex items-center gap-2 font-semibold">
               <Lock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <span>
-                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Valide seu e-mail estudantil institucional ou envie sua declaração para ativar o Selo Verificado.
+                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Valide seu e-mail estudantil institucional para ativar seu Selo de Estudante Verificado.
               </span>
             </div>
             <Link to="/configuracoes" className="btn btn-primary btn-sm text-xs font-bold shrink-0">

@@ -38,11 +38,15 @@ function MinhasVagasRoute() {
 function AppRoutes() {
   const { currentUser } = useAppStore();
   const isLogged = Boolean(currentUser || auth.currentUser);
+
+  // A verificação obrigatória de e-mail aplica-se exclusivamente a contas de alunos (estudantes)
+  // Contas de empresa e professor não possuem bloqueio de e-mail
+  const requiresEmailVerification = currentUser?.role === 'aluno';
   const isVerified = Boolean(auth.currentUser?.emailVerified ?? currentUser?.emailVerified);
 
-  // Se o usuário estiver logado, mas NÃO confirmou o e-mail:
+  // Se for aluno e ainda não tiver confirmado o e-mail:
   // Intercepta a navegação e renderiza a tela de bloqueio obrigatória
-  if (isLogged && !isVerified) {
+  if (isLogged && requiresEmailVerification && !isVerified) {
     return <ProtectedRoute />;
   }
 
