@@ -16,7 +16,7 @@ import {
   STORAGE_KEY_USERS_DB,
   STORAGE_KEY_CITY,
   USER_ROLES,
-} from '../data/seedData';
+} from '../data/seedData.js';
 
 export function getUsersDB() {
   if (typeof localStorage === 'undefined') return [];
@@ -51,6 +51,345 @@ export async function getUserProfile(uid) {
   }
 }
 
+export function formatFirebaseAuthError(error, context = 'login') {
+  if (!error) {
+    return {
+      code: 'auth/unknown',
+      message: 'Ocorreu um erro inesperado na autenticação.',
+      fullText: 'Ocorreu um erro inesperado.'
+    };
+  }
+
+  const rawMsg = error.message || (typeof error === 'string' ? error : '');
+  const code = error.code || (rawMsg.match(/\((auth\/[a-z0-9_-]+)\)/i)?.[1] || (rawMsg.match(/\[([a-z0-9_/-]+)\]/i)?.[1] || ''));
+  let friendlyMessage = '';
+
+  switch (code) {
+    case 'auth/email-already-in-use':
+      friendlyMessage = 'Este e-mail institucional já está cadastrado no sistema. Se você já possui uma conta, realize o login.';
+      break;
+    case 'auth/invalid-email':
+      friendlyMessage = 'O formato do endereço de e-mail informado é considerado inválido pelo Firebase Auth.';
+      break;
+    case 'auth/weak-password':
+      friendlyMessage = 'A senha informada é considerada muito fraca pelo Firebase. Ela deve conter no mínimo 6 caracteres.';
+      break;
+    case 'auth/missing-password':
+      friendlyMessage = 'Por favor, informe uma senha para acessar ou criar sua conta.';
+      break;
+    case 'auth/missing-email':
+      friendlyMessage = 'Por favor, informe seu endereço de e-mail institucional.';
+      break;
+    case 'auth/operation-not-allowed':
+      friendlyMessage = 'O método de autenticação por E-mail/Senha não está ativado no Firebase Console deste projeto (Ative em Authentication > Sign-in method).';
+      break;
+    case 'auth/user-not-found':
+      friendlyMessage = 'Nenhuma conta cadastrada encontrada com este e-mail no Firebase. Crie uma conta na aba "Quero Me Cadastrar".';
+      break;
+    case 'auth/wrong-password':
+      friendlyMessage = 'Senha incorreta para este e-mail.';
+      break;
+    case 'auth/invalid-credential':
+      friendlyMessage = 'Credenciais de acesso incorretas. Verifique se o e-mail institucional e a senha foram digitados corretamente.';
+      break;
+    case 'auth/user-disabled':
+      friendlyMessage = 'Esta conta de usuário foi desativada pelo administrador no Firebase Authentication.';
+      break;
+    case 'auth/too-many-requests':
+      friendlyMessage = 'Acesso temporariamente bloqueado pelo Firebase por excesso de tentativas consecutivas. Aguarde alguns minutos.';
+      break;
+    case 'auth/network-request-failed':
+      friendlyMessage = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão com a internet e tente novamente.';
+      break;
+    case 'auth/popup-closed-by-user':
+      friendlyMessage = 'A janela de autenticação do Google foi fechada antes da conclusão do login.';
+      break;
+    case 'auth/popup-blocked':
+      friendlyMessage = 'O navegador bloqueou a janela pop-up de autenticação do Google. Habilite pop-ups para este site.';
+      break;
+    case 'auth/cancelled-popup-request':
+      friendlyMessage = 'Apenas uma janela de login do Google pode ser aberta por vez.';
+      break;
+    case 'auth/account-exists-with-different-credential':
+      friendlyMessage = 'Já existe uma conta cadastrada com este e-mail utilizando outro método de autenticação.';
+      break;
+    case 'auth/credential-already-in-use':
+      friendlyMessage = 'Esta credencial de login já está associada a outra conta de usuário.';
+      break;
+    case 'auth/requires-recent-login':
+      friendlyMessage = 'Esta operação exige que você faça login novamente por motivos de segurança.';
+      break;
+    case 'auth/unauthorized-domain':
+      friendlyMessage = 'Este domínio web não está autorizado no Firebase Console. Adicione seu domínio ou localhost em Firebase Console > Authentication > Settings > Domínios Autorizados.';
+      break;
+    case 'auth/invalid-api-key':
+    case 'auth/api-key-not-valid':
+      friendlyMessage = 'Chave da API do Firebase configurada é inválida ou expirou. Verifique o arquivo de ambiente.';
+      break;
+    case 'auth/quota-exceeded':
+      friendlyMessage = 'Cota de requisições excedida nos servidores do Firebase Authentication.';
+      break;
+    case 'auth/invalid-institutional-email':
+      friendlyMessage = 'O e-mail informado não possui um domínio institucional educacional permitido para contas docentes.';
+      break;
+    case 'auth/internal-error':
+      friendlyMessage = 'Erro interno no Firebase Authentication. Tente novamente em instantes.';
+      break;
+    case 'permission-denied':
+      friendlyMessage = 'Permissão negada no Cloud Firestore ao gravar os dados do perfil em /users/{uid}. Verifique as regras de segurança (firestore.rules).';
+      break;
+    case 'unavailable':
+      friendlyMessage = 'O serviço do Firestore está temporariamente indisponível. Verifique a conexão com o banco de dados.';
+      break;
+    default:
+      if (rawMsg) {
+        const cleanMsg = rawMsg.replace(/^Firebase:\s*/i, '').replace(/\s*\([a-z0-9/-]+\)\.?$/i, '');
+        friendlyMessage = cleanMsg || (context === 'register' ? 'Erro ao realizar cadastro no Firebase.' : 'Erro ao realizar login no Firebase.');
+      } else {
+        friendlyMessage = context === 'register' ? 'Erro ao realizar cadastro no Firebase.' : 'Erro ao realizar login no Firebase.';
+      }
+      break;
+  }
+
+  return {
+    code: code || 'auth/error',
+    message: friendlyMessage,
+    rawMessage: rawMsg,
+    fullText: code ? `${friendlyMessage} (${code})` : friendlyMessage
+  };
+}
+
+export const OFFICIAL_INSTITUTION_SPECS = [
+  {
+    institution: 'IFPR Campus Ivaiporã / Rede Federal',
+    baseDomains: ['ifpr.edu.br'],
+    allowedSubdomains: [
+      'ivaipora', 'curitiba', 'londrina', 'maringa', 'paranagua', 'foz',
+      'cascavel', 'umuarama', 'campo-largo', 'jacarezinho', 'telemaco-borba',
+      'assis-chateaubriand', 'pinhais', 'colombo', 'pitanga', 'goioere',
+      'qquedaso', 'barracao', 'capanema', 'coronel-vivida', 'jaguariaiva',
+      'uniao-da-vitoria', 'astorga', 'arapongas', 'ead', 'reitoria',
+      'docente', 'professor', 'servidor', 'dti'
+    ]
+  },
+  {
+    institution: 'UTFPR - Univ. Tecnológica Federal do Paraná',
+    baseDomains: ['utfpr.edu.br'],
+    allowedSubdomains: ['cm', 'ap', 'ld', 'ct', 'cp', 'pg', 'pb', 'md', 'fb', 'dv', 'td', 'sh', 'gp', 'docente', 'prof', 'professor', 'reitoria', 'dti']
+  },
+  {
+    institution: 'UFPR - Univ. Federal do Paraná',
+    baseDomains: ['ufpr.br'],
+    allowedSubdomains: ['inf', 'dinf', 'exatas', 'bio', 'humanas', 'docente', 'prof', 'reitoria', 'palotina', 'jandaia', 'matinhos']
+  },
+  {
+    institution: 'UENP - Univ. Estadual do Norte do Paraná',
+    baseDomains: ['uenp.edu.br'],
+    allowedSubdomains: ['clm', 'cct', 'cj', 'docente', 'prof', 'reitoria']
+  },
+  {
+    institution: 'UEL - Univ. Estadual de Londrina',
+    baseDomains: ['uel.br'],
+    allowedSubdomains: ['dc', 'depto', 'docente', 'prof', 'reitoria', 'cce', 'cca', 'ctu']
+  },
+  {
+    institution: 'UEM - Univ. Estadual de Maringá',
+    baseDomains: ['uem.br'],
+    allowedSubdomains: ['din', 'dma', 'dfi', 'des', 'dco', 'dad', 'docente', 'prof', 'reitoria']
+  },
+  {
+    institution: 'UNESPAR - Univ. Estadual do Paraná',
+    baseDomains: ['unespar.edu.br'],
+    allowedSubdomains: ['campo-mourao', 'curitiba', 'paranavai', 'apucarana', 'paranagua', 'uniao-da-vitoria', 'docente', 'prof']
+  },
+  {
+    institution: 'UNICENTRO - Univ. Estadual do Centro-Oeste',
+    baseDomains: ['unicentro.br'],
+    allowedSubdomains: ['docente', 'prof', 'pitanga', 'prudentopolis', 'irati', 'guarapuava']
+  },
+  {
+    institution: 'UEPG - Univ. Estadual de Ponta Grossa',
+    baseDomains: ['uepg.br'],
+    allowedSubdomains: ['docente', 'prof', 'deinfo', 'reitoria']
+  },
+  {
+    institution: 'UNIOESTE - Univ. Estadual do Oeste do Paraná',
+    baseDomains: ['unioeste.br'],
+    allowedSubdomains: ['docente', 'prof', 'reitoria', 'cascavel', 'foz', 'toledo']
+  },
+  {
+    institution: 'Univale Ivaiporã',
+    baseDomains: ['univale.edu.br', 'univale.com.br', 'faive.edu.br', 'feati.edu.br', 'faculdadeivaipora.com.br', 'faculdadeivaipora.edu.br'],
+    allowedSubdomains: ['docente', 'prof', 'ead']
+  },
+  {
+    institution: 'FATEC Ivaiporã',
+    baseDomains: ['fatec.edu.br', 'fatecivaipora.edu.br'],
+    allowedSubdomains: ['docente', 'prof', 'ivaipora']
+  },
+  {
+    institution: 'Rede Pública Estadual (SEED-PR)',
+    baseDomains: ['escola.pr.gov.br', 'prof.pr.gov.br', 'seed.pr.gov.br', 'educacao.pr.gov.br'],
+    allowedSubdomains: []
+  },
+  {
+    institution: 'Ivaí Conecta (Ambiente Docente Homologado)',
+    baseDomains: ['ivaiconecta.com.br'],
+    allowedSubdomains: ['docente', 'prof', 'professor']
+  },
+  {
+    institution: 'UniCesumar',
+    baseDomains: ['unicesumar.edu.br', 'unicesumar.com.br'],
+    allowedSubdomains: ['docente', 'prof', 'ead']
+  },
+  {
+    institution: 'PUCPR',
+    baseDomains: ['pucpr.br', 'pucpr.edu.br'],
+    allowedSubdomains: ['docente', 'prof', 'londrina', 'maringa', 'curitiba']
+  },
+  {
+    institution: 'UniFil Londrina',
+    baseDomains: ['unifil.br'],
+    allowedSubdomains: ['docente', 'prof', 'ead']
+  },
+  {
+    institution: 'Universidade Positivo',
+    baseDomains: ['up.edu.br'],
+    allowedSubdomains: ['docente', 'prof']
+  },
+  {
+    institution: 'USP - Universidade de São Paulo',
+    baseDomains: ['usp.br'],
+    allowedSubdomains: ['ime', 'poli', 'icmc', 'ffclrp', 'docente', 'prof']
+  },
+  {
+    institution: 'UNICAMP',
+    baseDomains: ['unicamp.br'],
+    allowedSubdomains: ['ic', 'fee', 'fem', 'docente', 'prof']
+  },
+  {
+    institution: 'UNESP',
+    baseDomains: ['unesp.br'],
+    allowedSubdomains: ['ibilce', 'fc', 'docente', 'prof']
+  },
+  {
+    institution: 'UFRJ',
+    baseDomains: ['ufrj.br'],
+    allowedSubdomains: ['dcc', 'poli', 'docente', 'prof']
+  },
+  {
+    institution: 'UFMG',
+    baseDomains: ['ufmg.br'],
+    allowedSubdomains: ['dcc', 'eng', 'docente', 'prof']
+  },
+  {
+    institution: 'UnB',
+    baseDomains: ['unb.br'],
+    allowedSubdomains: ['cic', 'docente', 'prof']
+  },
+  {
+    institution: 'UFSC',
+    baseDomains: ['ufsc.br'],
+    allowedSubdomains: ['inf', 'ctc', 'docente', 'prof']
+  },
+  {
+    institution: 'UFRGS',
+    baseDomains: ['ufrgs.br'],
+    allowedSubdomains: ['inf', 'docente', 'prof']
+  }
+];
+
+const ALLOWED_INTERNATIONAL_DOMAINS = [
+  'mit.edu', 'harvard.edu', 'stanford.edu', 'berkeley.edu', 'cmu.edu',
+  'oxford.ac.uk', 'cam.ac.uk'
+];
+
+export const ALLOWED_INSTITUTIONAL_DOMAINS = OFFICIAL_INSTITUTION_SPECS.flatMap(s => s.baseDomains);
+
+export function isInstitutionalEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  let clean = email.toLowerCase().trim();
+
+  // Trata formatos com nome de exibição: "Prof. Nome" <email@ifpr.edu.br>
+  const matchAngle = clean.match(/<([^>]+)>/);
+  if (matchAngle) {
+    clean = matchAngle[1].toLowerCase().trim();
+  }
+
+  const atIndex = clean.lastIndexOf('@');
+  if (atIndex === -1 || atIndex === clean.length - 1) return false;
+
+  const domain = clean.slice(atIndex + 1).trim();
+  if (!domain) return false;
+
+  // 1. Verificação contra a tabela oficial de especificações institucionais
+  for (const spec of OFFICIAL_INSTITUTION_SPECS) {
+    for (const base of spec.baseDomains) {
+      if (domain === base) {
+        return true; // Match exato com domínio oficial (ex: @ifpr.edu.br, @univale.edu.br)
+      }
+      if (domain.endsWith('.' + base)) {
+        const sub = domain.slice(0, domain.length - base.length - 1);
+        // Só permite se o subdomínio for um subdomínio legítimo/acadêmico da instituição
+        if (spec.allowedSubdomains && spec.allowedSubdomains.includes(sub)) {
+          return true;
+        }
+        // Subdomínio arbitrário ou fake em instituição conhecida (ex: abacaxi.ifpr.edu.br) -> REJEITA!
+        return false;
+      }
+    }
+  }
+
+  // 2. Faculdades e Universidades brasileiras registradas oficialmente no Registro.br sob .edu.br
+  // Formato oficial obrigatório: <instituicao>.edu.br ou (docente|prof|professor|ead|campus).<instituicao>.edu.br
+  if (domain.endsWith('.edu.br')) {
+    const parts = domain.split('.');
+    if (parts.length === 3) {
+      const instName = parts[0];
+      const blockedNames = ['abacaxi', 'teste', 'fake', 'fakeedu', 'exemplo', 'qualquer'];
+      if (instName.length >= 2 && !blockedNames.includes(instName)) {
+        return true;
+      }
+    } else if (parts.length === 4) {
+      const sub = parts[0];
+      const instName = parts[1];
+      const validAcademicPrefixes = ['docente', 'prof', 'professor', 'ead', 'reitoria', 'campus', 'pos', 'lab', 'ti', 'dti'];
+      if (validAcademicPrefixes.includes(sub) && instName.length >= 2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // 3. Universidades internacionais de referência explicitamente credenciadas
+  if (ALLOWED_INTERNATIONAL_DOMAINS.includes(domain)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function inferInstitutionFromEmail(email) {
+  if (!email || typeof email !== 'string') return 'IFPR Campus Ivaiporã';
+  let clean = email.toLowerCase().trim();
+  const matchAngle = clean.match(/<([^>]+)>/);
+  if (matchAngle) {
+    clean = matchAngle[1].toLowerCase().trim();
+  }
+  const atIndex = clean.lastIndexOf('@');
+  const domain = atIndex !== -1 ? clean.slice(atIndex + 1).trim() : clean;
+
+  for (const spec of OFFICIAL_INSTITUTION_SPECS) {
+    for (const base of spec.baseDomains) {
+      if (domain === base || domain.endsWith('.' + base)) {
+        return spec.institution;
+      }
+    }
+  }
+
+  return 'Instituição de Ensino Superior / Técnico';
+}
+
 export async function login(email, password) {
   const cleanEmail = email.toLowerCase().trim();
 
@@ -60,61 +399,65 @@ export async function login(email, password) {
 
     // Buscar perfil adicional no Firestore
     const profileRes = await getUserProfile(fbUser.uid);
-    const role = profileRes.profile?.role || 'aluno';
+    let profileData = profileRes.profile;
+
+    if (!profileData) {
+      const guessedRole = isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno';
+      const guessedRoleMeta = USER_ROLES[guessedRole] || USER_ROLES.aluno;
+      profileData = {
+        id: fbUser.uid,
+        uid: fbUser.uid,
+        email: cleanEmail,
+        name: fbUser.displayName || (cleanEmail.split('@')[0].replace(/[._-]/g, ' ')),
+        city: 'Ivaiporã',
+        role: guessedRole,
+        badge: guessedRoleMeta.badge,
+        avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+        ...(guessedRole === 'professor' ? {
+          institution: inferInstitutionFromEmail(cleanEmail),
+          degree: 'Docente / Pesquisador',
+          discipline: 'Docência & Orientação Acadêmica',
+          verified: true
+        } : {}),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        await setDoc(doc(db, 'users', fbUser.uid), profileData, { merge: true });
+      } catch (err) {
+        console.warn('[login] Aviso ao sincronizar perfil novo no Firestore:', err.message);
+      }
+    }
+
+    const role = String(profileData.role || (isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno')).toLowerCase().trim();
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
       uid: fbUser.uid,
       id: fbUser.uid,
       email: fbUser.email,
-      name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
-      city: profileRes.profile?.city || 'Ivaiporã',
+      name: profileData.name || fbUser.displayName || 'Usuário',
+      city: profileData.city || 'Ivaiporã',
       role,
       badge: roleMeta.badge,
-      avatar: profileRes.profile?.avatar || fbUser.photoURL || '',
-      isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
-      isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-      ...(profileRes.profile || {})
+      avatar: profileData.avatar || fbUser.photoURL || '',
+      isVerifiedStudent: profileData.isVerifiedStudent ?? (role === 'aluno' ? false : true),
+      isVerifiedCompany: profileData.isVerifiedCompany ?? (role === 'empresa'),
+      ...profileData
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser };
   } catch (error) {
-    let errorMsg = 'E-mail ou senha incorretos. Verifique seus dados.';
-    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-      errorMsg = 'E-mail ou senha inválidos. Verifique suas credenciais.';
-    } else if (error.code === 'auth/invalid-email') {
-      errorMsg = 'O endereço de e-mail informado é inválido.';
-    } else if (error.code === 'auth/user-disabled') {
-      errorMsg = 'Esta conta foi desativada pelo administrador.';
-    } else if (error.code === 'auth/too-many-requests') {
-      errorMsg = 'Muitas tentativas sem sucesso. Tente novamente mais tarde.';
-    } else if (error.code === 'auth/network-request-failed') {
-      errorMsg = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão de rede.';
-    }
-    return { success: false, error: errorMsg, errorCode: error.code };
+    const formatted = formatFirebaseAuthError(error, 'login');
+    return {
+      success: false,
+      error: formatted.message,
+      errorCode: formatted.code,
+      fullError: formatted.fullText,
+      rawMessage: formatted.rawMessage
+    };
   }
-}
-
-export const ALLOWED_INSTITUTIONAL_DOMAINS = [
-  '@ifpr.edu.br',
-  '@uenp.edu.br',
-  '@univale.edu.br',
-  '@unespar.edu.br',
-  '@uel.br',
-  '@uem.br',
-  '@utfpr.edu.br',
-  '@escola.pr.gov.br',
-  '@prof.pr.gov.br'
-];
-
-export function isInstitutionalEmail(email) {
-  if (!email || typeof email !== 'string') return false;
-  const clean = email.toLowerCase().trim();
-  if (!clean.includes('@')) return false;
-  if (ALLOWED_INSTITUTIONAL_DOMAINS.some(d => clean.endsWith(d))) return true;
-  if (clean.endsWith('.edu.br') || clean.endsWith('.edu') || clean.endsWith('.ac.br')) return true;
-  return false;
 }
 
 export async function register(data) {
@@ -126,7 +469,8 @@ export async function register(data) {
   if (selectedRole === 'professor' && !isInstitutionalEmail(cleanEmail)) {
     return {
       success: false,
-      error: 'Professores e docentes devem utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br ou outro domínio .edu.br).'
+      errorCode: 'auth/invalid-institutional-email',
+      error: 'Professores e docentes devem utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @utfpr.edu.br, @ufpr.br, @seed.pr.gov.br ou qualquer domínio educacional .edu.br).'
     };
   }
 
@@ -157,9 +501,9 @@ export async function register(data) {
       endorsements: []
     },
     professor: {
-      degree: data.degree || '',
-      institution: data.institution || 'IFPR Campus Ivaiporã',
-      discipline: data.discipline || '',
+      degree: data.degree || 'Docente / Pesquisador',
+      institution: data.institution || inferInstitutionFromEmail(cleanEmail),
+      discipline: data.discipline || 'Docência & Orientação Acadêmica',
       endorsementCount: 0,
       verified: true,
       bio: data.bio || '',
@@ -217,28 +561,14 @@ export async function register(data) {
     return { success: true, user: sessionUser };
   } catch (error) {
     console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
-
-    // Mensagens explicativas para erros do Firebase Auth sem fallbacks mascarados
-    let userFriendlyError = 'Erro ao realizar cadastro no Firebase.';
-    if (error.code === 'auth/operation-not-allowed') {
-      userFriendlyError = 'O método E-mail/Senha não está ativado no Firebase Console (Vá em Authentication > Sign-in method e ative E-mail/senha).';
-    } else if (error.code === 'auth/email-already-in-use') {
-      userFriendlyError = 'Este e-mail já está cadastrado no sistema.';
-    } else if (error.code === 'auth/weak-password') {
-      userFriendlyError = 'A senha deve conter no mínimo 6 caracteres.';
-    } else if (error.code === 'auth/invalid-email') {
-      userFriendlyError = 'Formato de e-mail inválido.';
-    } else if (error.code === 'auth/network-request-failed') {
-      userFriendlyError = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão com a internet.';
-    } else if (error.code === 'auth/too-many-requests') {
-      userFriendlyError = 'Muitas tentativas bloqueadas temporariamente por segurança. Tente novamente mais tarde.';
-    } else if (error.code === 'auth/user-disabled') {
-      userFriendlyError = 'Esta conta de usuário foi desativada.';
-    } else if (error.message) {
-      userFriendlyError = `Erro no Firebase: ${error.message}`;
-    }
-
-    return { success: false, error: userFriendlyError, errorCode: error.code };
+    const formatted = formatFirebaseAuthError(error, 'register');
+    return {
+      success: false,
+      error: formatted.message,
+      errorCode: formatted.code,
+      fullError: formatted.fullText,
+      rawMessage: formatted.rawMessage
+    };
   }
 }
 
@@ -251,7 +581,9 @@ export async function loginWithGoogle() {
     const profileRes = await getUserProfile(fbUser.uid);
     let needsProfileCompletion = !profileRes.success || !profileRes.profile?.role;
 
-    const role = profileRes.profile?.role || 'aluno';
+    const email = (fbUser.email || '').toLowerCase().trim();
+    const fallbackRole = isInstitutionalEmail(email) ? 'professor' : 'aluno';
+    const role = profileRes.profile?.role || fallbackRole;
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
@@ -265,13 +597,26 @@ export async function loginWithGoogle() {
       avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
       isVerifiedCompany: role === 'empresa',
-      ...(profileRes.profile || {})
+      ...(role === 'professor' && !profileRes.profile?.institution ? {
+        institution: inferInstitutionFromEmail(email),
+        degree: 'Docente / Pesquisador',
+        discipline: 'Docência & Orientação Acadêmica',
+        verified: true
+      } : {}),
+      ...profileRes.profile
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser, needsProfileCompletion };
   } catch (error) {
-    return { success: false, error: 'Falha ao autenticar com o Google: ' + (error.message || error.code) };
+    const formatted = formatFirebaseAuthError(error, 'google');
+    return {
+      success: false,
+      error: formatted.message,
+      errorCode: formatted.code,
+      fullError: formatted.fullText,
+      rawMessage: formatted.rawMessage
+    };
   }
 }
 
@@ -279,14 +624,21 @@ export async function completeUserProfile(uid, additionalData) {
   try {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
     const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+    const email = (additionalData.email || auth.currentUser?.email || '').toLowerCase().trim();
 
     const payload = {
       name: additionalData.name,
-      email: additionalData.email,
+      email: email,
       city: additionalData.city,
       role: additionalData.role,
       avatar: avatar,
       updatedAt: new Date().toISOString(),
+      ...(additionalData.role === 'professor' ? {
+        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        degree: additionalData.degree || 'Docente / Pesquisador',
+        discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
+        verified: true
+      } : {}),
       ...(additionalData.cnpj && { cnpj: additionalData.cnpj }),
       ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
@@ -302,6 +654,12 @@ export async function completeUserProfile(uid, additionalData) {
       role: additionalData.role,
       avatar: avatar,
       badge: roleMeta.badge,
+      ...(additionalData.role === 'professor' ? {
+        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        degree: additionalData.degree || 'Docente / Pesquisador',
+        discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
+        verified: true
+      } : {}),
       ...(additionalData.cnpj && { cnpj: additionalData.cnpj }),
       ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
@@ -311,7 +669,13 @@ export async function completeUserProfile(uid, additionalData) {
 
     return { success: true, user: updated };
   } catch (error) {
-    return { success: false, error: error.message };
+    const formatted = formatFirebaseAuthError(error, 'completeProfile');
+    return {
+      success: false,
+      error: formatted.message,
+      errorCode: formatted.code,
+      fullError: formatted.fullText
+    };
   }
 }
 
@@ -337,7 +701,9 @@ export function watchAuthState(callback) {
             console.warn('[watchAuthState] Erro ao buscar perfil do Firestore:', pErr);
           }
 
-          const role = profileRes.profile?.role || 'aluno';
+          const userEmail = (fbUser.email || '').toLowerCase().trim();
+          const fallbackRole = isInstitutionalEmail(userEmail) ? 'professor' : 'aluno';
+          const role = String(profileRes.profile?.role || fallbackRole).toLowerCase().trim();
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
           const sessionUser = {
             uid: fbUser.uid,
@@ -350,7 +716,13 @@ export function watchAuthState(callback) {
             avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
             isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
-            ...(profileRes.profile || {})
+            ...(role === 'professor' && !profileRes.profile?.institution ? {
+              institution: inferInstitutionFromEmail(userEmail),
+              degree: 'Docente / Pesquisador',
+              discipline: 'Docência & Orientação Acadêmica',
+              verified: true
+            } : {}),
+            ...profileRes.profile
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
           callback(sessionUser);
@@ -414,7 +786,7 @@ export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
 
   const formattedCNPJ = maskCNPJ(digits);
   const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : (fileData ? String(fileData) : 'Cartao_CNPJ.pdf');
-  const filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '0.85';
+  const _filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '0.85';
 
   const updated = updateAuthUser({
     cnpj: formattedCNPJ,
