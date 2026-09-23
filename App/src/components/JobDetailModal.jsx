@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users, Bookmark
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   applyToJob, calculateMatchScore, isSkillMatch, getUsersDB,
-  updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications
+  updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications, isJobFavorited
 } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
-  const { currentUser, showToast, startChatWith } = useAppStore();
+  const { currentUser, showToast, startChatWith, favoriteJobs = [], toggleFavoriteJob } = useAppStore();
   const [applied, setApplied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job?.status || 'Ativa');
@@ -48,6 +48,17 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     (currentUser.razaoSocial && company && company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
     (currentUser.nomeFantasia && company && company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
+
+  const isFavorite = isJobFavorited(job, favoriteJobs);
+
+  const handleFavoriteToggle = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const added = toggleFavoriteJob(job);
+    showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
+  };
 
   const canSeeMatch = isCandidate;
   const userSkills = safeSkillsArray(currentUser?.skills);
@@ -200,13 +211,27 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
         
         {/* Header Visual estilo Gupy */}
         <div className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-6 sm:p-8">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Fechar modal"
-          >
-            <X size={20} />
-          </button>
+          <div className="absolute top-5 right-5 flex items-center gap-2">
+            <button
+              onClick={handleFavoriteToggle}
+              className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center cursor-pointer ${
+                isFavorite
+                  ? 'bg-amber-500 border-amber-400 text-white shadow-md'
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+              }`}
+              title={isFavorite ? 'Remover dos Favoritos' : 'Salvar Vaga nos Favoritos'}
+              aria-label="Favoritar vaga"
+            >
+              <Bookmark size={17} className={isFavorite ? 'fill-white' : ''} />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer border border-white/20"
+              aria-label="Fechar modal"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
           <div className="flex items-start gap-4 sm:gap-5">
             <img
@@ -391,6 +416,20 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 <MessageSquare size={14} /> Conversar no Chat
               </button>
             )}
+
+            {/* Botão de Salvar Vaga nos Favoritos */}
+            <button
+              onClick={handleFavoriteToggle}
+              className={`btn btn-sm text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer rounded-xl ${
+                isFavorite
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700'
+                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:text-amber-600 dark:hover:text-amber-400'
+              }`}
+              title={isFavorite ? 'Remover dos Favoritos' : 'Salvar Vaga nos Favoritos'}
+            >
+              <Bookmark size={14} className={isFavorite ? 'fill-amber-500 text-amber-500' : ''} />
+              <span>{isFavorite ? 'Salva nos Favoritos' : 'Salvar Vaga'}</span>
+            </button>
 
             {isJobOwner ? (
               <div className="flex items-center gap-2">

@@ -166,24 +166,6 @@ export function getTalentById(id) {
   return null;
 }
 
-export function submitStudentVerification(raNumber, fileData) {
-  const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : String(fileData || 'Declaracao_Matricula.pdf');
-  const filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '1.20';
-  
-  const verificationRecord = {
-    raNumber,
-    fileName: filename,
-    fileSizeMB: filesizeMB,
-    submittedAt: new Date().toLocaleDateString('pt-BR'),
-    status: 'Aprovado'
-  };
-
-  return {
-    success: true,
-    message: `Comprovante "${filename}" (${filesizeMB}MB) enviado com sucesso! Matrícula autenticada.`,
-    verificationRecord
-  };
-}
 
 export function getVerifiedTeachers() {
   let teachers = [];

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
@@ -21,10 +21,27 @@ import JobDetailModal from '../components/JobDetailModal';
 export default function MinhasVagas() {
   const { currentUser, favoriteJobs = [], showToast, startChatWith } = useAppStore();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [, forceUpdate] = useState(0);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [candidateTab, setCandidateTab] = useState('applications'); // 'applications' | 'favorites'
+
+  const initialTab = searchParams.get('tab') === 'favorites' || searchParams.get('tab') === 'salvas' ? 'favorites' : 'applications';
+  const [candidateTab, setCandidateTab] = useState(initialTab);
   const [selectedJob, setSelectedJob] = useState(null);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'favorites' || tabParam === 'salvas') {
+      setCandidateTab('favorites');
+    } else if (tabParam === 'applications' || tabParam === 'candidaturas') {
+      setCandidateTab('applications');
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab) => {
+    setCandidateTab(newTab);
+    setSearchParams({ tab: newTab });
+  };
 
   const isCompany   = currentUser?.role === 'empresa';
   const isProfessor = currentUser?.role === 'professor';
@@ -499,7 +516,27 @@ export default function MinhasVagas() {
 
               <button
                 type="button"
-                onClick={() => setCandidateTab('favorites')}
+                onClick={() => handleTabChange('applications')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  candidateTab === 'applications'
+                    ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
+                    : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Briefcase size={15} />
+                <span>Minhas Candidaturas</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                  candidateTab === 'applications'
+                    ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
+                }`}>
+                  {apps.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabChange('favorites')}
                 className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   candidateTab === 'favorites'
                     ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
@@ -507,7 +544,7 @@ export default function MinhasVagas() {
                 }`}
               >
                 <Bookmark size={15} className={candidateTab === 'favorites' ? 'fill-amber-500 text-amber-500' : 'text-gray-400'} />
-                <span>Vagas Favoritas</span>
+                <span>Vagas Salvas / Favoritas</span>
                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
                   candidateTab === 'favorites'
                     ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
@@ -520,7 +557,34 @@ export default function MinhasVagas() {
 
             {/* CONTEÚDO DA ABA 1: VAGAS CANDIDATADAS */}
             {candidateTab === 'applications' && (
-              <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="space-y-5 animate-in fade-in duration-200">
+                {/* Banner de atalho para Vagas Salvas caso o candidato tenha vagas salvas */}
+                {savedJobsList.length > 0 && (
+                  <div className="p-4 bg-gradient-to-r from-amber-50/90 to-orange-50/80 dark:from-amber-950/40 dark:to-slate-900 border border-amber-200/80 dark:border-amber-800/60 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                        <Bookmark size={20} className="fill-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                          <span>Você possui {savedJobsList.length} {savedJobsList.length === 1 ? 'vaga salva' : 'vagas salvas'} nos Favoritos</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-200 font-extrabold uppercase tracking-wide">
+                            Salvas
+                          </span>
+                        </h4>
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mt-0.5">
+                          Acesse suas oportunidades salvas para revisar requisitos, prazos e candidatar-se.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleTabChange('favorites')}
+                      className="btn btn-sm bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <Bookmark size={14} className="fill-white" /> Ver Vagas Salvas ({savedJobsList.length}) →
+                    </button>
+                  </div>
+                )}
                 {apps.length === 0 ? (
                   <div className="text-center py-20 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3">
                     <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center mx-auto">

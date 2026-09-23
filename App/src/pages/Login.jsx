@@ -149,7 +149,7 @@ export default function Login() {
       role: selectedRole,
       password: regPass,
       ...(selectedRole === 'aluno' && {
-        isVerifiedStudent: true,
+        isVerifiedStudent: false,
         institution: validatedStudent?.institution || 'IFPR Campus Ivaiporã',
         studentEmail: regEmail.toLowerCase().trim()
       }),
@@ -163,7 +163,11 @@ export default function Login() {
     });
     setLoading(false);
     if (res.success) {
-      showToast('🎉 Conta criada com sucesso! Bem-vindo(a) ao Ivaí Conecta.');
+      if (selectedRole === 'aluno') {
+        showToast('🎉 Conta criada! Enviamos um link de confirmação para o seu e-mail institucional. Acesse sua caixa postal e clique no link para ativar seu Selo de Estudante.');
+      } else {
+        showToast('🎉 Conta criada com sucesso! Enviamos um link de ativação para o seu e-mail.');
+      }
       navigate(redirectTarget, { replace: true });
     } else {
       setAlert(res.error || 'Erro ao realizar cadastro.');
