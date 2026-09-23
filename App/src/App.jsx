@@ -1,5 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Compass } from 'lucide-react';
+
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
@@ -22,7 +24,9 @@ const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
 const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
-const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
+const GerenciamentoVagasEmpresa = lazy(
+  () => import('./pages/GerenciamentoVagasEmpresa')
+);
 const CompletarPerfil = lazy(() => import('./pages/CompletarPerfil'));
 
 // Admin Area (Lazy Loaded)
@@ -37,9 +41,11 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 
 function MinhasVagasRoute() {
   const { currentUser } = useAppStore();
+
   if (currentUser?.role === 'empresa') {
     return <GerenciamentoVagasEmpresa />;
   }
+
   return <MinhasVagas />;
 }
 
@@ -54,25 +60,97 @@ function AppContent() {
 
       <main className="flex-1">
         <ErrorBoundary>
-          <Suspense fallback={
-            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
-              <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
-              <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">Carregando...</p>
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+                <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+
+                <p className="text-gray-500 dark:text-slate-400 text-xs font-medium animate-pulse">
+                  Carregando...
+                </p>
+              </div>
+            }
+          >
             <Routes>
-              <Route path="/"                 element={<Dashboard />} />
-              <Route path="/login"            element={<GuestRoute><Login /></GuestRoute>} />
-              <Route path="/completar-perfil" element={<CompletarPerfil />} />
-              <Route path="/vagas"            element={<Vagas />} />
-              <Route path="/servicos"         element={<Servicos />} />
-              <Route path="/talentos"         element={<BancoDeTalentos />} />
-              <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-              <Route path="/perfil/:id"       element={<PerfilAluno />} />
-              <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
-              <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
-              <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
-              <Route path="/professor/:id"    element={<PerfilProfessor />} />
+              <Route path="/" element={<Dashboard />} />
+
+              <Route
+                path="/login"
+                element={
+                  <GuestRoute>
+                    <Login />
+                  </GuestRoute>
+                }
+              />
+
+              <Route
+                path="/completar-perfil"
+                element={<CompletarPerfil />}
+              />
+
+              <Route path="/vagas" element={<Vagas />} />
+
+              <Route path="/servicos" element={<Servicos />} />
+
+              <Route
+                path="/talentos"
+                element={<BancoDeTalentos />}
+              />
+
+              <Route
+                path="/perfil"
+                element={
+                  <ProtectedRoute>
+                    <PerfilAluno />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/perfil/:id"
+                element={
+                  <ProtectedRoute>
+                    <PerfilAluno />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/empresa"
+                element={
+                  <ProtectedRoute>
+                    <PerfilEmpresa />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/empresa/:id"
+                element={
+                  <ProtectedRoute>
+                    <PerfilEmpresa />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/professor"
+                element={
+                  <ProtectedRoute>
+                    <PerfilProfessor />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/professor/:id"
+                element={
+                  <ProtectedRoute>
+                    <PerfilProfessor />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route
                 path="/configuracoes"
                 element={
@@ -81,6 +159,7 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/minhas-vagas"
                 element={
@@ -89,6 +168,7 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/gerenciamento-vagas"
                 element={
@@ -97,6 +177,7 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/painel-empresa"
                 element={
@@ -106,7 +187,7 @@ function AppContent() {
                 }
               />
 
-              {/* ── PAINEL ADMINISTRATIVO (RESTRITO A ROLE 'admin') ── */}
+              {/* PAINEL ADMINISTRATIVO (RESTRITO A ROLE 'admin') */}
               <Route
                 path="/admin"
                 element={
@@ -132,6 +213,7 @@ function AppContent() {
       </main>
 
       {!isAdminRoute && <Footer />}
+
       <Toast />
 
       {isChatOpen && <ChatModal onClose={closeChat} />}
@@ -140,36 +222,52 @@ function AppContent() {
 }
 
 export default function App() {
-  const initAuthListener = useAppStore(state => state.initAuthListener);
+  const initAuthListener = useAppStore(
+    (state) => state.initAuthListener
+  );
 
   useEffect(() => {
-    // Verifica e limpa localStorage se estiver cheio, para garantir funcionamento
+    // Verifica e limpa localStorage se estiver cheio
     try {
       const testKey = '__ivai_ls_test__';
+
       localStorage.setItem(testKey, '1');
       localStorage.removeItem(testKey);
     } catch (e) {
-      // localStorage cheio — limpa dados de cache pesados para liberar espaço
+      // localStorage cheio — limpa dados de cache pesados
       const cacheKeys = [
         'ivai_conecta_db_jobs',
         'ivai_conecta_db_talents',
         'ivai_conecta_db_services',
         'ivai_conecta_user_applications',
       ];
+
       for (const key of cacheKeys) {
-        try { localStorage.removeItem(key); } catch {}
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          // Ignora erro ao remover cache
+        }
       }
-      console.warn('[App] localStorage estava cheio. Cache de dados limpo para liberar espaço.');
+
+      console.warn(
+        '[App] localStorage estava cheio. Cache de dados limpo para liberar espaço.'
+      );
     }
+
     seedFirestoreIfEmpty();
+
     if (typeof initAuthListener === 'function') {
       const unsubscribe = initAuthListener();
+
       return () => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
         }
       };
     }
+
+    return undefined;
   }, [initAuthListener]);
 
   return (
@@ -180,20 +278,24 @@ export default function App() {
   );
 }
 
-import { Compass } from 'lucide-react';
-
 function NotFound() {
   return (
     <div className="container section text-center py-24">
       <div className="flex justify-center mb-6">
-        <Compass size={64} className="text-primary-blue animate-pulse" />
+        <Compass
+          size={64}
+          className="text-primary-blue animate-pulse"
+        />
       </div>
+
       <h1 className="text-4xl font-heading font-bold text-primary-dark dark:text-white mb-3">
         Página não encontrada
       </h1>
+
       <p className="text-gray-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
         A rota que você tentou acessar não existe nesta plataforma.
       </p>
+
       <a href="/" className="btn btn-primary">
         Voltar ao Dashboard
       </a>

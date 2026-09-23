@@ -3,9 +3,11 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, Loader2
 } from 'lucide-react';
-import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture } from '../lib/ivaiConecta';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { getTalentById, requestTeacherEndorsement, updateTalentProfile, proactiveEndorseStudent, uploadUserProfilePicture, validateStudentEmail } from '../lib/ivaiConecta';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
@@ -17,34 +19,122 @@ export default function PerfilAluno() {
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const talentId = id || currentUser?.uid || currentUser?.id;
-  const talent = getTalentById(talentId) || (currentUser ? {
-    id: currentUser.uid || currentUser.id,
-    firestoreId: currentUser.uid || currentUser.id,
-    name: currentUser.name || 'Estudante / Profissional',
-    course: currentUser.course || (currentUser.role === 'aluno' ? 'Graduação / Ensino Técnico' : 'Profissional'),
-    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
-    period: currentUser.period || 'Em andamento',
-    city: currentUser.city || 'Ivaiporã',
-    avatar: currentUser.avatar || '',
-    skills: currentUser.skills || [],
-    isVerifiedStudent: currentUser.isVerifiedStudent ?? (currentUser.role === 'aluno' ? false : true),
-    raNumber: currentUser.raNumber || '',
-    linkedin: currentUser.linkedin || '',
-    github: currentUser.github || '',
-    bio: currentUser.bio || '',
-    experiences: currentUser.experiences || [],
-    projects: currentUser.projects || [],
-    education: currentUser.education || [],
-    endorsements: currentUser.endorsements || []
-  } : null);
 
-  // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
+  // Estado reativo do talento com fallback local imediato
+  const buildFallbackTalent = (user) => {
+    if (!user) return null;
+    return {
+      id: user.uid || user.id || '',
+      firestoreId: user.uid || user.id || '',
+      name: user.name || user.displayName || 'Estudante',
+      course: user.course || '',
+      institution: user.institution || 'IFPR Campus Ivaiporã',
+      period: user.period || '',
+      city: user.city || 'Ivaiporã',
+      avatar: user.avatar || user.photoURL || '',
+      email: user.email || '',
+      skills: Array.isArray(user.skills) ? user.skills : [],
+      isVerifiedStudent: Boolean(user.isVerifiedStudent || user.emailVerified),
+      studentEmail: user.studentEmail || (validateStudentEmail(user.email)?.isValid ? user.email : ''),
+      raNumber: user.raNumber || '',
+      linkedin: user.linkedin || '',
+      github: user.github || '',
+      bio: user.bio || '',
+      experiences: Array.isArray(user.experiences) ? user.experiences : [],
+      projects: Array.isArray(user.projects) ? user.projects : [],
+      education: Array.isArray(user.education) ? user.education : [],
+      endorsements: Array.isArray(user.endorsements) ? user.endorsements : []
+    };
+  };
+
+  const [talent, setTalent] = useState(() => {
+    const local = getTalentById(talentId);
+    if (local) return local;
+    return buildFallbackTalent(currentUser);
+  });
+
+  const [loading, setLoading] = useState(!talent);
+
+  // Sincronização em tempo real do perfil direto do Cloud Firestore (multi-navegador e offline resilient)
+  useEffect(() => {
+    const targetId = id || currentUser?.uid || currentUser?.id;
+    if (!targetId) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const docRef = doc(db, 'users', String(targetId));
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (!isMounted) return;
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const mergedTalent = {
+          id: docSnap.id,
+          firestoreId: docSnap.id,
+          name: data.name || data.displayName || (currentUser && String(currentUser.uid) === String(docSnap.id) ? currentUser.name : 'Estudante'),
+          course: data.course || (currentUser?.course) || 'Graduação / Ensino Técnico',
+          institution: data.institution || (currentUser?.institution) || 'IFPR Campus Ivaiporã',
+          period: data.period || (currentUser?.period) || 'Em andamento',
+          city: data.city || (currentUser?.city) || 'Ivaiporã',
+          avatar: data.avatar || data.photoURL || (currentUser?.avatar) || '',
+          skills: Array.isArray(data.skills) ? data.skills : (currentUser?.skills || []),
+          isVerifiedStudent: Boolean(data.isVerifiedStudent || data.emailVerified || currentUser?.isVerifiedStudent || currentUser?.emailVerified),
+          studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (currentUser?.studentEmail || '')),
+          email: data.email || (currentUser?.email) || '',
+          raNumber: data.raNumber || (currentUser?.raNumber) || '',
+          linkedin: data.linkedin || (currentUser?.linkedin) || '',
+          github: data.github || (currentUser?.github) || '',
+          bio: data.bio || (currentUser?.bio) || '',
+          experiences: Array.isArray(data.experiences) ? data.experiences : (currentUser?.experiences || []),
+          projects: Array.isArray(data.projects) ? data.projects : (currentUser?.projects || []),
+          education: Array.isArray(data.education) ? data.education : (currentUser?.education || []),
+          endorsements: Array.isArray(data.endorsements) ? data.endorsements : (currentUser?.endorsements || [])
+        };
+
+        setTalent(mergedTalent);
+        setEditData({
+          name: mergedTalent.name,
+          avatar: mergedTalent.avatar,
+          city: mergedTalent.city,
+          institution: mergedTalent.institution,
+          course: mergedTalent.course,
+          period: mergedTalent.period,
+          bio: mergedTalent.bio,
+          linkedin: mergedTalent.linkedin,
+          github: mergedTalent.github,
+          skills: [...mergedTalent.skills],
+          experiences: [...mergedTalent.experiences],
+          projects: [...mergedTalent.projects],
+          education: [...mergedTalent.education],
+          newSkill: ''
+        });
+      } else {
+        // Fallback para cache local se ainda não existir documento no Firestore
+        const fallback = getTalentById(targetId) || buildFallbackTalent(currentUser);
+        // Só substitui se tiver um fallback válido; preserva estado anterior se já tinha dados
+        setTalent(prev => fallback || prev);
+      }
+      setLoading(false);
+    }, (err) => {
+      console.warn('[PerfilAluno] Erro na sincronização com Firestore:', err);
+      if (isMounted) setLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [id, currentUser?.uid, currentUser?.id]);
+
+  // Permissão estrita do proprietário: id, uid, e-mail ou correspondência com usuário logado
   const isOwner = Boolean(
     currentUser && talent && (
       (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
       (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
       (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
-      (currentUser.name && talent.name && currentUser.name.trim().toLowerCase() === talent.name.trim().toLowerCase())
+      (!id) // Rota "/perfil" direta sem ID é sempre do usuário logado
     )
   );
 
@@ -78,7 +168,7 @@ export default function PerfilAluno() {
   const [error, setError] = useState('');
 
   // Comprehensive edit form state
-  const [editData, setEditData] = useState({
+  const [editData, setEditData] = useState(() => ({
     name: talent?.name || '',
     avatar: talent?.avatar || '',
     city: talent?.city || 'Ivaiporã',
@@ -88,12 +178,12 @@ export default function PerfilAluno() {
     bio: talent?.bio || '',
     linkedin: talent?.linkedin || '',
     github: talent?.github || '',
-    skills: [...(talent?.skills || [])],
-    experiences: [...(talent?.experiences || [])],
-    projects: [...(talent?.projects || [])],
-    education: [...(talent?.education || [])],
+    skills: Array.isArray(talent?.skills) ? [...talent.skills] : [],
+    experiences: Array.isArray(talent?.experiences) ? [...talent.experiences] : [],
+    projects: Array.isArray(talent?.projects) ? [...talent.projects] : [],
+    education: Array.isArray(talent?.education) ? [...talent.education] : [],
     newSkill: ''
-  });
+  }));
 
   // Forms to add new experience, project, and education
   const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
@@ -139,29 +229,33 @@ export default function PerfilAluno() {
     }
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
-    updateTalentProfile(talent.id, editData);
+    const targetId = talent?.id || currentUser?.uid || currentUser?.id;
+    if (targetId) {
+      updateTalentProfile(targetId, editData);
+      try {
+        await setDoc(doc(db, 'users', String(targetId)), {
+          ...editData,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn('[PerfilAluno] Erro ao sincronizar edição no Firestore:', dbErr);
+      }
+    }
 
-    // If owner is currently logged in, update app store state
+    // Se o usuário logado for o proprietário, atualiza a store global
     if (isOwner && currentUser) {
       setCurrentUser({
         ...currentUser,
-        name: editData.name,
-        avatar: editData.avatar,
-        city: editData.city,
-        course: editData.course,
-        institution: editData.institution,
-        period: editData.period,
-        bio: editData.bio,
-        skills: editData.skills,
-        experiences: editData.experiences,
-        projects: editData.projects,
-        education: editData.education,
-        linkedin: editData.linkedin,
-        github: editData.github,
+        ...editData
       });
     }
+
+    setTalent(prev => ({
+      ...(prev || {}),
+      ...editData
+    }));
 
     showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
     handleCloseEditModal();
@@ -232,6 +326,27 @@ export default function PerfilAluno() {
     setEditData(prev => ({ ...prev, projects: prev.projects.filter(p => p.id !== projId) }));
   };
 
+  if (loading && !talent) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+        <div className="w-12 h-12 border-4 border-primary-blue/20 border-t-primary-blue rounded-full animate-spin mb-3"></div>
+        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium animate-pulse">Carregando dados do perfil...</p>
+      </div>
+    );
+  }
+
+  if (!talent) {
+    return (
+      <div className="container section text-center py-20">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Perfil não encontrado</h2>
+        <p className="text-gray-500 text-sm mb-6">O perfil solicitado não existe ou ainda não foi configurado.</p>
+        <button onClick={() => navigate('/')} className="btn btn-primary">Voltar ao Início</button>
+      </div>
+    );
+  }
+
+  const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
+
   return (
     <>
       {/* Alerta de Perfil Não Verificado para o próprio aluno */}
@@ -241,11 +356,11 @@ export default function PerfilAluno() {
             <div className="flex items-center gap-2 font-semibold">
               <Lock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <span>
-                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Envie sua Declaração de Matrícula para liberar candidaturas e o Selo Verificado.
+                Seu perfil está <strong>INVISÍVEL</strong> para recrutadores. Valide seu e-mail estudantil institucional para ativar seu Selo de Estudante Verificado.
               </span>
             </div>
             <Link to="/configuracoes" className="btn btn-primary btn-sm text-xs font-bold shrink-0">
-              Enviar Comprovante de Matrícula →
+              Validar E-mail Estudantil →
             </Link>
           </div>
         </div>
@@ -266,7 +381,7 @@ export default function PerfilAluno() {
             <div className="flex flex-wrap items-center gap-5 sm:gap-6">
               <div className="relative group shrink-0">
                 <img
-                  src={talent.avatar}
+                  src={talent.avatar || defaultAvatar}
                   alt={talent.name}
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
                 />
@@ -285,12 +400,12 @@ export default function PerfilAluno() {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">{talent.name}</h1>
                   {talent.isVerifiedStudent ? (
-                    <span className="bg-green-500/20 text-green-300 border border-green-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                      <ShieldCheck size={13} /> Matrícula Verificada
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-xs">
+                      <ShieldCheck size={13} className="text-emerald-400" /> Estudante Verificado
                     </span>
                   ) : (
                     <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                      <Lock size={12} /> Matrícula Pendente
+                      <Lock size={12} /> Comprovação Pendente
                     </span>
                   )}
                 </div>
@@ -304,6 +419,14 @@ export default function PerfilAluno() {
                     <span className="flex items-center gap-1.5"><Building2 size={14} />{talent.institution}</span>
                   ) : (
                     isOwner && <span className="text-gray-400 italic">Instituição não informada</span>
+                  )}
+                  {talent.studentEmail && (
+                    <>
+                      <span>·</span>
+                      <span className="flex items-center gap-1.5 text-blue-200 font-medium">
+                        <GraduationCap size={14} /> {talent.studentEmail}
+                      </span>
+                    </>
                   )}
                   {talent.period && (
                     <>
@@ -379,7 +502,7 @@ export default function PerfilAluno() {
                   }}
                   className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
                 >
-                  <MessageSquare size={15} /> Conversar com {talent.name.split(' ')[0]}
+                  <MessageSquare size={15} /> Conversar com {talent.name ? String(talent.name).split(' ')[0] : 'Estudante'}
                 </button>
               )}
 
@@ -644,7 +767,7 @@ export default function PerfilAluno() {
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name}
+                <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name || 'Estudante'}
               </h3>
               <button onClick={() => setProactiveEndorseModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>

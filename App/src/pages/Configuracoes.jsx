@@ -1,17 +1,20 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, FileText, Camera, GraduationCap,
+  Building2, Camera, GraduationCap,
   Search, Loader2, AlertCircle, RefreshCw, Check
 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import useAppStore from '../store/useAppStore';
 import {
   updateAuthUser,
-  submitStudentVerification,
   submitCompanyVerification,
   verifyStudentAccount,
+  sendStudentVerificationEmail,
+  checkStudentVerification,
   validateStudentEmail,
   getInstitutionFromEmail,
   uploadUserProfilePicture,
@@ -40,34 +43,107 @@ export default function Configuracoes() {
 
   // Verification form (Student)
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(currentUser?.isVerifiedStudent || false);
-  const [studentInstEmail, setStudentInstEmail] = useState(currentUser?.studentEmail || (currentUser?.email?.includes?.('.edu') ? currentUser.email : ''));
+  const [studentInstEmail, setStudentInstEmail] = useState(
+    currentUser?.studentEmail || (currentUser?.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu')) ? currentUser.email : '')
+  );
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
-  const fileInputRef = useRef(null);
+  const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
 
-  const handleVerifyStudentEmail = (e) => {
-    e.preventDefault();
-    const emailToVerify = studentInstEmail.trim() || currentUser?.email;
+  // Sincroniza estados do formulário sempre que o currentUser é carregado ou atualizado
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.name) setName(currentUser.name);
+    if (currentUser.email) setEmail(currentUser.email);
+    if (currentUser.linkedin) setLinkedin(currentUser.linkedin);
+    if (currentUser.github) setGithub(currentUser.github);
+    if (currentUser.avatar) setAvatar(currentUser.avatar);
+    if (currentUser.raNumber) setRaNumber(currentUser.raNumber);
+    if (currentUser.isVerifiedStudent != null) setVerificationSubmitted(Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified));
+    if (currentUser.studentEmail) {
+      setStudentInstEmail(currentUser.studentEmail);
+    } else if (currentUser.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu'))) {
+      setStudentInstEmail(currentUser.email);
+    }
+    if (currentUser.studentEmailVerificationSentAt) {
+      setVerificationEmailSent(true);
+    }
+  }, [currentUser]);
+
+  // Consulta direta ao Firestore para garantir consistência em navegadores novos ou abas anônimas
+  useEffect(() => {
+    const uid = currentUser?.uid || currentUser?.id;
+    if (!uid) return;
+
+    let isMounted = true;
+    const userDocRef = doc(db, 'users', String(uid));
+    getDoc(userDocRef).then((snap) => {
+      if (!isMounted || !snap.exists()) return;
+      const data = snap.data();
+      if (data.name) setName(data.name);
+      if (data.email) setEmail(data.email);
+      if (data.linkedin) setLinkedin(data.linkedin);
+      if (data.github) setGithub(data.github);
+      if (data.avatar) setAvatar(data.avatar);
+      if (data.raNumber) setRaNumber(data.raNumber);
+      if (data.isVerifiedStudent != null) setVerificationSubmitted(Boolean(data.isVerifiedStudent || data.emailVerified));
+      if (data.studentEmail) {
+        setStudentInstEmail(data.studentEmail);
+      } else if (data.email && (validateStudentEmail(data.email)?.isValid || data.email.includes('estudante'))) {
+        setStudentInstEmail(data.email);
+      }
+    }).catch((err) => console.warn('[Configuracoes] Erro ao sincronizar dados com Firestore:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid, currentUser?.id]);
+
+  const handleSendVerificationEmail = async (e) => {
+    if (e) e.preventDefault();
+    const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
     if (!emailToVerify) {
       showToast('Por favor, informe seu e-mail estudantil institucional.');
       return;
     }
     setSubmittingStudentEmail(true);
     try {
-      const res = verifyStudentAccount(emailToVerify);
+      const res = await sendStudentVerificationEmail(emailToVerify);
       if (res.success) {
+        setVerificationEmailSent(true);
+        if (res.alreadyVerified) {
+          await handleCheckStudentStatus();
+        } else {
+          showToast(res.message);
+        }
+      } else {
+        showToast(res.error || 'Erro ao enviar e-mail de verificação.');
+      }
+    } catch (err) {
+      showToast('Erro ao disparar verificação: ' + (err.message || 'Tente novamente.'));
+    } finally {
+      setSubmittingStudentEmail(false);
+    }
+  };
+
+  const handleCheckStudentStatus = async () => {
+    setCheckingStudentStatus(true);
+    try {
+      const res = await checkStudentVerification();
+      if (res.success && res.verified) {
         setVerificationSubmitted(true);
         if (res.user) {
           setCurrentUser(res.user);
         }
         showToast(res.message);
       } else {
-        showToast(res.error || 'E-mail educacional inválido.');
+        showToast(res.message || 'O e-mail ainda não foi confirmado. Acesse sua caixa de entrada e clique no link de validação.');
       }
+    } catch (err) {
+      showToast('Erro ao verificar status no Firebase: ' + (err.message || 'Tente novamente.'));
     } finally {
-      setSubmittingStudentEmail(false);
+      setCheckingStudentStatus(false);
     }
   };
 
@@ -91,7 +167,6 @@ export default function Configuracoes() {
   const [submittingPassword, setSubmittingPassword] = useState(false);
   const [passwordReauthRequired, setPasswordReauthRequired] = useState(false);
 
-  const [submittingStudent, setSubmittingStudent] = useState(false);
   const [submittingCompany, setSubmittingCompany] = useState(false);
 
   if (!currentUser) {
@@ -126,88 +201,17 @@ export default function Configuracoes() {
 
   const handleSaveAccount = (e) => {
     e.preventDefault();
-    updateAuthUser({ name, email, linkedin, github, avatar });
-    setCurrentUser({ ...currentUser, name, email, linkedin, github, avatar });
-    showToast('Dados da conta e foto atualizados com sucesso!');
-  };
-
-  // Student file drop / select
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processStudentFile(file);
-  };
-
-  const processStudentFile = (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('O arquivo selecionado excede o limite máximo de 5MB.');
-      return;
-    }
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
-      showToast('Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
-      return;
-    }
-    setSelectedFile(file);
-    showToast(`Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
-    else if (e.type === 'dragleave') setDragActive(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processStudentFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleVerificationSubmit = async (e) => {
-    e.preventDefault();
-    if (!raNumber.trim()) {
-      showToast('Por favor, informe seu RA / Número de Matrícula.');
-      return;
-    }
-    if (!selectedFile && !currentUser?.isVerifiedStudent) {
-      showToast('Por favor, selecione o arquivo PDF ou imagem da sua declaração de matrícula.');
-      return;
-    }
-
-    setSubmittingStudent(true);
-    showToast('Processando e autenticando declaração...');
-
-    try {
-      let uploadedDocUrl = null;
-      if (selectedFile) {
-        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
-        if (uploadRes.success) {
-          uploadedDocUrl = uploadRes.url;
-        }
-      }
-
-      const res = submitStudentVerification(raNumber, selectedFile);
-      if (res.success) {
-        setVerificationSubmitted(true);
-        const updated = updateAuthUser({
-          isVerifiedStudent: true,
-          raNumber,
-          studentProofUrl: uploadedDocUrl,
-          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
-        });
-        if (updated) {
-          setCurrentUser(updated);
-        }
-        showToast('Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
-      }
-    } finally {
-      setSubmittingStudent(false);
-    }
+    const updatedData = {
+      name,
+      email,
+      linkedin,
+      github,
+      avatar,
+      ...(currentUser?.role === 'aluno' ? { raNumber } : {})
+    };
+    updateAuthUser(updatedData);
+    setCurrentUser({ ...currentUser, ...updatedData });
+    showToast('Dados da conta atualizados com sucesso!');
   };
 
   const handleCnpjChange = (e) => {
@@ -525,6 +529,22 @@ export default function Configuracoes() {
                   </div>
                 </div>
 
+                {currentUser?.role === 'aluno' && (
+                  <div className="form-group">
+                    <label className="form-label">RA / Matrícula Acadêmica (Opcional)</label>
+                    <input
+                      type="text"
+                      value={raNumber}
+                      onChange={e => setRaNumber(e.target.value)}
+                      className="form-control"
+                      placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
+                    />
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
+                      Identificador acadêmico opcional exibido no seu currículo e para recrutadores.
+                    </p>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Tipo de Conta</label>
                   <input
@@ -544,15 +564,15 @@ export default function Configuracoes() {
             </div>
           )}
 
-          {/* ── ABA 2: VERIFICAÇÃO DE MATRÍCULA (ALUNOS) ── */}
+          {/* ── ABA 2: VERIFICAÇÃO DE ESTUDANTE (ALUNOS) ── */}
           {activeTab === 'verification' && currentUser.role === 'aluno' && (
             <div className="card p-6 sm:p-8 space-y-6">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
                 <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <ShieldCheck size={22} className="text-green-600 dark:text-green-400" /> Autenticação e Vínculo Estudantil
+                  <GraduationCap size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação Oficial de Estudante
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">
-                  Comprove seu vínculo acadêmico com o IFPR, Univale, UENP ou faculdades parceiras para **liberar candidaturas a vagas** e destacar seu perfil no Banco de Talentos.
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  Confirme seu e-mail institucional oficial (IFPR, Univale, UENP, UTFPR ou qualquer faculdade parceira com domínio <strong>.edu.br</strong>) para liberar candidaturas e ativar o <strong>Selo de Estudante Verificado</strong>.
                 </p>
               </div>
 
@@ -563,7 +583,7 @@ export default function Configuracoes() {
                   </div>
                   <h4 className="font-heading font-bold text-lg text-emerald-900 dark:text-emerald-300">Estudante Autenticado com Sucesso!</h4>
                   <p className="text-sm text-emerald-800 dark:text-emerald-200 max-w-md mx-auto leading-relaxed">
-                    Seu vínculo acadêmico foi confirmado pelo sistema. Seu perfil está <strong>VISÍVEL</strong> para recrutadores e você pode se candidatar a todas as vagas do ecossistema.
+                    Seu vínculo acadêmico foi confirmado oficialmente via Firebase Auth. Seu perfil está <strong>VISÍVEL</strong> para recrutadores e você pode se candidatar a todas as vagas do ecossistema.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     {(currentUser.studentEmail || validateStudentEmail(currentUser.email)?.isValid) && (
@@ -586,21 +606,23 @@ export default function Configuracoes() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Opção 1: Validação Instantânea por E-mail Estudantil */}
-                  <div className="p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-3">
+                  {/* Autenticação Oficial por E-mail Estudantil (Prova de Propriedade) */}
+                  <div className="p-5 sm:p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                        <GraduationCap size={16} className="text-primary-blue dark:text-blue-400" />
-                        Opção 1: Autenticação por E-mail Estudantil (Instantânea)
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <GraduationCap size={18} className="text-primary-blue dark:text-blue-400" />
+                        Validação Direta por E-mail Institucional
                       </h4>
-                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
-                        Recomendado
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
+                        Oficial Firebase Auth
                       </span>
                     </div>
+
                     <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                      Informe o e-mail institucional oficial fornecido pela sua faculdade (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer <strong>.edu.br</strong>) para ativar o selo imediatamente.
+                      Informe seu e-mail institucional acadêmico (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong>, <strong>@utfpr.edu.br</strong> ou qualquer domínio <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal institucional para validar sua titularidade instantaneamente.
                     </p>
-                    <form onSubmit={handleVerifyStudentEmail} className="flex flex-col sm:flex-row gap-2">
+
+                    <form onSubmit={handleSendVerificationEmail} className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="email"
                         value={studentInstEmail}
@@ -608,92 +630,73 @@ export default function Configuracoes() {
                         placeholder="seu.nome@estudante.ifpr.edu.br"
                         className="form-control text-xs sm:text-sm flex-1"
                         required
+                        disabled={submittingStudentEmail || checkingStudentStatus}
                       />
                       <button
                         type="submit"
-                        disabled={submittingStudentEmail}
+                        disabled={submittingStudentEmail || checkingStudentStatus}
                         className="btn btn-primary btn-sm font-bold shrink-0 flex items-center justify-center gap-1.5"
                       >
-                        <ShieldCheck size={15} />
-                        {submittingStudentEmail ? 'Autenticando...' : 'Autenticar E-mail'}
+                        {submittingStudentEmail ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            <span>Enviando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mail size={15} />
+                            <span>{verificationEmailSent ? 'Reenviar Link' : 'Enviar Link de Validação'}</span>
+                          </>
+                        )}
                       </button>
                     </form>
-                  </div>
 
-                  {/* Divisor */}
-                  <div className="relative flex items-center justify-center">
-                    <div className="border-t border-gray-200 dark:border-slate-800 w-full" />
-                    <span className="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider absolute">
-                      ou envie sua declaração em PDF
-                    </span>
-                  </div>
-
-                  {/* Opção 2: Declaração de Matrícula (PDF) */}
-                  <form onSubmit={handleVerificationSubmit} className="space-y-4 pt-1">
-                    <div className="form-group">
-                      <label className="form-label">RA / Número de Matrícula Acadêmica</label>
-                      <input
-                        type="text"
-                        value={raNumber}
-                        onChange={e => setRaNumber(e.target.value)}
-                        className="form-control"
-                        placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
-                        required
-                      />
-                    </div>
-
-                    {/* Input de Arquivo Real com Drag & Drop */}
-                    <div className="form-group">
-                      <label className="form-label">Anexar Declaração de Matrícula (PDF, PNG ou JPG - Máx. 5MB)</label>
-                      
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        accept=".pdf,.png,.jpg,.jpeg"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-
-                      <div
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
-                          dragActive
-                            ? 'border-primary-blue bg-blue-50/50 dark:bg-blue-950/40'
-                            : 'border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <Upload size={32} className="mx-auto mb-2 text-gray-400 dark:text-slate-500" />
-                        
-                        {selectedFile ? (
+                    {/* Banner de Verificação Pendente & Botão de Checagem */}
+                    {(verificationEmailSent || currentUser?.studentEmailVerificationSentAt) && (
+                      <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-3">
+                        <div className="flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                          <AlertCircle size={17} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="text-sm font-bold text-green-600 dark:text-green-400 flex items-center justify-center gap-1.5">
-                              <FileText size={16} /> {selectedFile.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-slate-400">
-                              Tamanho: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · Clique para alterar o arquivo
+                            <p className="font-semibold">Confirmação pendente na sua caixa postal institucional!</p>
+                            <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                              Um link de validação foi enviado para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra seu e-mail institucional, clique no link oficial do Firebase e em seguida clique no botão abaixo para ativar seu Selo de Estudante.
                             </p>
                           </div>
-                        ) : (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                              Arraste seu arquivo PDF/Imagem aqui ou clique para selecionar
-                            </p>
-                            <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Formatos aceitos: PDF, PNG, JPG (Máx. 5MB)</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
 
-                    <div className="flex justify-end pt-2">
-                      <button type="submit" disabled={submittingStudent} className="btn btn-teal btn-sm font-bold shadow-md">
-                        <ShieldCheck size={16} /> {submittingStudent ? 'Autenticando...' : 'Enviar Comprovante & Ativar Perfil'}
-                      </button>
-                    </div>
-                  </form>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleCheckStudentStatus}
+                            disabled={checkingStudentStatus || submittingStudentEmail}
+                            className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl shadow-xs"
+                          >
+                            {checkingStudentStatus ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>Verificando com o Firebase...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck size={15} />
+                                <span>Já confirmei meu e-mail (Verificar Status)</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendVerificationEmail}
+                            disabled={submittingStudentEmail || checkingStudentStatus}
+                            className="btn btn-ghost btn-sm text-xs font-semibold text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1.5"
+                          >
+                            <RefreshCw size={13} className={submittingStudentEmail ? 'animate-spin' : ''} />
+                            <span>Reenviar link</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
