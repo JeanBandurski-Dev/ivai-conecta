@@ -21,33 +21,36 @@ export default function PerfilAluno() {
   const talentId = id || currentUser?.uid || currentUser?.id;
 
   // Estado reativo do talento com fallback local imediato
+  const buildFallbackTalent = (user) => {
+    if (!user) return null;
+    return {
+      id: user.uid || user.id || '',
+      firestoreId: user.uid || user.id || '',
+      name: user.name || user.displayName || 'Estudante',
+      course: user.course || '',
+      institution: user.institution || 'IFPR Campus Ivaiporã',
+      period: user.period || '',
+      city: user.city || 'Ivaiporã',
+      avatar: user.avatar || user.photoURL || '',
+      email: user.email || '',
+      skills: Array.isArray(user.skills) ? user.skills : [],
+      isVerifiedStudent: Boolean(user.isVerifiedStudent || user.emailVerified),
+      studentEmail: user.studentEmail || (validateStudentEmail(user.email)?.isValid ? user.email : ''),
+      raNumber: user.raNumber || '',
+      linkedin: user.linkedin || '',
+      github: user.github || '',
+      bio: user.bio || '',
+      experiences: Array.isArray(user.experiences) ? user.experiences : [],
+      projects: Array.isArray(user.projects) ? user.projects : [],
+      education: Array.isArray(user.education) ? user.education : [],
+      endorsements: Array.isArray(user.endorsements) ? user.endorsements : []
+    };
+  };
+
   const [talent, setTalent] = useState(() => {
     const local = getTalentById(talentId);
     if (local) return local;
-    if (currentUser) {
-      return {
-        id: currentUser.uid || currentUser.id,
-        firestoreId: currentUser.uid || currentUser.id,
-        name: currentUser.name || 'Estudante',
-        course: currentUser.course || 'Graduação / Ensino Técnico',
-        institution: currentUser.institution || 'IFPR Campus Ivaiporã',
-        period: currentUser.period || 'Em andamento',
-        city: currentUser.city || 'Ivaiporã',
-        avatar: currentUser.avatar || '',
-        skills: currentUser.skills || [],
-        isVerifiedStudent: Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified),
-        studentEmail: currentUser.studentEmail || (validateStudentEmail(currentUser.email)?.isValid ? currentUser.email : ''),
-        raNumber: currentUser.raNumber || '',
-        linkedin: currentUser.linkedin || '',
-        github: currentUser.github || '',
-        bio: currentUser.bio || '',
-        experiences: currentUser.experiences || [],
-        projects: currentUser.projects || [],
-        education: currentUser.education || [],
-        endorsements: currentUser.endorsements || []
-      };
-    }
-    return null;
+    return buildFallbackTalent(currentUser);
   });
 
   const [loading, setLoading] = useState(!talent);
@@ -109,28 +112,9 @@ export default function PerfilAluno() {
         });
       } else {
         // Fallback para cache local se ainda não existir documento no Firestore
-        const fallback = getTalentById(targetId) || (currentUser ? {
-          id: currentUser.uid || currentUser.id,
-          firestoreId: currentUser.uid || currentUser.id,
-          name: currentUser.name || 'Estudante',
-          course: currentUser.course || 'Graduação / Ensino Técnico',
-          institution: currentUser.institution || 'IFPR Campus Ivaiporã',
-          period: currentUser.period || 'Em andamento',
-          city: currentUser.city || 'Ivaiporã',
-          avatar: currentUser.avatar || '',
-          skills: currentUser.skills || [],
-          isVerifiedStudent: Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified),
-          studentEmail: currentUser.studentEmail || '',
-          raNumber: currentUser.raNumber || '',
-          linkedin: currentUser.linkedin || '',
-          github: currentUser.github || '',
-          bio: currentUser.bio || '',
-          experiences: currentUser.experiences || [],
-          projects: currentUser.projects || [],
-          education: currentUser.education || [],
-          endorsements: currentUser.endorsements || []
-        } : null);
-        if (fallback) setTalent(fallback);
+        const fallback = getTalentById(targetId) || buildFallbackTalent(currentUser);
+        // Só substitui se tiver um fallback válido; preserva estado anterior se já tinha dados
+        setTalent(prev => fallback || prev);
       }
       setLoading(false);
     }, (err) => {
@@ -184,7 +168,7 @@ export default function PerfilAluno() {
   const [error, setError] = useState('');
 
   // Comprehensive edit form state
-  const [editData, setEditData] = useState({
+  const [editData, setEditData] = useState(() => ({
     name: talent?.name || '',
     avatar: talent?.avatar || '',
     city: talent?.city || 'Ivaiporã',
@@ -194,12 +178,12 @@ export default function PerfilAluno() {
     bio: talent?.bio || '',
     linkedin: talent?.linkedin || '',
     github: talent?.github || '',
-    skills: [...(talent?.skills || [])],
-    experiences: [...(talent?.experiences || [])],
-    projects: [...(talent?.projects || [])],
-    education: [...(talent?.education || [])],
+    skills: Array.isArray(talent?.skills) ? [...talent.skills] : [],
+    experiences: Array.isArray(talent?.experiences) ? [...talent.experiences] : [],
+    projects: Array.isArray(talent?.projects) ? [...talent.projects] : [],
+    education: Array.isArray(talent?.education) ? [...talent.education] : [],
     newSkill: ''
-  });
+  }));
 
   // Forms to add new experience, project, and education
   const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
@@ -518,7 +502,7 @@ export default function PerfilAluno() {
                   }}
                   className="btn btn-primary btn-sm font-bold shadow-md flex items-center justify-center gap-2 w-full text-xs cursor-pointer"
                 >
-                  <MessageSquare size={15} /> Conversar com {talent.name.split(' ')[0]}
+                  <MessageSquare size={15} /> Conversar com {talent.name ? String(talent.name).split(' ')[0] : 'Estudante'}
                 </button>
               )}
 
@@ -783,7 +767,7 @@ export default function PerfilAluno() {
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name}
+                <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name || 'Estudante'}
               </h3>
               <button onClick={() => setProactiveEndorseModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
