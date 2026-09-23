@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle2, Clock,
@@ -6,20 +6,21 @@ import {
   Award, Check, X, FileText, Calendar, Sparkles, Star, Copy,
   Search, Filter, ChevronRight, Trash2,
   SlidersHorizontal, Video, AlertCircle, GraduationCap, LayoutGrid,
-  ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
-  Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
-  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History,
+  ListFilter, MessageSquare, ChevronDown, ArrowUpDown,
+  Inbox, Settings, BarChart3, Layers, CheckSquare, Save,
+  GripVertical, ChevronLeft, UserPlus, History,
   Users, DollarSign, Share2, Download, Phone, PhoneCall,
-  ArrowUp, ArrowDown, Palette, Zap, CheckCircle, Info, Workflow, ArrowRight
+  ArrowUp, ArrowDown, Workflow, ArrowRight
 } from 'lucide-react';
 import {
-  getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
+  getJobs, updateJob, duplicateJob, deleteJob, updateJobStatus,
   getJobCandidates, updateCandidateStage, updateCandidateData,
   scheduleCandidateInterview, SELECTION_STAGES,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem,
+  saveJobCustomStages, reorderCandidateStage, sanitizeStageItem,
   subscribeToCompanyApplications,
-  STANDARD_WORKING_HOURS, validateJobTitle, validateProfessionalText, validatePhoneNumber
+  STANDARD_WORKING_HOURS, validateJobTitle, validatePhoneNumber,
+  validateJobDescription, validateWorkingHours, validateSalary
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
@@ -336,7 +337,22 @@ export default function GerenciamentoVagasEmpresa() {
 
   useEffect(() => {
     if (allCompanyJobs && allCompanyJobs.length > 0) {
-      if (selectedJobId !== 'default') {
+      const urlJobId = searchParams.get('jobId') || searchParams.get('job');
+      const targetParam = urlJobId ? String(urlJobId) : null;
+      
+      const foundByParam = targetParam
+        ? allCompanyJobs.find(j => String(j.id) === targetParam || String(j.firestoreId) === targetParam)
+        : null;
+
+      if (foundByParam) {
+        const nextId = foundByParam.firestoreId || foundByParam.id;
+        if (selectedJobId !== nextId) {
+          setSelectedJobId(nextId);
+        }
+        return;
+      }
+
+      if (selectedJobId && selectedJobId !== 'default') {
         const exists = allCompanyJobs.some(j => 
           String(j.id) === String(selectedJobId) ||
           (j.firestoreId && String(j.firestoreId) === String(selectedJobId))
@@ -347,10 +363,8 @@ export default function GerenciamentoVagasEmpresa() {
       } else {
         setSelectedJobId(allCompanyJobs[0].firestoreId || allCompanyJobs[0].id);
       }
-    } else {
-      setSelectedJobId('default');
     }
-  }, [allCompanyJobs, selectedJobId]);
+  }, [allCompanyJobs, selectedJobId, searchParams]);
 
   useEffect(() => {
     if (selectedJobId && selectedJobId !== 'default' && typeof localStorage !== 'undefined') {
@@ -382,7 +396,7 @@ export default function GerenciamentoVagasEmpresa() {
   const [onlyWithEndorsement, setOnlyWithEndorsement] = useState(false);
   const [onlyWithNotes, setOnlyWithNotes] = useState(false);
   const [sortBy, setSortBy] = useState('match_desc'); // 'match_desc' | 'match_asc' | 'recent' | 'oldest' | 'rating_desc' | 'name_asc'
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showAdvancedFilters, _setShowAdvancedFilters] = useState(false);
 
   // Jobs List Filters (Tab: Minhas Vagas)
   const [jobListViewMode, setJobListViewMode] = useState('grid'); // 'grid' | 'table'
@@ -401,7 +415,7 @@ export default function GerenciamentoVagasEmpresa() {
   const [historyViewMode, setHistoryViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Drag & Drop State
-  const [isDraggingLock, setIsDraggingLock] = useState(false);
+  const [isDraggingLock, _setIsDraggingLock] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState(null);
   const [dragOverStageId, setDragOverStageId] = useState(null);
   const [dragOverCandidateId, setDragOverCandidateId] = useState(null);
@@ -719,7 +733,7 @@ export default function GerenciamentoVagasEmpresa() {
   }, [allCompanyJobs, jobListSearch, jobListStatusFilter, jobListModalityFilter, jobListTypeFilter, jobListSort, updateCount]);
 
   // Stats calculation
-  const stats = useMemo(() => {
+  const _stats = useMemo(() => {
     const totalJobs = allCompanyJobs.length;
     const activeJobs = allCompanyJobs.filter(j => j.status === 'Ativa').length;
     let totalApplicants = 0;
@@ -844,7 +858,7 @@ export default function GerenciamentoVagasEmpresa() {
 
     updateCandidateStage(targetJobId, cand.id, nextStage);
     updateCandidateData(targetJobId, cand.id, {
-      interview: { ...(cand.interview || {}), concluida: true, bannerDismissed: true, result: 'aprovado' }
+      interview: { ...cand.interview, concluida: true, bannerDismissed: true, result: 'aprovado' }
     });
 
     showToast(`${cand.name} passou na entrevista e avançou para a etapa "${nextStageName}"!`);
@@ -853,7 +867,7 @@ export default function GerenciamentoVagasEmpresa() {
       setSelectedCandidate(prev => ({
         ...prev,
         stage: nextStage,
-        interview: { ...(prev.interview || {}), concluida: true, bannerDismissed: true, result: 'aprovado' }
+        interview: { ...prev.interview, concluida: true, bannerDismissed: true, result: 'aprovado' }
       }));
     }
     forceUpdate(n => n + 1);
@@ -867,7 +881,7 @@ export default function GerenciamentoVagasEmpresa() {
 
     updateCandidateStage(targetJobId, cand.id, bancoStageId);
     updateCandidateData(targetJobId, cand.id, {
-      interview: { ...(cand.interview || {}), concluida: true, bannerDismissed: true, result: 'banco_talentos' }
+      interview: { ...cand.interview, concluida: true, bannerDismissed: true, result: 'banco_talentos' }
     });
 
     showToast(`${cand.name} teve a chamada finalizada e foi para o Banco de Talentos.`);
@@ -876,7 +890,7 @@ export default function GerenciamentoVagasEmpresa() {
       setSelectedCandidate(prev => ({
         ...prev,
         stage: bancoStageId,
-        interview: { ...(prev.interview || {}), concluida: true, bannerDismissed: true, result: 'banco_talentos' }
+        interview: { ...prev.interview, concluida: true, bannerDismissed: true, result: 'banco_talentos' }
       }));
     }
     forceUpdate(n => n + 1);
@@ -1065,7 +1079,7 @@ export default function GerenciamentoVagasEmpresa() {
   };
 
   // ── Job Actions ──
-  const handleCloseJob = async (jobOrId) => {
+  const _handleCloseJob = async (jobOrId) => {
     const targetJob = typeof jobOrId === 'object' && jobOrId !== null
       ? jobOrId
       : allCompanyJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
@@ -1152,9 +1166,25 @@ export default function GerenciamentoVagasEmpresa() {
 
     if (editingJob.description) {
       const descClean = editingJob.description.trim();
-      const descVal = validateProfessionalText(descClean, 'Descrição da Vaga', 30, 2000);
+      const descVal = validateJobDescription(descClean);
       if (!descVal.valid) {
         showToast(`⚠️ ${descVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.workingHours && editingJob.workingHours.trim()) {
+      const whVal = validateWorkingHours(editingJob.workingHours);
+      if (!whVal.valid) {
+        showToast(`⚠️ ${whVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.salary && editingJob.salary.trim() && editingJob.salary !== 'A Combinar') {
+      const salVal = validateSalary(editingJob.salary, false);
+      if (!salVal.valid) {
+        showToast(`⚠️ ${salVal.error}`);
         return;
       }
     }
@@ -1961,7 +1991,7 @@ export default function GerenciamentoVagasEmpresa() {
                             const stageCandidates = filteredCandidates.filter(c => c.stage === stage.id);
                             const style = getStageStyle(stage.id, stage.color);
                             const isDragOver = dragOverStageId === stage.id;
-                            const isSingleColumn = selectedStageFilter !== 'todos';
+                            const _isSingleColumn = selectedStageFilter !== 'todos';
 
                             return (
                               <div

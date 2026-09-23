@@ -2,14 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
-  ArrowLeft, Plus, Users, Eye, Edit3, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, UserCheck, Check, X, FileText, Trash2, MessageSquare, Layers, Share2, Sparkles, ExternalLink, Bookmark
+  ArrowLeft, Plus, Users, Eye, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
+  Award, Send, X, FileText, Trash2, MessageSquare, Layers, Sparkles, ExternalLink, Bookmark
 } from 'lucide-react';
 import {
   getUserApplications, getJobs,
   updateJobStatus, deleteJob, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray,
-  isJobFavorited, subscribeToEndorsementRequests
+  isJobFavorited, subscribeToEndorsementRequests, getTalentById,
+  hasTeacherEndorsedStudent, deduplicateRequestsByStudent,
+  getTeacherEndorsedStudents, syncFulfilledEndorsementRequests, isSameProfessor
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants, subscribeToCompanyApplications } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -26,11 +28,12 @@ export default function MinhasVagas() {
   const [candidateTab, setCandidateTab] = useState('applications'); // 'applications' | 'favorites'
   const [selectedJob, setSelectedJob] = useState(null);
 
-  const isCompany = currentUser?.role === 'empresa';
-  const isProfessor = currentUser?.role === 'professor';
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador';
+  const isProfessor = userRole === 'professor' || userRole === 'docente' || userRole === 'teacher';
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
-  const [liveApps, setLiveApps] = useState(() => getUserApplications(currentUser?.uid));
+  const [liveApps, setLiveApps] = useState(() => isCompany ? getUserApplications() : getUserApplications(currentUser?.uid));
   const [jobActionModalTarget, setJobActionModalTarget] = useState(null);
 
   useEffect(() => {
@@ -55,9 +58,27 @@ export default function MinhasVagas() {
       }
     }
 
+    const handleAppsUpdate = (e) => {
+      if (Array.isArray(e?.detail)) {
+        if (isCompany) {
+          const email = currentUser?.email ? String(currentUser.email).toLowerCase().trim() : '';
+          const forCompany = email ? e.detail.filter(a => String(a.recruiterEmail || '').toLowerCase().trim() === email) : e.detail;
+          setLiveApps(forCompany);
+        } else {
+          const uid = currentUser?.uid || currentUser?.id;
+          const forCand = uid ? e.detail.filter(a => a.candidateUid === uid || a.candidateId === uid) : e.detail;
+          setLiveApps(forCand);
+        }
+      }
+      forceUpdate(n => n + 1);
+    };
+
+    window.addEventListener('ivai_applications_updated', handleAppsUpdate);
+
     return () => {
       unsubJobs();
       unsubApps();
+      window.removeEventListener('ivai_applications_updated', handleAppsUpdate);
     };
   }, [currentUser, isCompany]);
 
@@ -71,6 +92,8 @@ export default function MinhasVagas() {
 
   const companyJobs = safeLiveJobs.filter(j =>
     j && (
+      (j.companyUid && currentUser?.uid && String(j.companyUid) === String(currentUser.uid)) ||
+      (j.companyUid && currentUser?.id && String(j.companyUid) === String(currentUser.id)) ||
       (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
       (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
       (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
@@ -82,31 +105,80 @@ export default function MinhasVagas() {
   );
 
   // Teacher endorsement requests state
-  const [liveTeacherRequests, setLiveTeacherRequests] = useState(() => getEndorsementRequests());
+  const [liveTeacherRequests, setLiveTeacherRequests] = useState(() => deduplicateRequestsByStudent(getEndorsementRequests()));
 
   useEffect(() => {
     if (!currentUser || !isProfessor) return;
-    const unsub = subscribeToEndorsementRequests(currentUser.email, (data) => {
+    const unsub = subscribeToEndorsementRequests(currentUser, (data) => {
       if (Array.isArray(data)) {
-        setLiveTeacherRequests(data);
+        setLiveTeacherRequests(deduplicateRequestsByStudent(data));
       }
     });
     return () => unsub();
   }, [currentUser, isProfessor]);
 
   const teacherRequests = useMemo(() => {
-    if (!Array.isArray(liveTeacherRequests)) return [];
-    const profEmail = (currentUser?.email || '').toLowerCase().trim();
-    const profUid = currentUser?.uid || currentUser?.id;
-    return liveTeacherRequests.filter(r => {
-      const rEmail = (r.profEmail || '').toLowerCase().trim();
-      const rUid = r.profUid;
-      if (profEmail && rEmail === profEmail) return true;
-      if (profUid && rUid && String(profUid) === String(rUid)) return true;
-      if (!r.profEmail && isProfessor) return true;
-      return false;
+    return deduplicateRequestsByStudent(liveTeacherRequests);
+  }, [liveTeacherRequests]);
+
+  const { pendingTeacherRequests, finishedTeacherRequests } = useMemo(() => {
+    const pending = [];
+    const finished = [];
+    const seenStudentIds = new Set();
+
+    teacherRequests.forEach(req => {
+      const student = getTalentById(req.studentId);
+      const isAlreadyEndorsed = hasTeacherEndorsedStudent(student?.endorsements || [], currentUser);
+
+      if (req.status === 'Aprovado' || isAlreadyEndorsed) {
+        const endorsement = student?.endorsements?.find(e => isSameProfessor(e, currentUser));
+        seenStudentIds.add(String(req.studentId));
+        finished.push({
+          ...req,
+          status: 'Aprovado',
+          studentAvatar: req.studentAvatar || student?.avatar || '',
+          studentCourse: req.studentCourse || student?.course || '',
+          discipline: endorsement?.discipline || req.discipline || 'Avaliação Pedagógica',
+          quote: endorsement?.quote || req.quote || '',
+          date: endorsement?.date || req.resolvedAt || req.requestedAt || 'Recente'
+        });
+
+        // Sincroniza em segundo plano para persistir como Aprovado no Firestore
+        if (req.status === 'Pendente') {
+          syncFulfilledEndorsementRequests(req.studentId, currentUser);
+        }
+      } else if (req.status === 'Pendente') {
+        pending.push(req);
+      }
     });
-  }, [liveTeacherRequests, currentUser, isProfessor]);
+
+    // Inclui também estudantes que possuem recomendação deste professor
+    const profEmail = (currentUser?.email || '').toLowerCase().trim();
+    if (profEmail) {
+      const endorsedTalents = getTeacherEndorsedStudents(profEmail);
+      endorsedTalents.forEach(t => {
+        if (!seenStudentIds.has(String(t.id))) {
+          const endorsement = t.endorsements?.find(e => isSameProfessor(e, currentUser));
+          finished.push({
+            id: `end_${t.id}`,
+            studentId: t.id,
+            studentName: t.name,
+            studentAvatar: t.avatar,
+            studentCourse: t.course,
+            studentInstitution: t.institution,
+            status: 'Aprovado',
+            discipline: endorsement?.discipline || 'Avaliação Pedagógica',
+            quote: endorsement?.quote || '',
+            date: endorsement?.date || 'Recente'
+          });
+          seenStudentIds.add(String(t.id));
+        }
+      });
+    }
+
+    return { pendingTeacherRequests: pending, finishedTeacherRequests: finished };
+  }, [teacherRequests, currentUser]);
+
   const [customQuote, setCustomQuote] = useState({});
 
   // Selected job to view applicants (for company view)
@@ -123,6 +195,39 @@ export default function MinhasVagas() {
     });
     return () => unsub();
   }, [selectedJobApplicants]);
+
+  const getJobApplicantsCount = (jobItem) => {
+    if (!jobItem) return 0;
+    const jId = String(jobItem.id || '');
+    const jFId = jobItem.firestoreId ? String(jobItem.firestoreId) : '';
+    const matching = apps.filter(a => {
+      const aJobId = String(a.jobId || '');
+      const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
+      const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
+      return (jId && (aJobId === jId || aFsId === jId || aOrigId === jId)) ||
+             (jFId && (aJobId === jFId || aFsId === jFId || aOrigId === jFId));
+    });
+    return Math.max(Number(jobItem.applicantsCount) || 0, matching.length);
+  };
+
+  const displayedJobApplicants = useMemo(() => {
+    if (!selectedJobApplicants) return [];
+    const jId = String(selectedJobApplicants.id || '');
+    const jFId = selectedJobApplicants.firestoreId ? String(selectedJobApplicants.firestoreId) : '';
+    const fromApps = apps.filter(a => {
+      const aJobId = String(a.jobId || '');
+      const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
+      const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
+      return (jId && (aJobId === jId || aFsId === jId || aOrigId === jId)) ||
+             (jFId && (aJobId === jFId || aFsId === jFId || aOrigId === jFId));
+    });
+    const map = new Map();
+    [...jobApplicants, ...fromApps].forEach(item => {
+      const key = item.id || item.firestoreId || item.candidateUid;
+      if (key && !map.has(key)) map.set(key, item);
+    });
+    return Array.from(map.values());
+  }, [selectedJobApplicants, jobApplicants, apps]);
 
   if (!currentUser) {
     return (
@@ -206,13 +311,16 @@ export default function MinhasVagas() {
     if (res.success) {
       showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!');
       forceUpdate(n => n + 1);
+    } else if (res.alreadyEndorsed) {
+      showToast('Você já recomendou este aluno. A solicitação foi concluída sem duplicar pareceres.');
+      forceUpdate(n => n + 1);
     } else {
       showToast(res.error || 'Erro ao conceder parecer.');
     }
   };
 
   const handleRejectTeacherRequest = async (reqId) => {
-    await rejectEndorsementRequest(reqId);
+    await rejectEndorsementRequest(reqId, currentUser);
     showToast('Solicitação recusada.');
     forceUpdate(n => n + 1);
   };
@@ -272,94 +380,141 @@ export default function MinhasVagas() {
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                <Award className="text-amber-400 fill-amber-400" size={24} /> Solicitações de Recomendação Pendentes ({teacherRequests.filter(r => r.status === 'Pendente').length})
+                <Award className="text-amber-400 fill-amber-400" size={24} /> Solicitações de Recomendação Pendentes ({pendingTeacherRequests.length})
               </h2>
             </div>
 
-            {teacherRequests.filter(r => r.status === 'Pendente').length === 0 ? (
+            {pendingTeacherRequests.length === 0 ? (
               <div className="text-center py-16 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
                 <Award size={48} className="mx-auto mb-3 text-gray-300 dark:text-slate-600" />
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma solicitação pendente no momento.</p>
-                <p className="text-sm text-gray-400 dark:text-slate-400">Quando seus alunos enviarem pedidos de parecer, eles aparecerão aqui para você avaliar.</p>
+                <p className="text-sm text-gray-400 dark:text-slate-400">Todos os pedidos de parecer pedagógico foram avaliados e estão listados no histórico abaixo.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {teacherRequests.filter(r => r.status === 'Pendente').map(req => (
-                  <div key={req.id} className="card p-6 space-y-4 border-l-4 border-l-amber-400">
-                    <div className="flex items-start justify-between flex-wrap gap-4">
-                      <div>
-                        <div className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                          {req.studentName}
-                          <span className="text-xs bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-2.5 py-0.5 rounded-full font-bold">
-                            Solicitação em {req.requestedAt}
-                          </span>
+                {pendingTeacherRequests.map(req => {
+                  const student = getTalentById(req.studentId);
+
+                  return (
+                    <div key={req.id || req.firestoreId} className="card p-6 space-y-4 border-l-4 border-l-amber-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xs rounded-2xl">
+                      <div className="flex items-start justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-400 font-heading font-black text-lg flex items-center justify-center shrink-0 overflow-hidden border border-blue-200/50 shadow-xs">
+                            {(req.studentAvatar || student?.avatar) ? (
+                              <img src={req.studentAvatar || student?.avatar} alt={req.studentName} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{(req.studentName || 'E').charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-heading text-lg sm:text-xl font-bold text-primary-dark dark:text-white flex items-center flex-wrap gap-2">
+                              {req.studentName}
+                              <span className="text-xs bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-2.5 py-0.5 rounded-full font-bold">
+                                Solicitação em {req.requestedAt}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">
+                              {req.studentCourse || student?.course || 'Estudante'} · {req.studentInstitution || student?.institution || 'IFPR'}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                              Disciplina: <strong>{req.discipline}</strong>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{req.studentCourse}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Disciplina: <strong>{req.discipline}</strong></div>
+
+                        <button
+                          onClick={() => navigate(`/perfil/${req.studentId}`)}
+                          className="btn btn-outline btn-sm text-xs font-bold shrink-0 flex items-center gap-1.5"
+                        >
+                          <Eye size={13} /> Ver Perfil do Aluno
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => navigate(`/perfil/${req.studentId}`)}
-                        className="btn btn-outline btn-sm text-xs font-bold"
-                      >
-                        <Eye size={13} /> Ver Perfil do Aluno
-                      </button>
-                    </div>
+                      <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl text-sm text-gray-700 dark:text-slate-300 italic border border-gray-200 dark:border-slate-700">
+                        "{req.message}"
+                      </div>
 
-                    <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl text-sm text-gray-700 dark:text-slate-300 italic border border-gray-200 dark:border-slate-700">
-                      "{req.message}"
-                    </div>
+                      {/* Form de Parecer Personalizado */}
+                      <div className="space-y-2">
+                        <label className="form-label text-xs">Escreva seu Parecer / Avaliação Pedagógica:</label>
+                        <textarea
+                          value={customQuote[req.id] || ''}
+                          onChange={e => setCustomQuote({ ...customQuote, [req.id]: e.target.value })}
+                          className="form-control text-xs"
+                          rows={2}
+                          placeholder="Ex: Estudante com excelente raciocínio prático, boa assiduidade e ótimo trabalho em equipe."
+                        />
+                      </div>
 
-                    {/* Form de Parecer Personalizado */}
-                    <div className="space-y-2">
-                      <label className="form-label text-xs">Escreva seu Parecer / Avaliação Pedagógica:</label>
-                      <textarea
-                        value={customQuote[req.id] || ''}
-                        onChange={e => setCustomQuote({ ...customQuote, [req.id]: e.target.value })}
-                        className="form-control text-xs"
-                        rows={2}
-                        placeholder="Ex: Estudante com excelente raciocínio prático, boa assiduidade e ótimo trabalho em equipe."
-                      />
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => handleRejectTeacherRequest(req.id)}
+                          className="btn btn-outline border-red-200 text-red-600 dark:text-red-400 hover:bg-red-50 btn-sm text-xs font-bold"
+                        >
+                          <X size={14} /> Recusar
+                        </button>
+                        <button
+                          onClick={() => handleApproveTeacherRequest(req.id)}
+                          className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
+                        >
+                          <ShieldCheck size={15} /> Aprovar & Conceder Selo Verificado
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <button
-                        onClick={() => handleRejectTeacherRequest(req.id)}
-                        className="btn btn-outline border-red-200 text-red-600 dark:text-red-400 hover:bg-red-50 btn-sm text-xs font-bold"
-                      >
-                        <X size={14} /> Recusar
-                      </button>
-                      <button
-                        onClick={() => handleApproveTeacherRequest(req.id)}
-                        className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
-                      >
-                        <ShieldCheck size={15} /> Aprovar &amp; Conceder Selo Verificado
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             {/* Recomendações Já Concedidas pelo Professor */}
             <div className="pt-6 border-t border-gray-200 dark:border-slate-800 space-y-4">
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                <CheckCircle2 className="text-green-600 dark:text-green-400" size={20} /> Histórico de Pareceres Emitidos
+                <CheckCircle2 className="text-green-600 dark:text-green-400" size={20} /> Histórico de Pareceres Emitidos ({finishedTeacherRequests.length})
               </h3>
 
-              {teacherRequests.filter(r => r.status === 'Aprovado').length === 0 ? (
+              {finishedTeacherRequests.length === 0 ? (
                 <p className="text-sm text-gray-400 dark:text-slate-500">Nenhuma recomendação finalizada ainda.</p>
               ) : (
                 <div className="space-y-3">
-                  {teacherRequests.filter(r => r.status === 'Aprovado').map(req => (
-                    <div key={req.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <div className="font-bold text-gray-800 dark:text-white text-sm">{req.studentName}</div>
-                        <div className="text-xs text-primary-blue dark:text-blue-400 font-medium">{req.discipline} · Parecer Verificado</div>
+                  {finishedTeacherRequests.map(req => (
+                    <div key={req.id || req.studentId} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 flex items-center justify-between flex-wrap gap-4 shadow-xs">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-heading font-black text-base flex items-center justify-center shrink-0 overflow-hidden border border-emerald-200/50 shadow-xs">
+                          {req.studentAvatar ? (
+                            <img src={req.studentAvatar} alt={req.studentName} className="w-full h-full object-cover" />
+                          ) : (
+                            <span>{(req.studentName || 'E').charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-heading font-bold text-gray-900 dark:text-white text-base flex items-center gap-2 flex-wrap">
+                            {req.studentName}
+                            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Parecer Concedido
+                            </span>
+                            {req.date && (
+                              <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
+                                · {req.date}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-primary-blue dark:text-blue-400 font-medium mt-0.5">
+                            {req.studentCourse || 'Estudante'} · {req.discipline || 'Avaliação Pedagógica'}
+                          </div>
+                          {req.quote && (
+                            <div className="text-xs text-gray-600 dark:text-slate-300 italic mt-1.5 max-w-xl bg-gray-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-gray-100 dark:border-slate-800">
+                              "{req.quote}"
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full inline-flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Aprovado
-                      </span>
+
+                      <button
+                        onClick={() => navigate(`/perfil/${req.studentId}`)}
+                        className="btn btn-outline btn-sm text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Eye size={13} /> Ver Perfil do Aluno
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -451,7 +606,7 @@ export default function MinhasVagas() {
                           <Users size={14} className="group-hover:scale-110 transition-transform" /> Candidatos Inscritos
                         </span>
                         <span className="font-extrabold bg-primary-blue text-white px-2 py-0.5 rounded-full text-[11px] shadow-xs">
-                          {job.applicantsCount || 0}
+                          {getJobApplicantsCount(job)}
                         </span>
                       </div>
                     </div>
@@ -731,7 +886,7 @@ export default function MinhasVagas() {
               <button onClick={() => setSelectedJobApplicants(null)}><XCircle size={22} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
             </div>
 
-            {jobApplicants.length === 0 ? (
+            {displayedJobApplicants.length === 0 ? (
               <div className="text-center py-12 text-gray-400 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 border border-gray-100 dark:border-slate-800">
                 <Users size={36} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
                 <p className="font-bold text-gray-700 dark:text-white text-sm">Nenhum candidato se inscreveu nesta vaga ainda.</p>
@@ -739,7 +894,7 @@ export default function MinhasVagas() {
               </div>
             ) : (
               <div className="space-y-3">
-                {jobApplicants.map(cand => (
+                {displayedJobApplicants.map(cand => (
                   <div key={cand.id || cand.firestoreId} className="bg-gray-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-3.5">
                       <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950 text-primary-blue font-heading font-black text-lg flex items-center justify-center shrink-0 overflow-hidden border border-blue-200/50">
@@ -817,8 +972,12 @@ export default function MinhasVagas() {
       <PublishJobModal
         isOpen={showPublishModal}
         onClose={() => setShowPublishModal(false)}
-        onJobCreated={() => {
-          setLiveJobs(getJobs('Todas as Cidades'));
+        onJobCreated={(newJob) => {
+          if (newJob) {
+            setLiveJobs(prev => [newJob, ...prev.filter(j => String(j.id) !== String(newJob.id) && String(j.firestoreId) !== String(newJob.id))]);
+          } else {
+            setLiveJobs(getJobs('Todas as Cidades'));
+          }
           forceUpdate(n => n + 1);
         }}
       />
