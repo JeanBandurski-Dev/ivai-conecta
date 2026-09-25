@@ -31,6 +31,12 @@ import { matchCity } from '../utils/searchUtils.js';
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
 
+export function isJobActive(job) {
+  if (!job || typeof job !== 'object') return false;
+  const s = String(job.status || 'Ativa').trim().toLowerCase();
+  return s === 'ativa' || s === 'ativo' || s === 'aberta' || s === 'aberto';
+}
+
 // Cache em memória como fallback quando localStorage estiver cheio
 let _memJobsCache = null;
 let _memAppsCache = null;
@@ -111,31 +117,16 @@ function getJobStatusOverrides() {
 }
 
 function isCleanProfessionalJob(job) {
-  if (!job || typeof job !== 'object' || !job.title) return false;
-  try {
-    // Apenas bloqueia conteúdo ofensivo (palavrões) - não rejeita títulos de cargos válidos
-    // que não estejam na lista padronizada (empresas podem criar vagas com títulos customizados)
-    const titleStr = String(job.title || '');
-    if (!titleStr.trim()) return false;
-    if (hasProfanity(titleStr)) return false;
-    const salStr = String(job.salary || '').toLowerCase().trim();
-    if (hasProfanity(salStr)) return false;
-    if (job.description && hasProfanity(String(job.description))) return false;
-  } catch {
-    return true;
-  }
+  if (!job || typeof job !== 'object') return false;
+  const titleStr = String(job.title || '').trim();
+  if (!titleStr) return false;
   return true;
 }
 
 function applyJobOverrides(job) {
   if (!job || typeof job !== 'object') return null;
-  const deletedIds = getDeletedJobIds();
   const idStr = String(job.id || job.firestoreId || '');
   const fIdStr = job.firestoreId ? String(job.firestoreId) : null;
-
-  if (deletedIds.includes(idStr) || (fIdStr && deletedIds.includes(fIdStr))) {
-    return null; // Vaga excluída permanentemente pelo usuário
-  }
 
   const statusOverrides = getJobStatusOverrides();
   const overrideStatus = statusOverrides[idStr] || (fIdStr && statusOverrides[fIdStr]);
@@ -147,7 +138,7 @@ function applyJobOverrides(job) {
       ? job.requiredSkills.split(',').map(s => s.trim()).filter(Boolean)
       : []);
 
-  // Remove apenas habilidades com conteúdo ofensivo (palavrões) — não rejeita competências válidas
+  // Remove apenas habilidades com conteúdo ofensivo (palavrões)
   const safeRequiredSkills = rawRequiredSkills.filter(s => s && !hasProfanity(s));
 
   const safeBenefits = Array.isArray(job.benefits)
@@ -155,6 +146,12 @@ function applyJobOverrides(job) {
     : (typeof job.benefits === 'string'
       ? job.benefits.split(',').map(b => b.trim()).filter(Boolean)
       : []);
+
+  // Sanitiza salário sem descartar a vaga real do banco
+  let cleanSalary = String(job.salary || 'A combinar').trim();
+  if (!cleanSalary || cleanSalary === '-' || hasProfanity(cleanSalary)) {
+    cleanSalary = 'A combinar';
+  }
 
   const finalJob = {
     ...job,
@@ -164,6 +161,7 @@ function applyJobOverrides(job) {
     city: String(job.city || 'Ivaiporã'),
     type: String(job.type || 'Tempo Integral'),
     status: overrideStatus || job.status || 'Ativa',
+    salary: cleanSalary,
     requiredSkills: safeRequiredSkills,
     benefits: safeBenefits
   };
@@ -843,9 +841,56 @@ export function getUserApplications(candidateIdentifier) {
   return apps;
 }
 
-export async function applyToJob(jobOrId, user) {
+/**
+ * Verifica se uma vaga é do tipo PJ, Prestador de Serviços ou Freelance/Projeto
+ */
+export function isPjOrFreelanceJob(jobOrType) {
+  const typeStr = typeof jobOrType === 'object' && jobOrType !== null
+    ? String(jobOrType.type || '').toLowerCase().trim()
+    : String(jobOrType || '').toLowerCase().trim();
+  return (
+    typeStr.includes('pj') ||
+    typeStr.includes('prestador') ||
+    typeStr.includes('freelanc') ||
+    typeStr.includes('projeto') ||
+    typeStr.includes('autônomo') ||
+    typeStr.includes('autonomo')
+  );
+}
+
+/**
+ * Verifica se uma vaga é do tipo Estágio ou Trainee Acadêmico
+ */
+export function isInternshipJob(jobOrType) {
+  const typeStr = typeof jobOrType === 'object' && jobOrType !== null
+    ? String(jobOrType.type || '').toLowerCase().trim()
+    : String(jobOrType || '').toLowerCase().trim();
+  return typeStr.includes('estágio') || typeStr.includes('estagio');
+}
+
+/**
+ * Verifica se uma vaga é de regime formal CLT / Tempo Integral / Meio Período tradicional
+ */
+export function isCltOrFormalJob(jobOrType) {
+  return !isPjOrFreelanceJob(jobOrType);
+}
+
+/**
+ * Avalia detalhadamente as regras de elegibilidade para candidatura
+ * de acordo com o tipo de usuário (aluno, candidato, freelancer, empresa, professor)
+ * e o tipo de vaga (CLT, Estágio, Prestador PJ, Projetos).
+ *
+ * Freelancers NÃO são tratados automaticamente como candidatos comuns.
+ */
+export function getApplicationEligibility(user, jobOrId) {
   if (!user) {
-    return { success: false, message: 'Você precisa estar logado para se candidatar.' };
+    return {
+      canApply: false,
+      status: 'not_logged',
+      badge: 'Faça login para se candidatar',
+      buttonLabel: 'Entrar para Candidatar-se',
+      message: 'Você precisa estar conectado à sua conta para se candidatar a vagas ou enviar propostas PJ.'
+    };
   }
 
   const role = String(user.role || '').toLowerCase().trim();
@@ -855,11 +900,177 @@ export async function applyToJob(jobOrId, user) {
   const isCompany = role === 'empresa' || role === 'company' || role === 'recrutador';
   const isProfessor = role === 'professor' || role === 'docente' || role === 'teacher';
 
+  const job = typeof jobOrId === 'object' && jobOrId !== null
+    ? jobOrId
+    : getJobById(jobOrId);
+
+  // 1. Empresa
   if (isCompany) {
-    return { success: false, message: 'Perfis de empresa não podem se candidatar a vagas de emprego.' };
+    const isOwner = Boolean(
+      job && (
+        (job.createdBy && user.uid && String(job.createdBy) === String(user.uid)) ||
+        (job.createdBy && user.id && String(job.createdBy) === String(user.id)) ||
+        (job.createdBy && user.email && String(job.createdBy).toLowerCase() === String(user.email).toLowerCase()) ||
+        (job.recruiterEmail && user.email && job.recruiterEmail.toLowerCase() === user.email.toLowerCase()) ||
+        (user.name && job.company && job.company.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
+        (user.razaoSocial && job.company && job.company.toLowerCase().trim() === user.razaoSocial.toLowerCase().trim()) ||
+        (user.nomeFantasia && job.company && job.company.toLowerCase().trim() === user.nomeFantasia.toLowerCase().trim())
+      )
+    );
+
+    if (isOwner) {
+      return {
+        canApply: false,
+        status: 'job_owner',
+        isOwner: true,
+        badge: 'Sua Empresa',
+        buttonLabel: 'Gerenciar Minha Vaga',
+        message: 'Você é a empresa responsável por esta vaga e gerencia os candidatos recebidos.'
+      };
+    }
+
+    return {
+      canApply: false,
+      status: 'company_role',
+      badge: 'Perfil Empresa',
+      buttonLabel: 'Empresas não se candidatam',
+      message: 'Perfis de empresa são destinados ao recrutamento e publicação de vagas, não realizando candidaturas.'
+    };
   }
+
+  // 2. Professor
   if (isProfessor) {
-    return { success: false, message: 'Perfis de professor/docente não realizam candidaturas a vagas.' };
+    return {
+      canApply: false,
+      status: 'professor_role',
+      badge: 'Perfil Docente',
+      buttonLabel: 'Docente (Apenas visualização)',
+      message: 'Perfis de professor/docente visualizam vagas exclusivamente para orientação acadêmica e emissão de recomendações pedagógicas.'
+    };
+  }
+
+  const isPj = isPjOrFreelanceJob(job);
+  const isInternship = isInternshipJob(job);
+
+  // 3. FREELANCER: Não deve ser tratado como candidato comum
+  if (isFreelancer) {
+    if (isPj) {
+      return {
+        canApply: true,
+        status: 'freelancer_pj_allowed',
+        roleType: 'freelancer',
+        isPj: true,
+        badge: 'Oportunidade PJ / Prestador',
+        buttonLabel: 'Enviar Proposta PJ',
+        buttonSubmittingLabel: 'Enviando Proposta...',
+        appliedLabel: 'Proposta PJ Enviada!',
+        message: 'Esta vaga busca Prestador de Serviços (PJ) ou execução de projeto autônomo, totalmente compatível com seu perfil Freelancer.'
+      };
+    }
+
+    // Se a vaga for CLT, Estágio ou Meio Período convencional: BLOQUEADO
+    return {
+      canApply: false,
+      status: 'freelancer_clt_blocked',
+      roleType: 'freelancer',
+      isPj: false,
+      badge: 'Vaga Emprego Formal (CLT / Estágio)',
+      buttonLabel: 'Vaga CLT / Formal (Não aplicável a Freelancer)',
+      message: isInternship
+        ? 'Esta vaga é um Estágio acadêmico regulamentado (Lei nº 11.788), exclusivo para alunos regularmente matriculados. Seu perfil é de Freelancer / Autônomo.'
+        : 'Esta vaga é no regime CLT / Emprego Formal com carteira assinada. Perfis de Freelancer atuam em contratos de Prestação de Serviços (PJ), demandas e marketplace. Para concorrer a vagas de emprego formal, altere seu tipo de perfil para Candidato ou Aluno nas Configurações da Conta.',
+      actionLink: '/servicos',
+      actionLabel: 'Buscar Demandas no Marketplace de Serviços'
+    };
+  }
+
+  // 4. CANDIDATO CONVENCIONAL
+  if (isStandardCandidate) {
+    if (isInternship) {
+      return {
+        canApply: false,
+        status: 'candidate_stage_blocked',
+        roleType: 'candidato',
+        isPj: false,
+        badge: 'Vaga de Estágio (Exclusiva Aluno)',
+        buttonLabel: 'Exclusivo para Alunos / Estudantes',
+        message: 'Vagas de estágio são exclusivas para estudantes regularmente matriculados no ensino superior, técnico ou médio (perfil Aluno), conforme a Lei nº 11.788/2008. Se você é estudante, altere seu perfil para Aluno nas Configurações da Conta.',
+        actionLink: '/configuracoes',
+        actionLabel: 'Alterar Perfil para Aluno'
+      };
+    }
+
+    return {
+      canApply: true,
+      status: 'candidate_allowed',
+      roleType: 'candidato',
+      isPj: isPj,
+      badge: isPj ? 'Vaga Prestador PJ' : 'Vaga Emprego CLT',
+      buttonLabel: isPj ? 'Candidatar-se à Vaga PJ' : 'Candidatar-se à Vaga',
+      buttonSubmittingLabel: 'Enviando Candidatura...',
+      appliedLabel: 'Candidatura Enviada!',
+      message: isPj
+        ? 'Vaga no regime de Prestação de Serviços (PJ). Candidatos podem se candidatar se possuírem ou emitirem notas fiscais/CNPJ MEI.'
+        : 'Vaga de emprego compatível com seu perfil de Candidato.'
+    };
+  }
+
+  // 5. ALUNO / ESTUDANTE
+  if (isStudent) {
+    if (isInternship) {
+      if (!user.isVerifiedStudent) {
+        return {
+          canApply: false,
+          requiresVerification: true,
+          status: 'student_stage_unverified',
+          roleType: 'aluno',
+          isPj: false,
+          badge: 'Estágio · Requer Comprovação',
+          buttonLabel: 'Enviar Matrícula para Liberar Vaga',
+          message: 'Para sua segurança jurídica e da empresa contratante, envie sua Declaração de Matrícula (IFPR, Univale, UENP, etc.) nas Configurações para liberar candidaturas de estágio!',
+          actionLink: '/configuracoes?tab=verification',
+          actionLabel: 'Enviar Declaração de Matrícula'
+        };
+      }
+
+      return {
+        canApply: true,
+        status: 'student_stage_verified',
+        roleType: 'aluno',
+        isPj: false,
+        badge: 'Estágio · Estudante Verificado',
+        buttonLabel: 'Candidatar-se ao Estágio',
+        buttonSubmittingLabel: 'Enviando Candidatura...',
+        appliedLabel: 'Candidatura Enviada!',
+        message: 'Você possui comprovação de estudante ativa e atende a todos os requisitos legais para este estágio.'
+      };
+    }
+
+    return {
+      canApply: true,
+      status: 'student_allowed',
+      roleType: 'aluno',
+      isPj: isPj,
+      badge: isPj ? 'Vaga PJ' : 'Vaga Emprego / CLT',
+      buttonLabel: isPj ? 'Candidatar-se à Oportunidade PJ' : 'Candidatar-se à Vaga',
+      buttonSubmittingLabel: 'Enviando Candidatura...',
+      appliedLabel: 'Candidatura Enviada!',
+      message: 'Oportunidade aberta a estudantes e candidatos em geral.'
+    };
+  }
+
+  return {
+    canApply: false,
+    status: 'role_blocked',
+    badge: 'Perfil Não Habilitado',
+    buttonLabel: 'Candidatura não disponível',
+    message: 'Apenas estudantes, candidatos e prestadores de serviços podem se candidatar a vagas.'
+  };
+}
+
+export async function applyToJob(jobOrId, user) {
+  if (!user) {
+    return { success: false, message: 'Você precisa estar logado para se candidatar.' };
   }
 
   const job = typeof jobOrId === 'object' && jobOrId !== null
@@ -868,55 +1079,20 @@ export async function applyToJob(jobOrId, user) {
   const jobId = typeof jobOrId === 'object' && jobOrId !== null
     ? (jobOrId.id || jobOrId.firestoreId)
     : jobOrId;
-  const jobType = String(job?.type || '').toLowerCase().trim();
 
-  // Regra Freelancer: apenas PJ, Freelance ou Projetos
-  if (isFreelancer) {
-    const isPjOrFreelance = jobType.includes('pj') || jobType.includes('freelanc') || jobType.includes('projeto') || jobType.includes('prestador');
-    if (!isPjOrFreelance) {
-      return {
-        success: false,
-        message: 'Seu perfil está cadastrado como Freelancer (PJ). Esta vaga é no regime CLT / Estágio. Para se candidatar a vagas de emprego formal, acesse suas configurações para alterar seu tipo de perfil ou busque demandas e oportunidades PJ.'
-      };
-    }
+  const eligibility = getApplicationEligibility(user, job || jobId);
+  if (!eligibility.canApply) {
+    return {
+      success: false,
+      status: eligibility.status,
+      requiresVerification: Boolean(eligibility.requiresVerification),
+      message: eligibility.message
+    };
   }
 
-  // Regra Candidato convencional: não pode se candidatar a estágio
-  if (isStandardCandidate) {
-    if (jobType.includes('estágio') || jobType.includes('estagio')) {
-      return {
-        success: false,
-        message: 'Vagas de estágio são exclusivas para estudantes regularmente matriculados (perfil Aluno). Se você é estudante, altere seu perfil para Aluno ou busque oportunidades CLT e Meio Período.'
-      };
-    }
-  }
-
-  // Regra Aluno: estágio exige comprovação de matrícula
-  if (isStudent) {
-    if ((jobType.includes('estágio') || jobType.includes('estagio')) && !user.isVerifiedStudent) {
-      return {
-        success: false,
-        requiresVerification: true,
-        message: 'Para sua segurança e das empresas contratantes, envie sua Declaração de Matrícula nas Configurações para liberar candidaturas de estágio!'
-      };
-    }
-  }
-
-  if (!isStudent && !isStandardCandidate && !isFreelancer) {
-    return { success: false, message: 'Apenas perfis de alunos, candidatos e freelancers podem se candidatar a vagas.' };
-  }
-
-  if (job) {
-    const isOwner = (
-      (job.createdBy && user.uid && String(job.createdBy) === String(user.uid)) ||
-      (job.createdBy && user.id && String(job.createdBy) === String(user.id)) ||
-      (job.createdBy && user.email && String(job.createdBy).toLowerCase() === String(user.email).toLowerCase()) ||
-      (user.name && job.company && job.company.toLowerCase().trim() === user.name.toLowerCase().trim())
-    );
-    if (isOwner) {
-      return { success: false, message: 'Você não pode se candidatar à vaga publicada pela sua própria empresa.' };
-    }
-  }
+  const role = String(user.role || '').toLowerCase().trim();
+  const isFreelancer = role === 'freelancer' || role === 'prestador';
+  const isStudent = role === 'aluno' || role === 'estudante' || role === 'student';
 
   const userUid = String(user.uid || user.id || 'usr_guest').trim();
   const userEmail = String(user.email || '').toLowerCase().trim();
@@ -1019,10 +1195,11 @@ export async function applyToJob(jobOrId, user) {
     recruiterPhone: job ? (job.recruiterPhone || '') : '',
     candidateUid: userUid,
     candidateId: String(user.id || userUid),
-    candidateName: user.name || 'Candidato Ivaí Conecta',
+    candidateName: user.name || (isFreelancer ? 'Prestador Ivaí Conecta' : 'Candidato Ivaí Conecta'),
+    candidateRole: user.role || 'candidato',
     candidateEmail: userEmail,
     candidateAvatar: user.avatar || '',
-    candidateCourse: user.course || (isStudent ? 'Estudante' : 'Profissional'),
+    candidateCourse: user.course || (isFreelancer ? (user.category || 'Prestador de Serviço Autônomo') : (isStudent ? 'Estudante' : 'Profissional')),
     candidateInstitution: user.institution || '',
     candidateCity: user.city || 'Ivaiporã',
     candidatePhone: user.phone || '',
@@ -1034,12 +1211,19 @@ export async function applyToJob(jobOrId, user) {
     appliedAt: new Date().toLocaleDateString('pt-BR'),
     appliedTimestamp: Date.now(),
     matchScore: calculatedScore,
-    status: 'Candidatura Enviada',
+    status: isFreelancer ? 'Proposta PJ Enviada' : 'Candidatura Enviada',
     stage: 'triagem',
     statusClass: calculatedScore >= 75 ? 'badge-match-high' : calculatedScore >= 50 ? 'badge-match-med' : 'badge-match-low',
     currentStageIndex: 0,
-    nextStepNote: 'Sua candidatura foi recebida com sucesso e aguarda análise do recrutador.',
-    stages: [
+    nextStepNote: isFreelancer
+      ? 'Sua proposta de prestação de serviços foi enviada com sucesso e aguarda análise da contratante.'
+      : 'Sua candidatura foi recebida com sucesso e aguarda análise do recrutador.',
+    stages: isFreelancer ? [
+      { name: 'Proposta PJ Enviada', date: new Date().toLocaleDateString('pt-BR'), completed: true },
+      { name: 'Análise de Portfólio & Perfil', date: 'Pendente', completed: false, active: true },
+      { name: 'Alinhamento / Entrevista Técnica', date: 'A definir', completed: false },
+      { name: 'Fechamento de Contrato PJ', date: 'Pendente', completed: false }
+    ] : [
       { name: 'Candidatura Enviada', date: new Date().toLocaleDateString('pt-BR'), completed: true },
       { name: 'Triagem de Currículo', date: 'Pendente', completed: false, active: true },
       { name: 'Entrevista', date: 'A definir', completed: false },
@@ -1087,7 +1271,11 @@ export async function applyToJob(jobOrId, user) {
     } catch {}
   }
 
-  return { success: true, application: newApp };
+  return {
+    success: true,
+    message: isFreelancer ? 'Proposta PJ enviada com sucesso!' : 'Candidatura realizada com sucesso!',
+    application: newApp
+  };
 }
 
 

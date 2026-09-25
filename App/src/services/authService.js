@@ -66,40 +66,40 @@ export function formatFirebaseAuthError(error, context = 'login') {
 
   switch (code) {
     case 'auth/email-already-in-use':
-      friendlyMessage = 'Este e-mail institucional já está cadastrado no sistema. Se você já possui uma conta, realize o login.';
+      friendlyMessage = 'Este e-mail já está cadastrado no sistema. Se você já possui uma conta, realize o login.';
       break;
     case 'auth/invalid-email':
-      friendlyMessage = 'O formato do endereço de e-mail informado é considerado inválido pelo Firebase Auth.';
+      friendlyMessage = 'O formato do endereço de e-mail informado é inválido.';
       break;
     case 'auth/weak-password':
-      friendlyMessage = 'A senha informada é considerada muito fraca pelo Firebase. Ela deve conter no mínimo 6 caracteres.';
+      friendlyMessage = 'A senha informada deve conter no mínimo 6 caracteres.';
       break;
     case 'auth/missing-password':
       friendlyMessage = 'Por favor, informe uma senha para acessar ou criar sua conta.';
       break;
     case 'auth/missing-email':
-      friendlyMessage = 'Por favor, informe seu endereço de e-mail institucional.';
+      friendlyMessage = 'Por favor, informe seu endereço de e-mail.';
       break;
     case 'auth/operation-not-allowed':
-      friendlyMessage = 'O método de autenticação por E-mail/Senha não está ativado no Firebase Console deste projeto (Ative em Authentication > Sign-in method).';
+      friendlyMessage = 'Este método de autenticação está temporariamente indisponível.';
       break;
     case 'auth/user-not-found':
-      friendlyMessage = 'Nenhuma conta cadastrada encontrada com este e-mail no Firebase. Crie uma conta na aba "Quero Me Cadastrar".';
+      friendlyMessage = 'Nenhuma conta cadastrada encontrada com este e-mail. Crie uma conta na aba "Quero Me Cadastrar".';
       break;
     case 'auth/wrong-password':
       friendlyMessage = 'Senha incorreta para este e-mail.';
       break;
     case 'auth/invalid-credential':
-      friendlyMessage = 'Credenciais de acesso incorretas. Verifique se o e-mail institucional e a senha foram digitados corretamente.';
+      friendlyMessage = 'Credenciais de acesso incorretas. Verifique se o e-mail e a senha foram digitados corretamente.';
       break;
     case 'auth/user-disabled':
-      friendlyMessage = 'Esta conta de usuário foi desativada pelo administrador no Firebase Authentication.';
+      friendlyMessage = 'Esta conta de usuário foi desativada pelo administrador.';
       break;
     case 'auth/too-many-requests':
-      friendlyMessage = 'Acesso temporariamente bloqueado pelo Firebase por excesso de tentativas consecutivas. Aguarde alguns minutos.';
+      friendlyMessage = 'Acesso temporariamente bloqueado por excesso de tentativas consecutivas. Aguarde alguns minutos.';
       break;
     case 'auth/network-request-failed':
-      friendlyMessage = 'Falha de comunicação com os servidores do Firebase. Verifique sua conexão com a internet e tente novamente.';
+      friendlyMessage = 'Falha de comunicação com o servidor. Verifique sua conexão com a internet e tente novamente.';
       break;
     case 'auth/popup-closed-by-user':
       friendlyMessage = 'A janela de autenticação do Google foi fechada antes da conclusão do login.';
@@ -120,33 +120,38 @@ export function formatFirebaseAuthError(error, context = 'login') {
       friendlyMessage = 'Esta operação exige que você faça login novamente por motivos de segurança.';
       break;
     case 'auth/unauthorized-domain':
-      friendlyMessage = 'Este domínio web não está autorizado no Firebase Console. Adicione seu domínio ou localhost em Firebase Console > Authentication > Settings > Domínios Autorizados.';
+      friendlyMessage = 'Origem não autorizada para login. Tente novamente mais tarde.';
       break;
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid':
-      friendlyMessage = 'Chave da API do Firebase configurada é inválida ou expirou. Verifique o arquivo de ambiente.';
+      friendlyMessage = 'Falha de comunicação com o serviço de autenticação.';
       break;
     case 'auth/quota-exceeded':
-      friendlyMessage = 'Cota de requisições excedida nos servidores do Firebase Authentication.';
+      friendlyMessage = 'Limite de requisições excedido. Tente novamente mais tarde.';
       break;
     case 'auth/invalid-institutional-email':
       friendlyMessage = 'O e-mail informado não possui um domínio institucional educacional permitido para contas docentes.';
       break;
     case 'auth/internal-error':
-      friendlyMessage = 'Erro interno no Firebase Authentication. Tente novamente em instantes.';
+      friendlyMessage = 'Erro interno temporário. Tente novamente em instantes.';
       break;
     case 'permission-denied':
-      friendlyMessage = 'Permissão negada no Cloud Firestore ao gravar os dados do perfil em /users/{uid}. Verifique as regras de segurança (firestore.rules).';
+      friendlyMessage = 'Permissão negada ao salvar os dados do perfil. Tente novamente.';
       break;
     case 'unavailable':
-      friendlyMessage = 'O serviço do Firestore está temporariamente indisponível. Verifique a conexão com o banco de dados.';
+      friendlyMessage = 'O serviço está temporariamente indisponível. Verifique a conexão com a internet.';
       break;
     default:
       if (rawMsg) {
-        const cleanMsg = rawMsg.replace(/^Firebase:\s*/i, '').replace(/\s*\([a-z0-9/-]+\)\.?$/i, '');
-        friendlyMessage = cleanMsg || (context === 'register' ? 'Erro ao realizar cadastro no Firebase.' : 'Erro ao realizar login no Firebase.');
+        const cleanMsg = rawMsg
+          .replace(/^Firebase:\s*/i, '')
+          .replace(/^FirebaseError:\s*/i, '')
+          .replace(/\s*\([a-z0-9_/-]+\)\.?$/i, '')
+          .replace(/\s*\[[a-z0-9_/-]+\]\.?$/i, '')
+          .replace(/\bFirebase\b/gi, 'serviço');
+        friendlyMessage = cleanMsg || (context === 'register' ? 'Erro ao realizar cadastro.' : 'Erro ao realizar login.');
       } else {
-        friendlyMessage = context === 'register' ? 'Erro ao realizar cadastro no Firebase.' : 'Erro ao realizar login no Firebase.';
+        friendlyMessage = context === 'register' ? 'Erro ao realizar cadastro.' : 'Erro ao realizar login.';
       }
       break;
   }
@@ -155,7 +160,7 @@ export function formatFirebaseAuthError(error, context = 'login') {
     code: code || 'auth/error',
     message: friendlyMessage,
     rawMessage: rawMsg,
-    fullText: code ? `${friendlyMessage} (${code})` : friendlyMessage
+    fullText: friendlyMessage
   };
 }
 
@@ -428,25 +433,30 @@ export async function login(email, password) {
         console.warn('[login] Aviso ao sincronizar perfil novo no Firestore:', err.message);
       }
     }
-
-    const role = String(profileData.role || (isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno')).toLowerCase().trim();
+    const role = String(
+      profileData.activeRole ||
+      profileData.selectedRole ||
+      profileData.profileType ||
+      profileData.role ||
+      (isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno')
+    ).toLowerCase().trim();
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
+      ...profileData,
       uid: fbUser.uid,
       id: fbUser.uid,
       email: fbUser.email,
       name: profileData.name || fbUser.displayName || 'Usuário',
       city: profileData.city || 'Ivaiporã',
       role,
+      activeRole: role,
+      selectedRole: role,
       badge: roleMeta.badge,
       avatar: profileData.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileData.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileData.isVerifiedCompany ?? (role === 'empresa'),
-      ...profileData
-    };
-
-    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    };    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
     return { success: true, user: sessionUser };
   } catch (error) {
     const formatted = formatFirebaseAuthError(error, 'login');
@@ -583,16 +593,25 @@ export async function loginWithGoogle() {
 
     const email = (fbUser.email || '').toLowerCase().trim();
     const fallbackRole = isInstitutionalEmail(email) ? 'professor' : 'aluno';
-    const role = profileRes.profile?.role || fallbackRole;
+    const role = String(
+      profileRes.profile?.activeRole ||
+      profileRes.profile?.selectedRole ||
+      profileRes.profile?.profileType ||
+      profileRes.profile?.role ||
+      fallbackRole
+    ).toLowerCase().trim();
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
+      ...profileRes.profile,
       uid: fbUser.uid,
       id: fbUser.uid,
       email: fbUser.email,
       name: profileRes.profile?.name || fbUser.displayName || 'Usuário Google',
       city: profileRes.profile?.city || 'Ivaiporã',
       role,
+      activeRole: role,
+      selectedRole: role,
       badge: roleMeta.badge,
       avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
@@ -603,7 +622,6 @@ export async function loginWithGoogle() {
         discipline: 'Docência & Orientação Acadêmica',
         verified: true
       } : {}),
-      ...profileRes.profile
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -703,15 +721,24 @@ export function watchAuthState(callback) {
 
           const userEmail = (fbUser.email || '').toLowerCase().trim();
           const fallbackRole = isInstitutionalEmail(userEmail) ? 'professor' : 'aluno';
-          const role = String(profileRes.profile?.role || fallbackRole).toLowerCase().trim();
+          const role = String(
+            profileRes.profile?.activeRole ||
+            profileRes.profile?.selectedRole ||
+            profileRes.profile?.profileType ||
+            profileRes.profile?.role ||
+            fallbackRole
+          ).toLowerCase().trim();
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
           const sessionUser = {
+            ...profileRes.profile,
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
             name: profileRes.profile?.name || fbUser.displayName || 'Usuário',
             city: profileRes.profile?.city || 'Ivaiporã',
             role,
+            activeRole: role,
+            selectedRole: role,
             badge: roleMeta.badge,
             avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
             isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
@@ -721,14 +748,13 @@ export function watchAuthState(callback) {
               degree: 'Docente / Pesquisador',
               discipline: 'Docência & Orientação Acadêmica',
               verified: true
-            } : {}),
-            ...profileRes.profile
+            } : {})
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
           callback(sessionUser);
         } else {
           const localUser = getAuthUser();
-          if (localUser && (localUser.id?.startsWith?.('usr_') || localUser.id?.startsWith?.('prof_') || localUser.email?.includes?.('@ivaiconecta.com.br'))) {
+          if (localUser && (localUser.id || localUser.uid || localUser.email)) {
             callback(localUser);
           } else {
             localStorage.removeItem(STORAGE_KEY_AUTH_USER);
@@ -750,28 +776,115 @@ export function watchAuthState(callback) {
   }
 }
 
-export function updateAuthUser(data) {
-  const current = getAuthUser();
-  if (!current) return null;
-  const updated = { ...current, ...data };
-  localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(updated));
-
-  const users = getUsersDB();
-  const updatedDB = users.map(u => (u.email && current.email && u.email.toLowerCase() === current.email.toLowerCase() ? { ...u, ...data } : u));
-  localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(updatedDB));
-
-  // Sync no Firestore
-  const uid = current.uid || current.id;
-  if (uid) {
+export function updateAuthUser(data, userOverride = null) {
+  let current = userOverride || getAuthUser();
+  if (!current && typeof window !== 'undefined') {
     try {
-      setDoc(doc(db, 'users', String(uid)), {
-        ...data,
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => console.warn('[Firestore] Sync erro updateAuthUser:', err.message));
+      const stored = localStorage.getItem(STORAGE_KEY_AUTH_USER);
+      if (stored) current = JSON.parse(stored);
     } catch {}
   }
+  if (!current) {
+    if (auth.currentUser) {
+      current = {
+        uid: auth.currentUser.uid,
+        id: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        name: auth.currentUser.displayName || 'Usuário'
+      };
+    } else {
+      return null;
+    }
+  }
 
-  return updated;
+  const newRole = data.role ? String(data.role).toLowerCase().trim() : (data.activeRole || data.selectedRole || (current.role ? String(current.role).toLowerCase().trim() : null));
+  const roleMeta = newRole ? (USER_ROLES[newRole] || USER_ROLES.aluno) : null;
+  const updated = {
+    ...current,
+    ...data,
+    ...(newRole ? {
+      role: newRole,
+      activeRole: newRole,
+      selectedRole: newRole,
+      profileType: newRole
+    } : {}),
+    ...(roleMeta ? { badge: roleMeta.badge } : {})
+  };
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(updated));
+
+    const users = getUsersDB();
+    const updatedDB = users.map(u => (
+      (u.email && current.email && u.email.toLowerCase() === current.email.toLowerCase()) ||
+      (String(u.id) === String(current.id) || String(u.uid) === String(current.uid))
+        ? { ...u, ...data, ...(newRole ? { role: newRole, activeRole: newRole, selectedRole: newRole, profileType: newRole } : {}), ...(roleMeta ? { badge: roleMeta.badge } : {}) }
+        : u
+    ));
+    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(updatedDB));
+
+    // Sincroniza também no cache local de talentos
+    try {
+      const rawTalents = localStorage.getItem('ivai_conecta_db_talents');
+      if (rawTalents) {
+        const talents = JSON.parse(rawTalents);
+        if (Array.isArray(talents)) {
+          const updatedTalents = talents.map(t => {
+            const isMatch = (t.email && current.email && t.email.toLowerCase() === current.email.toLowerCase()) ||
+              (String(t.id) === String(current.id) || String(t.uid) === String(current.uid));
+            return isMatch
+              ? { ...t, ...data, ...(newRole ? { role: newRole, activeRole: newRole, selectedRole: newRole, profileType: newRole } : {}), ...(roleMeta ? { badge: roleMeta.badge } : {}) }
+              : t;
+          });
+          localStorage.setItem('ivai_conecta_db_talents', JSON.stringify(updatedTalents));
+        }
+      }
+    } catch (e) {
+      console.warn('[updateAuthUser] Falha ao sincronizar cache local de talentos:', e);
+    }
+  }
+
+  // Sync no Cloud Firestore em todos os IDs aplicáveis do usuário
+  const targetUids = new Set(
+    [auth.currentUser?.uid, current.uid, current.id, updated.uid, updated.id]
+      .filter(Boolean)
+      .map(String)
+  );
+
+  const payload = {
+    ...data,
+    ...(newRole ? {
+      role: newRole,
+      activeRole: newRole,
+      selectedRole: newRole,
+      profileType: newRole
+    } : {}),
+    ...(roleMeta ? { badge: roleMeta.badge } : {}),
+    updatedAt: new Date().toISOString()
+  };
+
+  const syncPromise = (async () => {
+    for (const uid of targetUids) {
+      try {
+        await setDoc(doc(db, 'users', uid), payload, { merge: true });
+      } catch (err) {
+        console.warn(`[Firestore] Sync erro updateAuthUser para uid ${uid}:`, err.message);
+        // Se as regras de segurança do Firestore bloquearem a mutação direta da chave 'role',
+        // aplica imediatamente o safePayload com activeRole, selectedRole, profileType e badge
+        try {
+          const { role: _forbiddenRole, ...safePayload } = payload;
+          await setDoc(doc(db, 'users', uid), safePayload, { merge: true });
+        } catch (fallbackErr) {
+          console.warn(`[Firestore] Fallback seguro erro para uid ${uid}:`, fallbackErr.message);
+        }
+      }
+    }
+    return updated;
+  })();
+
+  // Permite tanto uso síncrono imediato quanto async/await (Promise Thenable com propriedades do objeto)
+  Object.assign(syncPromise, updated);
+  return syncPromise;
 }
 
 export function submitCompanyVerification(cnpj, fileData, extraData = {}) {

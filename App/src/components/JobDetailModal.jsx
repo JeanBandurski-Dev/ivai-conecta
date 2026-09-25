@@ -2,13 +2,17 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
-  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users
+  Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users,
+  Wrench, GraduationCap, ShieldAlert, AlertCircle
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   applyToJob, calculateMatchScore, isSkillMatch, getUsersDB,
   updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications
 } from '../lib/ivaiConecta';
+import {
+  getApplicationEligibility, isPjOrFreelanceJob, isInternshipJob
+} from '../services/jobsService';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -38,9 +42,13 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const isStudent = userRole === 'aluno' || userRole === 'estudante' || userRole === 'student';
   const isStandardCandidate = userRole === 'candidato';
   const isFreelancer = userRole === 'freelancer' || userRole === 'prestador';
-  const isCandidate = Boolean(currentUser && (isStudent || isStandardCandidate || isFreelancer));
+  const isCandidate = Boolean(currentUser && (isStudent || isStandardCandidate));
   const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
   const isProfessor = Boolean(userRole === 'professor' || userRole === 'docente' || userRole === 'teacher');
+
+  const isPj = isPjOrFreelanceJob(job);
+  const isInternship = isInternshipJob(job);
+  const eligibility = getApplicationEligibility(currentUser, job);
 
   const isJobOwner = isCompany && currentUser && (
     (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
@@ -52,7 +60,16 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     (currentUser.nomeFantasia && company && company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
   );
 
-  const canSeeMatch = isCandidate;
+  // Freelancers só visualizam Match para vagas PJ/Freelance
+  // Candidatos padrão só visualizam Match para vagas não-estágio
+  const canSeeMatch = Boolean(
+    currentUser && (
+      isStudent ||
+      (isStandardCandidate && !isInternship) ||
+      (isFreelancer && isPj)
+    )
+  );
+
   const userSkills = safeSkillsArray(currentUser?.skills);
   const calculatedScore = matchScore ?? (canSeeMatch ? calculateMatchScore(userSkills, requiredSkills, {
     userCity: currentUser?.city,
@@ -62,7 +79,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   }) : null);
 
   useEffect(() => {
-    if (!currentUser || !isCandidate) return;
+    if (!currentUser || (!isCandidate && !isFreelancer)) return;
     const userUid = currentUser.uid || currentUser.id;
     const userEmail = currentUser.email?.toLowerCase().trim();
     const possibleJobIds = [
@@ -111,7 +128,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
         window.removeEventListener('ivai_applications_updated', handleLocalAppsUpdate);
       }
     };
-  }, [job, jobId, currentUser, isCandidate]);
+  }, [job, jobId, currentUser, isCandidate, isFreelancer]);
 
   const handleToggleJobStatus = async () => {
     const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
@@ -123,21 +140,15 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   const handleApply = async () => {
     if (!currentUser) {
-      showToast('Faça login como Aluno ou Candidato para se candidatar!');
+      showToast('Faça login como Aluno, Candidato ou Freelancer para se candidatar!');
       return;
     }
-    if (!isCandidate) {
-      if (isCompany) {
-        showToast('Perfis de empresa não realizam candidaturas a vagas.');
-      } else if (isProfessor) {
-        showToast('Perfis de professor/docente não realizam candidaturas a vagas.');
-      } else {
-        showToast('Apenas estudantes, candidatos e freelancers podem se candidatar a vagas.');
-      }
+    if (!eligibility.canApply) {
+      showToast(eligibility.message || 'Candidatura não disponível para seu perfil nesta vaga.');
       return;
     }
     if (applied) {
-      showToast('Você já se candidatou a esta vaga!');
+      showToast(isFreelancer ? 'Você já enviou proposta para esta vaga!' : 'Você já se candidatou a esta vaga!');
       return;
     }
     if (isSubmitting) return;
@@ -147,10 +158,10 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       const res = await applyToJob(job || jobId, currentUser);
       if (res?.success) {
         setApplied(true);
-        showToast('Candidatura realizada com sucesso!');
+        showToast(res?.message || (isFreelancer ? 'Proposta PJ enviada com sucesso!' : 'Candidatura realizada com sucesso!'));
       } else {
         showToast(res?.message || 'Não foi possível concluir a candidatura.');
-        if (res?.message?.includes('já se candidatou')) {
+        if (res?.message?.includes('já se candidatou') || res?.message?.includes('já enviou proposta')) {
           setApplied(true);
         }
       }
@@ -163,7 +174,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   const handleOpenChat = async () => {
     if (!currentUser) {
-      showToast('Faça login como Aluno ou Candidato para conversar com a empresa!');
+      showToast('Faça login para conversar com a empresa!');
       return;
     }
 
@@ -263,6 +274,49 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
             <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-center gap-1.5">
               <span>👨‍🏫</span> Visualização de oportunidade acadêmica para orientação de alunos.
             </div>
+          ) : isFreelancer ? (
+            isPj ? (
+              <div className="mt-6 pt-3 border-t border-white/15 flex items-center justify-between flex-wrap gap-3">
+                <div className="text-xs text-emerald-200 flex items-center gap-1.5 font-semibold">
+                  <Briefcase size={15} className="text-emerald-300 shrink-0" />
+                  <span>Oportunidade para Prestador PJ / Freelancer compatível com seu perfil.</span>
+                </div>
+                {canSeeMatch && typeof calculatedScore === 'number' && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-28 bg-white/20 h-2 rounded-full overflow-hidden">
+                      <div className="bg-gradient-to-r from-teal-400 to-green-400 h-full rounded-full" style={{ width: `${calculatedScore}%` }} />
+                    </div>
+                    <span className="text-xs font-extrabold text-green-300 bg-white/10 px-2 py-0.5 rounded-lg border border-white/20">
+                      {calculatedScore}% Match PJ
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-start gap-2.5">
+                <Wrench size={16} className="text-amber-300 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold text-white">Perfil Freelancer / Prestador: </span>
+                  Esta vaga é para <strong>Emprego Formal ({type})</strong>. Perfis de Freelancer atuam em contratos PJ, demandas autônomas e serviços no Marketplace.
+                </div>
+              </div>
+            )
+          ) : isStandardCandidate && isInternship ? (
+            <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-start gap-2">
+              <AlertCircle size={15} className="text-amber-300 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-bold text-white">Aviso de Elegibilidade: </span>
+                Vagas de estágio são exclusivas para estudantes com matrícula ativa (perfil Aluno), conforme Lei nº 11.788/2008.
+              </div>
+            </div>
+          ) : isStudent && isInternship && !currentUser?.isVerifiedStudent ? (
+            <div className="mt-6 pt-3 border-t border-white/15 text-xs text-amber-200 flex items-start gap-2">
+              <ShieldAlert size={15} className="text-amber-300 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-bold text-white">Comprovação Necessária: </span>
+                Para candidatar-se a este estágio, envie sua Declaração de Matrícula nas Configurações da Conta.
+              </div>
+            </div>
           ) : canSeeMatch && typeof calculatedScore === 'number' ? (
             <div className="mt-6 pt-4 border-t border-white/15 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
@@ -281,7 +335,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           ) : (
             <div className="mt-6 pt-3 border-t border-white/15 text-xs text-gray-300 flex items-center gap-2">
               <Lightbulb size={14} className="text-amber-300 shrink-0" />
-              <span>Entre como Aluno ou Candidato para ver seu cálculo de compatibilidade com esta vaga.</span>
+              <span>Entre como Aluno, Candidato ou Freelancer para visualizar a compatibilidade com a vaga.</span>
             </div>
           )}
         </div>
@@ -385,7 +439,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </button>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {isCandidate && !isJobOwner && (
+            {currentUser && !isJobOwner && !isCompany && (
               <button
                 type="button"
                 onClick={handleOpenChat}
@@ -426,7 +480,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               </span>
             ) : isProfessor ? (
               <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-3.5 py-2 rounded-xl font-medium border border-blue-200 dark:border-blue-800/70 flex items-center gap-1.5">
-                <Users size={14} /> Apenas estudantes e candidatos se candidatam
+                <Users size={14} /> Docentes não realizam candidaturas
               </span>
             ) : !currentUser ? (
               <Link
@@ -436,23 +490,65 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               >
                 <Send size={14} /> Entrar para Candidatar-se
               </Link>
-            ) : isCandidate ? (
-              applied ? (
-                <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5 shadow-sm">
-                  <CheckCircle2 size={15} /> Candidatura Enviada!
-                </button>
-              ) : (
-                <button 
-                  onClick={handleApply} 
-                  disabled={isSubmitting}
-                  className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            ) : applied ? (
+              <button disabled className="btn bg-green-600 text-white btn-sm text-xs font-bold cursor-default flex items-center gap-1.5 shadow-sm">
+                <CheckCircle2 size={15} /> {isFreelancer ? 'Proposta PJ Enviada!' : 'Candidatura Enviada!'}
+              </button>
+            ) : eligibility.status === 'freelancer_clt_blocked' ? (
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                <span className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 px-3.5 py-2 rounded-xl font-medium border border-amber-200 dark:border-amber-800/70 flex items-center gap-1.5">
+                  <Briefcase size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  Vaga CLT / Formal (Não aplicável a Freelancer)
+                </span>
+                <Link
+                  to="/servicos"
+                  onClick={onClose}
+                  className="btn btn-outline btn-sm text-xs font-bold text-teal-600 dark:text-teal-400 border-teal-500/40 hover:bg-teal-500 hover:text-white transition-all flex items-center gap-1"
                 >
-                  <Send size={14} /> {isSubmitting ? 'Enviando...' : 'Candidatar-se à Vaga'}
-                </button>
-              )
+                  Ver Demandas PJ →
+                </Link>
+              </div>
+            ) : eligibility.status === 'candidate_stage_blocked' ? (
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                <span className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 px-3.5 py-2 rounded-xl font-medium border border-amber-200 dark:border-amber-800/70 flex items-center gap-1.5">
+                  <GraduationCap size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  Exclusivo para Alunos / Estudantes (Estágio)
+                </span>
+                <Link
+                  to="/configuracoes"
+                  onClick={onClose}
+                  className="btn btn-outline btn-sm text-xs font-bold text-primary-blue dark:text-blue-400 border-primary-blue/40 hover:bg-primary-blue hover:text-white transition-all flex items-center gap-1"
+                >
+                  Alterar Perfil →
+                </Link>
+              </div>
+            ) : eligibility.status === 'student_stage_unverified' ? (
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                <span className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 px-3.5 py-2 rounded-xl font-medium border border-amber-200 dark:border-amber-800/70 flex items-center gap-1.5">
+                  <ShieldAlert size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  Requer Comprovação de Matrícula
+                </span>
+                <Link
+                  to="/configuracoes?tab=verification"
+                  onClick={onClose}
+                  className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+                >
+                  <ShieldCheck size={14} /> Enviar Matrícula
+                </Link>
+              </div>
+            ) : eligibility.canApply ? (
+              <button 
+                onClick={handleApply} 
+                disabled={isSubmitting}
+                className={`btn btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
+                  isFreelancer ? 'btn-teal' : 'btn-primary'
+                }`}
+              >
+                <Send size={14} /> {isSubmitting ? (eligibility.buttonSubmittingLabel || 'Enviando...') : eligibility.buttonLabel}
+              </button>
             ) : (
               <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/60 px-3.5 py-2 rounded-xl font-medium border border-gray-200 dark:border-slate-700">
-                Apenas alunos e candidatos podem se candidatar
+                {eligibility.buttonLabel}
               </span>
             )}
           </div>

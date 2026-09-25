@@ -179,7 +179,7 @@ export const STAGE_COLOR_MAP = {
 };
 
 export default function GerenciamentoVagasEmpresa() {
-  const { currentUser, showToast, startChatWith } = useAppStore();
+  const { currentUser, showToast, startChatWith, showConfirm } = useAppStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1141,8 +1141,16 @@ export default function GerenciamentoVagasEmpresa() {
     }
   };
 
-  const handleDeleteJob = (jobId) => {
-    if (confirm('Tem certeza que deseja excluir esta vaga e todas as suas candidaturas?')) {
+  const handleDeleteJob = async (jobId) => {
+    const confirmed = await showConfirm({
+      title: 'Excluir Vaga',
+      message: 'Tem certeza que deseja excluir esta vaga e todas as suas candidaturas?\nEsta ação é definitiva e removerá a oportunidade do mural.',
+      confirmText: 'Sim, excluir vaga',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      badge: 'Exclusão Definitiva'
+    });
+    if (confirmed) {
       deleteJob(jobId);
       showToast('Vaga excluída com sucesso.');
       forceUpdate(n => n + 1);

@@ -25,7 +25,6 @@ export default function Login() {
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [selectedRole, setRole] = useState('aluno');
   const [alert, setAlert] = useState('');
-  const [alertCode, setAlertCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Password visibility
@@ -99,7 +98,6 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setAlert('');
-    setAlertCode('');
     setLoading(true);
     const res = await login(loginEmail, loginPass);
     setLoading(false);
@@ -108,14 +106,12 @@ export default function Login() {
       navigate(redirectTarget, { replace: true });
     } else {
       setAlert(res.error || 'E-mail ou senha incorretos.');
-      setAlertCode(res.errorCode || '');
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setAlert('');
-    setAlertCode('');
     if (!regName.trim() || !regEmail.trim() || !regPass.trim()) {
       setAlert('Por favor, preencha todos os campos obrigatórios.');
       return;
@@ -136,7 +132,6 @@ export default function Login() {
     if (selectedRole === 'professor') {
       if (!isInstitutionalEmail(regEmail.trim())) {
         setAlert('Para cadastrar uma conta de Professor/Docente, é obrigatório utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer outro domínio .edu.br).');
-        setAlertCode('auth/invalid-institutional-email');
         return;
       }
     }
@@ -165,13 +160,11 @@ export default function Login() {
       navigate(redirectTarget, { replace: true });
     } else {
       setAlert(res.error || 'Erro ao realizar cadastro.');
-      setAlertCode(res.errorCode || '');
     }
   };
 
   const handleGoogleLogin = async () => {
     setAlert('');
-    setAlertCode('');
     setLoading(true);
     const res = await loginWithGoogle();
     setLoading(false);
@@ -186,7 +179,6 @@ export default function Login() {
       }
     } else {
       setAlert(res.error || 'Falha ao autenticar com o Google.');
-      setAlertCode(res.errorCode || '');
     }
   };
 
@@ -319,7 +311,7 @@ export default function Login() {
 
               <button
                 type="button"
-                onClick={() => { setTab('login'); setAlert(''); setAlertCode(''); }}
+                onClick={() => { setTab('login'); setAlert(''); }}
                 className={`relative z-10 flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
                   tab === 'login'
                     ? 'text-primary-blue dark:text-white'
@@ -330,7 +322,7 @@ export default function Login() {
               </button>
               <button
                 type="button"
-                onClick={() => { setTab('register'); setAlert(''); setAlertCode(''); }}
+                onClick={() => { setTab('register'); setAlert(''); }}
                 className={`relative z-10 flex-1 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
                   tab === 'register'
                     ? 'text-primary-blue dark:text-white'
@@ -385,26 +377,13 @@ export default function Login() {
               </div>
             )}
 
-            {/* Alerta de Erro com Código Real do Firebase */}
+            {/* Alerta de Erro Amigável */}
             {alert && (
               <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl space-y-1.5 animate-in fade-in duration-300">
                 <div className="flex items-start gap-2.5">
                   <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-red-800 dark:text-red-200 leading-snug" dangerouslySetInnerHTML={{ __html: alert }} />
-                    {alertCode && (
-                      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700/80 inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                          Firebase: {alertCode}
-                        </span>
-                        {alertCode === 'auth/operation-not-allowed' && (
-                          <span className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md font-medium">
-                            Dica: Habilite o provedor no Firebase Console
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

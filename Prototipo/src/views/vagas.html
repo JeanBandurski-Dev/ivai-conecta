@@ -446,7 +446,9 @@
           if (!IvaiConecta.requireAuth('para se candidatar a vagas')) return;
 
           // 2. Verificar permissão de candidatura
-          const permission = IvaiConecta.canApplyToJobs();
+          const jobId = btn.getAttribute('data-id');
+          const targetJob = (IvaiConecta.getJobs() || []).find(j => String(j.id) === String(jobId));
+          const permission = IvaiConecta.canApplyToJobs(targetJob);
 
           if (!permission.allowed) {
             // Mostrar modal de restrição com explicação clara

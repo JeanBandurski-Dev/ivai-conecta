@@ -161,7 +161,7 @@ function normalizeUserDoc(docData, docId) {
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Usuário',
-    role: data.role || 'aluno',
+    role: data.activeRole || data.selectedRole || data.profileType || data.role || (data.isVerifiedStudent ? 'aluno' : ''),
     city: data.city || '',
     avatar: data.avatar || '',
     skills: data.skills || [],
@@ -199,6 +199,35 @@ function normalizeTeacherDoc(docData, docId) {
     education: data.education || [],
     classes: data.classes || [],
   };
+}
+
+/**
+ * Validador consistente para determinar se um documento de usuário é um talento profissional
+ */
+export function isTalentUser(u) {
+  if (!u || typeof u !== 'object') return false;
+  const role = String(u.role || '').toLowerCase().trim();
+
+  // Exclui papéis expressamente não relacionados a talentos/estudantes/profissionais autônomos
+  if (['empresa', 'company', 'recrutador', 'professor', 'docente', 'teacher', 'admin'].includes(role)) {
+    return false;
+  }
+
+  // Papéis de talentos válidos
+  if (['aluno', 'estudante', 'student', 'candidato', 'freelancer', 'prestador', 'profissional'].includes(role)) {
+    return true;
+  }
+
+  // Documentos sem role definido explicitamente: valida se contém atributos reais de estudante ou habilidades
+  if (!role) {
+    const hasStudentProof = Boolean(u.isVerifiedStudent || u.studentEmail || u.raNumber || u.course || u.institution);
+    const hasSkills = Array.isArray(u.skills) && u.skills.length > 0;
+    const hasName = Boolean(u.name && u.name.trim() && u.name !== 'Usuário');
+    const hasEmail = Boolean(u.email && u.email.includes('@'));
+    return (hasStudentProof || hasSkills) || (hasName && hasEmail);
+  }
+
+  return false;
 }
 
 /**
@@ -255,7 +284,7 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
         return normalized;
       });
 
-      const remoteTalents = allUsers.filter(u => !u.role || ['aluno', 'candidato', 'freelancer'].includes(u.role));
+      const remoteTalents = allUsers.filter(isTalentUser);
 
       _memTalentsCache = remoteTalents;
       if (typeof localStorage !== 'undefined') {
@@ -404,6 +433,25 @@ export function getTalents(city = 'Todas as Cidades') {
       } catch {}
     }
   }
+
+  // Se o usuário logado for um talento e não estiver ainda na lista, inclui temporariamente
+  if (typeof localStorage !== 'undefined') {
+    const rawAuth = localStorage.getItem('ivai_conecta_auth_user');
+    if (rawAuth) {
+      try {
+        const auth = JSON.parse(rawAuth);
+        if (auth && isTalentUser(auth)) {
+          const authId = String(auth.uid || auth.id || '');
+          const exists = talents.some(t => String(t.id || t.firestoreId || '') === authId || (t.email && auth.email && t.email.toLowerCase() === auth.email.toLowerCase()));
+          if (!exists) {
+            talents = [normalizeUserDoc(auth, authId), ...talents];
+          }
+        }
+      } catch {}
+    }
+  }
+
+  talents = talents.filter(isTalentUser);
 
   if (!city || city === 'Todas as Cidades') return talents;
   return talents.filter(t => matchCity(t.city, city));
@@ -1352,11 +1400,13 @@ export function updateTalentProfile(talentId, updatedData) {
     return t;
   });
 
-  if (!found) {
+  if (!found && isTalentUser(updatedData)) {
     updated.push({ id: talentId, ...updatedData });
   }
 
-  localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(updated));
+  const cleanTalents = updated.filter(isTalentUser);
+  localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(cleanTalents));
+  _memTalentsCache = cleanTalents;
 
   if (typeof localStorage !== 'undefined') {
     const rawAuth = localStorage.getItem('ivai_conecta_auth_user');

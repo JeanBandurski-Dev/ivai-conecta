@@ -76,24 +76,48 @@ import { seedData } from '../../src/database/seed-data.js';
   }
 
   // Verifica se o usuário atual tem permissão para se candidatar a vagas
-  function canApplyToJobs() {
+  function canApplyToJobs(job) {
     const authUser = getAuthUser();
     if (!authUser) return { allowed: false, reason: 'not_logged', message: 'Você precisa estar logado para se candidatar a vagas.' };
 
     const role = authUser.role;
+    const typeStr = String(job?.type || '').toLowerCase();
+    const isPj = typeStr.includes('pj') || typeStr.includes('prestador') || typeStr.includes('freelanc') || typeStr.includes('projeto');
+    const isStage = typeStr.includes('estágio') || typeStr.includes('estagio');
 
-    if (role === 'aluno' || role === 'candidato') {
+    if (role === 'aluno') {
+      if (isStage && !authUser.isVerifiedStudent) {
+        return {
+          allowed: false,
+          reason: 'unverified_student',
+          message: 'Para sua segurança e das empresas contratantes, envie sua <strong>Declaração de Matrícula</strong> nas Configurações para liberar candidaturas de estágio!'
+        };
+      }
+      return { allowed: true };
+    }
+
+    if (role === 'candidato') {
+      if (isStage) {
+        return {
+          allowed: false,
+          reason: 'stage_blocked',
+          message: 'Vagas de estágio são exclusivas para estudantes regularmente matriculados (perfil Aluno), conforme a Lei do Estágio nº 11.788/2008. Altere seu perfil para Aluno caso esteja matriculado.'
+        };
+      }
       return { allowed: true };
     }
 
     if (role === 'freelancer') {
+      if (isPj) {
+        return { allowed: true, isPj: true, label: 'Enviar Proposta PJ' };
+      }
       if (authUser.isCandidateEnabled) {
         return { allowed: true };
       }
       return {
         allowed: false,
-        reason: 'hybrid_required',
-        message: 'Como Freelancer, você precisa ativar o <strong>Modo Candidato</strong> nas Configurações da Conta para se candidatar a vagas CLT/Estágio.'
+        reason: 'freelancer_clt_blocked',
+        message: 'Seu perfil está cadastrado como <strong>Freelancer / Autônomo</strong>. Esta vaga é de emprego formal (CLT / Estágio). Freelancers concorrem exclusivamente a demandas de Prestador de Serviço (PJ) e projetos no Marketplace de Serviços. Para candidatar-se a vagas formais, altere seu tipo de perfil nas Configurações da Conta.'
       };
     }
 
@@ -102,6 +126,14 @@ import { seedData } from '../../src/database/seed-data.js';
         allowed: false,
         reason: 'role_blocked',
         message: 'Contas empresariais não podem se candidatar a vagas. Para candidaturas pessoais, crie uma conta de Aluno ou Candidato.'
+      };
+    }
+
+    if (role === 'professor') {
+      return {
+        allowed: false,
+        reason: 'role_blocked',
+        message: 'Perfis de professor/docente visualizam vagas exclusivamente para fins de orientação acadêmica.'
       };
     }
 

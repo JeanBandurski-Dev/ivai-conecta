@@ -31,6 +31,7 @@ export default function MinhasVagas() {
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCompany = userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador';
   const isProfessor = userRole === 'professor' || userRole === 'docente' || userRole === 'teacher';
+  const isFreelancer = userRole === 'freelancer' || userRole === 'prestador';
 
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
   const [liveApps, setLiveApps] = useState(() => isCompany ? getUserApplications() : getUserApplications(currentUser?.uid));
@@ -346,18 +347,24 @@ export default function MinhasVagas() {
                   ? 'Painel do Docente & Recomendações'
                   : isCompany
                     ? 'Minhas Vagas Criadas & Candidatos'
-                    : candidateTab === 'favorites'
-                      ? 'Minhas Vagas Salvas & Favoritas'
-                      : 'Minhas Candidaturas & Processos'}
+                    : isFreelancer
+                      ? (candidateTab === 'favorites' ? 'Minhas Oportunidades Salvas & Favoritas' : 'Minhas Propostas PJ & Candidaturas')
+                      : candidateTab === 'favorites'
+                        ? 'Minhas Vagas Salvas & Favoritas'
+                        : 'Minhas Candidaturas & Processos'}
               </h1>
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
                 {isProfessor
                   ? 'Gerencie pedidos de parecer pedagógico dos seus alunos do IFPR, Univale e UENP e atribua selos verificados.'
                   : isCompany
                     ? 'Gerencie os processos seletivos da sua empresa, acompanhe os estudantes inscritos e altere os status das vagas.'
-                    : candidateTab === 'favorites'
-                      ? 'Suas oportunidades favoritadas para acompanhar prazos, comparar requisitos e candidatar-se no momento certo.'
-                      : 'Acompanhe o status e a evolução em tempo real de todas as suas candidaturas no Vale do Ivaí.'}
+                    : isFreelancer
+                      ? (candidateTab === 'favorites'
+                          ? 'Demandas e oportunidades PJ favoritadas para acompanhar prazos e enviar propostas.'
+                          : 'Acompanhe o status e a evolução em tempo real de todas as suas propostas de prestação de serviços PJ no Vale do Ivaí.')
+                      : candidateTab === 'favorites'
+                        ? 'Suas oportunidades favoritadas para acompanhar prazos, comparar requisitos e candidatar-se no momento certo.'
+                        : 'Acompanhe o status e a evolução em tempo real de todas as suas candidaturas no Vale do Ivaí.'}
               </p>
             </div>
 
@@ -689,7 +696,7 @@ export default function MinhasVagas() {
                   }`}
               >
                 <Send size={15} className={candidateTab === 'applications' ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
-                <span>Vagas Candidatadas</span>
+                <span>{isFreelancer ? 'Propostas Enviadas' : 'Vagas Candidatadas'}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${candidateTab === 'applications'
                     ? 'bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-300'
                     : 'bg-slate-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
@@ -725,13 +732,24 @@ export default function MinhasVagas() {
                     <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue flex items-center justify-center mx-auto">
                       <Briefcase size={32} />
                     </div>
-                    <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Você ainda não se candidatou a nenhuma vaga.</p>
-                    <p className="text-sm text-gray-400 dark:text-slate-400 mb-5 max-w-md mx-auto">
-                      Explore o mural de oportunidades abertas e envie seu currículo para as melhores empresas da nossa região.
+                    <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">
+                      {isFreelancer ? 'Você ainda não enviou propostas para nenhuma oportunidade.' : 'Você ainda não se candidatou a nenhuma vaga.'}
                     </p>
-                    <Link to="/vagas" className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2">
-                      <ExternalLink size={15} /> Explorar Vagas Disponíveis
-                    </Link>
+                    <p className="text-sm text-gray-400 dark:text-slate-400 mb-5 max-w-md mx-auto">
+                      {isFreelancer
+                        ? 'Explore oportunidades de Prestador de Serviço (PJ) ou divulgue seus serviços no Marketplace local.'
+                        : 'Explore o mural de oportunidades abertas e envie seu currículo para as melhores empresas da nossa região.'}
+                    </p>
+                    <div className="flex items-center justify-center gap-3 flex-wrap">
+                      <Link to="/vagas" className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2">
+                        <ExternalLink size={15} /> {isFreelancer ? 'Explorar Vagas PJ' : 'Explorar Vagas Disponíveis'}
+                      </Link>
+                      {isFreelancer && (
+                        <Link to="/servicos" className="btn btn-teal px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2">
+                          Marketplace de Serviços
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-4 sm:gap-5">
