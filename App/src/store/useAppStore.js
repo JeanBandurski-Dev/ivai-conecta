@@ -269,6 +269,63 @@ const useAppStore = create((set, get) => ({
       set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
     }, dur);
   },
+
+  // ─── Modal Dialog State (Alert & Confirm) ─────────────────
+  confirmDialog: null,
+
+  showConfirm: (options = {}) => {
+    const config = typeof options === 'string'
+      ? { message: options }
+      : (options || {});
+
+    return new Promise((resolve) => {
+      set({
+        confirmDialog: {
+          title: config.title || 'Confirmação',
+          message: config.message || 'Deseja prosseguir com esta ação?',
+          confirmText: config.confirmText || 'Confirmar',
+          cancelText: config.cancelText || 'Cancelar',
+          variant: config.variant || 'primary',
+          badge: config.badge || null,
+          isAlert: false,
+          resolve
+        }
+      });
+    });
+  },
+
+  showAlert: (options = {}) => {
+    const config = typeof options === 'string'
+      ? { message: options }
+      : (options || {});
+
+    return new Promise((resolve) => {
+      set({
+        confirmDialog: {
+          title: config.title || 'Aviso',
+          message: config.message || '',
+          confirmText: config.confirmText || 'Entendi',
+          cancelText: null,
+          variant: config.variant || 'info',
+          badge: config.badge || null,
+          isAlert: true,
+          resolve
+        }
+      });
+    });
+  },
+
+  closeConfirm: (result = false) => {
+    const dialog = get().confirmDialog;
+    if (dialog && typeof dialog.resolve === 'function') {
+      try {
+        dialog.resolve(result);
+      } catch (err) {
+        console.error('Erro ao resolver dialog:', err);
+      }
+    }
+    set({ confirmDialog: null });
+  },
 }));
 
 export default useAppStore;
