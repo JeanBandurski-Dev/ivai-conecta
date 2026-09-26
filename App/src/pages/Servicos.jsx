@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, HelpCircle
+  BarChart3, CheckCircle2, AlertCircle, HelpCircle, User,
+  Wrench, Sparkles, Tag, FileText, Briefcase, Eye
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getServices, addService, updateService, CITIES, maskPhone, matchCity } from '../lib/ivaiConecta';
@@ -81,6 +82,14 @@ export default function Servicos() {
     address: currentService?.address || '',
     phone: currentService?.phone || currentUser?.phone || '',
     description: currentService?.description || ''
+  });
+
+  const [newServiceForm, setNewServiceForm] = useState({
+    title: '',
+    category: 'Construção & Manutenção',
+    city: currentUser?.city || 'Ivaiporã',
+    phone: currentUser?.phone || '',
+    description: ''
   });
 
   useEffect(() => {
@@ -228,9 +237,17 @@ export default function Servicos() {
                 <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
                   Cadastre suas atividades profissionais para começar a receber contatos de clientes de Ivaiporã e região e acompanhar suas métricas de desempenho.
                 </p>
-                <button onClick={() => setModal(true)} className="btn btn-teal px-6 py-2.5 font-bold shadow-md">
-                  <Plus size={16} /> Cadastrar Meu Serviço
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={() => setModal(true)} className="btn btn-teal px-6 py-2.5 font-bold shadow-md cursor-pointer">
+                    <Plus size={16} /> Cadastrar Meu Serviço
+                  </button>
+                  <Link
+                    to={currentUser?.uid ? `/freelancer/${currentUser.uid}` : '/freelancer'}
+                    className="btn btn-outline px-6 py-2.5 font-bold"
+                  >
+                    <User size={16} /> Ver Meu Perfil Freelancer
+                  </Link>
+                </div>
               </div>
             ) : (
               <>
@@ -262,9 +279,17 @@ export default function Servicos() {
                     </div>
                   </div>
 
-                  <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
-                    <Edit3 size={15} /> Editar Dados &amp; Localização
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={currentUser?.uid ? `/freelancer/${currentUser.uid}` : '/freelancer'}
+                      className="btn btn-outline btn-sm font-bold shadow-xs gap-1.5"
+                    >
+                      <User size={15} /> Ver Meu Perfil Público
+                    </Link>
+                    <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
+                      <Edit3 size={15} /> Editar Dados &amp; Localização
+                    </button>
+                  </div>
                 </div>
 
                 {/* CARDS DE ANALYTICS / DESEMPENHO DE VENDAS */}
@@ -595,87 +620,251 @@ export default function Servicos() {
         </div>
       )}
 
-      {/* New Service Modal */}
+      {/* ── MODAL: CADASTRAR NOVO SERVIÇO (PADRÃO DE PUBLICAÇÃO) ── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Cadastrar Meu Serviço</h3>
-              <button onClick={() => setModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          onClick={() => setModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl w-full max-w-xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4.5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20 shadow-xs">
+                  <Wrench size={20} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                      Marketplace Regional
+                    </span>
+                    <span className="text-gray-300 dark:text-slate-600">·</span>
+                    <span className="text-[11px] font-medium text-gray-500 dark:text-slate-400">
+                      Novo Anúncio
+                    </span>
+                  </div>
+                  <h3 className="font-heading text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white tracking-tight truncate">
+                    Anunciar Novo Serviço
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModal(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const category = e.target.category.value;
-              const city = e.target.city.value;
-              const rawPhone = e.target.phone.value;
-              const description = e.target.description.value;
-              const title = e.target.title.value || category;
 
-              const phone = rawPhone || currentUser?.phone || '';
+            {/* Form Body */}
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const category = newServiceForm.category;
+                const city = newServiceForm.city;
+                const phone = newServiceForm.phone || currentUser?.phone || '';
+                const description = newServiceForm.description;
+                const title = newServiceForm.title.trim() || category;
 
-              const servicePayload = {
-                title,
-                name: title,
-                category,
-                providerName: currentUser?.name || 'Profissional Autônomo',
-                avatar: currentUser?.avatar || '',
-                providerEmail: currentUser?.email || '',
-                city,
-                phone,
-                description,
-                createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
-                rating: 5.0,
-                reviewsCount: 0,
-                badge: 'Prestador Regional',
-                analytics: { views: 0, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
-                reviews: [],
-                forumTopics: []
-              };
-              await addService(servicePayload);
-              showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
-              setModal(false);
-            }} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Título ou Nome do Serviço</label>
-                <input name="title" type="text" className="form-control" placeholder="Ex: Manutenção Elétrica Residencial e Predial" required />
+                const servicePayload = {
+                  title,
+                  name: title,
+                  category,
+                  providerName: currentUser?.name || 'Profissional Autônomo',
+                  avatar: currentUser?.avatar || '',
+                  providerEmail: currentUser?.email || '',
+                  city,
+                  phone,
+                  description,
+                  createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
+                  rating: 5.0,
+                  reviewsCount: 0,
+                  badge: 'Prestador Regional',
+                  analytics: { views: 0, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
+                  reviews: [],
+                  forumTopics: []
+                };
+                await addService(servicePayload);
+                showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
+                setModal(false);
+                setNewServiceForm({
+                  title: '',
+                  category: 'Construção & Manutenção',
+                  city: currentUser?.city || 'Ivaiporã',
+                  phone: currentUser?.phone || '',
+                  description: ''
+                });
+              }} 
+              className="flex flex-col flex-1 overflow-hidden"
+            >
+              <div className="p-6 overflow-y-auto space-y-4.5 text-sm">
+                
+                {/* Título do Serviço */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Briefcase size={14} className="text-teal-600 dark:text-teal-400" />
+                    Título ou Especialidade do Serviço <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newServiceForm.title}
+                    onChange={e => setNewServiceForm(f => ({ ...f, title: e.target.value }))}
+                    className="w-full bg-slate-50/50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                    placeholder="Ex: Instalação & Manutenção Elétrica Residencial"
+                  />
+                  {/* Sugestões rápidas e intuitivas */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-gray-400 dark:text-slate-500 font-medium">Sugestões:</span>
+                    {[
+                      'Manutenção Residencial',
+                      'Design & Redes Sociais',
+                      'Desenvolvimento Web',
+                      'Aulas Particulares',
+                      'Pintura & Reformas'
+                    ].map(sug => (
+                      <button
+                        type="button"
+                        key={sug}
+                        onClick={() => setNewServiceForm(f => ({ ...f, title: sug }))}
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-gray-100 hover:bg-teal-50 text-gray-600 hover:text-teal-700 dark:bg-slate-800 dark:hover:bg-teal-950/50 dark:text-slate-400 dark:hover:text-teal-300 transition-colors border border-transparent hover:border-teal-200 dark:hover:border-teal-800 cursor-pointer"
+                      >
+                        + {sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Categoria e Cidade */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Tag size={14} className="text-teal-600 dark:text-teal-400" />
+                      Categoria
+                    </label>
+                    <select
+                      value={newServiceForm.category}
+                      onChange={e => setNewServiceForm(f => ({ ...f, category: e.target.value }))}
+                      className="w-full bg-slate-50/50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer"
+                    >
+                      {CATEGORIES.slice(1).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <MapPin size={14} className="text-teal-600 dark:text-teal-400" />
+                      Cidade de Atuação
+                    </label>
+                    <select
+                      value={newServiceForm.city}
+                      onChange={e => setNewServiceForm(f => ({ ...f, city: e.target.value }))}
+                      className="w-full bg-slate-50/50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer"
+                    >
+                      {CITIES.slice(1).map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* WhatsApp / Telefone */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Phone size={14} className="text-teal-600 dark:text-teal-400" />
+                    WhatsApp / Telefone para Contato
+                  </label>
+                  <input
+                    type="tel"
+                    value={newServiceForm.phone}
+                    onChange={e => setNewServiceForm(f => ({ ...f, phone: maskPhone(e.target.value) }))}
+                    maxLength={15}
+                    className="w-full bg-slate-50/50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                    placeholder="(43) 99999-9999"
+                  />
+                  <p className="text-[11px] text-gray-400 dark:text-slate-500">
+                    Clientes poderão iniciar uma conversa direta no seu WhatsApp com 1 clique.
+                  </p>
+                </div>
+
+                {/* Descrição */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <FileText size={14} className="text-teal-600 dark:text-teal-400" />
+                    Descrição do Serviço & Diferenciais
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newServiceForm.description}
+                    onChange={e => setNewServiceForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full bg-slate-50/50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-none"
+                    placeholder="Descreva o que está incluso, prazos, orçamentos, materiais e garantias oferecidas..."
+                  />
+                </div>
+
+                {/* Mini Prévia do Anúncio (Intuitiva & Visual) */}
+                <div className="p-3.5 rounded-2xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-100 dark:border-teal-900/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 flex items-center gap-1">
+                      <Eye size={12} /> Prévia no Marketplace
+                    </span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={10} /> Ativo no Catálogo
+                    </span>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-200 dark:border-slate-800 flex items-center gap-3 shadow-xs">
+                    <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0 font-bold">
+                      <Wrench size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-md border border-teal-200/60 dark:border-teal-800/60">
+                          {newServiceForm.category}
+                        </span>
+                        <span className="text-[11px] text-gray-500 dark:text-slate-400 flex items-center gap-0.5">
+                          <MapPin size={11} className="text-teal-500" /> {newServiceForm.city}
+                        </span>
+                      </div>
+                      <p className="font-bold text-xs text-gray-900 dark:text-white truncate mt-0.5">
+                        {newServiceForm.title.trim() || 'Título do serviço será exibido aqui'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-              <div className="form-group">
-                <label className="form-label">Categoria do Serviço</label>
-                <select name="category" className="form-control">
-                  {CATEGORIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Cidade onde Atua</label>
-                <select name="city" className="form-control">
-                  {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Telefone de Contato</label>
-                <input
-                  name="phone"
-                  type="tel"
-                  className="form-control"
-                  placeholder="Ex: (43) 99999-0000"
-                  maxLength={15}
-                  onChange={e => { e.target.value = maskPhone(e.target.value); }}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Descrição dos Serviços</label>
-                <textarea name="description" className="form-control" rows={3} placeholder="Descreva seus serviços, especialidades e diferenciais..." required />
-              </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setModal(false)} className="btn btn-outline btn-sm">Cancelar</button>
-                <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">Cadastrar Serviço</button>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-teal px-5 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-brand-sm hover:shadow-brand-md hover:scale-[1.01] active:scale-95 transition-all"
+                >
+                  <Sparkles size={14} />
+                  <span>Publicar Serviço no Mural</span>
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </>
   );
 }

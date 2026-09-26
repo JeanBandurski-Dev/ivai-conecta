@@ -74,6 +74,14 @@ export default function PerfilAluno() {
     return () => { isMounted = false; };
   }, [talentId, id, currentUser]);
 
+  // Se o perfil acessado for de um freelancer, redireciona para a página dedicada de freelancer
+  useEffect(() => {
+    if (talent?.role === 'freelancer') {
+      const targetId = id || talent?.id || talent?.firestoreId || currentUser?.uid;
+      navigate(targetId ? `/freelancer/${targetId}` : '/freelancer', { replace: true });
+    }
+  }, [talent?.role, id, talent?.id, talent?.firestoreId, currentUser?.uid, navigate]);
+
   // Permissão estrita do proprietário: id, uid, e-mail ou nome correspondente entre o usuário logado e o perfil
   const isOwner = Boolean(
     currentUser && talent && (

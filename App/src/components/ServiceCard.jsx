@@ -1,4 +1,5 @@
-import { Star, MessageSquare, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Star, MessageSquare, Trash2, User } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { deleteService } from '../lib/ivaiConecta';
 
@@ -52,6 +53,8 @@ export default function ServiceCard({ service, onDelete }) {
     }, `Serviço: ${serviceTitle}`, null, draft);
   };
 
+  const freelancerProfileTarget = createdBy ? `/freelancer/${createdBy}` : null;
+
   return (
     <div className="card gap-3 hover:border-primary-blue/30 transition-all flex flex-col h-full">
       {/* Top row */}
@@ -75,7 +78,19 @@ export default function ServiceCard({ service, onDelete }) {
       <div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{serviceTitle}</h3>
         <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-          Por <span className="font-semibold text-gray-700 dark:text-slate-300">{provider}</span>
+          Por{' '}
+          {freelancerProfileTarget ? (
+            <Link
+              to={freelancerProfileTarget}
+              className="font-semibold text-gray-700 dark:text-slate-300 hover:text-primary-blue dark:hover:text-blue-400 underline decoration-dotted transition-colors"
+              onClick={e => e.stopPropagation()}
+              title="Ver perfil do prestador"
+            >
+              {provider}
+            </Link>
+          ) : (
+            <span className="font-semibold text-gray-700 dark:text-slate-300">{provider}</span>
+          )}
         </p>
       </div>
 
@@ -96,20 +111,34 @@ export default function ServiceCard({ service, onDelete }) {
       <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed flex-1">{description}</p>
 
       {/* Actions */}
-      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
+      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
         {isOwner ? (
-          <div className="text-xs text-center py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5">
-            <span>✨ Seu anúncio de serviço</span>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleContactChat}
-            className="btn btn-primary btn-sm w-full text-xs gap-2 cursor-pointer font-bold shadow-brand-sm transition-all flex items-center justify-center py-2.5 rounded-xl"
+          <Link
+            to={currentUser?.uid ? `/freelancer/${currentUser.uid}` : '/freelancer'}
+            className="text-xs text-center py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5 flex-1 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
           >
-            <MessageSquare size={15} />
-            Conversar com o Prestador
-          </button>
+            <span>✨ Seu anúncio (Ver Perfil Freelancer)</span>
+          </Link>
+        ) : (
+          <>
+            {freelancerProfileTarget && (
+              <Link
+                to={freelancerProfileTarget}
+                className="btn btn-outline btn-sm text-xs px-3 py-2 rounded-xl font-bold text-center"
+                title="Ver perfil completo do prestador"
+              >
+                Ver Perfil
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={handleContactChat}
+              className="btn btn-primary btn-sm flex-1 text-xs gap-1.5 cursor-pointer font-bold shadow-brand-sm transition-all flex items-center justify-center py-2 rounded-xl"
+            >
+              <MessageSquare size={14} />
+              Conversar
+            </button>
+          </>
         )}
       </div>
     </div>

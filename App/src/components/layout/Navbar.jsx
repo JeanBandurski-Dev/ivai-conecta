@@ -70,7 +70,7 @@ export default function Navbar() {
     const userIdentifier = currentUser.uid || currentUser.id;
     if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
     if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
-    if (userRole === 'freelancer') return '/servicos?view=dashboard';
+    if (userRole === 'freelancer') return userIdentifier ? `/freelancer/${userIdentifier}` : '/freelancer';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
@@ -130,14 +130,19 @@ export default function Navbar() {
               </button>
 
               {currentUser ? (
-                <div className="relative" ref={dropdownRef}>
+                <div className="relative flex items-center justify-center" ref={dropdownRef}>
+                  {/* Glow suave e fluido 100% acelerado por GPU (zero travamento/stutter) */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-blue-500 blur-md profile-fluid-glow"
+                  />
                   <button
                     onClick={() => setDropdownOpen(o => !o)}
-                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary-blue dark:hover:border-blue-400 transition-colors duration-200 bg-white dark:bg-slate-800 shadow-xs cursor-pointer"
+                    className="relative flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-primary-blue/60 dark:border-blue-400/60 bg-white dark:bg-slate-800 hover:border-primary-blue transition-colors duration-200 shadow-xs cursor-pointer select-none"
                     aria-label="Menu do usuário"
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
-                      {currentUser.avatar ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/40 shrink-0">
+                      {currentUser.avatar && currentUser.avatar.trim() !== '' ? (
                         <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                       ) : (
                         <User size={15} className="text-primary-blue dark:text-blue-400" />
@@ -153,7 +158,7 @@ export default function Navbar() {
                     <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                          {currentUser.avatar ? (
+                          {currentUser.avatar && currentUser.avatar.trim() !== '' ? (
                             <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
@@ -170,7 +175,7 @@ export default function Navbar() {
                       <div className="py-2">
                         <Link to={getProfileLink()} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Painel Freelancer' : 'Meu Perfil'}
+                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Perfil Profissional' : 'Meu Perfil'}
                         </Link>
 
                         {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
@@ -201,10 +206,13 @@ export default function Navbar() {
                         )}
 
                         {currentUser.role === 'freelancer' && (
-                          <Link to="/servicos?action=new" onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                            <PlusCircle size={15} /> Cadastrar Novo Serviço
-                          </Link>
+                          <>
+                            <Link to="/servicos?view=dashboard" onClick={() => setDropdownOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
+                              <Briefcase size={15} /> Painel de Meus Serviços
+                            </Link>
+
+                          </>
                         )}
                       </div>
 
@@ -273,7 +281,7 @@ export default function Navbar() {
                   <div className="border-t border-gray-100 dark:border-slate-800 my-2.5" />
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                      {currentUser.avatar ? (
+                      {currentUser.avatar && currentUser.avatar.trim() !== '' ? (
                         <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
@@ -320,6 +328,12 @@ export default function Navbar() {
                   {currentUser.role === 'empresa' && (
                     <NavLink to="/gerenciamento-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><Building2 size={16} /> Gestão de Vagas &amp; Funil ATS</span>
+                    </NavLink>
+                  )}
+
+                  {currentUser.role === 'freelancer' && (
+                    <NavLink to="/servicos?view=dashboard" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><Briefcase size={16} /> Painel de Meus Serviços</span>
                     </NavLink>
                   )}
 

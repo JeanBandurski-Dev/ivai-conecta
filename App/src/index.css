@@ -651,6 +651,25 @@
   }
 }
 
+/* ─── Blue Glow Pulse (100% GPU-Accelerated, Zero-Lag) ────────── */
+@keyframes profileFluidGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.96) translateZ(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05) translateZ(0);
+  }
+}
 
+.profile-fluid-glow {
+  animation: profileFluidGlow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  pointer-events: none;
+}
 
 

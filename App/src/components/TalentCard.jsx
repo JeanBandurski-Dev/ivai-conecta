@@ -121,7 +121,7 @@ export default function TalentCard({ talent }) {
       {/* Action & Direct Social Links */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
         <Link
-          to={`/perfil/${id}`}
+          to={talent.role === 'freelancer' ? `/freelancer/${id}` : `/perfil/${id}`}
           className="btn btn-outline btn-sm flex-1 text-xs font-bold text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-700 text-center"
         >
           Ver Perfil Completo
