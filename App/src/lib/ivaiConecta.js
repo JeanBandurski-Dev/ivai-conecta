@@ -14,3 +14,6 @@ export * from '../services/jobTaxonomy';
 export * from '../services/companiesService';
 export * from '../services/studentVerificationService';
 export * from '../utils/searchUtils';
+export * from '../models';
+export * from '../repositories';
+export * from '../hooks';

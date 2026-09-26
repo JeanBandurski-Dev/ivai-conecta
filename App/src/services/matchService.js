@@ -9,6 +9,8 @@
  * 4. Proteção contra falsos positivos (ex: C não casa com React, Java não casa com JavaScript)
  */
 
+import { MatchTier } from '../models/enums.js';
+
 // Grupos canônicos de sinônimos e equivalências no mercado de trabalho
 const SYNONYM_GROUPS = [
   // Frontend / Web / JS
@@ -241,13 +243,13 @@ export function getMatchDetails(candidateSkills = [], requiredSkills = [], optio
 
   const score = calculateMatchScore(candidateSkills, requiredSkills, options);
 
-  let matchLevel = 'Em Desenvolvimento';
+  let matchLevel = MatchTier.EM_DESENVOLVIMENTO;
   let matchLevelColor = 'text-amber-500';
   if (score >= 80) {
-    matchLevel = 'Alta Afinidade';
+    matchLevel = MatchTier.ALTA_AFINIDADE;
     matchLevelColor = 'text-green-500';
   } else if (score >= 60) {
-    matchLevel = 'Boa Compatibilidade';
+    matchLevel = MatchTier.BOA_COMPATIBILIDADE;
     matchLevelColor = 'text-blue-500';
   }
 

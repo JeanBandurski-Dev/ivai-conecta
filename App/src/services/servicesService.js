@@ -11,6 +11,10 @@ import {
   where
 } from 'firebase/firestore';
 import { STORAGE_KEY_SERVICES, CITIES } from '../data/seedData.js';
+import { serviceRepository, serviceOrderRepository } from '../repositories/index.js';
+import { ServiceStatus, ServiceOrderStatus } from '../models/enums.js';
+import { normalizeServiceDTO } from '../models/ServiceDTO.js';
+import { normalizeServiceOrderDTO } from '../models/ServiceOrderDTO.js';
 import {
   hasProfanity,
   validateProfessionalText,
@@ -400,15 +404,7 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
   }
 
   try {
-    const servicesRef = collection(db, 'services');
-    
-    const unsub = onSnapshot(servicesRef, (snapshot) => {
-      const remoteServices = snapshot.docs.map(d => ({
-        id: d.id,
-        firestoreId: d.id,
-        ...d.data()
-      }));
-
+    const unsub = serviceRepository.subscribeToServices((remoteServices) => {
       _memServicesCache = remoteServices;
       if (typeof localStorage !== 'undefined') {
         try {
@@ -498,11 +494,11 @@ export async function addService(serviceData) {
   };
 
   try {
-    const docRef = await addDoc(collection(db, 'services'), newService);
-    newService.id = docRef.id;
-    newService.firestoreId = docRef.id;
+    const created = await serviceRepository.create(newService);
+    newService.id = created.id;
+    newService.firestoreId = created.firestoreId;
   } catch (err) {
-    console.warn('[Firestore] Erro ao cadastrar serviço:', err.message);
+    console.warn('[ServiceRepository] Erro ao cadastrar serviço:', err.message);
     newService.id = `serv_${Date.now()}`;
   }
 
@@ -525,9 +521,9 @@ export async function updateService(id, serviceData) {
 
   if (docId) {
     try {
-      await updateDoc(doc(db, 'services', String(docId)), serviceData);
+      await serviceRepository.update(String(docId), serviceData);
     } catch (err) {
-      console.warn('[Firestore] Erro ao atualizar serviço:', err.message);
+      console.warn('[ServiceRepository] Erro ao atualizar serviço:', err.message);
     }
   }
 
@@ -549,9 +545,9 @@ export async function deleteService(id) {
 
   if (docId) {
     try {
-      await deleteDoc(doc(db, 'services', String(docId)));
+      await serviceRepository.delete(String(docId));
     } catch (err) {
-      console.warn('[Firestore] Erro ao deletar serviço:', err.message);
+      console.warn('[ServiceRepository] Erro ao deletar serviço:', err.message);
     }
   }
 
@@ -874,21 +870,15 @@ export function subscribeToServiceOrders(user, callback) {
     callback(filterForUser(merged), merged);
   };
 
-  // 1. Assina coleção direta 'service_orders'
+  // 1. Assina coleção direta 'service_orders' via ServiceOrderRepository
   try {
-    const ordersRef = collection(db, 'service_orders');
-    unsubDirect = onSnapshot(ordersRef, (snapshot) => {
-      const directOrders = snapshot.docs.map(d => ({
-        id: d.id,
-        firestoreId: d.id,
-        ...d.data()
-      }));
+    unsubDirect = serviceOrderRepository.subscribe((directOrders) => {
       mergeAndNotify(directOrders);
     }, (error) => {
-      console.warn('[Firestore service_orders realtime] Aviso:', error.message);
+      console.warn('[ServiceOrderRepository realtime] Aviso:', error.message);
     });
   } catch (err) {
-    console.warn('[Firestore service_orders realtime] Erro:', err.message);
+    console.warn('[ServiceOrderRepository realtime] Erro:', err.message);
   }
 
   // 2. Assina chats relacionados a ordens de serviço

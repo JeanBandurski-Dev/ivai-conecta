@@ -1,7 +1,7 @@
 import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { calculateMatchScore, safeSkillsArray, isJobFavorited } from '../lib/ivaiConecta';
+import { calculateMatchScore, safeSkillsArray, isJobFavorited, UserRole } from '../lib/ivaiConecta';
 import { getUserApplications, isPjOrFreelanceJob, isInternshipJob } from '../services/jobsService';
 
 export default function JobCard({ job, matchScore, onSelect }) {
@@ -23,10 +23,10 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
   const isFavorite = isJobFavorited(job, favoriteJobs);
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isStudent = userRole === 'aluno' || userRole === 'estudante' || userRole === 'student';
+  const isStudent = userRole === UserRole.ALUNO || userRole === 'estudante' || userRole === 'student';
   const isStandardCandidate = userRole === 'candidato';
-  const isFreelancer = userRole === 'freelancer' || userRole === 'prestador';
-  const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
+  const isFreelancer = userRole === UserRole.FREELANCER || userRole === 'prestador';
+  const isCompany = Boolean(userRole === UserRole.EMPRESA || userRole === 'company' || userRole === 'recrutador');
 
   const isPj = isPjOrFreelanceJob(job);
   const isInternship = isInternshipJob(job);

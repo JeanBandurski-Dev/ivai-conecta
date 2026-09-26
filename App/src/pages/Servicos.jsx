@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getServices, updateService, CITIES, maskPhone, matchCity,
-  subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders
+  updateService, CITIES, maskPhone, matchCity,
+  subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders,
+  useServices, UserRole
 } from '../lib/ivaiConecta';
-import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
 import ServiceOrderCard from '../components/ServiceOrderCard';
 import AvaliarServicoModal from '../components/AvaliarServicoModal';
@@ -46,7 +46,7 @@ export default function Servicos() {
   const { currentUser, showToast, selectedCity } = useAppStore();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const isFreelancer = currentUser?.role === 'freelancer';
+  const isFreelancer = currentUser?.role === UserRole.FREELANCER;
 
   const [activeTab,    setActiveTab]    = useState(() => {
     const v = params.get('view');
@@ -68,10 +68,10 @@ export default function Servicos() {
     const v = params.get('view');
     if (v === 'orders') {
       setActiveTab('orders');
-      if (currentUser?.role !== 'freelancer') {
+      if (currentUser?.role !== UserRole.FREELANCER) {
         setOrderSubTab('sent');
       }
-    } else if (currentUser?.role === 'freelancer') {
+    } else if (currentUser?.role === UserRole.FREELANCER) {
       if (v === 'dashboard') setActiveTab('dashboard');
       else if (v === 'explore') setActiveTab('explore');
     } else if (v === 'explore') {
@@ -83,16 +83,7 @@ export default function Servicos() {
     if (selectedCity) setCity(selectedCity);
   }, [selectedCity]);
 
-  const [liveServices, setLiveServices] = useState(() => getServices('Todas as Cidades'));
-
-  useEffect(() => {
-    const unsub = subscribeToServices('Todas as Cidades', (data) => {
-      setLiveServices(data);
-    });
-    return () => unsub();
-  }, []);
-
-  const all = liveServices;
+  const { services: all } = useServices('Todas as Cidades');
   const myServices = all.filter(s => 
     s.createdBy === currentUser?.uid || 
     s.createdBy === currentUser?.email ||

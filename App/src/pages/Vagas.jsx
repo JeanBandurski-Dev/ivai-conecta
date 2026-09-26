@@ -3,9 +3,9 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity
+  calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity,
+  useJobs, UserRole, WorkplaceType
 } from '../lib/ivaiConecta';
-import { subscribeToJobs } from '../services/jobsService.js';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
 import PublishJobModal from '../components/PublishJobModal';
@@ -21,9 +21,9 @@ const TYPES = [
 
 const MODALITIES = [
   { label: 'Todas as Modalidades', value: 'Todas' },
-  { label: 'Presencial', value: 'Presencial' },
-  { label: 'Híbrido', value: 'Híbrido' },
-  { label: '100% Remoto', value: 'Remoto' },
+  { label: 'Presencial', value: WorkplaceType.PRESENCIAL },
+  { label: 'Híbrido', value: WorkplaceType.HIBRIDO },
+  { label: '100% Remoto', value: WorkplaceType.REMOTO },
 ];
 
 const MATCH_RANGES = [
@@ -52,18 +52,8 @@ export default function Vagas() {
   const [showNewModal,  setShowModal]     = useState(params.get('action') === 'new');
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
-  const [refreshKey,    setRefreshKey]    = useState(0);
 
-  const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
-
-  useEffect(() => {
-    const unsub = subscribeToJobs('Todas as Cidades', (data) => {
-      if (Array.isArray(data)) setLiveJobs(data);
-    });
-    return () => unsub();
-  }, [refreshKey]);
-
-  const allJobs = Array.isArray(liveJobs) ? liveJobs : [];
+  const { jobs: allJobs, refresh: refreshJobs } = useJobs('Todas as Cidades');
 
   // Check jobId param in URL
   useEffect(() => {
@@ -77,7 +67,7 @@ export default function Vagas() {
   useEffect(() => {
     if (params.get('action') === 'new') {
       const uRole = String(currentUser?.role || '').toLowerCase().trim();
-      if (uRole === 'empresa' || uRole === 'company' || uRole === 'recrutador') {
+      if (uRole === UserRole.EMPRESA || uRole === 'company' || uRole === 'recrutador') {
         setShowModal(true);
       } else {
         showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
@@ -94,7 +84,7 @@ export default function Vagas() {
 
   const handleOpenPublish = () => {
     const uRole = String(currentUser?.role || '').toLowerCase().trim();
-    if (uRole === 'empresa' || uRole === 'company' || uRole === 'recrutador') {
+    if (uRole === UserRole.EMPRESA || uRole === 'company' || uRole === 'recrutador') {
       setShowModal(true);
     } else {
       showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
@@ -102,7 +92,7 @@ export default function Vagas() {
   };
 
   const handleJobCreated = () => {
-    setRefreshKey(k => k + 1);
+    refreshJobs();
     setParams({});
   };
 

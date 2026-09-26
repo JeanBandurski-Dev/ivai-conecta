@@ -6,6 +6,10 @@ import {
   STORAGE_KEY_TEACHERS,
   STORAGE_KEY_ENDORSEMENT_REQUESTS,
 } from '../data/seedData.js';
+import { userRepository, endorsementRepository } from '../repositories/index.js';
+import { EndorsementStatus, UserRole } from '../models/enums.js';
+import { normalizeEndorsementDTO, normalizeEndorsementRequestDTO } from '../models/EndorsementDTO.js';
+import { normalizeUserDTO } from '../models/UserDTO.js';
 
 import { matchCity } from '../utils/searchUtils.js';
 import { isInstitutionalEmail } from './authService.js';
@@ -860,12 +864,12 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
       callback(filterForTeacher(current.length > 0 ? current : getEndorsementRequests()));
     });
 
-    // 2. Escuta também endorsement_requests caso habilitado no Firestore
+    // 2. Escuta também endorsement_requests via EndorsementRepository
     let unsubFs = null;
     try {
-      unsubFs = onSnapshot(collection(db, 'endorsement_requests'), (snapshot) => {
-        snapshot.docs.forEach(d => {
-          requestsMap.set(String(d.id), { id: d.id, firestoreId: d.id, ...d.data() });
+      unsubFs = endorsementRepository.subscribe((remoteRequests) => {
+        remoteRequests.forEach(d => {
+          requestsMap.set(String(d.id), d);
         });
         const merged = Array.from(requestsMap.values());
         try { localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify(merged)); } catch {}
@@ -1151,10 +1155,10 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
     }
   }
 
-  // 5. Tenta salvar na coleção 'endorsement_requests' se as regras permitirem
+  // 5. Salva na coleção 'endorsement_requests' via EndorsementRepository
   try {
-    const docRef = await addDoc(collection(db, 'endorsement_requests'), newReq);
-    newReq.firestoreId = docRef.id;
+    const created = await endorsementRepository.create(newReq);
+    newReq.firestoreId = created.firestoreId;
   } catch {}
 
   // 6. Atualiza cache local garantindo unicidade
@@ -1299,12 +1303,12 @@ export async function approveEndorsementRequest(requestId, quote, profUser) {
     }
   } catch {}
 
-  // 5. Tenta atualizar 'endorsement_requests' caso exista
+  // 5. Tenta atualizar 'endorsement_requests' via EndorsementRepository
   const targetDocId = req.firestoreId || req.id;
   if (targetDocId) {
     try {
-      await updateDoc(doc(db, 'endorsement_requests', String(targetDocId)), {
-        status: 'Aprovado',
+      await endorsementRepository.update(String(targetDocId), {
+        status: EndorsementStatus.APROVADO,
         approvedAt: new Date().toISOString(),
         quote: newEndorsement.quote,
         endorsementId: newEndorsement.id
@@ -1375,8 +1379,8 @@ export async function rejectEndorsementRequest(requestId, profUser = null) {
 
   if (targetDocId) {
     try {
-      await updateDoc(doc(db, 'endorsement_requests', targetDocId), {
-        status: 'Recusado',
+      await endorsementRepository.update(targetDocId, {
+        status: EndorsementStatus.RECUSADO,
         rejectedAt: new Date().toISOString()
       });
     } catch {}
