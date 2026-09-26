@@ -347,7 +347,7 @@ export function subscribeToUserThreads(userEmail, callback) {
         }
       }
     }, () => { });
-  } catch (e) { }
+  } catch { }
 
   return () => {
     if (syncTimer) clearInterval(syncTimer);
@@ -428,7 +428,7 @@ export function subscribeToMessages(chatId, callback) {
         }
       }
     }, () => { });
-  } catch (err) { }
+  } catch { }
 
   return () => {
     window.removeEventListener('storage', emitLocal);

@@ -2,91 +2,104 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
-  query,
-  where,
   onSnapshot
 } from 'firebase/firestore';
-import { getJobs, subscribeToJobs } from './jobsService.js';
-import { subscribeToTalents } from './talentsService.js';
-import { subscribeToServices } from './servicesService.js';
-import { getUsersDB } from './authService.js';
+import { getJobs, subscribeToJobs, isJobActive } from './jobsService.js';
+import { getTalents, subscribeToTalents } from './talentsService.js';
+import { getServices, subscribeToServices } from './servicesService.js';
+import { getUsersDB, getAuthUser } from './authService.js';
 import { matchCity } from '../utils/searchUtils.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 
 export const DEFAULT_COMPANIES = [];
 
+let _memCompanyUsers = null;
+
+export function isCompanyUser(u) {
+  if (!u || typeof u !== 'object') return false;
+  const r = String(u.role || '').toLowerCase().trim();
+  return r === 'empresa' || r === 'company' || r === 'recrutador' || Boolean(u.isVerifiedCompany && r !== 'aluno' && r !== 'professor' && r !== 'admin');
+}
+
 export function getCompanies(city = 'Todas as Cidades') {
-  const users = getUsersDB() || [];
-  const companyUsers = users.filter(u => u?.role === 'empresa');
+  const companyUsersMap = new Map();
+
+  // 1. Prioriza dados reais vindos da assinatura do Firestore em memória
+  if (Array.isArray(_memCompanyUsers) && _memCompanyUsers.length > 0) {
+    _memCompanyUsers.filter(isCompanyUser).forEach(u => companyUsersMap.set(String(u.uid || u.id || u.email), u));
+  } else {
+    // Fallback inicial para cache local
+    const users = getUsersDB() || [];
+    users.filter(isCompanyUser).forEach(u => companyUsersMap.set(String(u.uid || u.id || u.email), u));
+  }
+
+  // 2. Reconhece o usuário autenticado caso seja empresa
+  const authUser = getAuthUser();
+  if (authUser && isCompanyUser(authUser)) {
+    companyUsersMap.set(String(authUser.uid || authUser.id || authUser.email), authUser);
+  }
+
+  const companyUsers = Array.from(companyUsersMap.values());
   const allJobs = getJobs('Todas as Cidades');
 
-  // Mapa com deduplicação por nome normalizado
+  // Mapa com deduplicação por UID e nome normalizado
   const map = new Map();
 
-  // 1. Adiciona empresas padrão
-  DEFAULT_COMPANIES.forEach(comp => {
-    map.set(comp.name.toLowerCase().trim(), { ...comp });
-  });
-
-  // 2. Adiciona empresas cadastradas via registro de usuário
+  // Adiciona empresas cadastradas oficialmente
   companyUsers.forEach(u => {
     const compName = (u.razaoSocial || u.nomeFantasia || u.name || 'Empresa').trim();
-    const key = compName.toLowerCase();
-    const existing = map.get(key) || {};
+    const cleanKey = compName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const uidKey = String(u.uid || u.id || cleanKey);
 
-    map.set(key, {
-      ...existing,
-      id: u.uid || u.id || existing.id || `comp_${Date.now()}`,
-      uid: u.uid || existing.uid,
+    map.set(uidKey, {
+      id: u.uid || u.id || uidKey,
+      uid: u.uid || u.id || uidKey,
+      _cleanKey: cleanKey,
       name: compName,
-      city: u.city || existing.city || 'Ivaiporã',
-      sector: u.sector || existing.sector || 'Comércio & Serviços',
-      logo: u.avatar || u.logo || existing.logo || '',
-      about: u.about || existing.about || 'Empresa atuante no Vale do Ivaí.',
-      cnpj: u.cnpj || existing.cnpj || '',
-      isVerified: Boolean(u.cnpj || u.isVerifiedCompany || existing.isVerified),
-      rating: u.rating || existing.rating || 5.0,
-      reviews: u.reviewsCount || existing.reviews || 0,
-      perks: u.perks || existing.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento']
+      city: u.city || 'Ivaiporã',
+      sector: u.sector || 'Comércio & Serviços',
+      logo: u.avatar || u.logo || '',
+      about: u.about || 'Empresa atuante no Vale do Ivaí.',
+      cnpj: u.cnpj || '',
+      isVerified: Boolean(u.cnpj || u.isVerifiedCompany),
+      rating: u.rating || 5.0,
+      reviews: u.reviewsCount || 0,
+      perks: u.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento']
     });
   });
 
-  // 3. Adiciona empresas detectadas a partir de vagas publicadas
+  // Associa logos ou cidades adicionais vindos de vagas às empresas cadastradas
   allJobs.forEach(job => {
-    if (!job?.company) return;
-    const compName = job.company.trim();
-    const key = compName.toLowerCase();
-    const existing = map.get(key);
+    if (!job) return;
+    const compName = (job.company || '').trim();
+    const cleanCompName = compName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const createdBy = job.createdBy ? String(job.createdBy) : null;
 
-    if (existing) {
-      if (!existing.logo && job.companyLogo) existing.logo = job.companyLogo;
-      if (!existing.city && job.city) existing.city = job.city;
-    } else {
-      map.set(key, {
-        id: job.createdBy || `comp_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-        name: compName,
-        city: job.city || 'Ivaiporã',
-        sector: 'Setor Corporativo',
-        logo: job.companyLogo || '',
-        about: `Empresa com oportunidades abertas no portal Ivaí Conecta em ${job.city || 'Ivaiporã'}.`,
-        cnpj: '',
-        isVerified: true,
-        rating: 4.8,
-        reviews: 8,
-        perks: ['Oportunidades de Aprendizado', 'Desenvolvimento Regional']
-      });
+    let targetComp = null;
+    for (const comp of map.values()) {
+      if ((createdBy && (comp.uid === createdBy || comp.id === createdBy)) || (cleanCompName && comp._cleanKey === cleanCompName)) {
+        targetComp = comp;
+        break;
+      }
+    }
+
+    if (targetComp) {
+      if (!targetComp.logo && job.companyLogo) targetComp.logo = job.companyLogo;
+      if (!targetComp.city && job.city) targetComp.city = job.city;
     }
   });
 
-  // 4. Calcula vagas ativas para cada empresa em tempo real
+  // Calcula vagas ativas para cada empresa em tempo real
   const companiesList = Array.from(map.values()).map(comp => {
     const compNameLower = comp.name.toLowerCase();
+    const cleanCompName = comp._cleanKey || compNameLower.replace(/[^a-z0-9]/g, '');
     const activeJobs = allJobs.filter(j => 
-      j.status === 'Ativa' && (
-        (j.company && j.company.toLowerCase().trim() === compNameLower) ||
+      isJobActive(j) && (
         (comp.uid && j.createdBy && String(j.createdBy) === String(comp.uid)) ||
-        (comp.id && j.createdBy && String(j.createdBy) === String(comp.id))
+        (comp.id && j.createdBy && String(j.createdBy) === String(comp.id)) ||
+        (j.company && j.company.toLowerCase().trim() === compNameLower) ||
+        (j.company && j.company.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanCompName)
       )
     );
     return {
@@ -137,6 +150,7 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
     unsubscribeFirestore = onSnapshot(q, (snap) => {
       // Empresas reais vindas do Firestore (pode ser lista vazia)
       const remoteCompanyUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      _memCompanyUsers = remoteCompanyUsers;
 
       // Mantém usuários não-empresa intactos e descarta empresas que não existem no Firestore
       const local = getUsersDB();
@@ -169,13 +183,14 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
 }
 
 export function subscribeToPlatformMetrics(city = 'Todas as Cidades', callback) {
-  let talentsList = [];
-  let companiesList = [];
-  let jobsList = [];
-  let servicesList = [];
+  // Inicializa imediatamente com dados em cache para evitar emitir contadores parciais ou zerados
+  let talentsList = getTalents('Todas as Cidades') || [];
+  let companiesList = getCompanies('Todas as Cidades') || [];
+  let jobsList = getJobs('Todas as Cidades') || [];
+  let servicesList = getServices('Todas as Cidades') || [];
 
   const emitMetrics = () => {
-    const activeJobs = jobsList.filter(j => j.status === 'Ativa');
+    const activeJobs = jobsList.filter(isJobActive);
     callback({
       talentsCount: talentsList.length,
       companiesCount: companiesList.length,
@@ -184,28 +199,32 @@ export function subscribeToPlatformMetrics(city = 'Todas as Cidades', callback) 
     });
   };
 
-  const unsubTalents = subscribeToTalents(city, data => {
+  // Disparo inicial imediato consolidado
+  emitMetrics();
+
+  // Escuta todas as coleções consolidadas ('Todas as Cidades') para refletir o impacto regional
+  const unsubTalents = subscribeToTalents('Todas as Cidades', data => {
     if (Array.isArray(data)) {
       talentsList = data;
       emitMetrics();
     }
   });
 
-  const unsubCompanies = subscribeToCompanies(city, data => {
+  const unsubCompanies = subscribeToCompanies('Todas as Cidades', data => {
     if (Array.isArray(data)) {
       companiesList = data;
       emitMetrics();
     }
   });
 
-  const unsubJobs = subscribeToJobs(city, data => {
+  const unsubJobs = subscribeToJobs('Todas as Cidades', data => {
     if (Array.isArray(data)) {
       jobsList = data;
       emitMetrics();
     }
   });
 
-  const unsubServices = subscribeToServices(city, data => {
+  const unsubServices = subscribeToServices('Todas as Cidades', data => {
     if (Array.isArray(data)) {
       servicesList = data;
       emitMetrics();

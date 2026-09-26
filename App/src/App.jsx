@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
 import Toast from './components/ui/Toast';
+import CustomConfirmModal from './components/ui/CustomConfirmModal';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import GuestRoute from './components/auth/GuestRoute';
 import ChatModal from './components/ChatModal';
@@ -22,6 +23,7 @@ const BancoDeTalentos = lazy(() => import('./pages/BancoDeTalentos'));
 const PerfilAluno = lazy(() => import('./pages/PerfilAluno'));
 const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
 const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
+const PerfilFreelancer = lazy(() => import('./pages/PerfilFreelancer'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
 const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
@@ -69,12 +71,14 @@ function AppContent() {
               <Route path="/vagas" element={<Vagas />} />
               <Route path="/servicos" element={<Servicos />} />
               <Route path="/talentos" element={<BancoDeTalentos />} />
-              <Route path="/perfil" element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-              <Route path="/perfil/:id" element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-              <Route path="/empresa" element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
-              <Route path="/empresa/:id" element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
-              <Route path="/professor" element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
-              <Route path="/professor/:id" element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
+              <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+              <Route path="/perfil/:id"       element={<PerfilAluno />} />
+              <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
+              <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
+              <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
+              <Route path="/professor/:id"    element={<PerfilProfessor />} />
+              <Route path="/freelancer"       element={<ProtectedRoute><PerfilFreelancer /></ProtectedRoute>} />
+              <Route path="/freelancer/:id"   element={<PerfilFreelancer />} />
               <Route
                 path="/configuracoes"
                 element={
@@ -135,6 +139,7 @@ function AppContent() {
 
       {!isAdminRoute && <Footer />}
       <Toast />
+      <CustomConfirmModal />
 
       {isChatOpen && <ChatModal onClose={closeChat} />}
     </div>
@@ -150,7 +155,7 @@ export default function App() {
       const testKey = '__ivai_ls_test__';
       localStorage.setItem(testKey, '1');
       localStorage.removeItem(testKey);
-    } catch (e) {
+    } catch {
       // localStorage cheio — limpa dados de cache pesados para liberar espaço
       const cacheKeys = [
         'ivai_conecta_db_jobs',
@@ -163,15 +168,27 @@ export default function App() {
       }
       console.warn('[App] localStorage estava cheio. Cache de dados limpo para liberar espaço.');
     }
+    // Intercepta window.alert legado e redireciona para o modal moderno
+    const originalAlert = window.alert;
+    window.alert = (msg) => {
+      useAppStore.getState().showAlert({
+        title: 'Aviso',
+        message: String(msg ?? ''),
+        variant: 'info'
+      });
+    };
+
     seedFirestoreIfEmpty();
+    let unsubscribe;
     if (typeof initAuthListener === 'function') {
-      const unsubscribe = initAuthListener();
-      return () => {
-        if (typeof unsubscribe === 'function') {
-          unsubscribe();
-        }
-      };
+      unsubscribe = initAuthListener();
     }
+    return () => {
+      window.alert = originalAlert;
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, [initAuthListener]);
 
   return (

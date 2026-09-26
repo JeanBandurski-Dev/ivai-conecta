@@ -15,6 +15,7 @@ export default function SkillCombobox({
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [localError, setLocalError] = useState('');
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
@@ -58,6 +59,13 @@ export default function SkillCombobox({
     const clean = (skillToAdd || '').trim();
     if (!clean) return;
 
+    const validation = validateSkill(clean);
+    if (!validation.valid) {
+      setLocalError(validation.error);
+      return;
+    }
+
+    setLocalError('');
     onAddSkill(clean);
     setInputValue('');
     setIsOpen(false);
@@ -114,6 +122,7 @@ export default function SkillCombobox({
             value={inputValue}
             onChange={e => {
               setInputValue(e.target.value);
+              setLocalError('');
               setIsOpen(true);
               setHighlightedIndex(0);
             }}
@@ -121,7 +130,7 @@ export default function SkillCombobox({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={`form-control pl-9 pr-14 text-xs transition-all ${
-              error
+              localError || error
                 ? 'border-red-400 dark:border-red-500 bg-red-50/15'
                 : inputValue.trim() && currentValidation && !currentValidation.valid
                 ? 'border-amber-400 dark:border-amber-500 bg-amber-50/20'
@@ -138,6 +147,7 @@ export default function SkillCombobox({
                 type="button"
                 onClick={() => {
                   setInputValue('');
+                  setLocalError('');
                   inputRef.current?.focus();
                 }}
                 className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
@@ -166,7 +176,7 @@ export default function SkillCombobox({
         <button
           type="button"
           onClick={() => handleAdd(inputValue)}
-          disabled={!inputValue.trim()}
+          disabled={!inputValue.trim() || (currentValidation && !currentValidation.valid)}
           className="btn btn-primary btn-sm text-xs font-bold shrink-0 flex items-center gap-1.5 px-3 py-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus size={14} />
@@ -175,17 +185,17 @@ export default function SkillCombobox({
       </div>
 
       {/* Dica / Validação em Tempo Real sob o input */}
-      {error && !inputValue.trim() ? (
+      {(localError || (error && !inputValue.trim())) ? (
         <div className="text-[11px] font-medium px-1">
           <p className="text-red-500 dark:text-red-400 flex items-center gap-1">
-            <AlertCircle size={12} /> {error}
+            <AlertCircle size={12} /> {localError || error}
           </p>
         </div>
       ) : inputValue.trim() ? (
         <div className="text-[11px] font-medium px-1">
           {currentValidation?.valid ? (
             <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
-              <Check size={12} /> Competência profissional aceita para o cálculo de Match
+              <Check size={12} /> Competência profissional válida no catálogo
             </p>
           ) : currentValidation ? (
             <p className="text-amber-600 dark:text-amber-400 flex items-center gap-1">

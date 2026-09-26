@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, ArrowLeft,
@@ -10,10 +10,11 @@ import { getUserProfile } from '../services/authService';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
+import EditCompanyProfileModal from '../components/EditCompanyProfileModal';
 
 const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600';
 
-const BANNER_PRESETS = [
+const _BANNER_PRESETS = [
   { id: 'office', name: 'Corporativo Moderno', url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600' },
   { id: 'tech', name: 'Hub Tecnológico', url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=1600' },
   { id: 'team', name: 'Trabalho em Equipe', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=1600' },
@@ -26,12 +27,29 @@ export default function PerfilEmpresa() {
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
-  const [activeEditTab, setActiveEditTab] = useState('branding');
-  const [newPerkInput, setNewPerkInput] = useState('');
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  const [editCompanyData, setEditCompanyData] = useState({
+    name: currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Cadastrada',
+    tradingName: currentUser?.nomeFantasia || currentUser?.name || '',
+    cnpj: currentUser?.cnpj || '',
+    city: currentUser?.city || 'Ivaiporã',
+    industry: currentUser?.sector || 'Comércio & Serviços',
+    size: currentUser?.size || '1-10 funcionários',
+    foundedYear: currentUser?.foundedYear || '',
+    description: currentUser?.about || '',
+    culture: currentUser?.history || currentUser?.culture || '',
+    benefits: currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+    avatar: currentUser?.avatar || '',
+    coverImage: currentUser?.banner || DEFAULT_BANNER,
+    website: currentUser?.website || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || currentUser?.whatsapp || '',
+    linkedin: currentUser?.linkedin || '',
+    instagram: currentUser?.instagram || '',
+  });
 
   const [company, setCompany] = useState({
     name:     currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Cadastrada',
@@ -217,6 +235,7 @@ export default function PerfilEmpresa() {
     setUploadingLogo(false);
     if (res.success) {
       setCompany(c => ({ ...c, logo: res.url }));
+      setEditCompanyData(d => ({ ...d, avatar: res.url }));
       if (currentUser) {
         const updated = { ...currentUser, avatar: res.url };
         setCurrentUser(updated);
@@ -237,6 +256,7 @@ export default function PerfilEmpresa() {
     setUploadingBanner(false);
     if (res.success) {
       setCompany(c => ({ ...c, banner: res.url }));
+      setEditCompanyData(d => ({ ...d, coverImage: res.url }));
       if (currentUser) {
         const updated = { ...currentUser, banner: res.url };
         setCurrentUser(updated);
@@ -248,8 +268,9 @@ export default function PerfilEmpresa() {
     }
   };
 
-  const handleSelectPresetBanner = (presetUrl) => {
+  const _handleSelectPresetBanner = (presetUrl) => {
     setCompany(c => ({ ...c, banner: presetUrl }));
+    setEditCompanyData(d => ({ ...d, coverImage: presetUrl }));
     if (currentUser && isCompanyOwner) {
       const updated = { ...currentUser, banner: presetUrl };
       setCurrentUser(updated);
@@ -267,21 +288,75 @@ export default function PerfilEmpresa() {
     }
   };
 
-  const handleSaveCompany = (e) => {
-    e.preventDefault();
+  const handleOpenEditModal = () => {
+    setEditCompanyData({
+      name: company.name || currentUser?.razaoSocial || currentUser?.name || '',
+      tradingName: currentUser?.nomeFantasia || company.name || '',
+      cnpj: company.cnpj || currentUser?.cnpj || '',
+      city: company.city || currentUser?.city || 'Ivaiporã',
+      industry: company.sector || currentUser?.sector || 'Comércio & Serviços',
+      size: company.size || currentUser?.size || '1-10 funcionários',
+      foundedYear: currentUser?.foundedYear || '',
+      description: company.about || currentUser?.about || '',
+      culture: company.history || currentUser?.history || '',
+      benefits: company.perks || currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+      avatar: company.logo || currentUser?.avatar || '',
+      coverImage: company.banner || currentUser?.banner || DEFAULT_BANNER,
+      website: company.website || currentUser?.website || '',
+      email: currentUser?.email || '',
+      phone: company.phone || currentUser?.phone || currentUser?.whatsapp || '',
+      linkedin: currentUser?.linkedin || '',
+      instagram: currentUser?.instagram || '',
+    });
+    setEditModal(true);
+  };
+
+  const handleSaveCompany = async (e) => {
+    if (e) e.preventDefault();
     setEditModal(false);
+
     const payload = {
-      name: company.name,
-      sector: company.sector,
-      city: company.city,
-      size: company.size,
-      website: company.website,
-      phone: company.phone,
-      about: company.about,
-      avatar: company.logo,
-      banner: company.banner
+      name: editCompanyData.name,
+      razaoSocial: editCompanyData.name,
+      nomeFantasia: editCompanyData.tradingName,
+      cnpj: editCompanyData.cnpj,
+      city: editCompanyData.city,
+      sector: editCompanyData.industry,
+      size: editCompanyData.size,
+      foundedYear: editCompanyData.foundedYear,
+      about: editCompanyData.description,
+      history: editCompanyData.culture,
+      culture: editCompanyData.culture,
+      perks: editCompanyData.benefits,
+      avatar: editCompanyData.avatar,
+      banner: editCompanyData.coverImage,
+      website: editCompanyData.website,
+      email: editCompanyData.email,
+      phone: editCompanyData.phone,
+      linkedin: editCompanyData.linkedin,
+      instagram: editCompanyData.instagram,
     };
-    updateAuthUser(payload);
+
+    setCompany(prev => ({
+      ...prev,
+      name: editCompanyData.name,
+      tradingName: editCompanyData.tradingName,
+      cnpj: editCompanyData.cnpj,
+      city: editCompanyData.city,
+      sector: editCompanyData.industry,
+      size: editCompanyData.size,
+      about: editCompanyData.description,
+      history: editCompanyData.culture,
+      culture: editCompanyData.culture,
+      perks: editCompanyData.benefits,
+      logo: editCompanyData.avatar,
+      banner: editCompanyData.coverImage,
+      website: editCompanyData.website,
+      phone: editCompanyData.phone,
+      email: editCompanyData.email,
+    }));
+
+    await updateAuthUser(payload);
     if (currentUser) {
       setCurrentUser({
         ...currentUser,
@@ -477,7 +552,7 @@ export default function PerfilEmpresa() {
             {isCompanyOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <button
-                  onClick={() => setEditModal(true)}
+                  onClick={handleOpenEditModal}
                   className="btn btn-outline border-white/40 text-white hover:bg-white/20 font-bold btn-sm shadow-md cursor-pointer backdrop-blur-sm"
                 >
                   <Edit3 size={15} /> Editar Perfil da Empresa
@@ -654,389 +729,18 @@ export default function PerfilEmpresa() {
         </div>
       </main>
 
-      {/* Modal: Editar Perfil da Empresa */}
-      {editModal && (
-        <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setEditModal(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header do Modal */}
-            <div className="bg-[linear-gradient(135deg,#0A1128_0%,#051944_50%,#0052FF_100%)] text-white p-5 sm:p-6 shrink-0 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-400/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="relative z-10 flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="p-3 bg-white/10 rounded-2xl border border-white/20 shadow-inner backdrop-blur-md shrink-0">
-                    <Building2 size={22} className="text-cyan-300" />
-                  </div>
-                  <div>
-                    <h2 className="font-heading text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                      <span>Editar Perfil da Empresa</span>
-                      <span className="text-[10px] uppercase tracking-wider bg-white/15 px-2 py-0.5 rounded-full text-cyan-200 font-bold hidden sm:inline-block">
-                        Recrutador
-                      </span>
-                    </h2>
-                    <p className="text-xs text-slate-300 line-clamp-1">
-                      Personalize a identidade visual, capa e dados institucionais da sua organização
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setEditModal(false)}
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10 hover:scale-105 active:scale-95"
-                  title="Fechar Janela"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Abas de Navegação */}
-            <div className="flex items-center gap-1 p-2 bg-slate-100 dark:bg-slate-800/80 border-b border-gray-200 dark:border-slate-800 overflow-x-auto scrollbar-none shrink-0">
-              {[
-                { id: 'branding', label: 'Imagens & Capa', icon: ImageIcon },
-                { id: 'info', label: 'Dados da Empresa', icon: Building2 },
-                { id: 'contact', label: 'Contato & Redes', icon: Globe },
-                { id: 'culture', label: 'Sobre & Benefícios', icon: HeartHandshake }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeEditTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveEditTab(tab.id)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer ${
-                      isActive
-                        ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
-                        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                  >
-                    <Icon size={14} className={isActive ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Formulário com Abas */}
-            <form onSubmit={handleSaveCompany} className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5 text-left">
-              
-              {/* ABA 1: IMAGENS & IDENTIDADE */}
-              {activeEditTab === 'branding' && (
-                <div className="space-y-5 animate-in fade-in duration-200">
-                  
-                  {/* Capa / Banner */}
-                  <div className="space-y-2.5 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-200/90 dark:border-slate-800">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                        <ImageIcon size={14} className="text-primary-blue" /> Imagem de Capa do Perfil
-                      </label>
-                      <label className="btn btn-primary btn-sm text-[11px] font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-2xs">
-                        {uploadingBanner ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
-                        <span>{uploadingBanner ? 'Enviando capa...' : 'Fazer Upload de Capa'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleBannerUpload}
-                          disabled={uploadingBanner}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="relative h-28 sm:h-32 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 shadow-inner group">
-                      <img
-                        src={company.banner || DEFAULT_BANNER}
-                        alt="Prévia da Capa"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-3">
-                        <span className="text-[11px] font-semibold text-white/90 drop-shadow">
-                          Capa atual exibida no cabeçalho
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Predefinições de Capas */}
-                    <div>
-                      <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 mb-1.5">
-                        Ou escolha uma capa predefinida em alta resolução:
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {BANNER_PRESETS.map((preset) => {
-                          const isSelected = (company.banner || DEFAULT_BANNER) === preset.url;
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => handleSelectPresetBanner(preset.url)}
-                              className={`relative h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer group ${
-                                isSelected
-                                  ? 'border-primary-blue ring-2 ring-primary-blue/30 scale-[1.02]'
-                                  : 'border-gray-200 dark:border-slate-700 opacity-75 hover:opacity-100 hover:border-gray-400'
-                              }`}
-                            >
-                              <img
-                                src={preset.url}
-                                alt={preset.name}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 flex items-center justify-center p-1">
-                                {isSelected ? (
-                                  <div className="bg-primary-blue text-white p-1 rounded-full shadow">
-                                    <Check size={12} />
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-white text-center line-clamp-1 drop-shadow">
-                                    {preset.name}
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Logotipo / Foto */}
-                  <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-200/90 dark:border-slate-800 flex items-center gap-4">
-                    <div className="relative shrink-0">
-                      <img
-                        src={company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250'}
-                        alt={company.name}
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
-                      />
-                      {uploadingLogo && (
-                        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs rounded-2xl flex items-center justify-center text-white z-10">
-                          <Loader2 size={18} className="animate-spin text-primary-blue" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="font-bold text-xs text-gray-900 dark:text-white">Logotipo Oficial da Empresa</div>
-                      <p className="text-[11px] text-gray-500 dark:text-slate-400">
-                        Aparece nos cards de vagas, buscas e comunicações com candidatos.
-                      </p>
-                      <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 mt-1 bg-white dark:bg-slate-900 shadow-2xs">
-                        {uploadingLogo ? <Loader2 size={13} className="animate-spin text-primary-blue" /> : <Camera size={13} />}
-                        <span>{uploadingLogo ? 'Enviando...' : 'Alterar Logotipo'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                          disabled={uploadingLogo}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* ABA 2: DADOS DA EMPRESA */}
-              {activeEditTab === 'info' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="grid sm:grid-cols-2 gap-3.5">
-                    <div className="form-group">
-                      <label className="form-label text-xs font-bold">Razão Social / Nome Fantasia *</label>
-                      <input
-                        type="text"
-                        value={company.name}
-                        onChange={e => setCompany(c => ({ ...c, name: e.target.value }))}
-                        className="form-control text-xs sm:text-sm font-semibold"
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label text-xs font-bold">Setor de Atuação *</label>
-                      <input
-                        type="text"
-                        value={company.sector}
-                        onChange={e => setCompany(c => ({ ...c, sector: e.target.value }))}
-                        className="form-control text-xs sm:text-sm"
-                        placeholder="Ex: Tecnologia, Varejo, Saúde"
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label text-xs font-bold">Cidade Polo / Sede</label>
-                      <input
-                        type="text"
-                        value={company.city}
-                        onChange={e => setCompany(c => ({ ...c, city: e.target.value }))}
-                        className="form-control text-xs sm:text-sm"
-                        placeholder="Ex: Ivaiporã, PR"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label text-xs font-bold">Porte da Empresa</label>
-                      <select
-                        value={company.size}
-                        onChange={e => setCompany(c => ({ ...c, size: e.target.value }))}
-                        className="form-control text-xs sm:text-sm"
-                      >
-                        <option value="1-10 funcionários">1-10 funcionários (Microempresa)</option>
-                        <option value="11-50 funcionários">11-50 funcionários (Pequeno Porte)</option>
-                        <option value="51-200 funcionários">51-200 funcionários (Médio Porte)</option>
-                        <option value="201-500 funcionários">201-500 funcionários (Grande Porte)</option>
-                        <option value="500+ funcionários">500+ funcionários (Corporação)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {company.cnpj && (
-                    <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between text-xs">
-                      <span className="font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <ShieldCheck size={14} className="text-emerald-500" /> CNPJ Verificado:
-                      </span>
-                      <span className="font-mono font-bold text-primary-blue dark:text-blue-400">{company.cnpj}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ABA 3: CONTATO & REDES */}
-              {activeEditTab === 'contact' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="form-group">
-                    <label className="form-label text-xs font-bold flex items-center gap-1.5">
-                      <Globe size={13} className="text-primary-blue" /> Website Oficial
-                    </label>
-                    <input
-                      type="url"
-                      value={company.website || ''}
-                      onChange={e => setCompany(c => ({ ...c, website: e.target.value }))}
-                      className="form-control text-xs sm:text-sm"
-                      placeholder="https://suaempresa.com.br"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label text-xs font-bold flex items-center gap-1.5">
-                      <Phone size={13} className="text-primary-blue" /> Telefone Comercial / WhatsApp
-                    </label>
-                    <input
-                      type="text"
-                      value={company.phone || ''}
-                      onChange={e => setCompany(c => ({ ...c, phone: e.target.value }))}
-                      className="form-control text-xs sm:text-sm"
-                      placeholder="(43) 99999-9999"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* ABA 4: CULTURA & BENEFÍCIOS */}
-              {activeEditTab === 'culture' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="form-group">
-                    <label className="form-label text-xs font-bold">Sobre a Instituição / Cultura da Empresa</label>
-                    <textarea
-                      value={company.about}
-                      onChange={e => setCompany(c => ({ ...c, about: e.target.value }))}
-                      className="form-control text-xs sm:text-sm leading-relaxed"
-                      rows={3}
-                      placeholder="Apresente sua empresa, ambiente de trabalho e missão aos talentos..."
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label text-xs font-bold">História e Trajetória no Vale do Ivaí</label>
-                    <textarea
-                      value={company.history || ''}
-                      onChange={e => setCompany(c => ({ ...c, history: e.target.value }))}
-                      className="form-control text-xs sm:text-sm leading-relaxed"
-                      rows={2}
-                      placeholder="Conte um pouco sobre como a empresa nasceu e se desenvolveu na região..."
-                    />
-                  </div>
-
-                  {/* Gerenciamento de Benefícios / Diferenciais */}
-                  <div className="space-y-2 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-200/90 dark:border-slate-800">
-                    <label className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                      <HeartHandshake size={14} className="text-primary-blue" /> Diferenciais &amp; Benefícios Oferecidos
-                    </label>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newPerkInput}
-                        onChange={e => setNewPerkInput(e.target.value)}
-                        placeholder="Ex: Vale Alimentação, Horário Flexível, Bolsa Estágio..."
-                        className="form-control text-xs flex-1"
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (newPerkInput.trim() && !company.perks.includes(newPerkInput.trim())) {
-                              setCompany(c => ({ ...c, perks: [...(c.perks || []), newPerkInput.trim()] }));
-                              setNewPerkInput('');
-                            }
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (newPerkInput.trim() && !company.perks.includes(newPerkInput.trim())) {
-                            setCompany(c => ({ ...c, perks: [...(c.perks || []), newPerkInput.trim()] }));
-                            setNewPerkInput('');
-                          }
-                        }}
-                        className="btn btn-primary btn-sm text-xs font-bold px-3 shrink-0 cursor-pointer"
-                      >
-                        <Plus size={13} /> Adicionar
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {company.perks?.map((perk, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-semibold shadow-2xs">
-                          {perk}
-                          <button
-                            type="button"
-                            onClick={() => setCompany(c => ({ ...c, perks: c.perks.filter((_, idx) => idx !== i) }))}
-                            className="text-gray-400 hover:text-red-500 cursor-pointer"
-                          >
-                            <X size={12} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Rodapé Fixo */}
-              <div className="pt-4 border-t border-gray-200 dark:border-slate-800 flex items-center justify-end gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setEditModal(false)}
-                  className="btn btn-outline btn-sm font-bold text-xs px-4 py-2 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm font-extrabold text-xs px-6 py-2.5 flex items-center gap-2 shadow-brand-sm hover:shadow-brand-md cursor-pointer hover:scale-[1.02] active:scale-95"
-                >
-                  <CheckCircle2 size={15} /> Salvar Dados da Empresa
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal Padronizado: Editar Perfil da Empresa */}
+      <EditCompanyProfileModal
+        isOpen={editModal}
+        onClose={() => setEditModal(false)}
+        editData={editCompanyData}
+        setEditData={setEditCompanyData}
+        handleSaveProfile={handleSaveCompany}
+        handleLogoUpload={handleLogoUpload}
+        handleBannerUpload={handleBannerUpload}
+        uploadingLogo={uploadingLogo}
+        uploadingBanner={uploadingBanner}
+      />
       {/* Modal: Publicar Nova Vaga */}
       <PublishJobModal
         isOpen={showPublishModal}

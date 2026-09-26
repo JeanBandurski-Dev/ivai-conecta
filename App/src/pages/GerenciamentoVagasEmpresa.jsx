@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle2, Clock,
@@ -6,18 +6,21 @@ import {
   Award, Check, X, FileText, Calendar, Sparkles, Star, Copy,
   Search, Filter, ChevronRight, Trash2,
   SlidersHorizontal, Video, AlertCircle, GraduationCap, LayoutGrid,
-  ListFilter, MessageSquare, ChevronDown, ChevronUp, ArrowUpDown, RefreshCw,
-  Inbox, Settings, BarChart3, Layers, CheckSquare, Save, HelpCircle, UserCheck,
-  GripVertical, ChevronLeft, UserPlus, ArrowUpRight, History,
+  ListFilter, MessageSquare, ChevronDown, ArrowUpDown,
+  Inbox, Settings, BarChart3, Layers, CheckSquare, Save,
+  GripVertical, ChevronLeft, UserPlus, History,
   Users, DollarSign, Share2, Download, Phone, PhoneCall,
-  ArrowUp, ArrowDown, Palette, Zap, CheckCircle, Info, Workflow, ArrowRight
+  ArrowUp, ArrowDown, Workflow, ArrowRight
 } from 'lucide-react';
 import {
-  getJobs, addJob, updateJob, duplicateJob, deleteJob, updateJobStatus,
+  getJobs, updateJob, duplicateJob, deleteJob, updateJobStatus,
   getJobCandidates, updateCandidateStage, updateCandidateData,
   scheduleCandidateInterview, SELECTION_STAGES,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem
+  saveJobCustomStages, reorderCandidateStage, sanitizeStageItem,
+  subscribeToCompanyApplications,
+  STANDARD_WORKING_HOURS, validateJobTitle, validatePhoneNumber,
+  validateJobDescription, validateWorkingHours, validateSalary
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
@@ -176,7 +179,7 @@ export const STAGE_COLOR_MAP = {
 };
 
 export default function GerenciamentoVagasEmpresa() {
-  const { currentUser, showToast, startChatWith } = useAppStore();
+  const { currentUser, showToast, startChatWith, showConfirm } = useAppStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -266,6 +269,24 @@ export default function GerenciamentoVagasEmpresa() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeToCompanyApplications(currentUser, () => {
+      forceUpdate(prev => prev + 1);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleAppsChanged = () => {
+      forceUpdate(prev => prev + 1);
+    };
+    window.addEventListener('ivai_applications_updated', handleAppsChanged);
+    return () => window.removeEventListener('ivai_applications_updated', handleAppsChanged);
+  }, []);
+
   const allCompanyJobs = useMemo(() => {
     const jobs = Array.isArray(liveJobs) ? liveJobs : [];
     if (!currentUser) return jobs;
@@ -308,22 +329,42 @@ export default function GerenciamentoVagasEmpresa() {
     const fromStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_selected_job') : null;
     return fromStorage || allCompanyJobs[0]?.id || 'default';
   });
-  const currentJob = allCompanyJobs.find(j => j.id === Number(selectedJobId) || j.id === selectedJobId) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
+  const currentJob = allCompanyJobs.find(j => 
+    String(j.id) === String(selectedJobId) ||
+    (j.firestoreId && String(j.firestoreId) === String(selectedJobId)) ||
+    (j.id === Number(selectedJobId))
+  ) || (allCompanyJobs.length > 0 ? allCompanyJobs[0] : null);
 
   useEffect(() => {
     if (allCompanyJobs && allCompanyJobs.length > 0) {
-      if (selectedJobId !== 'default') {
-        const exists = allCompanyJobs.some(j => String(j.id) === String(selectedJobId));
+      const urlJobId = searchParams.get('jobId') || searchParams.get('job');
+      const targetParam = urlJobId ? String(urlJobId) : null;
+      
+      const foundByParam = targetParam
+        ? allCompanyJobs.find(j => String(j.id) === targetParam || String(j.firestoreId) === targetParam)
+        : null;
+
+      if (foundByParam) {
+        const nextId = foundByParam.firestoreId || foundByParam.id;
+        if (selectedJobId !== nextId) {
+          setSelectedJobId(nextId);
+        }
+        return;
+      }
+
+      if (selectedJobId && selectedJobId !== 'default') {
+        const exists = allCompanyJobs.some(j => 
+          String(j.id) === String(selectedJobId) ||
+          (j.firestoreId && String(j.firestoreId) === String(selectedJobId))
+        );
         if (!exists) {
-          setSelectedJobId(allCompanyJobs[0].id);
+          setSelectedJobId(allCompanyJobs[0].firestoreId || allCompanyJobs[0].id);
         }
       } else {
-        setSelectedJobId(allCompanyJobs[0].id);
+        setSelectedJobId(allCompanyJobs[0].firestoreId || allCompanyJobs[0].id);
       }
-    } else {
-      setSelectedJobId('default');
     }
-  }, [allCompanyJobs, selectedJobId]);
+  }, [allCompanyJobs, selectedJobId, searchParams]);
 
   useEffect(() => {
     if (selectedJobId && selectedJobId !== 'default' && typeof localStorage !== 'undefined') {
@@ -355,7 +396,7 @@ export default function GerenciamentoVagasEmpresa() {
   const [onlyWithEndorsement, setOnlyWithEndorsement] = useState(false);
   const [onlyWithNotes, setOnlyWithNotes] = useState(false);
   const [sortBy, setSortBy] = useState('match_desc'); // 'match_desc' | 'match_asc' | 'recent' | 'oldest' | 'rating_desc' | 'name_asc'
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showAdvancedFilters, _setShowAdvancedFilters] = useState(false);
 
   // Jobs List Filters (Tab: Minhas Vagas)
   const [jobListViewMode, setJobListViewMode] = useState('grid'); // 'grid' | 'table'
@@ -374,7 +415,7 @@ export default function GerenciamentoVagasEmpresa() {
   const [historyViewMode, setHistoryViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Drag & Drop State
-  const [isDraggingLock, setIsDraggingLock] = useState(false);
+  const [isDraggingLock, _setIsDraggingLock] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState(null);
   const [dragOverStageId, setDragOverStageId] = useState(null);
   const [dragOverCandidateId, setDragOverCandidateId] = useState(null);
@@ -426,7 +467,7 @@ export default function GerenciamentoVagasEmpresa() {
   // Candidates for selected job
   const jobCandidates = useMemo(() => {
     if (!currentJob) return [];
-    return getJobCandidates(currentJob.id);
+    return getJobCandidates(currentJob);
   }, [currentJob, selectedJobId, updateCount]);
 
   const interviewsNow = useMemo(() => {
@@ -692,7 +733,7 @@ export default function GerenciamentoVagasEmpresa() {
   }, [allCompanyJobs, jobListSearch, jobListStatusFilter, jobListModalityFilter, jobListTypeFilter, jobListSort, updateCount]);
 
   // Stats calculation
-  const stats = useMemo(() => {
+  const _stats = useMemo(() => {
     const totalJobs = allCompanyJobs.length;
     const activeJobs = allCompanyJobs.filter(j => j.status === 'Ativa').length;
     let totalApplicants = 0;
@@ -817,7 +858,7 @@ export default function GerenciamentoVagasEmpresa() {
 
     updateCandidateStage(targetJobId, cand.id, nextStage);
     updateCandidateData(targetJobId, cand.id, {
-      interview: { ...(cand.interview || {}), concluida: true, bannerDismissed: true, result: 'aprovado' }
+      interview: { ...cand.interview, concluida: true, bannerDismissed: true, result: 'aprovado' }
     });
 
     showToast(`${cand.name} passou na entrevista e avançou para a etapa "${nextStageName}"!`);
@@ -826,7 +867,7 @@ export default function GerenciamentoVagasEmpresa() {
       setSelectedCandidate(prev => ({
         ...prev,
         stage: nextStage,
-        interview: { ...(prev.interview || {}), concluida: true, bannerDismissed: true, result: 'aprovado' }
+        interview: { ...prev.interview, concluida: true, bannerDismissed: true, result: 'aprovado' }
       }));
     }
     forceUpdate(n => n + 1);
@@ -840,7 +881,7 @@ export default function GerenciamentoVagasEmpresa() {
 
     updateCandidateStage(targetJobId, cand.id, bancoStageId);
     updateCandidateData(targetJobId, cand.id, {
-      interview: { ...(cand.interview || {}), concluida: true, bannerDismissed: true, result: 'banco_talentos' }
+      interview: { ...cand.interview, concluida: true, bannerDismissed: true, result: 'banco_talentos' }
     });
 
     showToast(`${cand.name} teve a chamada finalizada e foi para o Banco de Talentos.`);
@@ -849,7 +890,7 @@ export default function GerenciamentoVagasEmpresa() {
       setSelectedCandidate(prev => ({
         ...prev,
         stage: bancoStageId,
-        interview: { ...(prev.interview || {}), concluida: true, bannerDismissed: true, result: 'banco_talentos' }
+        interview: { ...prev.interview, concluida: true, bannerDismissed: true, result: 'banco_talentos' }
       }));
     }
     forceUpdate(n => n + 1);
@@ -1038,7 +1079,7 @@ export default function GerenciamentoVagasEmpresa() {
   };
 
   // ── Job Actions ──
-  const handleCloseJob = async (jobOrId) => {
+  const _handleCloseJob = async (jobOrId) => {
     const targetJob = typeof jobOrId === 'object' && jobOrId !== null
       ? jobOrId
       : allCompanyJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
@@ -1100,8 +1141,16 @@ export default function GerenciamentoVagasEmpresa() {
     }
   };
 
-  const handleDeleteJob = (jobId) => {
-    if (confirm('Tem certeza que deseja excluir esta vaga e todas as suas candidaturas?')) {
+  const handleDeleteJob = async (jobId) => {
+    const confirmed = await showConfirm({
+      title: 'Excluir Vaga',
+      message: 'Tem certeza que deseja excluir esta vaga e todas as suas candidaturas?\nEsta ação é definitiva e removerá a oportunidade do mural.',
+      confirmText: 'Sim, excluir vaga',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      badge: 'Exclusão Definitiva'
+    });
+    if (confirmed) {
       deleteJob(jobId);
       showToast('Vaga excluída com sucesso.');
       forceUpdate(n => n + 1);
@@ -1111,7 +1160,56 @@ export default function GerenciamentoVagasEmpresa() {
   const handleSaveJobEdit = (e) => {
     e.preventDefault();
     if (!editingJob) return;
-    updateJob(editingJob.id, editingJob);
+
+    const titleClean = (editingJob.title || '').trim();
+    if (!titleClean) {
+      showToast('⚠️ O título da vaga é obrigatório.');
+      return;
+    }
+    const titleVal = validateJobTitle(titleClean);
+    if (!titleVal.valid) {
+      showToast(`⚠️ ${titleVal.error}`);
+      return;
+    }
+
+    if (editingJob.description) {
+      const descClean = editingJob.description.trim();
+      const descVal = validateJobDescription(descClean);
+      if (!descVal.valid) {
+        showToast(`⚠️ ${descVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.workingHours && editingJob.workingHours.trim()) {
+      const whVal = validateWorkingHours(editingJob.workingHours);
+      if (!whVal.valid) {
+        showToast(`⚠️ ${whVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.salary && editingJob.salary.trim() && editingJob.salary !== 'A Combinar') {
+      const salVal = validateSalary(editingJob.salary, false);
+      if (!salVal.valid) {
+        showToast(`⚠️ ${salVal.error}`);
+        return;
+      }
+    }
+
+    if (editingJob.recruiterPhone && editingJob.recruiterPhone.trim()) {
+      const phoneVal = validatePhoneNumber(editingJob.recruiterPhone, false);
+      if (!phoneVal.valid) {
+        showToast(`⚠️ ${phoneVal.error}`);
+        return;
+      }
+    }
+
+    updateJob(editingJob.id, {
+      ...editingJob,
+      title: titleClean,
+      workingHours: editingJob.workingHours || STANDARD_WORKING_HOURS[0]
+    });
     showToast('Vaga atualizada com sucesso!');
     setEditingJob(null);
     forceUpdate(n => n + 1);
@@ -1901,7 +1999,7 @@ export default function GerenciamentoVagasEmpresa() {
                             const stageCandidates = filteredCandidates.filter(c => c.stage === stage.id);
                             const style = getStageStyle(stage.id, stage.color);
                             const isDragOver = dragOverStageId === stage.id;
-                            const isSingleColumn = selectedStageFilter !== 'todos';
+                            const _isSingleColumn = selectedStageFilter !== 'todos';
 
                             return (
                               <div
@@ -4662,12 +4760,16 @@ export default function GerenciamentoVagasEmpresa() {
 
               <form onSubmit={handleSaveJobEdit} className="p-6 space-y-4 text-xs">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Título:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-gray-700 dark:text-slate-300">Título do Cargo / Função:</label>
+                    <span className="text-[10px] text-gray-400 font-semibold">Exige função profissional válida</span>
+                  </div>
                   <input
                     type="text"
                     value={editingJob.title}
                     onChange={e => setEditingJob({ ...editingJob, title: e.target.value })}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold"
+                    placeholder="Ex: Assistente Administrativo, Vendedor Comercial, Desenvolvedor React..."
                     required
                   />
                 </div>
@@ -4698,12 +4800,29 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Descrição:</label>
+                  <label className="font-bold text-gray-700 dark:text-slate-300 block mb-1">Carga Horária & Jornada:</label>
+                  <select
+                    value={editingJob.workingHours || STANDARD_WORKING_HOURS[0]}
+                    onChange={e => setEditingJob({ ...editingJob, workingHours: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 font-semibold"
+                  >
+                    {STANDARD_WORKING_HOURS.map(wh => (
+                      <option key={wh} value={wh}>{wh}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-gray-700 dark:text-slate-300">Descrição Detalhada:</label>
+                    <span className="text-[10px] text-gray-400">Mínimo 30 caracteres</span>
+                  </div>
                   <textarea
                     rows={4}
                     value={editingJob.description || ''}
                     onChange={e => setEditingJob({ ...editingJob, description: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-xs"
+                    placeholder="Descreva as responsabilidades e detalhes da oportunidade..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-xs leading-relaxed"
                   />
                 </div>
 

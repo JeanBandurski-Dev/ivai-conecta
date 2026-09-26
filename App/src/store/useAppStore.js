@@ -254,12 +254,77 @@ const useAppStore = create((set, get) => ({
     }
   },
 
-  showToast: (message, duration = 3500) => {
-    const id = Date.now();
-    set(state => ({ toasts: [...state.toasts, { id, message }] }));
+  showToast: (message, typeOrDuration = 'info', duration = 3800) => {
+    const id = Date.now() + Math.random();
+    let type = 'info';
+    let dur = 3800;
+    if (typeof typeOrDuration === 'number') {
+      dur = typeOrDuration;
+    } else if (typeof typeOrDuration === 'string') {
+      type = typeOrDuration;
+      if (typeof duration === 'number') dur = duration;
+    }
+    set(state => ({ toasts: [...state.toasts, { id, message, type }] }));
     setTimeout(() => {
       set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
-    }, duration);
+    }, dur);
+  },
+
+  // ─── Modal Dialog State (Alert & Confirm) ─────────────────
+  confirmDialog: null,
+
+  showConfirm: (options = {}) => {
+    const config = typeof options === 'string'
+      ? { message: options }
+      : (options || {});
+
+    return new Promise((resolve) => {
+      set({
+        confirmDialog: {
+          title: config.title || 'Confirmação',
+          message: config.message || 'Deseja prosseguir com esta ação?',
+          confirmText: config.confirmText || 'Confirmar',
+          cancelText: config.cancelText || 'Cancelar',
+          variant: config.variant || 'primary',
+          badge: config.badge || null,
+          isAlert: false,
+          resolve
+        }
+      });
+    });
+  },
+
+  showAlert: (options = {}) => {
+    const config = typeof options === 'string'
+      ? { message: options }
+      : (options || {});
+
+    return new Promise((resolve) => {
+      set({
+        confirmDialog: {
+          title: config.title || 'Aviso',
+          message: config.message || '',
+          confirmText: config.confirmText || 'Entendi',
+          cancelText: null,
+          variant: config.variant || 'info',
+          badge: config.badge || null,
+          isAlert: true,
+          resolve
+        }
+      });
+    });
+  },
+
+  closeConfirm: (result = false) => {
+    const dialog = get().confirmDialog;
+    if (dialog && typeof dialog.resolve === 'function') {
+      try {
+        dialog.resolve(result);
+      } catch (err) {
+        console.error('Erro ao resolver dialog:', err);
+      }
+    }
+    set({ confirmDialog: null });
   },
 }));
 

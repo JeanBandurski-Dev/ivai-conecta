@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   getJobs, calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity
@@ -159,7 +159,7 @@ export default function Vagas() {
         const matchScoreOk = !canSeeMatch || minMatch === 0 || (typeof j.calculatedScore === 'number' && j.calculatedScore >= minMatch);
 
         // Habilidades
-        const matchSkillsOk = selectedSkills.length === 0 || selectedSkills.every(sk => 
+        const matchSkillsOk = selectedSkills.every(sk => 
           (j.requiredSkills || []).some(r => r && String(r).toLowerCase().includes(String(sk).toLowerCase()))
         );
 
@@ -352,6 +352,41 @@ export default function Vagas() {
           )}
 
         </div>
+
+        {/* ── BANNER INFORMATIVO PARA FREELANCERS / AUTÔNOMOS ── */}
+        {currentUser?.role === 'freelancer' && (
+          <div className="mb-6 bg-gradient-to-r from-amber-500/10 via-teal-500/10 to-blue-500/10 border border-amber-300/40 dark:border-amber-700/40 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Wrench size={20} />
+              </div>
+              <div>
+                <h4 className="font-heading font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                  Painel de Oportunidades para Freelancers &amp; Autônomos
+                </h4>
+                <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed mt-0.5">
+                  Como <strong>Freelancer (PJ)</strong>, você concorre a vagas no modelo <strong>Prestador de Serviço</strong> e projetos sob demanda. Vagas CLT e Estágio são exclusivas para emprego formal com vínculo e estudantes.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setFilterType('Prestador de Serviço')}
+                className={`btn btn-xs sm:btn-sm font-bold transition-all cursor-pointer ${
+                  filterType === 'Prestador de Serviço'
+                    ? 'btn-teal shadow-xs'
+                    : 'btn-outline border-teal-500/40 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/40'
+                }`}
+              >
+                {filterType === 'Prestador de Serviço' ? '✓ Vagas PJ Filtradas' : 'Ver Vagas PJ / Prestador'}
+              </button>
+              <Link to="/servicos" className="btn btn-outline btn-xs sm:btn-sm font-bold text-gray-700 dark:text-slate-300">
+                Marketplace de Serviços →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* ── GRID DE VAGAS ── */}
         {filtered.length === 0 ? (

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Search, X, Sparkles, MapPin, Briefcase, Users, Wrench,
-  Building2, ArrowRight, RotateCcw, Filter, CheckCircle2, ChevronRight
+  Building2, ArrowRight, RotateCcw
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -10,13 +10,14 @@ import {
   subscribeToTalents, subscribeToJobs, subscribeToServices,
   subscribeToCompanies, subscribeToPlatformMetrics,
   tokenizeQuery, scoreTalentMatch, scoreJobMatch, scoreServiceMatch,
-  normalizeSearchText
+  isJobActive
 } from '../lib/ivaiConecta';
 import TalentsCarousel from '../components/TalentsCarousel';
 import EmpresasCarousel from '../components/EmpresasCarousel';
 import JobCard from '../components/JobCard';
 import ServiceCard from '../components/ServiceCard';
 import TalentCard from '../components/TalentCard';
+import SolicitarServicoModal from '../components/SolicitarServicoModal';
 
 const PILLARS = [
   'Conexão entre pessoas e empresas',
@@ -35,8 +36,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedSector, setSelectedSector] = useState('todos'); // 'todos' | 'vagas' | 'talentos' | 'servicos'
+  const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
   const resultsRef = useRef(null);
-  const navigate = useNavigate();
 
   const [talents, setTalents]     = useState(() => getTalents(selectedCity));
   const [jobs, setJobs]           = useState(() => getJobs(selectedCity));
@@ -44,30 +45,37 @@ export default function Dashboard() {
   const [companies, setCompanies] = useState(() => getCompanies(selectedCity));
 
   const [platformMetrics, setPlatformMetrics] = useState(() => ({
-    talentsCount: getTalents(selectedCity).length,
-    companiesCount: getCompanies(selectedCity).length,
-    jobsCount: getJobs(selectedCity).filter(j => j.status === 'Ativa').length,
-    servicesCount: getServices(selectedCity).length
+    talentsCount: getTalents('Todas as Cidades').length,
+    companiesCount: getCompanies('Todas as Cidades').length,
+    jobsCount: getJobs('Todas as Cidades').filter(isJobActive).length,
+    servicesCount: getServices('Todas as Cidades').length
   }));
 
+  // O card 'Impacto no Vale do Ivaí' reflete as estatísticas globais e consolidadas de toda a região
   useEffect(() => {
-    const unsubTalents   = subscribeToTalents(selectedCity, data => { if (Array.isArray(data)) setTalents(data); });
-    const unsubJobs      = subscribeToJobs(selectedCity, data => { if (Array.isArray(data)) setJobs(data); });
-    const unsubServices  = subscribeToServices(selectedCity, data => { if (Array.isArray(data)) setServices(data); });
-    const unsubCompanies = subscribeToCompanies(selectedCity, data => { if (Array.isArray(data)) setCompanies(data); });
-
-    const unsubMetrics   = subscribeToPlatformMetrics(selectedCity, metricsData => {
+    const unsubMetrics = subscribeToPlatformMetrics('Todas as Cidades', metricsData => {
       if (metricsData) {
         setPlatformMetrics(metricsData);
       }
     });
 
     return () => {
+      unsubMetrics();
+    };
+  }, []);
+
+  // Dados filtrados por cidade para os módulos e carrosséis da página inicial
+  useEffect(() => {
+    const unsubTalents   = subscribeToTalents(selectedCity, data => { if (Array.isArray(data)) setTalents(data); });
+    const unsubJobs      = subscribeToJobs(selectedCity, data => { if (Array.isArray(data)) setJobs(data); });
+    const unsubServices  = subscribeToServices(selectedCity, data => { if (Array.isArray(data)) setServices(data); });
+    const unsubCompanies = subscribeToCompanies(selectedCity, data => { if (Array.isArray(data)) setCompanies(data); });
+
+    return () => {
       unsubTalents();
       unsubJobs();
       unsubServices();
       unsubCompanies();
-      unsubMetrics();
     };
   }, [selectedCity]);
 
@@ -84,7 +92,7 @@ export default function Dashboard() {
   }, [talents, searchTokens]);
 
   const filteredJobs = useMemo(() => {
-    const activeOnly = jobs.filter(j => j && j.status === 'Ativa');
+    const activeOnly = jobs.filter(isJobActive);
     if (searchTokens.length === 0) return activeOnly;
     return activeOnly
       .map(j => ({ item: j, score: scoreJobMatch(j, searchTokens) }))
@@ -101,17 +109,6 @@ export default function Dashboard() {
       .sort((a, b) => b.score - a.score)
       .map(x => x.item);
   }, [services, searchTokens]);
-
-  const filteredCompanies = useMemo(() => {
-    if (searchTokens.length === 0) return companies;
-    const q = normalizeSearchText(activeSearch);
-    return companies.filter(c => {
-      const name = normalizeSearchText(c.name);
-      const sector = normalizeSearchText(c.sector);
-      const about = normalizeSearchText(c.about);
-      return name.includes(q) || sector.includes(q) || about.includes(q);
-    });
-  }, [companies, activeSearch, searchTokens]);
 
   const totalMatches = filteredTalents.length + filteredJobs.length + filteredServices.length;
 
@@ -134,29 +131,26 @@ export default function Dashboard() {
 
   const metrics = [
     {
-      value: platformMetrics.talentsCount > 0 ? `${platformMetrics.talentsCount}` : `${talents.length}`,
+      value: `${platformMetrics.talentsCount || 0}`,
       label: 'Talentos Registrados',
       color: 'text-[#4ADE80]'
     },
     {
-      value: platformMetrics.companiesCount > 0 ? `${platformMetrics.companiesCount}` : `${companies.length}`,
+      value: `${platformMetrics.companiesCount || 0}`,
       label: 'Empresas Parceiras',
       color: 'text-[#A78BFA]'
     },
     {
-      value: platformMetrics.jobsCount > 0 ? `${platformMetrics.jobsCount}` : `${jobs.filter(j => j.status === 'Ativa').length}`,
+      value: `${platformMetrics.jobsCount || 0}`,
       label: 'Vagas Ativas',
       color: 'text-[#38BDF8]'
     },
     {
-      value: platformMetrics.servicesCount > 0 ? `${platformMetrics.servicesCount}` : `${services.length}`,
+      value: `${platformMetrics.servicesCount || 0}`,
       label: 'Serviços no Marketplace',
       color: 'text-[#FBBF24]'
     },
   ];
-
-  const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
 
   return (
     <>
@@ -459,7 +453,7 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2.5 items-center flex-wrap">
                 <Link to="/vagas" className="btn btn-outline bg-white dark:bg-slate-800 btn-sm shrink-0 font-bold flex items-center gap-1.5">
-                  Ver Vagas Abertas ({jobs.filter(j => j.status === 'Ativa').length}) <ArrowRight size={14} />
+                  Ver Vagas Abertas ({selectedCity === 'Todas as Cidades' ? platformMetrics.jobsCount : jobs.filter(isJobActive).length}) <ArrowRight size={14} />
                 </Link>
               </div>
             </div>
@@ -573,12 +567,23 @@ export default function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
                 {filteredServices.slice(0, 6).map(s => (
-                  <ServiceCard key={s.id || s.firestoreId} service={s} />
+                  <ServiceCard
+                    key={s.id || s.firestoreId}
+                    service={s}
+                    onRequestService={setSelectedServiceToOrder}
+                  />
                 ))}
               </div>
             )}
           </div>
         </section>
+      )}
+
+      {selectedServiceToOrder && (
+        <SolicitarServicoModal
+          service={selectedServiceToOrder}
+          onClose={() => setSelectedServiceToOrder(null)}
+        />
       )}
     </>
   );

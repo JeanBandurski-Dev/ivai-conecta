@@ -3,10 +3,10 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   GraduationCap, UserCheck, Wrench, Briefcase, Building2, Lock, ShieldCheck,
   CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Mail, Sparkles,
-  ArrowRight, MapPin, Check
+  ArrowRight, MapPin
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail } from '../lib/ivaiConecta';
+import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail, isInstitutionalEmail, inferInstitutionFromEmail } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',    shortLabel: 'Aluno',      desc: 'Estágios & 1º Emprego',    icon: GraduationCap, color: 'text-blue-500' },
@@ -141,6 +141,13 @@ export default function Login() {
       }
     }
 
+    if (selectedRole === 'professor') {
+      if (!isInstitutionalEmail(regEmail.trim())) {
+        setAlert('Para cadastrar uma conta de Professor/Docente, é obrigatório utilizar um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer outro domínio .edu.br).');
+        return;
+      }
+    }
+
     setLoading(true);
     const res = await register({
       name: regName.trim(),
@@ -152,6 +159,9 @@ export default function Login() {
         isVerifiedStudent: false,
         institution: validatedStudent?.institution || 'IFPR Campus Ivaiporã',
         studentEmail: regEmail.toLowerCase().trim()
+      }),
+      ...(selectedRole === 'professor' && {
+        institution: inferInstitutionFromEmail(regEmail.trim())
       }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(regCnpj),
@@ -388,11 +398,15 @@ export default function Login() {
               </div>
             )}
 
-            {/* Alerta de Erro */}
+            {/* Alerta de Erro Amigável */}
             {alert && (
-              <div className="p-2.5 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/80 text-red-700 dark:text-red-300 text-xs font-semibold rounded-xl flex items-start gap-2 animate-in fade-in duration-300">
-                <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-500" />
-                <span className="leading-snug" dangerouslySetInnerHTML={{ __html: alert }} />
+              <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl space-y-1.5 animate-in fade-in duration-300">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-red-800 dark:text-red-200 leading-snug" dangerouslySetInnerHTML={{ __html: alert }} />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -417,6 +431,12 @@ export default function Login() {
                     />
                     <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors duration-200 pointer-events-none" />
                   </div>
+                  {loginEmail.trim().length > 3 && isInstitutionalEmail(loginEmail.trim()) && (
+                    <div className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 animate-in fade-in duration-200">
+                      <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />
+                      <span className="truncate">Acesso Docente: <strong>{inferInstitutionFromEmail(loginEmail.trim())}</strong></span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -675,6 +695,10 @@ export default function Login() {
                             ? studentValidation?.isValid
                               ? 'border-emerald-500 text-gray-900 dark:text-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15'
                               : 'border-amber-400 text-gray-900 dark:text-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15'
+                            : selectedRole === 'professor' && regEmail.trim().length > 3
+                            ? isInstitutionalEmail(regEmail.trim())
+                              ? 'border-emerald-400 dark:border-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/15 text-gray-900 dark:text-white'
+                              : 'border-amber-400 dark:border-amber-600 focus:border-amber-500 focus:ring-amber-500/15 text-gray-900 dark:text-white'
                             : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 text-gray-900 dark:text-white'
                         }`}
                         placeholder={
@@ -695,7 +719,31 @@ export default function Login() {
                           )}
                         </div>
                       )}
+                      {selectedRole === 'professor' && regEmail.trim().length > 3 && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                          {isInstitutionalEmail(regEmail.trim()) ? (
+                            <CheckCircle2 size={15} className="text-emerald-500 animate-in zoom-in-75 duration-200" title={`Validado: ${inferInstitutionFromEmail(regEmail.trim())}`} />
+                          ) : (
+                            <AlertCircle size={15} className="text-amber-500 animate-in zoom-in-75 duration-200" title="Requer e-mail institucional" />
+                          )}
+                        </div>
+                      )}
                     </div>
+                    {selectedRole === 'professor' && regEmail.trim().length > 0 && (
+                      <div className="mt-1 text-[11px] transition-all duration-200">
+                        {isInstitutionalEmail(regEmail.trim()) ? (
+                          <div className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />
+                            <span className="truncate">Instituição reconhecida: <strong>{inferInstitutionFromEmail(regEmail.trim())}</strong></span>
+                          </div>
+                        ) : (
+                          <div className="text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 p-1.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <AlertCircle size={13} className="shrink-0 text-amber-500" />
+                            <span>Informe um e-mail institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @seed.pr.gov.br ou .edu.br)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Cidade Polo */}

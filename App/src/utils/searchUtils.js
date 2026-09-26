@@ -47,7 +47,7 @@ export function tokenizeQuery(query) {
   if (!query) return [];
   const normalized = normalizeSearchText(query);
   return normalized
-    .split(/[\s,;+/\-]+/)
+    .split(/[\s,;+/-]+/)
     .map(t => t.trim())
     .filter(t => t.length >= 2);
 }

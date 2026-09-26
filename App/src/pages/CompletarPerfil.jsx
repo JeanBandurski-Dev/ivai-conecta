@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail } from '../lib/ivaiConecta';
+import { CITIES, completeUserProfile, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail, isInstitutionalEmail, inferInstitutionFromEmail } from '../lib/ivaiConecta';
 import { auth } from '../lib/firebase';
-import { User, MapPin, CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowRight, GraduationCap, UserCheck, Wrench, Briefcase, Building2, Sparkles, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',       icon: GraduationCap, desc: 'Acesse vagas de estágio e endossos acadêmicos' },
@@ -146,6 +146,13 @@ export default function CompletarPerfil() {
       }
     }
 
+    if (selectedRole === 'professor') {
+      if (!isInstitutionalEmail(email)) {
+        setAlert('Para atuar com o perfil de Professor/Docente, sua conta Google/e-mail deve utilizar um domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer domínio .edu.br).');
+        return;
+      }
+    }
+
     setLoading(true);
 
     const res = await completeUserProfile(uid, {
@@ -159,6 +166,12 @@ export default function CompletarPerfil() {
         studentEmail: finalStudentEmail,
         institution: studentInstitution || 'IFPR Campus Ivaiporã',
         studentEmailVerifiedAt: isStudentVerified ? new Date().toISOString() : null
+      }),
+      ...(selectedRole === 'professor' && {
+        institution: inferInstitutionFromEmail(email),
+        degree: 'Docente / Pesquisador',
+        discipline: 'Docência & Orientação Acadêmica',
+        verified: true
       }),
       ...(selectedRole === 'empresa' && {
         cnpj: maskCNPJ(cnpj),

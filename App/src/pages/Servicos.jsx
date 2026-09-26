@@ -3,12 +3,19 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, HelpCircle
+  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { getServices, addService, updateService, CITIES, maskPhone, matchCity } from '../lib/ivaiConecta';
+import {
+  getServices, updateService, CITIES, maskPhone, matchCity,
+  subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders
+} from '../lib/ivaiConecta';
 import { subscribeToServices } from '../services/servicesService.js';
 import ServiceCard from '../components/ServiceCard';
+import ServiceOrderCard from '../components/ServiceOrderCard';
+import AvaliarServicoModal from '../components/AvaliarServicoModal';
+import PublishServiceModal from '../components/PublishServiceModal';
+import SolicitarServicoModal from '../components/SolicitarServicoModal';
 
 const CATEGORIES = [
   'Todas',
@@ -39,8 +46,14 @@ export default function Servicos() {
   const { currentUser, showToast, selectedCity } = useAppStore();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const isFreelancer = currentUser?.role === 'freelancer';
 
-  const [activeTab,    setActiveTab]    = useState(params.get('view') === 'dashboard' ? 'dashboard' : 'explore'); // 'explore' | 'dashboard'
+  const [activeTab,    setActiveTab]    = useState(() => {
+    const v = params.get('view');
+    if (v === 'orders') return 'orders';
+    if (!isFreelancer) return 'explore';
+    return v === 'dashboard' ? 'dashboard' : 'explore';
+  });
   const [query,        setQuery]        = useState('');
   const [city,         setCity]         = useState(selectedCity || 'Todas as Cidades');
   const [category,     setCategory]     = useState('Todas');
@@ -49,6 +62,22 @@ export default function Servicos() {
   const [sortBy,       setSortBy]       = useState('rating');
   const [showModal,    setModal]        = useState(params.get('action') === 'new');
   const [editModal,    setEditModal]    = useState(false);
+  const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
+
+  useEffect(() => {
+    const v = params.get('view');
+    if (v === 'orders') {
+      setActiveTab('orders');
+      if (currentUser?.role !== 'freelancer') {
+        setOrderSubTab('sent');
+      }
+    } else if (currentUser?.role === 'freelancer') {
+      if (v === 'dashboard') setActiveTab('dashboard');
+      else if (v === 'explore') setActiveTab('explore');
+    } else if (v === 'explore') {
+      setActiveTab('explore');
+    }
+  }, [params, currentUser?.role]);
 
   useEffect(() => {
     if (selectedCity) setCity(selectedCity);
@@ -96,6 +125,102 @@ export default function Servicos() {
       });
     }
   }, [currentService, currentUser]);
+
+  // ── Service Orders Lifecycle State ──
+  const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
+  const [evaluatingOrder, setEvaluatingOrder] = useState(null);
+  const [orderSubTab, setOrderSubTab] = useState('received'); // 'received' | 'sent'
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeToServiceOrders(currentUser, (data) => {
+      if (Array.isArray(data)) setLiveOrders(data);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleOrdersUpdated = (e) => {
+      if (Array.isArray(e.detail)) setLiveOrders(e.detail);
+      else setLiveOrders(getServiceOrders());
+    };
+    window.addEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+    return () => window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+  }, []);
+
+  const receivedOrders = useMemo(() => {
+    if (!currentUser) return [];
+    const uid = String(currentUser.uid || currentUser.id || '');
+    const email = String(currentUser.email || '').toLowerCase().trim();
+    const name = String(currentUser.name || '').toLowerCase().trim();
+    return liveOrders.filter(o =>
+      (uid && String(o.providerId) === uid) ||
+      (email && String(o.providerEmail || '').toLowerCase().trim() === email) ||
+      (name && String(o.providerName || '').toLowerCase().trim() === name)
+    );
+  }, [liveOrders, currentUser]);
+
+  const sentOrders = useMemo(() => {
+    if (!currentUser) return [];
+    const uid = String(currentUser.uid || currentUser.id || '');
+    const email = String(currentUser.email || '').toLowerCase().trim();
+    const name = String(currentUser.name || '').toLowerCase().trim();
+    return liveOrders.filter(o =>
+      (uid && String(o.clientId) === uid) ||
+      (email && String(o.clientEmail || '').toLowerCase().trim() === email) ||
+      (name && String(o.clientName || '').toLowerCase().trim() === name)
+    );
+  }, [liveOrders, currentUser]);
+
+  const combinedReviews = useMemo(() => {
+    const fromService = currentService?.reviews || [];
+    const fromOrders = receivedOrders
+      .filter(o => o.status === 'avaliado' && o.review)
+      .map(o => ({
+        client: o.review.author || o.clientName || 'Cliente',
+        stars: Number(o.review.rating) || 5,
+        rating: Number(o.review.rating) || 5,
+        comment: o.review.comment,
+        date: o.review.date || o.createdAt,
+        timestamp: o.review.timestamp
+      }));
+
+    const allReviews = [...fromOrders, ...fromService];
+    const unique = [];
+    const seen = new Set();
+    for (const r of allReviews) {
+      const key = `${r.client || r.author}_${r.comment}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(r);
+      }
+    }
+    return unique;
+  }, [currentService, receivedOrders]);
+
+  const serviceRatingScore = useMemo(() => {
+    if (combinedReviews.length === 0) return currentService?.rating || 5.0;
+    const total = combinedReviews.reduce((sum, r) => sum + (Number(r.stars || r.rating) || 5), 0);
+    return Number((total / combinedReviews.length).toFixed(1));
+  }, [combinedReviews, currentService]);
+
+  const handleOrderStatusTransition = async (orderId, nextStatus, note) => {
+    try {
+      await updateServiceOrderStatus(orderId, nextStatus, note);
+      const statusNames = {
+        aceito: 'Demanda aceita com sucesso!',
+        recusado: 'Demanda recusada.',
+        em_andamento: 'Atendimento iniciado!',
+        concluido: 'Serviço marcado como concluído!',
+        avaliado: 'Atendimento avaliado com sucesso!'
+      };
+      showToast(statusNames[nextStatus] || `Status atualizado para: ${nextStatus}`);
+    } catch {
+      showToast('Erro ao atualizar status do serviço.');
+    }
+  };
 
   const hasActiveFilters = query || city !== 'Todas as Cidades' || category !== 'Todas' || badgeFilter !== 'todos' || minRating > 0;
 
@@ -192,9 +317,9 @@ export default function Servicos() {
             )}
           </div>
 
-          {/* Abas para Freelancer */}
+          {/* Abas de Navegação exclusivas do Prestador Freelancer */}
           {currentUser?.role === 'freelancer' && (
-            <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2">
+            <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('explore')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
@@ -202,6 +327,17 @@ export default function Servicos() {
                 }`}
               >
                 Explorar Marketplace
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                  activeTab === 'orders' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+                }`}
+              >
+                <FileText size={15} /> Minhas Demandas &amp; Pedidos
+                {(receivedOrders.some(o => o.status === 'solicitado') || sentOrders.some(o => o.status === 'concluido')) && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                )}
               </button>
               <button
                 onClick={() => setActiveTab('dashboard')}
@@ -213,13 +349,147 @@ export default function Servicos() {
               </button>
             </div>
           )}
+
+          {/* Abas para Clientes */}
+          {currentUser && currentUser.role !== 'freelancer' && (
+            <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 flex-wrap">
+              <button
+                onClick={() => setActiveTab('explore')}
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                  activeTab === 'explore' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+                }`}
+              >
+                Explorar Marketplace
+              </button>
+              <button
+                onClick={() => {
+                  setOrderSubTab('sent');
+                  setActiveTab('orders');
+                }}
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                  activeTab === 'orders' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+                }`}
+              >
+                <FileText size={15} /> Meus Pedidos de Serviços {sentOrders.length > 0 ? `(${sentOrders.length})` : ''}
+                {sentOrders.some(o => o.status === 'concluido') && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="container section">
 
-        {/* ── ABA FREELANCER DASHBOARD DE DESEMPENHO ── */}
-        {activeTab === 'dashboard' && currentUser?.role === 'freelancer' ? (
+        {/* ── ABA MINHAS DEMANDAS & ORDENS DE SERVIÇO ── */}
+        {activeTab === 'orders' ? (
+          !currentUser ? (
+            <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-4 max-w-lg mx-auto">
+              <FileText size={48} className="mx-auto text-primary-blue/60" />
+              <h3 className="font-heading text-xl font-bold text-gray-800 dark:text-white">Acesse sua conta para ver suas demandas</h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Faça login para acompanhar pedidos de serviços solicitados ou recebidos.
+              </p>
+              <button onClick={() => navigate('/login')} className="btn btn-primary btn-sm font-bold mx-auto">
+                Fazer Login
+              </button>
+            </div>
+          ) : (
+          <div className="space-y-6 max-w-5xl mx-auto">
+            {/* Subtabs for Freelancers or header for clients */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-slate-800">
+              <div>
+                <h2 className="text-2xl font-bold font-heading text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText size={24} className="text-primary-blue" /> Gestão de Demandas &amp; Ordens de Serviço
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Acompanhe todas as etapas do atendimento: solicitação, aceite, execução, conclusão e avaliação com nota.
+                </p>
+              </div>
+
+              {currentUser?.role === 'freelancer' ? (
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 p-1 rounded-2xl">
+                  <button
+                    onClick={() => setOrderSubTab('received')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      orderSubTab === 'received'
+                        ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs'
+                        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900'
+                    }`}
+                  >
+                    Demandas Recebidas ({receivedOrders.length})
+                  </button>
+                  <button
+                    onClick={() => setOrderSubTab('sent')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      orderSubTab === 'sent'
+                        ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs'
+                        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900'
+                    }`}
+                  >
+                    Meus Pedidos Solicitados ({sentOrders.length})
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                  {sentOrders.length} pedido(s) contratado(s)
+                </span>
+              )}
+            </div>
+
+            {/* List of Orders */}
+            {currentUser?.role === 'freelancer' && orderSubTab === 'received' ? (
+              receivedOrders.length === 0 ? (
+                <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-3">
+                  <Inbox size={48} className="mx-auto text-gray-400 dark:text-slate-600" />
+                  <h3 className="font-heading text-lg font-bold text-gray-800 dark:text-white">Nenhuma solicitação de serviço recebida ainda</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Assim que clientes de Ivaiporã e região solicitarem demandas nos seus anúncios de serviço, elas aparecerão aqui para você aceitar e gerenciar.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {receivedOrders.map(order => (
+                    <ServiceOrderCard
+                      key={order.id}
+                      order={order}
+                      isProvider={true}
+                      onTransition={handleOrderStatusTransition}
+                      onEvaluate={setEvaluatingOrder}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              sentOrders.length === 0 ? (
+                <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-3">
+                  <Inbox size={48} className="mx-auto text-gray-400 dark:text-slate-600" />
+                  <h3 className="font-heading text-lg font-bold text-gray-800 dark:text-white">Você ainda não solicitou nenhum serviço</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Navegue pelo catálogo de serviços locais, selecione um prestador de serviços e clique em "Solicitar" para iniciar uma ordem de atendimento.
+                  </p>
+                  <button onClick={() => setActiveTab('explore')} className="btn btn-primary btn-sm text-xs font-bold shadow-md">
+                    Explorar Marketplace de Serviços
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sentOrders.map(order => (
+                    <ServiceOrderCard
+                      key={order.id}
+                      order={order}
+                      isProvider={false}
+                      onTransition={handleOrderStatusTransition}
+                      onEvaluate={setEvaluatingOrder}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+          )
+        ) : activeTab === 'dashboard' && currentUser?.role === 'freelancer' ? (
           <div className="space-y-8 max-w-5xl mx-auto">
             {!currentService ? (
               <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-4">
@@ -301,8 +571,12 @@ export default function Servicos() {
                         <span>Serviços Prestados</span>
                         <CheckCircle2 size={18} className="text-teal-600" />
                       </div>
-                      <div className="text-3xl font-extrabold text-teal-600">{currentService.analytics?.closedDeals || 0}</div>
-                      <div className="text-xs font-bold text-teal-700">Taxa: {currentService.analytics?.conversionRate || '0%'}</div>
+                      <div className="text-3xl font-extrabold text-teal-600">
+                        {Math.max(currentService.analytics?.closedDeals || 0, receivedOrders.filter(o => o.status === 'concluido' || o.status === 'avaliado').length)}
+                      </div>
+                      <div className="text-xs font-bold text-teal-700">
+                        Taxa: {Math.min(100, Math.round((Math.max(currentService.analytics?.closedDeals || 0, receivedOrders.filter(o => o.status === 'concluido' || o.status === 'avaliado').length) / Math.max(1, currentService.analytics?.views || 1)) * 100))}%
+                      </div>
                     </div>
 
                     {/* Não Compraram */}
@@ -311,7 +585,9 @@ export default function Servicos() {
                         <span>Desistências</span>
                         <AlertCircle size={18} className="text-amber-500" />
                       </div>
-                      <div className="text-3xl font-extrabold text-gray-700 dark:text-slate-200">{currentService.analytics?.nonBuyers || 0}</div>
+                      <div className="text-3xl font-extrabold text-gray-700 dark:text-slate-200">
+                        {Math.max(currentService.analytics?.nonBuyers || 0, receivedOrders.filter(o => o.status === 'recusado').length)}
+                      </div>
                       <div className="text-xs text-amber-600 font-semibold">Sem fechamento</div>
                     </div>
 
@@ -325,23 +601,23 @@ export default function Servicos() {
                   <div className="card space-y-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
                     <div className="flex items-center justify-between">
                       <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                        <Star size={18} className="fill-amber-400 text-amber-400" /> Avaliações ({currentService.reviewsCount || 0})
+                        <Star size={18} className="fill-amber-400 text-amber-400" /> Avaliações ({combinedReviews.length})
                       </h3>
                       <span className="text-sm font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                        <Star size={13} className="fill-amber-500 text-amber-500" /> {currentService.rating || 5.0} / 5.0
+                        <Star size={13} className="fill-amber-500 text-amber-500" /> {serviceRatingScore.toFixed(1)} / 5.0
                       </span>
                     </div>
 
-                    {(!currentService.reviews || currentService.reviews.length === 0) ? (
+                    {combinedReviews.length === 0 ? (
                       <p className="text-sm text-gray-400 dark:text-slate-500">Nenhuma avaliação detalhada recebida ainda.</p>
                     ) : (
                       <div className="space-y-3">
-                        {currentService.reviews.map((r, i) => (
+                        {combinedReviews.map((r, i) => (
                           <div key={r.id || i} className="bg-gray-50 dark:bg-slate-800/70 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 space-y-1">
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{r.client}</span>
+                              <span className="font-bold text-sm text-gray-800 dark:text-slate-100">{r.client || r.author}</span>
                               <div className="flex items-center gap-0.5">
-                                {Array.from({ length: r.stars || 5 }).map((_, idx) => (
+                                {Array.from({ length: Math.min(5, Math.max(1, Math.round(r.stars || r.rating || 5))) }).map((_, idx) => (
                                   <Star key={idx} size={13} className="fill-amber-400 text-amber-400" />
                                 ))}
                               </div>
@@ -508,7 +784,13 @@ export default function Servicos() {
               </div>
             ) : (
               <div className="grid-3">
-                {filtered.map(s => <ServiceCard key={s.id} service={s} />)}
+                {filtered.map(s => (
+                  <ServiceCard
+                    key={s.id || s.firestoreId}
+                    service={s}
+                    onRequestService={setSelectedServiceToOrder}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -595,86 +877,34 @@ export default function Servicos() {
         </div>
       )}
 
-      {/* New Service Modal */}
+      {/* New Service Modal com Validação Rigorosa & Anti-Profanidade */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Cadastrar Meu Serviço</h3>
-              <button onClick={() => setModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
-            </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const category = e.target.category.value;
-              const city = e.target.city.value;
-              const rawPhone = e.target.phone.value;
-              const description = e.target.description.value;
-              const title = e.target.title.value || category;
+        <PublishServiceModal
+          onClose={() => setModal(false)}
+          onSuccess={(created) => {
+            setLiveServices(prev => [created, ...prev.filter(s => s.id !== created.id && s.firestoreId !== created.id)]);
+            setActiveTab('explore');
+            setCity('Todas as Cidades');
+            setCategory('Todas');
+            setQuery('');
+            setModal(false);
+          }}
+        />
+      )}
 
-              const phone = rawPhone || currentUser?.phone || '';
+      {evaluatingOrder && (
+        <AvaliarServicoModal
+          order={evaluatingOrder}
+          onClose={() => setEvaluatingOrder(null)}
+          onSuccess={() => setEvaluatingOrder(null)}
+        />
+      )}
 
-              const servicePayload = {
-                title,
-                name: title,
-                category,
-                providerName: currentUser?.name || 'Profissional Autônomo',
-                avatar: currentUser?.avatar || '',
-                providerEmail: currentUser?.email || '',
-                city,
-                phone,
-                description,
-                createdBy: currentUser?.uid || currentUser?.email || 'freelancer',
-                rating: 5.0,
-                reviewsCount: 0,
-                badge: 'Prestador Regional',
-                analytics: { views: 0, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
-                reviews: [],
-                forumTopics: []
-              };
-              await addService(servicePayload);
-              showToast('🎉 Serviço cadastrado com sucesso no Marketplace!');
-              setModal(false);
-            }} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Título ou Nome do Serviço</label>
-                <input name="title" type="text" className="form-control" placeholder="Ex: Manutenção Elétrica Residencial e Predial" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Categoria do Serviço</label>
-                <select name="category" className="form-control">
-                  {CATEGORIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Cidade onde Atua</label>
-                <select name="city" className="form-control">
-                  {CITIES.slice(1).map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Telefone de Contato</label>
-                <input
-                  name="phone"
-                  type="tel"
-                  className="form-control"
-                  placeholder="Ex: (43) 99999-0000"
-                  maxLength={15}
-                  onChange={e => { e.target.value = maskPhone(e.target.value); }}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Descrição dos Serviços</label>
-                <textarea name="description" className="form-control" rows={3} placeholder="Descreva seus serviços, especialidades e diferenciais..." required />
-              </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setModal(false)} className="btn btn-outline btn-sm">Cancelar</button>
-                <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md">Cadastrar Serviço</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {selectedServiceToOrder && (
+        <SolicitarServicoModal
+          service={selectedServiceToOrder}
+          onClose={() => setSelectedServiceToOrder(null)}
+        />
       )}
     </>
   );

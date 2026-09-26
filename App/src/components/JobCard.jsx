@@ -1,7 +1,8 @@
 import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { calculateMatchScore, safeSkillsArray, isJobFavorited, getUserApplications } from '../lib/ivaiConecta';
+import { calculateMatchScore, safeSkillsArray, isJobFavorited } from '../lib/ivaiConecta';
+import { getUserApplications, isPjOrFreelanceJob, isInternshipJob } from '../services/jobsService';
 
 export default function JobCard({ job, matchScore, onSelect }) {
   const { currentUser, favoriteJobs = [], toggleFavoriteJob, showToast } = useAppStore();
@@ -22,10 +23,27 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
   const isFavorite = isJobFavorited(job, favoriteJobs);
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
+  const isStudent = userRole === 'aluno' || userRole === 'estudante' || userRole === 'student';
+  const isStandardCandidate = userRole === 'candidato';
+  const isFreelancer = userRole === 'freelancer' || userRole === 'prestador';
   const isCompany = Boolean(userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador');
-  const canSeeMatch = isCandidate;
-  
+
+  const isPj = isPjOrFreelanceJob(job);
+  const isInternship = isInternshipJob(job);
+
+  // Freelancer só visualiza Match para vagas PJ/Freelance
+  // Candidato tradicional só visualiza Match para vagas não-estágio
+  // Aluno visualiza Match
+  const canSeeMatch = Boolean(
+    currentUser && (
+      isStudent ||
+      (isStandardCandidate && !isInternship) ||
+      (isFreelancer && isPj)
+    )
+  );
+
+  const canApplyOrPropose = isStudent || isStandardCandidate || isFreelancer;
+
   const isOwner = isCompany && currentUser && (
     (job.createdBy && currentUser?.uid && String(job.createdBy) === String(currentUser.uid)) ||
     (job.createdBy && currentUser?.id && String(job.createdBy) === String(currentUser.id)) ||
@@ -39,7 +57,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
   const userEmail = currentUser?.email?.toLowerCase().trim();
   const jobIds = [String(job.id || ''), String(job.firestoreId || ''), String(id)].filter(Boolean);
   
-  const hasApplied = isCandidate && (getUserApplications() || []).some(a => {
+  const hasApplied = canApplyOrPropose && (getUserApplications() || []).some(a => {
     const matchesJob = jobIds.includes(String(a.jobId || '')) ||
                        (a.firestoreJobId && jobIds.includes(String(a.firestoreJobId))) ||
                        (a.originalJobId && jobIds.includes(String(a.originalJobId)));
@@ -95,7 +113,12 @@ export default function JobCard({ job, matchScore, onSelect }) {
                 </span>
                 {hasApplied && (
                   <span className="text-[10px] font-bold bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5">
-                    <Check size={10} strokeWidth={3} /> Inscrito
+                    <Check size={10} strokeWidth={3} /> {isFreelancer && isPj ? 'Proposta Enviada' : 'Inscrito'}
+                  </span>
+                )}
+                {isPj && (
+                  <span className="text-[10px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5">
+                    PJ / Demanda
                   </span>
                 )}
                 {isOwner && (

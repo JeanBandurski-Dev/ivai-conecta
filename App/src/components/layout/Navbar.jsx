@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert
+  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert, FileText
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
@@ -72,8 +72,8 @@ export default function Navbar() {
     if (!currentUser) return '/login';
     const userIdentifier = currentUser.uid || currentUser.id;
     if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
-    if (userRole === 'professor') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
-    if (userRole === 'freelancer') return '/servicos?view=dashboard';
+    if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
+    if (userRole === 'freelancer') return userIdentifier ? `/freelancer/${userIdentifier}` : '/freelancer';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
@@ -189,8 +189,20 @@ export default function Navbar() {
 
                         <Link to={getProfileLink()} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Painel Freelancer' : 'Meu Perfil'}
+                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Perfil Freelancer' : 'Meu Perfil'}
                         </Link>
+
+                        {currentUser.role === 'freelancer' ? (
+                          <Link to="/servicos?view=orders" onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
+                            <FileText size={15} /> Demandas &amp; Pedidos de Serviços
+                          </Link>
+                        ) : (
+                          <Link to="/servicos?view=orders" onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
+                            <FileText size={15} /> Meus Pedidos de Serviços
+                          </Link>
+                        )}
 
                         {isStudentOrCandidate && (
                           <>
@@ -231,13 +243,6 @@ export default function Navbar() {
                               <Star size={15} /> Banco de Talentos
                             </Link>
                           </>
-                        )}
-
-                        {currentUser.role === 'freelancer' && (
-                          <Link to="/servicos?action=new" onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                            <PlusCircle size={15} /> Cadastrar Novo Serviço
-                          </Link>
                         )}
                       </div>
 
@@ -329,6 +334,16 @@ export default function Navbar() {
                   <NavLink to={getProfileLink()} className={mobileNavLinkClass} onClick={closeMobile}>
                     <span className="flex items-center gap-2.5"><User size={16} /> Meu Perfil</span>
                   </NavLink>
+
+                  {currentUser.role === 'freelancer' ? (
+                    <NavLink to="/servicos?view=orders" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><FileText size={16} /> Demandas &amp; Pedidos</span>
+                    </NavLink>
+                  ) : (
+                    <NavLink to="/servicos?view=orders" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <span className="flex items-center gap-2.5"><FileText size={16} /> Meus Pedidos de Serviços</span>
+                    </NavLink>
+                  )}
 
                   <button
                     onClick={() => { closeMobile(); openChat(); }}

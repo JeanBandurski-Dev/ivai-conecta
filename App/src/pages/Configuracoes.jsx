@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, Camera, GraduationCap,
-  Search, Loader2, AlertCircle, RefreshCw, Check
+  Building2, FileText, Camera,
+  Search, Loader2, AlertCircle, RefreshCw, Check,
+  Wrench, Briefcase, GraduationCap
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -28,7 +29,7 @@ import {
 } from '../lib/ivaiConecta';
 
 export default function Configuracoes() {
-  const { currentUser, setCurrentUser, logout, showToast } = useAppStore();
+  const { currentUser, setCurrentUser, logout, showToast, showConfirm } = useAppStore();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('account'); // 'account', 'verification', 'company', 'security', 'privacy'
@@ -40,6 +41,14 @@ export default function Configuracoes() {
   const [github, setGithub] = useState(currentUser?.github || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(currentUser?.role || 'candidato');
+  const [switchingRole, setSwitchingRole] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.role) {
+      setSelectedRole(currentUser.role);
+    }
+  }, [currentUser?.role]);
 
   // Verification form (Student)
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
@@ -199,19 +208,182 @@ export default function Configuracoes() {
     }
   };
 
-  const handleSaveAccount = (e) => {
+  const handleSaveAccount = async (e) => {
     e.preventDefault();
-    const updatedData = {
+    const roleBadges = {
+      candidato: 'Candidato / Profissional',
+      freelancer: 'Prestador de Serviço Autônomo',
+      aluno: 'Estudante (IFPR/UENP/Univale)',
+      empresa: 'Empresa / Recrutador',
+      professor: 'Docente (IFPR/UENP/Univale)'
+    };
+    const targetRole = selectedRole || currentUser?.role || 'candidato';
+    const targetBadge = roleBadges[targetRole] || currentUser?.badge;
+
+    const updated = await updateAuthUser({
       name,
       email,
       linkedin,
       github,
       avatar,
-      ...(currentUser?.role === 'aluno' ? { raNumber } : {})
+      ...(currentUser?.role === 'aluno' ? { raNumber } : {}),
+      role: targetRole,
+      activeRole: targetRole,
+      selectedRole: targetRole,
+      profileType: targetRole,
+      badge: targetBadge
+    }, currentUser);
+
+    if (updated) {
+      setCurrentUser(updated);
+      showToast('Dados da conta e perfil atualizados com sucesso!', 'success');
+    }
+  };
+
+  const handleSwitchRole = async (newRole) => {
+    const roleBadges = {
+      candidato: 'Candidato / Profissional',
+      freelancer: 'Prestador de Serviço Autônomo',
+      aluno: 'Estudante (IFPR/UENP/Univale)'
     };
-    updateAuthUser(updatedData);
-    setCurrentUser({ ...currentUser, ...updatedData });
-    showToast('Dados da conta atualizados com sucesso!');
+    if (!roleBadges[newRole]) return;
+
+    const roleDetails = {
+      candidato: {
+        title: 'Mudar perfil para Candidato',
+        message: 'Deseja alterar seu perfil para Candidato?\nVocê passará a concorrer a vagas de emprego formal (CLT / Meio Período).',
+        confirmText: 'Alterar para Candidato'
+      },
+      freelancer: {
+        title: 'Mudar perfil para Freelancer',
+        message: 'Deseja alterar seu perfil para Freelancer?\nVocê passará a concorrer a demandas e vagas PJ no Marketplace de Serviços.',
+        confirmText: 'Alterar para Freelancer'
+      },
+      aluno: {
+        title: 'Mudar perfil para Estudante',
+        message: 'Deseja alterar seu perfil para Estudante?\nVocê terá acesso prioritário a programas de estágio e capacitação regional.',
+        confirmText: 'Alterar para Estudante'
+      }
+    };
+
+    const targetConfig = roleDetails[newRole] || {
+      title: 'Alterar Perfil',
+      message: 'Deseja alterar seu tipo de perfil?',
+      confirmText: 'Confirmar'
+    };
+
+    const confirmed = await showConfirm({
+      title: targetConfig.title,
+      message: targetConfig.message,
+      confirmText: targetConfig.confirmText,
+      cancelText: 'Cancelar',
+      variant: 'primary',
+      badge: 'Transição de Perfil'
+    });
+    if (!confirmed) return;
+
+    setSwitchingRole(true);
+    try {
+      const updated = await updateAuthUser({
+        role: newRole,
+        activeRole: newRole,
+        selectedRole: newRole,
+        profileType: newRole,
+        badge: roleBadges[newRole]
+      }, currentUser);
+
+      if (updated) {
+        setCurrentUser(updated);
+        setSelectedRole(newRole);
+        showToast(`Perfil alterado com sucesso para ${roleBadges[newRole]}!`, 'success');
+      } else {
+        showToast('Não foi possível atualizar o perfil no momento.', 'error');
+      }
+    } catch (err) {
+      console.error('Erro ao alternar perfil:', err);
+      showToast('Erro ao atualizar tipo de perfil.', 'error');
+    } finally {
+      setSwitchingRole(false);
+    }
+  };
+
+  // Student file drop / select
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    processStudentFile(file);
+  };
+
+  const processStudentFile = (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('O arquivo selecionado excede o limite máximo de 5MB.');
+      return;
+    }
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
+      showToast('Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
+      return;
+    }
+    setSelectedFile(file);
+    showToast(`Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processStudentFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleVerificationSubmit = async (e) => {
+    e.preventDefault();
+    if (!raNumber.trim()) {
+      showToast('Por favor, informe seu RA / Número de Matrícula.');
+      return;
+    }
+    if (!selectedFile && !currentUser?.isVerifiedStudent) {
+      showToast('Por favor, selecione o arquivo PDF ou imagem da sua declaração de matrícula.');
+      return;
+    }
+
+    setSubmittingStudent(true);
+    showToast('Processando e autenticando declaração...');
+
+    try {
+      let uploadedDocUrl = null;
+      if (selectedFile) {
+        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
+        if (uploadRes.success) {
+          uploadedDocUrl = uploadRes.url;
+        }
+      }
+
+      const res = submitStudentVerification(raNumber, selectedFile);
+      if (res.success) {
+        setVerificationSubmitted(true);
+        const updated = updateAuthUser({
+          isVerifiedStudent: true,
+          raNumber,
+          studentProofUrl: uploadedDocUrl,
+          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
+        });
+        if (updated) {
+          setCurrentUser(updated);
+        }
+        showToast('Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
+      }
+    } finally {
+      setSubmittingStudent(false);
+    }
   };
 
   const handleCnpjChange = (e) => {
@@ -468,7 +640,7 @@ export default function Configuracoes() {
                   <div className="space-y-1.5 flex-1 min-w-[200px]">
                     <div className="font-bold text-sm text-gray-900 dark:text-white">Foto do Perfil</div>
                     <p className="text-xs text-gray-500 dark:text-slate-400">
-                      Envie uma imagem JPG, PNG ou WEBP (máx. 5MB) para salvar no Firebase Storage.
+                      Envie uma imagem JPG, PNG ou WEBP (máx. 5MB).
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5">
@@ -545,14 +717,121 @@ export default function Configuracoes() {
                   </div>
                 )}
 
-                <div className="form-group">
-                  <label className="form-label">Tipo de Conta</label>
-                  <input
-                    type="text"
-                    value={currentUser.badge}
-                    disabled
-                    className="form-control bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-gray-200 dark:border-slate-700 cursor-not-allowed"
-                  />
+                <div className="form-group space-y-3">
+                  <div>
+                    <label className="form-label">Tipo de Conta &amp; Regras de Candidatura</label>
+                    <input
+                      type="text"
+                      value={currentUser.badge || currentUser.role}
+                      disabled
+                      className="form-control bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-bold border-gray-200 dark:border-slate-700 cursor-not-allowed"
+                    />
+                  </div>
+
+                  {/* Cartão de Regras de Candidatura do Perfil */}
+                  <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 sm:p-4.5 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      {currentUser.role === 'freelancer' ? (
+                        <Wrench size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                      ) : currentUser.role === 'candidato' ? (
+                        <Briefcase size={18} className="text-primary-blue shrink-0 mt-0.5" />
+                      ) : currentUser.role === 'aluno' ? (
+                        <GraduationCap size={18} className="text-green-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <Building2 size={18} className="text-sky-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="text-xs leading-relaxed space-y-1">
+                        <div className="font-bold text-gray-900 dark:text-white">
+                          Diretrizes de Candidatura para seu Perfil:
+                        </div>
+                        {currentUser.role === 'freelancer' && (
+                          <div className="text-gray-600 dark:text-slate-300">
+                            Perfis <strong>Freelancer / Autônomo</strong> concorrem a oportunidades no modelo <strong>Prestador de Serviço (PJ)</strong> e projetos técnicos sob demanda. Não realizam candidaturas diretas a vagas de emprego formal (CLT / Estágio). Se você deseja buscar emprego formal com carteira assinada, altere seu tipo de perfil abaixo.
+                          </div>
+                        )}
+                        {currentUser.role === 'candidato' && (
+                          <div className="text-gray-600 dark:text-slate-300">
+                            Perfis <strong>Candidato</strong> podem se candidatar a vagas de <strong>Emprego Formal CLT</strong> (Tempo Integral e Meio Período) e <strong>Prestador PJ</strong>. Vagas de <strong>Estágio</strong> são exclusivas para estudantes com matrícula acadêmica ativa.
+                          </div>
+                        )}
+                        {currentUser.role === 'aluno' && (
+                          <div className="text-gray-600 dark:text-slate-300">
+                            Perfis <strong>Aluno / Estudante</strong> podem se candidatar a vagas de <strong>Estágio</strong> (mediante envio de declaração de matrícula), além de oportunidades CLT, Meio Período e PJ.
+                          </div>
+                        )}
+                        {currentUser.role === 'empresa' && (
+                          <div className="text-gray-600 dark:text-slate-300">
+                            Perfis <strong>Empresa</strong> publicam oportunidades, realizam triagem de currículos e gerenciam processos seletivos. Não realizam candidaturas.
+                          </div>
+                        )}
+                        {currentUser.role === 'professor' && (
+                          <div className="text-gray-600 dark:text-slate-300">
+                            Perfis <strong>Docente / Professor</strong> acompanham oportunidades acadêmicas e emitem recomendações de parecer pedagógico para estudantes.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ação de Alternância de Perfil (Aluno, Freelancer ou Candidato) */}
+                    {['aluno', 'candidato', 'freelancer'].includes(currentUser.role) && (
+                      <div className="pt-3 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                          <span className="font-semibold text-gray-700 dark:text-slate-300">
+                            Alternar Tipo de Perfil:
+                          </span>
+                          <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Escolha um perfil para testar as regras de candidatura
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSwitchRole('aluno')}
+                            disabled={currentUser.role === 'aluno' || switchingRole}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                              currentUser.role === 'aluno'
+                                ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-300 dark:border-green-800 shadow-2xs cursor-default'
+                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-green-400'
+                            }`}
+                          >
+                            <GraduationCap size={15} className={currentUser.role === 'aluno' ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+                            <span>Aluno / Estudante</span>
+                            {currentUser.role === 'aluno' && <Check size={13} className="text-green-600 dark:text-green-400" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSwitchRole('freelancer')}
+                            disabled={currentUser.role === 'freelancer' || switchingRole}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                              currentUser.role === 'freelancer'
+                                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 shadow-2xs cursor-default'
+                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                            }`}
+                          >
+                            <Wrench size={15} className={currentUser.role === 'freelancer' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'} />
+                            <span>Freelancer (PJ)</span>
+                            {currentUser.role === 'freelancer' && <Check size={13} className="text-amber-600 dark:text-amber-400" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSwitchRole('candidato')}
+                            disabled={currentUser.role === 'candidato' || switchingRole}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                              currentUser.role === 'candidato'
+                                ? 'bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-2xs cursor-default'
+                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                            }`}
+                          >
+                            <Briefcase size={15} className={currentUser.role === 'candidato' ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
+                            <span>Candidato (CLT)</span>
+                            {currentUser.role === 'candidato' && <Check size={13} className="text-primary-blue dark:text-blue-400" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end pt-3">

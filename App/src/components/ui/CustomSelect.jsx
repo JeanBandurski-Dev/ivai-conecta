@@ -17,7 +17,7 @@ export default function CustomSelect({
   className = '',
   searchable = false,
   size = 'md', // 'sm' | 'md' | 'lg'
-  name = '',
+  name: _name = '',
   id = ''
 }) {
   const [isOpen, setIsOpen] = useState(false);

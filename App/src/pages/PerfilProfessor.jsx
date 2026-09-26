@@ -1,20 +1,42 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Award, Building2, MapPin, CheckCircle2, ShieldCheck,
-  Edit3, ArrowLeft, BookOpen, GraduationCap, Users, X, Eye, Plus, Trash2, MessageSquare, Calendar
+  Award, Building2, ShieldCheck,
+  Edit3, ArrowLeft, ArrowRight, BookOpen, GraduationCap, Users, Plus, MessageSquare, Calendar
 } from 'lucide-react';
-import { getTeacherById, getTeacherEndorsedStudents, updateTeacherProfile } from '../lib/ivaiConecta';
+import {
+  getTeacherById, getTalents, subscribeToTalents, updateTeacherProfile,
+  subscribeToEndorsementRequests, deduplicateRequestsByStudent,
+  hasTeacherEndorsedStudent, sanitizeUniqueEndorsements, isSameProfessor, getTalentById,
+  uploadUserProfilePicture
+} from '../lib/ivaiConecta';
+import { db } from '../lib/firebase.js';
+import { doc, onSnapshot } from 'firebase/firestore';
 import TalentCard from '../components/TalentCard';
+import EditTeacherProfileModal from '../components/EditTeacherProfileModal';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilProfessor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, showToast, startChatWith } = useAppStore();
+  const { currentUser, showToast, startChatWith, setCurrentUser } = useAppStore();
 
   const teacherId = id || (currentUser?.role === 'professor' ? (currentUser?.uid || currentUser?.id) : null);
-  const teacher = getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
+  const [liveTeacherDoc, setLiveTeacherDoc] = useState(null);
+
+  useEffect(() => {
+    if (!teacherId) return;
+    try {
+      const unsub = onSnapshot(doc(db, 'users', String(teacherId)), (snap) => {
+        if (snap.exists()) {
+          setLiveTeacherDoc({ id: snap.id, firestoreId: snap.id, ...snap.data() });
+        }
+      }, () => {});
+      return () => unsub();
+    } catch {}
+  }, [teacherId]);
+
+  const teacher = liveTeacherDoc || getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
     id: currentUser.uid || currentUser.id,
     firestoreId: currentUser.uid || currentUser.id,
     name: currentUser.name || 'Professor Docente',
@@ -29,8 +51,6 @@ export default function PerfilProfessor() {
     education: currentUser.education || [],
   } : null);
 
-  const endorsedStudents = getTeacherEndorsedStudents(teacher?.email);
-
   const isOwner = Boolean(
     currentUser && teacher && (
       (currentUser.email && teacher?.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
@@ -38,6 +58,88 @@ export default function PerfilProfessor() {
       (currentUser.id != null && String(currentUser.id) === String(teacher?.id))
     )
   );
+
+  const [liveTalents, setLiveTalents] = useState(() => getTalents('Todas as Cidades'));
+  const [pendingRequests, setPendingRequests] = useState([]);
+
+  useEffect(() => {
+    const unsub = subscribeToTalents('Todas as Cidades', (data) => {
+      if (Array.isArray(data)) setLiveTalents(data);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== 'professor' && currentUser.role !== 'docente')) return;
+    const unsub = subscribeToEndorsementRequests(currentUser, (reqs) => {
+      if (Array.isArray(reqs)) {
+        setPendingRequests(deduplicateRequestsByStudent(reqs).filter(r => r.status === 'Pendente'));
+      }
+    });
+    return () => unsub();
+  }, [currentUser]);
+
+  const endorsedStudents = useMemo(() => {
+    if (!teacher) return [];
+    const profEmail = (teacher.email || '').toLowerCase().trim();
+    const profUid = String(teacher.firestoreId || teacher.id || teacher.uid || '');
+
+    // 1. Alunos de liveTalents que já possuem este professor em t.endorsements
+    const matchedFromTalents = (liveTalents || []).filter(t =>
+      hasTeacherEndorsedStudent(t.endorsements || [], teacher) ||
+      (profEmail && t.endorsements?.some(e => (e.profEmail || '').toLowerCase().trim() === profEmail)) ||
+      (profUid && t.endorsements?.some(e => String(e.profUid || '') === profUid))
+    );
+
+    const studentMap = new Map();
+    matchedFromTalents.forEach(s => {
+      const sId = String(s.id || s.firestoreId || s.uid);
+      studentMap.set(sId, s);
+    });
+
+    // 2. Alunos registrados em endorsementResponses no perfil do professor (Firestore)
+    const allResponses = [
+      ...(Array.isArray(teacher.endorsementResponses) ? teacher.endorsementResponses : []),
+      ...(liveTeacherDoc && Array.isArray(liveTeacherDoc.endorsementResponses) ? liveTeacherDoc.endorsementResponses : []),
+      ...(isOwner && currentUser && Array.isArray(currentUser.endorsementResponses) ? currentUser.endorsementResponses : [])
+    ];
+
+    const approvedResponses = allResponses.filter(r => r && r.status === 'Aprovado' && r.studentId);
+
+    approvedResponses.forEach(resp => {
+      const sId = String(resp.studentId);
+      const existing = studentMap.get(sId);
+      const talentBase = existing || (liveTalents || []).find(t => String(t.id) === sId || String(t.firestoreId) === sId) || getTalentById(sId);
+
+      if (talentBase) {
+        const teacherEndorsement = {
+          id: `end_${resp.reqId || resp.timestamp || Date.now()}`,
+          profUid: profUid || String(teacher.id || ''),
+          profName: teacher.name || 'Professor Docente',
+          profEmail: teacher.email || '',
+          institution: teacher.institution || 'IFPR Campus Ivaiporã',
+          discipline: resp.discipline || teacher.discipline || 'Formação Acadêmica',
+          quote: resp.quote || 'Estudante com excelente desempenho acadêmico e postura ética comprovada.',
+          isVerified: true,
+          date: resp.date || new Date().toLocaleDateString('pt-BR'),
+          timestamp: resp.timestamp || Date.now()
+        };
+
+        const existingEndorsements = Array.isArray(talentBase.endorsements) ? talentBase.endorsements : [];
+        const mergedEndorsements = sanitizeUniqueEndorsements([teacherEndorsement, ...existingEndorsements]);
+
+        studentMap.set(sId, {
+          ...talentBase,
+          id: talentBase.id || sId,
+          endorsements: mergedEndorsements,
+          endorsementCount: mergedEndorsements.length,
+          isVerifiedStudent: true
+        });
+      }
+    });
+
+    return Array.from(studentMap.values());
+  }, [liveTalents, teacher, liveTeacherDoc, isOwner, currentUser]);
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);
@@ -56,55 +158,51 @@ export default function PerfilProfessor() {
     newEdu: { degree: '', institution: '', period: '' }
   });
 
+  useEffect(() => {
+    if (teacher && editModal) {
+      setEditData({
+        name: teacher.name || '',
+        avatar: teacher.avatar || '',
+        degree: teacher.degree || '',
+        institution: teacher.institution || 'IFPR Campus Ivaiporã',
+        discipline: teacher.discipline || '',
+        bio: teacher.bio || '',
+        classes: [...(teacher.classes || [])],
+        education: [...(teacher.education || [])],
+        newClass: '',
+        newEdu: { degree: '', institution: '', period: '' }
+      });
+    }
+  }, [teacher, editModal]);
+
   const handleSaveProfile = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!teacher) return;
-    await updateTeacherProfile(teacher.firestoreId || teacher.id, editData);
-    showToast('🎉 Perfil acadêmico e formações atualizados com sucesso!');
+    const targetId = teacher.firestoreId || teacher.id;
+    await updateTeacherProfile(targetId, editData);
+    if (isOwner && currentUser && typeof setCurrentUser === 'function') {
+      setCurrentUser({
+        ...currentUser,
+        ...editData
+      });
+    }
+    showToast('🎉 Perfil acadêmico e matérias atualizados com sucesso!');
     setEditModal(false);
   };
 
-  const addClassItem = () => {
-    if (editData.newClass.trim()) {
-      setEditData(prev => ({
-        ...prev,
-        classes: [...prev.classes, prev.newClass.trim()],
-        newClass: ''
-      }));
+  const handleAvatarFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      showToast('Enviando foto para o Firebase Storage...');
+      const targetId = teacher?.firestoreId || teacher?.id || currentUser?.uid;
+      const res = await uploadUserProfilePicture(file, targetId);
+      if (res.success) {
+        setEditData(d => ({ ...d, avatar: res.url }));
+        showToast('Foto do docente salva com sucesso!');
+      } else {
+        showToast(res.error || 'Erro ao enviar foto.');
+      }
     }
-  };
-
-  const removeClassItem = (cls) => {
-    setEditData(prev => ({
-      ...prev,
-      classes: prev.classes.filter(c => c !== cls)
-    }));
-  };
-
-  const addEducationItem = (e) => {
-    e.preventDefault();
-    if (!editData.newEdu.degree.trim() || !editData.newEdu.institution.trim()) {
-      showToast('Preencha a titulação e a instituição.');
-      return;
-    }
-    const item = {
-      degree: editData.newEdu.degree.trim(),
-      institution: editData.newEdu.institution.trim(),
-      period: editData.newEdu.period.trim() || '2026 à 2030'
-    };
-    setEditData(prev => ({
-      ...prev,
-      education: [item, ...prev.education],
-      newEdu: { degree: '', institution: '', period: '' }
-    }));
-    showToast('Formação acadêmica adicionada!');
-  };
-
-  const removeEducationItem = (idx) => {
-    setEditData(prev => ({
-      ...prev,
-      education: prev.education.filter((_, i) => i !== idx)
-    }));
   };
 
   if (!teacher) {
@@ -155,14 +253,20 @@ export default function PerfilProfessor() {
                   <span>·</span>
                   <span className="flex items-center gap-1.5"><BookOpen size={14} />{teacher.discipline}</span>
                   <span>·</span>
-                  <span className="flex items-center gap-1.5"><Award size={14} className="text-amber-400" />{teacher.endorsementCount || 0} Indicações Concedidas</span>
+                  <span className="flex items-center gap-1.5">
+                    <Award size={14} className="text-amber-400" />
+                    {Math.max(teacher.endorsementCount || 0, endorsedStudents.length)} {Math.max(teacher.endorsementCount || 0, endorsedStudents.length) === 1 ? 'Indicação Concedida' : 'Indicações Concedidas'}
+                  </span>
                 </div>
               </div>
             </div>
 
             {isOwner ? (
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md">
+                <Link to="/minhas-vagas" className="btn btn-teal text-white font-bold btn-sm shadow-md flex items-center gap-1.5 cursor-pointer">
+                  <Award size={15} /> Pareceres de Alunos ({pendingRequests.length})
+                </Link>
+                <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md cursor-pointer">
                   <Edit3 size={15} /> Editar Perfil Acadêmico
                 </button>
               </div>
@@ -184,6 +288,28 @@ export default function PerfilProfessor() {
               </div>
             )}
           </div>
+
+          {/* Banner de Solicitações Pendentes (Visível se houver alunos aguardando) */}
+          {isOwner && pendingRequests.length > 0 && (
+            <div className="mt-6 bg-amber-500/20 border border-amber-400/40 rounded-2xl p-4 sm:p-5 flex items-center justify-between flex-wrap gap-4 shadow-sm backdrop-blur-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center shrink-0 font-bold">
+                  <Award size={22} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-white text-sm sm:text-base">
+                    Você tem {pendingRequests.length} {pendingRequests.length === 1 ? 'aluno aguardando sua recomendação' : 'alunos aguardando sua recomendação'}!
+                  </h4>
+                  <p className="text-xs text-amber-200 mt-0.5">
+                    Estudantes solicitaram seu parecer pedagógico para comprovação curricular e selo verificado.
+                  </p>
+                </div>
+              </div>
+              <Link to="/minhas-vagas" className="btn btn-teal btn-sm font-bold text-xs flex items-center gap-1.5 shadow-md">
+                Avaliar Solicitações no Painel <ArrowRight size={14} />
+              </Link>
+            </div>
+          )}
 
           {/* Abas */}
           <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2">
@@ -243,41 +369,97 @@ export default function PerfilProfessor() {
             <div className="lg:col-span-2 space-y-6">
               
               <div className="card">
-                <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
-                  <GraduationCap size={20} className="text-primary-blue dark:text-blue-400" /> Formações Acadêmicas &amp; Período de Estudo
-                </h3>
-
-                <div className="space-y-4">
-                  {(teacher.education || [
-                    { degree: 'Doutorado em Ciência da Computação', institution: 'Universidade Federal do Paraná (UFPR)', period: '2026 à 2030' },
-                    { degree: 'Mestrado em Engenharia Elétrica & Computação', institution: 'Universidade Estadual de Londrina (UEL)', period: '2022 à 2025' },
-                    { degree: 'Bacharelado em Ciência da Computação', institution: 'Universidade Estadual de Maringá (UEM)', period: '2017 à 2021' }
-                  ]).map((edu, idx) => (
-                    <div key={idx} className="border-l-3 border-primary-blue pl-4 py-1.5 space-y-1 bg-gray-50/50 dark:bg-slate-800/40 p-3 rounded-r-2xl border-y border-r border-gray-100 dark:border-slate-800">
-                      <div className="font-extrabold text-gray-900 dark:text-white text-base">{edu.degree}</div>
-                      <div className="text-xs font-bold text-primary-blue dark:text-blue-400 flex items-center justify-between">
-                        <span className="flex items-center gap-1"><Building2 size={12} /> {edu.institution}</span>
-                        <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                          <Calendar size={11} /> {edu.period || edu.year || '2026 à 2030'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                    <GraduationCap size={20} className="text-primary-blue dark:text-blue-400" /> Formações Acadêmicas &amp; Período de Estudo
+                  </h3>
+                  {isOwner && (
+                    <button
+                      onClick={() => setEditModal(true)}
+                      className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={13} /> Gerenciar Formações
+                    </button>
+                  )}
                 </div>
+
+                {(!teacher.education || teacher.education.length === 0) ? (
+                  <div className="p-4 bg-gray-50 dark:bg-slate-800/60 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 text-center">
+                    <GraduationCap size={28} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                    <p className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      Nenhuma formação acadêmica cadastrada ainda.
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mb-3">
+                      Adicione suas titulações, pós-graduações e períodos acadêmicos para valorizar seu perfil.
+                    </p>
+                    {isOwner && (
+                      <button
+                        onClick={() => setEditModal(true)}
+                        className="btn btn-teal btn-sm text-xs font-bold cursor-pointer"
+                      >
+                        <Plus size={13} /> Adicionar Formação
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {teacher.education.map((edu, idx) => (
+                      <div key={idx} className="border-l-3 border-primary-blue pl-4 py-1.5 space-y-1 bg-gray-50/50 dark:bg-slate-800/40 p-3 rounded-r-2xl border-y border-r border-gray-100 dark:border-slate-800">
+                        <div className="font-extrabold text-gray-900 dark:text-white text-base">{edu.degree}</div>
+                        <div className="text-xs font-bold text-primary-blue dark:text-blue-400 flex items-center justify-between">
+                          <span className="flex items-center gap-1"><Building2 size={12} /> {edu.institution}</span>
+                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                            <Calendar size={11} /> {edu.period || edu.year || 'Período Vigente'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="card">
-                <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white mb-4 flex items-center gap-2">
-                  <BookOpen size={20} className="text-primary-blue dark:text-blue-400" /> Disciplinas Ministradas &amp; Turmas
-                </h3>
-
-                <div className="flex flex-wrap gap-2">
-                  {(teacher.classes || ['Programação de Computadores', 'Redes de Computadores']).map((cls, idx) => (
-                    <span key={idx} className="tag tag-blue text-xs py-1.5 px-3 flex items-center gap-1.5">
-                      <BookOpen size={12} /> {cls}
-                    </span>
-                  ))}
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <h3 className="font-heading text-lg font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                    <BookOpen size={20} className="text-primary-blue dark:text-blue-400" /> Disciplinas Ministradas &amp; Turmas
+                  </h3>
+                  {isOwner && (
+                    <button
+                      onClick={() => setEditModal(true)}
+                      className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={13} /> Gerenciar Matérias
+                    </button>
+                  )}
                 </div>
+
+                {(!teacher.classes || teacher.classes.length === 0) ? (
+                  <div className="p-4 bg-gray-50 dark:bg-slate-800/60 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 text-center">
+                    <BookOpen size={28} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
+                    <p className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      Nenhuma matéria cadastrada ainda.
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mb-3">
+                      Cadastre as matérias que você leciona para que seus estudantes possam selecioná-las ao solicitar pareceres.
+                    </p>
+                    {isOwner && (
+                      <button
+                        onClick={() => setEditModal(true)}
+                        className="btn btn-teal btn-sm text-xs font-bold cursor-pointer"
+                      >
+                        <Plus size={13} /> Adicionar Minhas Matérias
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.classes.map((cls, idx) => (
+                      <span key={idx} className="tag tag-blue text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold">
+                        <BookOpen size={12} /> {cls}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>
@@ -302,9 +484,29 @@ export default function PerfilProfessor() {
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {endorsedStudents.map(student => (
-                  <TalentCard key={student.id} talent={student} />
-                ))}
+                {endorsedStudents.map(student => {
+                  const endorsement = student.endorsements?.find(e => isSameProfessor(e, teacher));
+                  return (
+                    <div key={student.id} className="flex flex-col h-full group">
+                      <TalentCard talent={student} />
+                      {endorsement?.quote && (
+                        <div className="-mt-1.5 mx-1 bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-b-2xl p-3.5 text-xs text-emerald-900 dark:text-emerald-200 shadow-2xs transition-all">
+                          <div className="font-bold flex items-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 mb-1">
+                            <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            Parecer Concedido pelo Docente:
+                          </div>
+                          <p className="italic text-gray-700 dark:text-emerald-100/90 font-medium leading-relaxed">
+                            "{endorsement.quote}"
+                          </p>
+                          <div className="flex items-center justify-between text-[10px] text-emerald-700/80 dark:text-emerald-400/80 mt-2 pt-1.5 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                            <span>Disciplina: <strong className="text-emerald-900 dark:text-emerald-200">{endorsement.discipline || teacher.discipline}</strong></span>
+                            <span>{endorsement.date}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -312,119 +514,15 @@ export default function PerfilProfessor() {
 
       </main>
 
-      {/* Modal: Editar Perfil do Professor */}
-      {editModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setEditModal(false)}>
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-xl p-7 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Editar Perfil &amp; Formações Acadêmicas</h3>
-              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
-            </div>
-
-            <form onSubmit={handleSaveProfile} className="space-y-5">
-              <div className="form-group">
-                <label className="form-label">Link da Foto de Perfil (URL)</label>
-                <input
-                  type="url"
-                  value={editData.avatar}
-                  onChange={e => setEditData(d => ({ ...d, avatar: e.target.value }))}
-                  className="form-control"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Nome Completo</label>
-                <input
-                  type="text"
-                  value={editData.name}
-                  onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Titulação Principal (Exibida no Card)</label>
-                <input
-                  type="text"
-                  value={editData.degree}
-                  onChange={e => setEditData(d => ({ ...d, degree: e.target.value }))}
-                  className="form-control"
-                  placeholder="Ex: Doutor em Ciência da Computação (UFPR)"
-                  required
-                />
-              </div>
-
-              {/* Seção de Formações Acadêmicas Múltiplas com Período */}
-              <div className="space-y-3 border-t border-b border-gray-100 dark:border-slate-800 py-4">
-                <div className="text-sm font-bold text-primary-dark dark:text-white flex items-center gap-1.5">
-                  <GraduationCap size={18} className="text-primary-blue" /> Gerenciar Formações Acadêmicas &amp; Período de Estudo
-                </div>
-
-                <div className="bg-gray-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-gray-200 dark:border-slate-700 space-y-3">
-                  <div className="text-xs font-bold text-primary-blue dark:text-blue-400">Adicionar Nova Formação</div>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={editData.newEdu.degree}
-                      onChange={e => setEditData(d => ({ ...d, newEdu: { ...d.newEdu, degree: e.target.value } }))}
-                      placeholder="Titulação (ex: Doutorado em Ciência da Computação)"
-                      className="form-control text-xs"
-                    />
-                    <input
-                      type="text"
-                      value={editData.newEdu.institution}
-                      onChange={e => setEditData(d => ({ ...d, newEdu: { ...d.newEdu, institution: e.target.value } }))}
-                      placeholder="Instituição (ex: UFPR)"
-                      className="form-control text-xs"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    value={editData.newEdu.period}
-                    onChange={e => setEditData(d => ({ ...d, newEdu: { ...d.newEdu, period: e.target.value } }))}
-                    placeholder="Período de Estudo (ex: 2026 à 2030)"
-                    className="form-control text-xs"
-                  />
-                  <button type="button" onClick={addEducationItem} className="btn btn-teal btn-sm text-xs font-bold">
-                    <Plus size={14} /> Adicionar Formação
-                  </button>
-                </div>
-
-                {/* Lista de Formações */}
-                <div className="space-y-2">
-                  {editData.education.map((edu, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 text-xs">
-                      <div>
-                        <strong className="text-gray-900 dark:text-white">{edu.degree}</strong> — {edu.institution} <span className="text-primary-blue dark:text-blue-400 font-bold">({edu.period || edu.year})</span>
-                      </div>
-                      <button type="button" onClick={() => removeEducationItem(idx)} className="text-red-500 hover:text-red-700 p-1">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Sobre o Docente (Bio Acadêmica)</label>
-                <textarea
-                  value={editData.bio}
-                  onChange={e => setEditData(d => ({ ...d, bio: e.target.value }))}
-                  className="form-control"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setEditModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">Salvar Perfil Docente</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal Padronizado: Editar Perfil do Professor */}
+      <EditTeacherProfileModal
+        isOpen={editModal}
+        onClose={() => setEditModal(false)}
+        editData={editData}
+        setEditData={setEditData}
+        handleSaveProfile={handleSaveProfile}
+        handleAvatarFileChange={handleAvatarFileChange}
+      />
     </>
   );
 }

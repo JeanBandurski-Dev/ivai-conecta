@@ -1,4 +1,4 @@
-export default function SkeletonCard({ type = 'job' }) {
+export default function SkeletonCard({ type: _type = 'job' }) {
   return (
     <div className="card gap-3.5 animate-pulse bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
       <div className="flex items-center justify-between gap-3">
