@@ -99,7 +99,7 @@ export function deduplicateRequestsByStudent(requests) {
 
   for (const req of sorted) {
     if (!req) continue;
-    const studentKey = String(req.studentId || req.studentUid || req.studentEmail || req.studentName || '').toLowerCase().trim();
+    const studentKey = String(req.studentId || req.studentUid || req.studentEmail || '').toLowerCase().trim();
     if (!studentKey) continue;
 
     if (!map.has(studentKey)) {
@@ -128,7 +128,7 @@ export function deduplicateRequestsByTeacher(requests) {
     if (!req) continue;
     const profKey = (req.profEmail && req.profEmail.includes('@'))
       ? req.profEmail.toLowerCase().trim()
-      : String(req.profUid || req.targetTeacherId || req.profName || '').toLowerCase().trim();
+      : String(req.profUid || req.targetTeacherId || '').toLowerCase().trim();
     if (!profKey) continue;
 
     if (!map.has(profKey)) {
@@ -784,18 +784,8 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
       // 2. Match por UID
       if (profUid && rUid && rUid === profUid) return true;
 
-      // 3. Match por Nome (ex: Prof. Joelson vs Joelson)
-      if (profName && rName) {
-        if (rName === profName || profName.includes(rName) || rName.includes(profName)) {
-          return true;
-        }
-      }
-
-      // 4. Comparador de professor unificado
+      // 3. Comparador de professor unificado (UID/Email)
       if (isSameProfessor(r, teacherUserOrEmail)) return true;
-
-      // 5. Fallback permissivo se professor logado e requisição sem e-mail
-      if (!rEmail && profUid) return true;
 
       return false;
     });

@@ -880,12 +880,9 @@ export function getApplicationEligibility(user, jobOrId) {
     const isOwner = Boolean(
       job && (
         (job.createdBy && user.uid && String(job.createdBy) === String(user.uid)) ||
+        (job.companyUid && user.uid && String(job.companyUid) === String(user.uid)) ||
         (job.createdBy && user.id && String(job.createdBy) === String(user.id)) ||
-        (job.createdBy && user.email && String(job.createdBy).toLowerCase() === String(user.email).toLowerCase()) ||
-        (job.recruiterEmail && user.email && job.recruiterEmail.toLowerCase() === user.email.toLowerCase()) ||
-        (user.name && job.company && job.company.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
-        (user.razaoSocial && job.company && job.company.toLowerCase().trim() === user.razaoSocial.toLowerCase().trim()) ||
-        (user.nomeFantasia && job.company && job.company.toLowerCase().trim() === user.nomeFantasia.toLowerCase().trim())
+        (job.companyUid && user.id && String(job.companyUid) === String(user.id))
       )
     );
 

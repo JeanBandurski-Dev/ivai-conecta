@@ -76,19 +76,12 @@ export default function PerfilFreelancer() {
   const providerServices = useMemo(() => {
     if (!freelancer) return [];
     const fUid = String(freelancer.firestoreId || freelancer.id || freelancer.uid || '').trim();
-    const fEmail = String(freelancer.email || '').toLowerCase().trim();
-    const fName = String(freelancer.name || '').toLowerCase().trim();
 
     return allServices.filter(s => {
       const createdBy = String(s.createdBy || '').trim();
-      const providerEmail = String(s.providerEmail || '').toLowerCase().trim();
-      const providerName = String(s.providerName || '').toLowerCase().trim();
+      const providerUid = String(s.providerUid || '').trim();
 
-      return (
-        (fUid && (createdBy === fUid || String(s.providerUid || '') === fUid)) ||
-        (fEmail && (createdBy.toLowerCase() === fEmail || providerEmail === fEmail)) ||
-        (fName && providerName === fName)
-      );
+      return Boolean(fUid && (createdBy === fUid || providerUid === fUid));
     });
   }, [allServices, freelancer]);
 

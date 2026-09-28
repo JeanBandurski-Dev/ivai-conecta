@@ -158,10 +158,6 @@ export function isSameUser(userA, userB) {
   if (userA.id && userB.uid && String(userA.id) === String(userB.uid)) return true;
   if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
   
-  const nameA = (userA.name || userA.razaoSocial || userA.nomeFantasia || userA.company || userA.providerName || '').toLowerCase().trim();
-  const nameB = (userB.name || userB.razaoSocial || userB.nomeFantasia || userB.company || userB.providerName || '').toLowerCase().trim();
-  if (nameA && nameB && nameA === nameB) return true;
-  
   return false;
 }
 

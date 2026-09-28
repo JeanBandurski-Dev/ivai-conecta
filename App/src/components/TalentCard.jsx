@@ -9,13 +9,13 @@ export default function TalentCard({ talent }) {
 
   const isFavorite = isTalentFavorited(talent, favoriteTalents);
 
-  const isSelf = currentUser && (
-    (currentUser.uid && talent.uid && String(currentUser.uid) === String(talent.uid)) ||
-    (currentUser.id && talent.id && String(currentUser.id) === String(talent.id)) ||
-    (currentUser.uid && talent.id && String(currentUser.uid) === String(talent.id)) ||
-    (currentUser.id && talent.uid && String(currentUser.id) === String(talent.uid)) ||
-    (currentUser.email && talent.email && currentUser.email.toLowerCase().trim() === talent.email.toLowerCase().trim()) ||
-    (currentUser.name && name && currentUser.name.toLowerCase().trim() === name.toLowerCase().trim())
+  const isSelf = Boolean(
+    currentUser && (
+      (currentUser.uid && talent.uid && String(currentUser.uid) === String(talent.uid)) ||
+      (currentUser.id && talent.id && String(currentUser.id) === String(talent.id)) ||
+      (currentUser.uid && talent.id && String(currentUser.uid) === String(talent.id)) ||
+      (currentUser.id && talent.uid && String(currentUser.id) === String(talent.uid))
+    )
   );
 
   const handleFavoriteToggle = (e) => {

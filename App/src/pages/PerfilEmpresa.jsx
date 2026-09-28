@@ -74,17 +74,8 @@ export default function PerfilEmpresa() {
       String(id) === 'empresa' ||
       String(id) === String(currentUser.uid) ||
       String(id) === String(currentUser.id) ||
-      (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
-      (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
-      (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase())) ||
-      (currentUser.name && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-      (currentUser.razaoSocial && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-      (currentUser.nomeFantasia && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
-      (company?.name && currentUser?.name && company.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-      (company?.name && currentUser?.razaoSocial && company.name.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-      (company?.name && currentUser?.nomeFantasia && company.name.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim()) ||
-      (company?.email && currentUser?.email && company.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-      (company?.cnpj && currentUser?.cnpj && company.cnpj.replace(/\D/g, '') === currentUser.cnpj.replace(/\D/g, ''))
+      (company?.uid && currentUser.uid && String(company.uid) === String(currentUser.uid)) ||
+      (company?.id && currentUser.id && String(company.id) === String(currentUser.id))
     )
   );
 
@@ -94,13 +85,7 @@ export default function PerfilEmpresa() {
         !id ||
         String(id) === 'empresa' ||
         String(id) === String(currentUser.uid) ||
-        String(id) === String(currentUser.id) ||
-        (currentUser.name && String(id).toLowerCase() === encodeURIComponent(currentUser.name.toLowerCase())) ||
-        (currentUser.razaoSocial && String(id).toLowerCase() === encodeURIComponent(currentUser.razaoSocial.toLowerCase())) ||
-        (currentUser.nomeFantasia && String(id).toLowerCase() === encodeURIComponent(currentUser.nomeFantasia.toLowerCase())) ||
-        (currentUser.name && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-        (currentUser.razaoSocial && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-        (currentUser.nomeFantasia && decodeURIComponent(String(id)).toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+        String(id) === String(currentUser.id)
       )
     );
 
@@ -205,18 +190,15 @@ export default function PerfilEmpresa() {
     if (!j) return false;
     if (isCompanyOwner) {
       return (
-        (currentUser?.uid && j.createdBy === currentUser.uid) ||
-        (currentUser?.id && j.createdBy === currentUser.id) ||
-        (currentUser?.email && j.recruiterEmail === currentUser.email) ||
-        (company.name && j.company && j.company.toLowerCase().trim() === company.name.toLowerCase().trim())
+        (currentUser?.uid && (String(j.createdBy) === String(currentUser.uid) || String(j.companyUid) === String(currentUser.uid))) ||
+        (currentUser?.id && (String(j.createdBy) === String(currentUser.id) || String(j.companyUid) === String(currentUser.id)))
       );
     }
     if (id) {
-      const decoded = decodeURIComponent(id).toLowerCase().trim();
+      const targetId = String(id).trim();
       return (
-        (j.createdBy && String(j.createdBy).toLowerCase() === decoded) ||
-        (company.name && j.company && j.company.toLowerCase().trim() === company.name.toLowerCase().trim()) ||
-        (j.company && j.company.toLowerCase().trim() === decoded)
+        (j.createdBy && String(j.createdBy) === targetId) ||
+        (j.companyUid && String(j.companyUid) === targetId)
       );
     }
     return false;

@@ -52,12 +52,9 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   const isJobOwner = isCompany && currentUser && (
     (job.createdBy && currentUser.uid && String(job.createdBy) === String(currentUser.uid)) ||
+    (job.companyUid && currentUser.uid && String(job.companyUid) === String(currentUser.uid)) ||
     (job.createdBy && currentUser.id && String(job.createdBy) === String(currentUser.id)) ||
-    (job.createdBy && currentUser.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (job.recruiterEmail && currentUser.email && job.recruiterEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser.name && company && company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-    (currentUser.razaoSocial && company && company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-    (currentUser.nomeFantasia && company && company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+    (job.companyUid && currentUser.id && String(job.companyUid) === String(currentUser.id))
   );
 
   const isFavorite = isJobFavorited(job, favoriteJobs);

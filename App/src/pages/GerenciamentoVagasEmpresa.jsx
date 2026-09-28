@@ -291,30 +291,14 @@ export default function GerenciamentoVagasEmpresa() {
     const jobs = Array.isArray(liveJobs) ? liveJobs : [];
     if (!currentUser) return jobs;
 
-    const currentUid = currentUser.uid ? String(currentUser.uid) : null;
-    const currentId = currentUser.id ? String(currentUser.id) : null;
-    const currentEmail = currentUser.email ? String(currentUser.email).toLowerCase() : null;
-    const currentName = currentUser.name ? String(currentUser.name).toLowerCase().trim() : null;
-    const currentCompany = currentUser.company ? String(currentUser.company).toLowerCase().trim() : null;
-    const currentRazao = currentUser.razaoSocial ? String(currentUser.razaoSocial).toLowerCase().trim() : null;
-    const currentNomeFantasia = currentUser.nomeFantasia ? String(currentUser.nomeFantasia).toLowerCase().trim() : null;
+    const currentUid = currentUser.uid ? String(currentUser.uid) : (currentUser.id ? String(currentUser.id) : null);
 
     const userCompanyMatch = jobs.filter(j => {
       if (!j) return false;
       const createdByStr = String(j.createdBy || '');
-      const recruiterEmailStr = String(j.recruiterEmail || '').toLowerCase();
-      const jobCompanyStr = String(j.company || '').toLowerCase().trim();
+      const companyUidStr = String(j.companyUid || '');
 
-      const uidMatch = currentUid && (createdByStr === currentUid);
-      const idMatch = currentId && (createdByStr === currentId);
-      const emailMatch = currentEmail && (createdByStr.toLowerCase() === currentEmail || recruiterEmailStr === currentEmail);
-      const nameMatch = currentName && (jobCompanyStr === currentName || jobCompanyStr.includes(currentName.split(' ')[0]));
-      const companyMatch = currentCompany && (jobCompanyStr === currentCompany || jobCompanyStr.includes(currentCompany));
-      const razaoMatch = currentRazao && (jobCompanyStr === currentRazao || jobCompanyStr.includes(currentRazao));
-      const fantasiaMatch = currentNomeFantasia && (jobCompanyStr === currentNomeFantasia || jobCompanyStr.includes(currentNomeFantasia));
-      const defaultDevMatch = !currentUid && !currentEmail && jobCompanyStr.includes('valetech');
-
-      return uidMatch || idMatch || emailMatch || nameMatch || companyMatch || razaoMatch || fantasiaMatch || defaultDevMatch;
+      return Boolean(currentUid && (createdByStr === currentUid || companyUidStr === currentUid));
     });
 
     if (userCompanyMatch.length > 0) return userCompanyMatch;

@@ -812,13 +812,9 @@ export function subscribeToServiceOrders(user, callback) {
   const filterForUser = (orders) => {
     if (!user) return orders;
     const uid = String(user.uid || user.id || '').trim();
-    const email = String(user.email || '').toLowerCase().trim();
-    const name = String(user.name || '').toLowerCase().trim();
 
     return orders.filter(o => 
-      (uid && (String(o.providerId) === uid || String(o.clientId) === uid)) ||
-      (email && (String(o.providerEmail || '').toLowerCase() === email || String(o.clientEmail || '').toLowerCase() === email)) ||
-      (name && (String(o.providerName || '').toLowerCase() === name || String(o.clientName || '').toLowerCase() === name))
+      Boolean(uid && (String(o.providerId) === uid || String(o.clientId) === uid))
     );
   };
 

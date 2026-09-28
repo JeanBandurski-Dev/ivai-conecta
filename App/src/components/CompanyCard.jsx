@@ -18,13 +18,13 @@ export default function CompanyCard({ company }) {
   const perks = Array.isArray(company.perks) ? company.perks : [];
   const activeJobsCount = company.activeJobsCount ?? (company.activeJobs ? company.activeJobs.length : 0);
 
-  const isOwner = currentUser && currentUser.role === 'empresa' && (
-    (company.uid && currentUser.uid && String(company.uid) === String(currentUser.uid)) ||
-    (company.id && currentUser.id && String(company.id) === String(currentUser.id)) ||
-    (company.id && currentUser.uid && String(company.id) === String(currentUser.uid)) ||
-    (currentUser.name && company.name && currentUser.name.toLowerCase().trim() === company.name.toLowerCase().trim()) ||
-    (currentUser.razaoSocial && company.name && currentUser.razaoSocial.toLowerCase().trim() === company.name.toLowerCase().trim()) ||
-    (currentUser.nomeFantasia && company.name && currentUser.nomeFantasia.toLowerCase().trim() === company.name.toLowerCase().trim())
+  const isOwner = Boolean(
+    currentUser && currentUser.role === 'empresa' && (
+      (company.uid && currentUser.uid && String(company.uid) === String(currentUser.uid)) ||
+      (company.id && currentUser.id && String(company.id) === String(currentUser.id)) ||
+      (company.id && currentUser.uid && String(company.id) === String(currentUser.uid)) ||
+      (company.uid && currentUser.id && String(company.uid) === String(currentUser.id))
+    )
   );
 
   const handleStartChat = (e) => {
@@ -40,6 +40,7 @@ export default function CompanyCard({ company }) {
     startChatWith({
       name,
       email: companyEmail,
+      uid: company.uid || company.id || '',
       role: 'empresa',
       avatar: logo
     }, `Contato com Empresa: ${name}`);

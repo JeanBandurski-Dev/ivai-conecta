@@ -46,11 +46,9 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
   const isOwner = isCompany && currentUser && (
     (job.createdBy && currentUser?.uid && String(job.createdBy) === String(currentUser.uid)) ||
+    (job.companyUid && currentUser?.uid && String(job.companyUid) === String(currentUser.uid)) ||
     (job.createdBy && currentUser?.id && String(job.createdBy) === String(currentUser.id)) ||
-    (job.createdBy && currentUser?.email && String(job.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (currentUser?.name && job.company && job.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-    (currentUser?.razaoSocial && job.company && job.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-    (currentUser?.nomeFantasia && job.company && job.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+    (job.companyUid && currentUser?.id && String(job.companyUid) === String(currentUser.id))
   );
 
   const userUid = currentUser?.uid || currentUser?.id;

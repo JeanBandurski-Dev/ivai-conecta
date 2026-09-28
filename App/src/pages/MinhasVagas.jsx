@@ -113,12 +113,7 @@ export default function MinhasVagas() {
       (j.companyUid && currentUser?.uid && String(j.companyUid) === String(currentUser.uid)) ||
       (j.companyUid && currentUser?.id && String(j.companyUid) === String(currentUser.id)) ||
       (j.createdBy && currentUser?.uid && String(j.createdBy) === String(currentUser.uid)) ||
-      (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id)) ||
-      (j.createdBy && currentUser?.email && String(j.createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-      (currentUser?.email && j.recruiterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
-      (currentUser?.name && j.company && j.company.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
-      (currentUser?.razaoSocial && j.company && j.company.toLowerCase().trim() === currentUser.razaoSocial.toLowerCase().trim()) ||
-      (currentUser?.nomeFantasia && j.company && j.company.toLowerCase().trim() === currentUser.nomeFantasia.toLowerCase().trim())
+      (j.createdBy && currentUser?.id && String(j.createdBy) === String(currentUser.id))
     )
   );
 

@@ -13,11 +13,9 @@ const LIFECYCLE_STEPS = [
 export default function ServiceOrderCard({ order, isProvider, onTransition, onEvaluate }) {
   const { currentUser, startChatWith, showToast } = useAppStore();
 
-  const isActuallyProvider = isProvider || (
+  const isActuallyProvider = isProvider || Boolean(
     currentUser && (
-      (order.providerId && (String(currentUser.uid) === String(order.providerId) || String(currentUser.id) === String(order.providerId))) ||
-      (order.providerEmail && currentUser.email && order.providerEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-      (order.providerName && currentUser.name && order.providerName.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+      (order.providerId && (String(currentUser.uid) === String(order.providerId) || String(currentUser.id) === String(order.providerId)))
     )
   );
 

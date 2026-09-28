@@ -85,10 +85,8 @@ export default function Servicos() {
 
   const { services: all } = useServices('Todas as Cidades');
   const myServices = all.filter(s => 
-    s.createdBy === currentUser?.uid || 
-    s.createdBy === currentUser?.email ||
-    (currentUser?.email && s.providerEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
-    (currentUser?.name && s.providerName?.toLowerCase() === currentUser.name.toLowerCase())
+    (currentUser?.uid && (s.createdBy === currentUser.uid || s.providerUid === currentUser.uid)) ||
+    (currentUser?.id && (s.createdBy === currentUser.id || s.providerUid === currentUser.id))
   );
   const currentService = myServices[0] || null;
 
@@ -144,24 +142,16 @@ export default function Servicos() {
   const receivedOrders = useMemo(() => {
     if (!currentUser) return [];
     const uid = String(currentUser.uid || currentUser.id || '');
-    const email = String(currentUser.email || '').toLowerCase().trim();
-    const name = String(currentUser.name || '').toLowerCase().trim();
     return liveOrders.filter(o =>
-      (uid && String(o.providerId) === uid) ||
-      (email && String(o.providerEmail || '').toLowerCase().trim() === email) ||
-      (name && String(o.providerName || '').toLowerCase().trim() === name)
+      Boolean(uid && String(o.providerId) === uid)
     );
   }, [liveOrders, currentUser]);
 
   const sentOrders = useMemo(() => {
     if (!currentUser) return [];
     const uid = String(currentUser.uid || currentUser.id || '');
-    const email = String(currentUser.email || '').toLowerCase().trim();
-    const name = String(currentUser.name || '').toLowerCase().trim();
     return liveOrders.filter(o =>
-      (uid && String(o.clientId) === uid) ||
-      (email && String(o.clientEmail || '').toLowerCase().trim() === email) ||
-      (name && String(o.clientName || '').toLowerCase().trim() === name)
+      Boolean(uid && String(o.clientId) === uid)
     );
   }, [liveOrders, currentUser]);
 

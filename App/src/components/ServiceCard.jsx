@@ -9,19 +9,20 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const {
     id, title, name, providerName, category, city, rating,
-    reviewsCount, badge, description, providerEmail, avatar, createdBy
+    reviewsCount, badge, description, providerEmail, avatar, createdBy, providerUid
   } = service;
   const { currentUser, showToast, startChatWith, showConfirm } = useAppStore();
 
   const serviceTitle = title || name || category || 'Serviço Profissional';
   const provider = providerName || 'Profissional Regional';
 
-  const isOwner = currentUser && (
-    (createdBy && currentUser.uid && String(createdBy) === String(currentUser.uid)) ||
-    (createdBy && currentUser.id && String(createdBy) === String(currentUser.id)) ||
-    (createdBy && currentUser.email && String(createdBy).toLowerCase() === String(currentUser.email).toLowerCase()) ||
-    (providerEmail && currentUser.email && providerEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-    (currentUser.name && providerName && currentUser.name.toLowerCase().trim() === providerName.toLowerCase().trim())
+  const isOwner = Boolean(
+    currentUser && (
+      (createdBy && currentUser.uid && String(createdBy) === String(currentUser.uid)) ||
+      (createdBy && currentUser.id && String(createdBy) === String(currentUser.id)) ||
+      (providerUid && currentUser.uid && String(providerUid) === String(currentUser.uid)) ||
+      (providerUid && currentUser.id && String(providerUid) === String(currentUser.id))
+    )
   );
 
   const handleDelete = async (e) => {
