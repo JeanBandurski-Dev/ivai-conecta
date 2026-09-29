@@ -555,11 +555,18 @@ export default function PerfilEmpresa() {
                         showToast('⚠️ Você não pode iniciar uma conversa com sua própria empresa.');
                         return;
                       }
-                      const companyEmail = company.email || `${(company.name || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+                      const companyEmail = company.email || company.recruiterEmail || '';
+                      const companyUid = company.uid || company.id || (id !== 'empresa' ? id : '');
+
+                      if (!companyEmail && !companyUid) {
+                        showToast('Esta empresa não possui canal de chat configurado.');
+                        return;
+                      }
                       
                       startChatWith({
                         name: company.name,
                         email: companyEmail,
+                        uid: companyUid,
                         role: 'empresa',
                         avatar: company.logo
                       }, `Contato com Empresa: ${company.name}`);

@@ -190,21 +190,47 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       return;
     }
 
-    // Busca o email real da empresa no banco de usuários
+    // Busca a empresa prioritariamente pelo UID do Firebase
+    const companyUid = job.companyUid || job.createdBy;
     const allUsers = getUsersDB() || [];
-    const companyUser = allUsers.find(u => 
-      u?.name?.toLowerCase().trim() === company?.toLowerCase().trim() ||
-      (job.createdBy && u?.email?.toLowerCase().trim() === String(job.createdBy).toLowerCase().trim())
+    let companyUser = allUsers.find(u => 
+      (companyUid && (String(u?.uid) === String(companyUid) || String(u?.id) === String(companyUid)))
     );
 
-    const targetEmail = companyUser?.email || 
-      (job.recruiterEmail && String(job.recruiterEmail).includes('@') ? job.recruiterEmail : null) || 
-      (job.createdBy && String(job.createdBy).includes('@') ? job.createdBy : null) || 
-      (company ? `${company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+    let targetEmail = companyUser?.email || 
+      (job.recruiterEmail && String(job.recruiterEmail).includes('@') ? job.recruiterEmail : null);
+
+    // Se não encontrou no cache local, busca o documento oficial da empresa no Firestore pelo UID
+    if (!targetEmail && companyUid && typeof companyUid === 'string' && companyUid.length > 5 && !companyUid.includes('@')) {
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const userDoc = await getDoc(doc(db, 'users', companyUid));
+        if (userDoc.exists()) {
+          const uData = userDoc.data();
+          targetEmail = uData.email;
+          if (!companyUser) companyUser = { uid: userDoc.id, ...uData };
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar dados da empresa pelo UID:', err);
+      }
+    }
+
+    if (!targetEmail && (!companyUid || companyUid.includes('@'))) {
+      if (job.createdBy && String(job.createdBy).includes('@')) {
+        targetEmail = job.createdBy;
+      }
+    }
+
+    if (!targetEmail && !companyUid) {
+      showToast('Esta vaga não possui um canal direto de chat disponível no momento.');
+      return;
+    }
 
     const companyTarget = {
       name: company,
-      email: targetEmail,
+      email: targetEmail || '',
+      uid: companyUid || companyUser?.uid || companyUser?.id || '',
       role: 'empresa',
       avatar: companyLogo || companyUser?.avatar || ''
     };

@@ -54,12 +54,20 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
       return;
     }
 
-    const targetEmail = providerEmail || `${provider.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+    const targetEmail = providerEmail || service.providerEmail || '';
+    const targetUid = createdBy || service.providerUid || service.userId || '';
+
+    if (!targetEmail && !targetUid) {
+      showToast('Prestador de serviço não possui canal de chat configurado.');
+      return;
+    }
+
     const draft = `Olá, vi seu anúncio do serviço "${serviceTitle}" no Ivaí Conecta e gostaria de solicitar um orçamento.`;
 
     await startChatWith({
       name: provider,
       email: targetEmail,
+      uid: targetUid,
       role: 'freelancer',
       avatar: avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
     }, `Serviço: ${serviceTitle}`, null, draft);

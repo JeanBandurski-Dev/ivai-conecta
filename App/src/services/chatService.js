@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import {
   collection,
   doc,
+  getDoc,
   addDoc,
   setDoc,
   deleteDoc,
@@ -357,12 +358,28 @@ export function subscribeToUserThreads(userEmail, callback) {
 }
 
 // 2. Escutar as mensagens de uma conversa aberta em TEMPO REAL (Firestore + Local)
-export function subscribeToMessages(chatId, callback) {
+// 2. Escutar as mensagens de uma conversa aberta em TEMPO REAL (Firestore + Local) com validação de participante
+export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
   if (!chatId) return () => { };
+
+  const cleanEmail = currentUserEmail ? currentUserEmail.toLowerCase().trim() : '';
 
   const emitLocal = () => {
     const all = getChatThreads();
     const thread = all.find(t => t.id === chatId);
+    if (!thread) {
+      callback([]);
+      return;
+    }
+
+    // Isolamento estrito de segurança: se o e-mail do usuário logado foi informado,
+    // verifica se ele é realmente um dos participantes cadastrados nesta conversa.
+    if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+      console.warn('[Chat] Acesso negado: usuário não é participante desta conversa.');
+      callback([]);
+      return;
+    }
+
     callback(thread?.messages || []);
   };
 
@@ -402,7 +419,13 @@ export function subscribeToMessages(chatId, callback) {
         const allThreads = getChatThreads();
         const threadIndex = allThreads.findIndex(t => t.id === chatId);
         if (threadIndex !== -1) {
-          const existingMsgs = allThreads[threadIndex].messages || [];
+          const thread = allThreads[threadIndex];
+          // Validação de participante antes de processar
+          if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+            return;
+          }
+
+          const existingMsgs = thread.messages || [];
           const merged = [...existingMsgs];
           let added = false;
 
@@ -511,6 +534,7 @@ export async function sendChatMessage(chatId, senderUser, text) {
       updatedAt: serverTimestamp(),
       ...(currentThread ? {
         participants: currentThread.participants,
+        participantUids: currentThread.participantUids || [],
         participantNames: currentThread.participantNames,
         participantAvatars: currentThread.participantAvatars,
         participantRoles: currentThread.participantRoles,
@@ -528,10 +552,38 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
   }
 
   const user1Email = (currentUser?.email || '').toLowerCase().trim();
-  const user2Email = (targetUser?.email || '').toLowerCase().trim();
+  const currentUid = currentUser?.uid || currentUser?.id || '';
+  const targetUid = targetUser?.uid || targetUser?.id || '';
+  let user2Email = (targetUser?.email || '').toLowerCase().trim();
+
+  // Se o destinatário não possui e-mail no objeto, busca o e-mail real pelo UID no Firestore
+  if ((!user2Email || !user2Email.includes('@')) && targetUid) {
+    try {
+      const userSnap = await getDoc(doc(db, 'users', String(targetUid)));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        user2Email = (uData.email || uData.studentEmail || '').toLowerCase().trim();
+        if (!targetUser.name || targetUser.name === 'Usuário' || targetUser.name === 'Contato' || targetUser.name === 'Prestador de Serviço') {
+          targetUser.name = uData.name || uData.displayName || targetUser.name;
+        }
+        if (!targetUser.avatar) targetUser.avatar = uData.avatar || uData.photoURL || '';
+        if (!targetUser.role) targetUser.role = uData.role || targetUser.role;
+      }
+    } catch (err) {
+      console.warn('[Chat] Não foi possível carregar usuário pelo UID:', err);
+    }
+  }
+
+  if (!user1Email || !user1Email.includes('@')) {
+    throw new Error('Você precisa estar autenticado com um e-mail válido para usar o chat.');
+  }
+
+  if (!user2Email || !user2Email.includes('@')) {
+    throw new Error('O usuário selecionado não possui um canal de mensagens configurado.');
+  }
 
   // Bloqueio rigoroso: ninguém (empresa, freelancer ou aluno) pode criar chat consigo mesmo
-  if (isSameUser(currentUser, targetUser) || (user1Email && user2Email && user1Email === user2Email)) {
+  if (isSameUser(currentUser, targetUser) || user1Email === user2Email) {
     console.warn('[Chat] Tentativa de iniciar conversa consigo mesmo bloqueada.');
     throw new Error('Você não pode iniciar uma conversa consigo mesmo.');
   }
@@ -540,6 +592,8 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
   const sortedEmails = [user1Email, user2Email].sort();
   const chatId = `chat_${sortedEmails[0].replace(/[@.]/g, '_')}_${sortedEmails[1].replace(/[@.]/g, '_')}`;
 
+  const participantUids = [currentUid, targetUid].filter(Boolean);
+
   const allThreads = getChatThreads();
   let thread = allThreads.find(t => t.id === chatId);
 
@@ -547,6 +601,7 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     thread = {
       id: chatId,
       participants: [user1Email, user2Email],
+      participantUids,
       participantNames: {
         [user1Email]: currentUser.name,
         [user2Email]: targetUser.name
@@ -568,6 +623,10 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     allThreads.unshift(thread);
     saveChatThreads(allThreads);
   } else {
+    // Garante sincronização de participantUids
+    if (participantUids.length > 0 && (!thread.participantUids || thread.participantUids.length === 0)) {
+      thread.participantUids = participantUids;
+    }
     if (contextTitle && thread.contextTitle !== contextTitle) {
       thread.contextTitle = contextTitle;
       saveChatThreads(allThreads);
@@ -579,6 +638,7 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     setDoc(doc(db, 'chats', chatId), {
       id: chatId,
       participants: thread.participants,
+      participantUids: thread.participantUids || participantUids,
       participantNames: thread.participantNames,
       participantAvatars: thread.participantAvatars,
       participantRoles: thread.participantRoles,

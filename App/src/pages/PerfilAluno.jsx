@@ -694,9 +694,18 @@ export default function PerfilAluno() {
               {!isOwner && (
                 <button
                   onClick={() => {
+                    const targetEmail = talent.email || talent.studentEmail || '';
+                    const targetUid = talent.uid || talent.id || (id !== 'aluno' ? id : '');
+
+                    if (!targetEmail && !targetUid) {
+                      showToast('Estudante não possui canal de chat configurado.');
+                      return;
+                    }
+
                     startChatWith({
                       name: talent.name,
-                      email: talent.email || 'aluno@ivaiconecta.com.br',
+                      email: targetEmail,
+                      uid: targetUid,
                       role: 'aluno',
                       avatar: talent.avatar || ''
                     }, `Contato Direto: Perfil de ${talent.name}`);

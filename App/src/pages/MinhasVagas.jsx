@@ -864,11 +864,18 @@ export default function MinhasVagas() {
                           <span className="text-[11px] text-gray-400 dark:text-slate-400">Em {app.appliedAt}</span>
                           <button
                             onClick={() => {
-                              const targetEmail = app.recruiterEmail || (app.company ? `${app.company.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br` : 'empresa@ivaiconecta.com.br');
+                              const targetEmail = app.recruiterEmail || '';
+                              const targetUid = app.recruiterUid || app.companyUid || '';
+
+                              if (!targetEmail && !targetUid) {
+                                showToast('Empresa da vaga não possui dados de contato de chat vinculados.');
+                                return;
+                              }
 
                               startChatWith({
                                 name: app.company,
                                 email: targetEmail,
+                                uid: targetUid,
                                 role: 'empresa',
                                 avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
                               }, `Candidatura: ${app.title}`);
@@ -1001,9 +1008,18 @@ export default function MinhasVagas() {
                     <div className="flex items-center gap-2 flex-wrap sm:self-center shrink-0">
                       <button
                         onClick={() => {
+                          const candEmail = cand.candidateEmail || cand.email || '';
+                          const candUid = cand.candidateUid || cand.candidateId || cand.id || '';
+
+                          if (!candEmail && !candUid) {
+                            showToast('Candidato não possui canal de chat configurado.');
+                            return;
+                          }
+
                           startChatWith({
                             name: cand.candidateName || cand.name || 'Candidato',
-                            email: cand.candidateEmail || cand.email,
+                            email: candEmail,
+                            uid: candUid,
                             role: 'aluno',
                             avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
                           }, `Processo Seletivo: ${selectedJobApplicants.title}`);

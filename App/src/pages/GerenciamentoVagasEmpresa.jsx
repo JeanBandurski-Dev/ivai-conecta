@@ -986,9 +986,13 @@ export default function GerenciamentoVagasEmpresa() {
       msg = `Olá ${selectedCandidate.name}! Sua entrevista para a vaga de ${currentJob.title} foi agendada para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
     }
 
+    const candEmail = selectedCandidate.candidateEmail || selectedCandidate.email || '';
+    const candUid = selectedCandidate.candidateUid || selectedCandidate.candidateId || selectedCandidate.uid || selectedCandidate.id || '';
+
     startChatWith({
       name: selectedCandidate.name,
-      email: selectedCandidate.email || 'aluno@ivaiconecta.com.br',
+      email: candEmail,
+      uid: candUid,
       role: 'aluno',
       avatar: selectedCandidate.avatar
     }, `Entrevista: ${currentJob.title}`, isAlteration ? null : msg, isAlteration ? msg : null);
@@ -1542,9 +1546,13 @@ export default function GerenciamentoVagasEmpresa() {
                       if (platform.includes('Google Meet')) window.open('https://meet.google.com/new', '_blank');
                       else if (platform.includes('Teams')) window.open('https://teams.microsoft.com/', '_blank');
 
+                      const candEmail = activeCand.candidateEmail || activeCand.email || '';
+                      const candUid = activeCand.candidateUid || activeCand.candidateId || activeCand.uid || activeCand.id || '';
+
                       startChatWith({
                         name: activeCand.name,
-                        email: activeCand.email || 'aluno@ivaiconecta.com.br',
+                        email: candEmail,
+                        uid: candUid,
                         role: 'aluno',
                         avatar: activeCand.avatar
                       }, `Entrevista: ${currentJob?.title}`, `Olá ${activeCand.name}! Nossa entrevista está começando. \nPor favor, acesse o link abaixo para entrar na sala oficial:\n\n[COLE O LINK DA REUNIÃO AQUI]`);
@@ -2229,9 +2237,12 @@ export default function GerenciamentoVagasEmpresa() {
                                                 {/* Chat Button */}
                                                 <button
                                                   onClick={() => {
+                                                    const candEmail = cand.candidateEmail || cand.email || '';
+                                                    const candUid = cand.candidateUid || cand.candidateId || cand.uid || cand.id || '';
                                                     startChatWith({
                                                       name: cand.name,
-                                                      email: cand.email || 'aluno@ivaiconecta.com.br',
+                                                      email: candEmail,
+                                                      uid: candUid,
                                                       role: 'aluno',
                                                       avatar: cand.avatar
                                                     }, `Processo Seletivo: ${currentJob?.title || 'Vaga'}`);
@@ -2340,9 +2351,12 @@ export default function GerenciamentoVagasEmpresa() {
                                     </button>
                                     <button
                                       onClick={() => {
+                                        const candEmail = cand.candidateEmail || cand.email || '';
+                                        const candUid = cand.candidateUid || cand.candidateId || cand.uid || cand.id || '';
                                         startChatWith({
                                           name: cand.name,
-                                          email: cand.email || 'aluno@ivaiconecta.com.br',
+                                          email: candEmail,
+                                          uid: candUid,
                                           role: 'aluno',
                                           avatar: cand.avatar
                                         }, `Processo Seletivo: ${currentJob?.title || 'Vaga'}`);
@@ -3376,7 +3390,8 @@ export default function GerenciamentoVagasEmpresa() {
                                   onClick={() => {
                                     startChatWith({
                                       name: cand.name,
-                                      email: cand.email || 'aluno@ivaiconecta.com.br',
+                                      email: cand.candidateEmail || cand.email || '',
+                                      uid: cand.candidateUid || cand.candidateId || cand.uid || cand.id || '',
                                       role: 'aluno',
                                       avatar: cand.avatar
                                     }, `Entrevista: ${cand.jobTitle}`);
@@ -3575,7 +3590,8 @@ export default function GerenciamentoVagasEmpresa() {
                                         onClick={() => {
                                           startChatWith({
                                             name: cand.name,
-                                            email: cand.email || 'aluno@ivaiconecta.com.br',
+                                            email: cand.candidateEmail || cand.email || '',
+                                            uid: cand.candidateUid || cand.candidateId || cand.uid || cand.id || '',
                                             role: 'aluno',
                                             avatar: cand.avatar
                                           }, `Entrevista: ${cand.jobTitle}`);
@@ -4236,9 +4252,12 @@ export default function GerenciamentoVagasEmpresa() {
                     <div className="flex items-center gap-2 flex-wrap mt-3">
                       <button
                         onClick={() => {
+                          const candEmail = selectedCandidate.candidateEmail || selectedCandidate.email || '';
+                          const candUid = selectedCandidate.candidateUid || selectedCandidate.candidateId || selectedCandidate.uid || selectedCandidate.id || '';
                           startChatWith({
                             name: selectedCandidate.name,
-                            email: selectedCandidate.email || 'aluno@ivaiconecta.com.br',
+                            email: candEmail,
+                            uid: candUid,
                             role: 'aluno',
                             avatar: selectedCandidate.avatar
                           }, `Processo Seletivo: ${currentJob?.title || 'Vaga'}`);
@@ -4436,9 +4455,12 @@ export default function GerenciamentoVagasEmpresa() {
                                 if (platform.includes('Google Meet')) window.open('https://meet.google.com/new', '_blank');
                                 else if (platform.includes('Teams')) window.open('https://teams.microsoft.com/', '_blank');
 
+                                const candEmail = selectedCandidate.candidateEmail || selectedCandidate.email || '';
+                                const candUid = selectedCandidate.candidateUid || selectedCandidate.candidateId || selectedCandidate.uid || selectedCandidate.id || '';
                                 startChatWith({
                                   name: selectedCandidate.name,
-                                  email: selectedCandidate.email || 'aluno@ivaiconecta.com.br',
+                                  email: candEmail,
+                                  uid: candUid,
                                   role: 'aluno',
                                   avatar: selectedCandidate.avatar
                                 }, `Entrevista: ${currentJob?.title}`, `Olá ${selectedCandidate.name}! Nossa entrevista está começando. \nPor favor, acesse o link abaixo para entrar na sala oficial:\n\n[COLE O LINK DA REUNIÃO AQUI]`);

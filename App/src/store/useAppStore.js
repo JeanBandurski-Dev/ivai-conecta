@@ -70,10 +70,14 @@ const useAppStore = create((set, get) => ({
 
     const unsubscribe = watchAuthState((user) => {
       clearTimeout(safetyTimer);
+      const prevUser = get().currentUser;
+      const userChanged = (!prevUser && user) || (prevUser && !user) || (prevUser && user && (prevUser.uid !== user.uid || prevUser.email !== user.email));
+
       set({
         currentUser: user,
         authLoading: false,
         isAuthReady: true,
+        ...(userChanged ? { activeChatThreadId: null, isChatOpen: false, chatDraftMessage: null } : {})
       });
       get().syncUserFavorites(user);
     });
@@ -87,7 +91,7 @@ const useAppStore = create((set, get) => ({
   login: async (email, password) => {
     const result = await libLogin(email, password);
     if (result.success) {
-      set({ currentUser: result.user, authLoading: false });
+      set({ currentUser: result.user, authLoading: false, activeChatThreadId: null, isChatOpen: false });
       get().syncUserFavorites(result.user);
     }
     return result;
@@ -96,7 +100,7 @@ const useAppStore = create((set, get) => ({
   register: async (data) => {
     const result = await libRegister(data);
     if (result.success) {
-      set({ currentUser: result.user, authLoading: false });
+      set({ currentUser: result.user, authLoading: false, activeChatThreadId: null, isChatOpen: false });
       get().syncUserFavorites(result.user);
     }
     return result;
@@ -105,7 +109,7 @@ const useAppStore = create((set, get) => ({
   loginWithGoogle: async () => {
     const result = await libLoginGoogle();
     if (result.success) {
-      set({ currentUser: result.user, authLoading: false });
+      set({ currentUser: result.user, authLoading: false, activeChatThreadId: null, isChatOpen: false });
       get().syncUserFavorites(result.user);
     }
     return result;
@@ -124,7 +128,15 @@ const useAppStore = create((set, get) => ({
     await libLogout();
     const guestJobs = getFavoriteJobs(null);
     const guestTalents = getFavoriteTalents(null);
-    set({ currentUser: null, authLoading: false, favoriteJobs: guestJobs, favoriteTalents: guestTalents });
+    set({
+      currentUser: null,
+      authLoading: false,
+      favoriteJobs: guestJobs,
+      favoriteTalents: guestTalents,
+      isChatOpen: false,
+      activeChatThreadId: null,
+      chatDraftMessage: null
+    });
   },
 
   setCurrentUser: (user) => {
@@ -249,7 +261,7 @@ const useAppStore = create((set, get) => ({
       return chatId;
     } catch (error) {
       console.error('Erro ao iniciar chat: ', error);
-      get().showToast('Não foi possível abrir o chat no momento.');
+      get().showToast(error?.message || 'Não foi possível abrir o chat no momento.');
       return null;
     }
   },

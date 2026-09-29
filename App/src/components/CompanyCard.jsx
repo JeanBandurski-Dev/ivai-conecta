@@ -36,11 +36,18 @@ export default function CompanyCard({ company }) {
       return;
     }
 
-    const companyEmail = company.email || `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@ivaiconecta.com.br`;
+    const companyEmail = company.email || company.recruiterEmail || '';
+    const companyUid = company.uid || company.id || '';
+
+    if (!companyEmail && !companyUid) {
+      showToast('Empresa não possui canal de chat configurado.');
+      return;
+    }
+
     startChatWith({
       name,
       email: companyEmail,
-      uid: company.uid || company.id || '',
+      uid: companyUid,
       role: 'empresa',
       avatar: logo
     }, `Contato com Empresa: ${name}`);

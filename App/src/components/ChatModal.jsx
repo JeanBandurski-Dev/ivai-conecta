@@ -13,6 +13,8 @@ import {
   getThreadUnreadCount
 } from '../services/chatService';
 import { getUsersDB } from '../lib/ivaiConecta';
+import { db } from '../lib/firebase';
+import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 
 function getOtherParticipant(thread, currentUser) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
@@ -35,9 +37,22 @@ export default function ChatModal({ onClose }) {
   const [loading, setLoading] = useState(true);
   const [showNewChat, setShowNewChat] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(Boolean(activeChatThreadId));
+  const [remoteUsers, setRemoteUsers] = useState([]);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // Carrega lista de usuários reais do Firestore para novos contatos
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'users'), limit(50));
+      const unsub = onSnapshot(q, (snap) => {
+        const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+        setRemoteUsers(users);
+      }, () => {});
+      return () => unsub();
+    } catch { }
+  }, []);
 
   useEffect(() => {
     if (activeChatThreadId) {
@@ -62,7 +77,12 @@ export default function ChatModal({ onClose }) {
   }, [chatDraftMessage, setChatDraftMessage]);
 
   useEffect(() => {
-    if (!currentUser?.email) return;
+    if (!currentUser?.email) {
+      setThreads([]);
+      setActiveThreadId(null);
+      setLoading(false);
+      return;
+    }
 
     const unsubscribe = subscribeToUserThreads(currentUser.email, (liveChats) => {
       setThreads(liveChats || []);
@@ -75,31 +95,37 @@ export default function ChatModal({ onClose }) {
           }
           return liveChats[0].id;
         });
+      } else {
+        setActiveThreadId(null);
       }
     });
 
     return () => unsubscribe();
   }, [currentUser?.email]);
 
+  // Conversa ativa validada: garante que o thread selecionado pertence exclusivamente ao usuário atual
+  const activeThread = threads.find(t => t.id === activeThreadId);
+  const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
+
   useEffect(() => {
-    if (!activeThreadId) {
+    if (!activeThreadId || !currentUser?.email || !activeThread) {
       setMessages([]);
       return;
     }
 
     const unsubscribe = subscribeToMessages(activeThreadId, (liveMessages) => {
       setMessages(liveMessages || []);
-    });
+    }, currentUser.email);
 
     return () => unsubscribe();
-  }, [activeThreadId]);
+  }, [activeThreadId, currentUser?.email, Boolean(activeThread)]);
 
   // Marca conversa ativa como lida
   useEffect(() => {
-    if (activeThreadId && currentUser?.email) {
+    if (activeThreadId && currentUser?.email && activeThread) {
       markThreadAsRead(activeThreadId, currentUser.email);
     }
-  }, [activeThreadId, currentUser?.email, messages]);
+  }, [activeThreadId, currentUser?.email, messages, Boolean(activeThread)]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,7 +133,7 @@ export default function ChatModal({ onClose }) {
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
-    if (!messageInput.trim() || !activeThreadId) return;
+    if (!messageInput.trim() || !activeThreadId || !activeThread) return;
 
     const text = messageInput.trim();
     setMessageInput('');
@@ -136,13 +162,12 @@ export default function ChatModal({ onClose }) {
       if (remaining.length === 0) setMobileShowChat(false);
     }
   };
-  const activeThread = threads.find(t => t.id === activeThreadId);
-  const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
-  const allUsers = getUsersDB() || [];
+  const allUsers = remoteUsers.length > 0 ? remoteUsers : (getUsersDB() || []);
   const myEmail = currentUser?.email?.toLowerCase().trim();
   const availableContacts = allUsers.filter(u => 
     !isSameUser(currentUser, u) && 
+    u.email &&
     !matchesUserEmail(u.email, myEmail)
   );
 

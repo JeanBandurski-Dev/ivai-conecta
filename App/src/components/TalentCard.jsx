@@ -133,9 +133,18 @@ export default function TalentCard({ talent }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              const targetEmail = talent.email || talent.studentEmail || '';
+              const targetUid = talent.uid || talent.id || '';
+
+              if (!targetEmail && !targetUid) {
+                showToast('Perfil de talento não possui dados de contato vinculados.');
+                return;
+              }
+
               startChatWith({
                 name,
-                email: talent.email || 'aluno@ivaiconecta.com.br',
+                email: targetEmail,
+                uid: targetUid,
                 role: 'aluno',
                 avatar
               }, `Contato com Talento: ${name}`);
