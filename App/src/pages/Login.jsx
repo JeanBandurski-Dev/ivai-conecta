@@ -148,6 +148,11 @@ export default function Login() {
       }
     }
 
+    if (regName.trim().length > 70) {
+      setAlert('O nome informado deve ter no máximo 70 caracteres.');
+      return;
+    }
+
     setLoading(true);
     const res = await register({
       name: regName.trim(),
@@ -665,6 +670,7 @@ export default function Login() {
                       onChange={e => setRegName(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 text-gray-900 dark:text-white transition-all duration-200 placeholder:text-gray-400 placeholder:font-normal"
                       placeholder={selectedRole === 'empresa' ? 'Ex: ValeTech Ltda' : 'Seu nome completo'}
+                      maxLength={70}
                       required
                     />
                   </div>

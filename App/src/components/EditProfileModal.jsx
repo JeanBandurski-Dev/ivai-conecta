@@ -281,6 +281,7 @@ export default function EditProfileModal({
                     onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
                     className="form-control text-xs sm:text-sm font-semibold"
                     placeholder="Seu nome completo"
+                    maxLength={70}
                     required
                   />
                 </div>

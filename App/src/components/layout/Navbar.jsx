@@ -173,7 +173,7 @@ export default function Navbar() {
                             </div>
                           )}
                         </div>
-                        <div className="overflow-hidden">
+                        <div className="overflow-hidden min-w-0 flex-1">
                           <div className="font-semibold text-sm text-gray-800 dark:text-white truncate">{currentUser.name}</div>
                           <div className="text-xs text-primary-blue dark:text-blue-400 font-medium mt-0.5 truncate">{currentUser.badge}</div>
                         </div>
@@ -319,7 +319,7 @@ export default function Navbar() {
                         </div>
                       )}
                     </div>
-                    <div className="overflow-hidden">
+                    <div className="overflow-hidden min-w-0 flex-1">
                       <div className="font-semibold text-base text-gray-800 dark:text-white truncate">{currentUser.name}</div>
                       <div className="text-xs text-primary-blue dark:text-blue-400 font-medium truncate">{currentUser.badge}</div>
                     </div>

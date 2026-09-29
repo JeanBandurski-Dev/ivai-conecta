@@ -654,6 +654,7 @@ export async function login(email, password) {
 export async function register(data) {
   const { email, name, city, role, password } = data;
   const cleanEmail = email.toLowerCase().trim();
+  const cleanName = (name || '').trim().slice(0, 70);
   const selectedRole = role || 'aluno';
   const roleMeta = USER_ROLES[selectedRole] || USER_ROLES.aluno;
 
@@ -759,7 +760,7 @@ export async function register(data) {
     const profileData = {
       id: fbUser.uid,
       uid: fbUser.uid,
-      name,
+      name: cleanName,
       email: cleanEmail,
       emailVerified: selectedRole === 'aluno' ? false : true,
       city: city || 'Ivaiporã',
@@ -906,9 +907,10 @@ export async function completeUserProfile(uid, additionalData) {
       auth.currentUser?.email?.toLowerCase() === candidateEmail
     );
     const isStudentVerified = Boolean(additionalData.role === 'aluno' && studentCheck.isValid && isOwnerEmailVerified);
+    const cleanName = typeof additionalData.name === 'string' ? additionalData.name.trim().slice(0, 70) : additionalData.name;
 
     const payload = {
-      name: additionalData.name,
+      name: cleanName,
       email: email,
       city: additionalData.city,
       role: additionalData.role,
@@ -1445,11 +1447,19 @@ export function updateAuthUser(data, userOverride = null) {
     }
   }
 
-  const newRole = data.role ? String(data.role).toLowerCase().trim() : (data.activeRole || data.selectedRole || (current.role ? String(current.role).toLowerCase().trim() : null));
+  const sanitizedData = { ...data };
+  if (typeof sanitizedData.name === 'string') {
+    sanitizedData.name = sanitizedData.name.trim().slice(0, 70);
+  }
+  if (typeof sanitizedData.tradingName === 'string') {
+    sanitizedData.tradingName = sanitizedData.tradingName.trim().slice(0, 70);
+  }
+
+  const newRole = sanitizedData.role ? String(sanitizedData.role).toLowerCase().trim() : (sanitizedData.activeRole || sanitizedData.selectedRole || (current.role ? String(current.role).toLowerCase().trim() : null));
   const roleMeta = newRole ? (USER_ROLES[newRole] || USER_ROLES.aluno) : null;
   const updated = {
     ...current,
-    ...data,
+    ...sanitizedData,
     ...(newRole ? {
       role: newRole,
       activeRole: newRole,

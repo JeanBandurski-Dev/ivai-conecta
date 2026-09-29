@@ -362,6 +362,7 @@ export default function EditCompanyProfileModal({
                     onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
                     placeholder="Ex: Ivaí Tech Soluções em TI Ltda"
                     className="form-control text-xs font-semibold"
+                    maxLength={70}
                     required
                   />
                 </div>
@@ -376,6 +377,7 @@ export default function EditCompanyProfileModal({
                     onChange={e => setEditData(d => ({ ...d, tradingName: e.target.value }))}
                     placeholder="Ex: Ivaí Tech"
                     className="form-control text-xs font-semibold"
+                    maxLength={70}
                     required
                   />
                 </div>

@@ -460,9 +460,9 @@ export default function PerfilEmpresa() {
               </div>
 
               {/* Informações Textuais */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0 flex-1 max-w-full">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white tracking-tight drop-shadow-sm">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white tracking-tight drop-shadow-sm break-words [overflow-wrap:anywhere] max-w-full">
                     {company.name}
                   </h1>
                   {company.blocked || company.status === 'blocked' || (isCompanyOwner && (currentUser?.blocked || currentUser?.status === 'blocked')) ? (

@@ -579,7 +579,7 @@ export default function PerfilAluno() {
           </button>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex flex-wrap items-center gap-5 sm:gap-6">
+            <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 max-w-full flex-1">
               <div className="relative group shrink-0">
                 <img
                   src={talent.avatar || defaultAvatar}
@@ -597,9 +597,9 @@ export default function PerfilAluno() {
                 )}
               </div>
 
-              <div>
+              <div className="min-w-0 flex-1 max-w-full">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">{talent.name}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white break-words [overflow-wrap:anywhere] max-w-full">{talent.name}</h1>
                   {talent.isVerifiedStudent ? (
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-xs">
                       <ShieldCheck size={13} className="text-emerald-400" /> Estudante Verificado

@@ -210,6 +210,14 @@ export default function Configuracoes() {
 
   const handleSaveAccount = async (e) => {
     e.preventDefault();
+    if (!name || !name.trim()) {
+      showToast('Por favor, informe seu nome ou razão social.', 'error');
+      return;
+    }
+    if (name.trim().length > 70) {
+      showToast('O nome deve ter no máximo 70 caracteres.', 'error');
+      return;
+    }
     const roleBadges = {
       candidato: 'Candidato / Profissional',
       freelancer: 'Prestador de Serviço Autônomo',
@@ -658,6 +666,7 @@ export default function Configuracoes() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     className="form-control"
+                    maxLength={70}
                     required
                   />
                 </div>

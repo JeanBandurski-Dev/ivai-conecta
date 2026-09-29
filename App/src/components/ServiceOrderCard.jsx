@@ -75,7 +75,7 @@ export default function ServiceOrderCard({ order, isProvider, onTransition, onEv
       
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1 max-w-full">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs font-bold text-primary-blue bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
               {order.serviceTitle || 'Serviço Profissional'}
@@ -84,7 +84,7 @@ export default function ServiceOrderCard({ order, isProvider, onTransition, onEv
               Solicitado em: {order.createdAt || 'Hoje'}
             </span>
           </div>
-          <h3 className="font-heading font-bold text-lg text-gray-900 dark:text-white">
+          <h3 className="font-heading font-bold text-lg text-gray-900 dark:text-white break-words [overflow-wrap:anywhere]">
             {isActuallyProvider ? `Cliente: ${order.clientName || 'Cliente'}` : `Prestador: ${order.providerName || 'Profissional'}`}
           </h3>
           <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-slate-400 mt-1 flex-wrap">

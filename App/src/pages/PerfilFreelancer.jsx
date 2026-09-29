@@ -352,9 +352,9 @@ export default function PerfilFreelancer() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0 flex-1 max-w-full">
                   <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                    <h1 className="text-2xl sm:text-3xl font-bold font-heading text-gray-900 dark:text-white">
+                    <h1 className="text-2xl sm:text-3xl font-bold font-heading text-gray-900 dark:text-white break-words [overflow-wrap:anywhere] max-w-full">
                       {profileName}
                     </h1>
                     {freelancer.cnpj ? (

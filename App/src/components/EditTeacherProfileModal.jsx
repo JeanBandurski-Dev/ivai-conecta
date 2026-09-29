@@ -285,6 +285,7 @@ export default function EditTeacherProfileModal({
                     onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
                     placeholder="Ex: Prof. Dr. Carlos Eduardo"
                     className="form-control text-xs font-semibold"
+                    maxLength={70}
                     required
                   />
                 </div>

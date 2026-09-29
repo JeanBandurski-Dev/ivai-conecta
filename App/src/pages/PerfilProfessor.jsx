@@ -231,16 +231,16 @@ export default function PerfilProfessor() {
           </button>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex flex-wrap items-center gap-5 sm:gap-6">
+            <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 flex-1 max-w-full">
               <img
                 src={teacher.avatar}
                 alt={teacher.name}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
               />
 
-              <div>
+              <div className="min-w-0 flex-1 max-w-full">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">{teacher.name}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white break-words [overflow-wrap:anywhere] max-w-full">{teacher.name}</h1>
                   <span className="bg-green-500/20 text-green-300 border border-green-400/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                     <ShieldCheck size={13} /> Docente Verificado
                   </span>

@@ -290,10 +290,10 @@ export default function ChatModal({ onClose }) {
                 <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/30 dark:bg-slate-800/30 shrink-0">
                   <div className="flex items-center gap-3">
                     <img src={otherPerson.avatar} alt={otherPerson.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
-                    <div>
-                      <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
-                        {otherPerson.name}
-                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
+                        <span className="truncate">{otherPerson.name}</span>
+                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full shrink-0">
                           Online
                         </span>
                       </div>

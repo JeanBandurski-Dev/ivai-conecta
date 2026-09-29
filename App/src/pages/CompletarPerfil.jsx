@@ -112,6 +112,11 @@ export default function CompletarPerfil() {
       return;
     }
 
+    if (name.trim().length > 70) {
+      setAlert('O nome ou razão social deve ter no máximo 70 caracteres.');
+      return;
+    }
+
     if (selectedRole === 'empresa') {
       const cleanDigits = cleanCNPJ(cnpj);
       if (!cleanDigits || cleanDigits.length !== 14) {
@@ -428,6 +433,7 @@ export default function CompletarPerfil() {
               onChange={e => setName(e.target.value)}
               className="form-control"
               placeholder="Ex: Lucas Eduardo Silva ou ValeTech Soluções"
+              maxLength={70}
               required
             />
           </div>

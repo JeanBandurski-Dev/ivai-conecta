@@ -225,6 +225,7 @@ export default function EditFreelancerProfileModal({
                       onChange={e => setEditData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Ex: João da Silva / Silva Eletricista"
                       className="input w-full text-xs font-semibold rounded-xl"
+                      maxLength={70}
                     />
                   </div>
 
