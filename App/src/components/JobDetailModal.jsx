@@ -7,7 +7,8 @@ import {
 import useAppStore from '../store/useAppStore';
 import {
   applyToJob, calculateMatchScore, isSkillMatch, getUsersDB,
-  updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications
+  updateJobStatus, safeSkillsArray, getUserApplications, subscribeToApplications,
+  DEFAULT_COMPANY_LOGO
 } from '../lib/ivaiConecta';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
@@ -210,7 +211,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
           <div className="flex items-start gap-4 sm:gap-5">
             <img
-              src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+              src={companyLogo || DEFAULT_COMPANY_LOGO}
               alt={company}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white dark:bg-slate-800"
             />

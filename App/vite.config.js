@@ -4,8 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
 import path from 'node:path'
 import dns from 'node:dns'
+import nodemailer from 'nodemailer'
+
+import { fileURLToPath } from 'node:url'
 
 dns.setDefaultResultOrder('ipv4first')
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 function localChatSyncPlugin() {
   let serverThreads = [];
@@ -39,33 +45,35 @@ function localChatSyncPlugin() {
               if (payload.action === 'SYNC_ALL' && Array.isArray(payload.threads)) {
                 payload.threads.forEach(t => {
                   const idx = serverThreads.findIndex(st => st.id === t.id);
-                  if (idx === -1) {
-                    serverThreads.push(t);
+                  if (idx >= 0) {
+                    serverThreads[idx] = { ...serverThreads[idx], ...t };
                   } else {
-                    const existingMsgs = serverThreads[idx].messages || [];
-                    const incomingMsgs = t.messages || [];
-                    const mergedMsgs = [...existingMsgs];
-                    incomingMsgs.forEach(im => {
-                      if (!mergedMsgs.some(em => em.id === im.id || (em.text === im.text && em.timestamp === im.timestamp))) {
-                        mergedMsgs.push(im);
-                      }
-                    });
-                    serverThreads[idx] = { ...serverThreads[idx], ...t, messages: mergedMsgs };
+                    serverThreads.push(t);
                   }
                 });
-              } else if (payload.action === 'MESSAGE' && payload.chatId && payload.message) {
-                const idx = serverThreads.findIndex(st => st.id === payload.chatId);
-                if (idx !== -1) {
-                  const current = serverThreads[idx];
-                  if (!current.messages.some(m => m.id === payload.message.id || (m.text === payload.message.text && m.timestamp === payload.message.timestamp))) {
-                    current.messages.push(payload.message);
-                  }
-                  current.lastMessage = payload.message.text;
-                  current.lastMessageAt = payload.message.timestamp;
-                  current.updatedAt = Date.now();
-                } else if (payload.thread) {
-                  serverThreads.unshift(payload.thread);
+              } else if (payload.action === 'SEND_MESSAGE' && payload.threadId && payload.message) {
+                let thread = serverThreads.find(st => st.id === payload.threadId);
+                if (!thread) {
+                  thread = {
+                    id: payload.threadId,
+                    contactName: payload.contactName || 'Contato',
+                    contactRole: payload.contactRole || 'recrutador',
+                    contactAvatar: payload.contactAvatar || '',
+                    messages: [],
+                    unreadCount: 0,
+                    lastUpdated: new Date().toISOString()
+                  };
+                  serverThreads.push(thread);
                 }
+                const msg = {
+                  ...payload.message,
+                  id: payload.message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                  timestamp: payload.message.timestamp || new Date().toISOString()
+                };
+                thread.messages = [...(thread.messages || []), msg];
+                thread.lastMessage = msg.text;
+                thread.lastTime = 'Agora';
+                thread.lastUpdated = new Date().toISOString();
               } else if (payload.action === 'DELETE_THREAD' && payload.threadId) {
                 serverThreads = serverThreads.filter(st => st.id !== payload.threadId);
               }
@@ -88,26 +96,38 @@ function localChatSyncPlugin() {
 
 function loadEnvFile() {
   const envVars = { ...process.env };
-  try {
-    const envFile = path.resolve(process.cwd(), '.env');
-    if (fs.existsSync(envFile)) {
-      const content = fs.readFileSync(envFile, 'utf-8');
-      content.split('\n').forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx !== -1) {
-          const key = trimmed.slice(0, eqIdx).trim();
-          let val = trimmed.slice(eqIdx + 1).trim();
-          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.slice(1, -1);
+  const possiblePaths = [
+    path.resolve(__dirname, '.env'),
+    path.resolve(__dirname, '.env.local'),
+    path.resolve(process.cwd(), 'App/.env'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(__dirname, '../.env'),
+  ];
+
+  for (const envFile of possiblePaths) {
+    try {
+      if (fs.existsSync(envFile)) {
+        const content = fs.readFileSync(envFile, 'utf-8');
+        content.split('\n').forEach(line => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) return;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            let val = trimmed.slice(eqIdx + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            if (val) {
+              envVars[key] = val;
+            }
           }
-          envVars[key] = val;
-        }
-      });
+        });
+      }
+    } catch (err) {
+      console.warn('[vite] Erro ao ler .env em', envFile, err);
     }
-  } catch (err) {
-    console.warn('[vite] Erro ao ler .env:', err);
   }
   return envVars;
 }
@@ -171,8 +191,8 @@ function emailVerificationPlugin() {
 
             if (smtpHost && smtpUser && smtpPass) {
               try {
-                const nodemailer = await import('nodemailer');
-                const transporter = nodemailer.createTransport({
+                const mailer = nodemailer.createTransport ? nodemailer : (nodemailer.default || nodemailer);
+                const transporter = mailer.createTransport({
                   host: smtpHost || 'smtp.gmail.com',
                   port: smtpPort || 587,
                   secure: smtpPort === 465,
@@ -180,9 +200,9 @@ function emailVerificationPlugin() {
                     user: smtpUser,
                     pass: smtpPass
                   },
-                  connectionTimeout: 4000,
-                  greetingTimeout: 4000,
-                  socketTimeout: 5000,
+                  connectionTimeout: 10000,
+                  greetingTimeout: 10000,
+                  socketTimeout: 15000,
                   tls: {
                     rejectUnauthorized: false
                   }

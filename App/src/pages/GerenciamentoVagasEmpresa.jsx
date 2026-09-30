@@ -17,7 +17,8 @@ import {
   getJobCandidates, updateCandidateStage, updateCandidateData,
   scheduleCandidateInterview, SELECTION_STAGES,
   getCompanyCustomStages, saveCompanyCustomStages, getJobCustomStages,
-  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem
+  saveJobCustomStages, CITIES, reorderCandidateStage, sanitizeStageItem,
+  DEFAULT_AVATAR
 } from '../lib/ivaiConecta';
 import { subscribeToJobs } from '../services/jobsService';
 import useAppStore from '../store/useAppStore';
@@ -999,7 +1000,7 @@ export default function GerenciamentoVagasEmpresa() {
       course: newCandidateForm.course,
       institution: newCandidateForm.institution,
       city: newCandidateForm.city,
-      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250`,
+      avatar: DEFAULT_AVATAR,
       matchScore: Number(newCandidateForm.matchScore) || 85,
       stage: addCandidateTargetStage,
       appliedAt: new Date().toLocaleDateString('pt-BR'),

@@ -13,7 +13,8 @@ import {
   validateSkill,
   validateBenefit,
   validateProfessionalText,
-  getJobDescriptionTemplate
+  getJobDescriptionTemplate,
+  DEFAULT_COMPANY_LOGO
 } from '../lib/ivaiConecta';
 
 const SUGGESTED_SKILLS = [
@@ -373,7 +374,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
 
     try {
       const companyName = currentUser?.company || currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Regional';
-      const companyLogo = currentUser?.avatar || currentUser?.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250';
+      const companyLogo = currentUser?.avatar || currentUser?.logo || DEFAULT_COMPANY_LOGO;
       const userUid = currentUser?.uid || currentUser?.id || currentUser?.email || 'empresa';
 
       created = await addJob({
@@ -451,7 +452,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   // Componente de Prévia em Tempo Real Renderizado Dinamicamente
   const renderLivePreview = () => {
     const companyName = currentUser?.name || currentUser?.company || 'Minha Empresa';
-    const companyLogo = currentUser?.avatar || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150';
+    const companyLogo = currentUser?.avatar || DEFAULT_COMPANY_LOGO;
     const displayTitle = form.title.trim() || 'Título do Cargo / Função';
     const displaySalary = form.salary.trim() || 'A Combinar';
     const displayCity = form.city || 'Ivaiporã';

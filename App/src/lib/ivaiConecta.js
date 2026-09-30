@@ -14,3 +14,4 @@ export * from '../services/jobTaxonomy';
 export * from '../services/companiesService';
 export * from '../services/emailVerificationService';
 export * from '../utils/searchUtils';
+export * from '../utils/defaultAssets';

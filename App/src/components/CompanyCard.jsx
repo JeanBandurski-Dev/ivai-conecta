@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, ShieldCheck, Briefcase, Star, MessageSquare, ArrowRight } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
+import { DEFAULT_COMPANY_LOGO } from '../lib/ivaiConecta';
 
 export default function CompanyCard({ company }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -9,7 +10,7 @@ export default function CompanyCard({ company }) {
 
   const id = company.id || company.uid || encodeURIComponent(company.name);
   const name = company.name || 'Empresa Regional';
-  const logo = company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200';
+  const logo = company.logo || DEFAULT_COMPANY_LOGO;
   const city = company.city || 'Ivaiporã';
   const sector = company.sector || 'Comércio & Serviços';
   const isVerified = Boolean(company.isVerified || company.cnpj);
@@ -55,7 +56,7 @@ export default function CompanyCard({ company }) {
             alt={name}
             className="w-12 h-12 rounded-2xl object-cover border border-gray-200 dark:border-slate-700 shadow-xs shrink-0 bg-white p-0.5"
             onError={(e) => {
-              e.target.src = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200';
+              e.target.src = DEFAULT_COMPANY_LOGO;
             }}
           />
           <div className="min-w-0">

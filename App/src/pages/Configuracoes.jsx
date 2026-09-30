@@ -21,7 +21,8 @@ import {
   sendEmailVerificationToUser,
   refreshEmailVerificationStatus,
   updateUserPassword,
-  isGoogleOnlyAuthUser
+  isGoogleOnlyAuthUser,
+  DEFAULT_AVATAR
 } from '../lib/ivaiConecta';
 
 export default function Configuracoes() {
@@ -35,7 +36,7 @@ export default function Configuracoes() {
   const [email, setEmail] = useState(currentUser?.email || '');
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
   const [github, setGithub] = useState(currentUser?.github || '');
-  const [avatar, setAvatar] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250');
+  const [avatar, setAvatar] = useState(currentUser?.avatar || DEFAULT_AVATAR);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Verification form (Student)

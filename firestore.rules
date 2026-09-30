@@ -188,5 +188,14 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAuthenticated() && request.auth.uid == teacherId;
     }
+
+    // Coleção de Verificação de E-mail (códigos OTP)
+    match /email_verifications/{verifId} {
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid == verifId ||
+        request.resource.data.email == request.auth.token.email ||
+        resource.data.email == request.auth.token.email
+      );
+    }
   }
 }

@@ -78,10 +78,10 @@
 /* ─── Custom Component Classes ────────────────────────────── */
 @layer components {
 
-  /* ── Container / Layout (Centered firmly in screen) ── */
+  /* ── Container / Layout (Distributed and spacious across widescreen displays) ── */
   .container {
     width: 100%;
-    max-width: 1140px; /* Levemente mais concentrado no meio da tela */
+    max-width: 1536px;
     margin-left: auto;
     margin-right: auto;
     padding-left: 1.5rem;

@@ -4,7 +4,7 @@ import {
   Search, X, Sparkles, RotateCcw,
   ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap
 } from 'lucide-react';
-import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES, matchCity } from '../lib/ivaiConecta';
+import { getTalents, getVerifiedTeachers, getTeacherEndorsedStudents, CITIES, matchCity, DEFAULT_AVATAR } from '../lib/ivaiConecta';
 import { subscribeToTalents, subscribeToTeachers } from '../services/talentsService.js';
 import TalentCard from '../components/TalentCard';
 import useAppStore from '../store/useAppStore';
@@ -431,7 +431,7 @@ export default function BancoDeTalentos() {
                 getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
                   <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
-                      <img src={student.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
+                      <img src={student.avatar || DEFAULT_AVATAR} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
                       <div>
                         <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
                         <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>

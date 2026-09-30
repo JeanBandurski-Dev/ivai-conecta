@@ -16,6 +16,7 @@ import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS } from '../data/seedData.js'
 import { validateProfessionalText, validateJobTitle, validateSkill, hasProfanity } from './jobTaxonomy.js';
 import { calculateMatchScore, safeSkillsArray } from './matchService.js';
 import { matchCity } from '../utils/searchUtils.js';
+import { DEFAULT_AVATAR } from '../utils/defaultAssets.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
@@ -903,7 +904,7 @@ export function getJobCandidates(jobId) {
             course: app.candidateCourse || 'Análise e Desenvolvimento de Sistemas',
             institution: app.candidateInstitution || 'IFPR Campus Ivaiporã',
             city: app.candidateCity || 'Ivaiporã',
-            avatar: app.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            avatar: app.candidateAvatar || DEFAULT_AVATAR,
             matchScore: computedScore,
             stage: app.stage || stageMap[app.status] || 'triagem',
             appliedAt: app.appliedAt || new Date().toLocaleDateString('pt-BR'),

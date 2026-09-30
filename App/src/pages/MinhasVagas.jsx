@@ -9,7 +9,7 @@ import {
   getUserApplications, getJobs,
   updateJobStatus, deleteJob, getEndorsementRequests,
   approveEndorsementRequest, rejectEndorsementRequest, safeSkillsArray,
-  isJobFavorited
+  isJobFavorited, DEFAULT_AVATAR, DEFAULT_COMPANY_LOGO
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants } from '../services/jobsService.js';
 import useAppStore from '../store/useAppStore';
@@ -615,7 +615,7 @@ export default function MinhasVagas() {
                                 name: app.company,
                                 email: targetEmail,
                                 role: 'empresa',
-                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                                avatar: app.companyLogo || DEFAULT_COMPANY_LOGO
                               }, `Candidatura: ${app.title}`);
                             }}
                             className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs rounded-xl"
@@ -719,7 +719,7 @@ export default function MinhasVagas() {
                             name: cand.candidateName || cand.name || 'Candidato',
                             email: cand.candidateEmail || cand.email,
                             role: 'aluno',
-                            avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                            avatar: cand.candidateAvatar || cand.avatar || DEFAULT_AVATAR
                           }, `Processo Seletivo: ${selectedJobApplicants.title}`);
                           setSelectedJobApplicants(null);
                         }}

@@ -23,6 +23,7 @@ import {
   STORAGE_KEY_CITY,
   USER_ROLES,
 } from '../data/seedData';
+import { DEFAULT_AVATAR } from '../utils/defaultAssets.js';
 
 export function getUsersDB() {
   if (typeof localStorage === 'undefined') return [];
@@ -119,6 +120,12 @@ export async function login(email, password) {
     const role = profileRes.profile?.role || 'aluno';
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
+    const isEmailVerified = Boolean(
+      fbUser.emailVerified ||
+      profileRes.profile?.emailVerified ||
+      getAuthUser()?.emailVerified
+    );
+
     const sessionUser = {
       uid: fbUser.uid,
       id: fbUser.uid,
@@ -131,7 +138,7 @@ export async function login(email, password) {
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
       ...(profileRes.profile || {}),
-      emailVerified: Boolean(fbUser.emailVerified),
+      emailVerified: isEmailVerified,
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -224,7 +231,7 @@ export async function register(data) {
       city: city || 'Ivaiporã',
       role: selectedRole,
       badge: roleMeta.badge,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: DEFAULT_AVATAR,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...roleSpecific
@@ -288,6 +295,12 @@ export async function loginWithGoogle() {
     const role = profileRes.profile?.role || 'aluno';
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
+    const isEmailVerified = Boolean(
+      fbUser.emailVerified ||
+      profileRes.profile?.emailVerified ||
+      getAuthUser()?.emailVerified
+    );
+
     const sessionUser = {
       uid: fbUser.uid,
       id: fbUser.uid,
@@ -296,11 +309,11 @@ export async function loginWithGoogle() {
       city: profileRes.profile?.city || 'Ivaiporã',
       role,
       badge: roleMeta.badge,
-      avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: fbUser.photoURL || profileRes.profile?.avatar || DEFAULT_AVATAR,
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? false,
       isVerifiedCompany: role === 'empresa',
       ...(profileRes.profile || {}),
-      emailVerified: Boolean(fbUser.emailVerified),
+      emailVerified: isEmailVerified,
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -313,7 +326,7 @@ export async function loginWithGoogle() {
 export async function completeUserProfile(uid, additionalData) {
   try {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
-    const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+    const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || DEFAULT_AVATAR;
 
     const payload = {
       name: additionalData.name,
@@ -491,6 +504,13 @@ export function watchAuthState(callback) {
 
           const role = profileRes.profile?.role || 'aluno';
           const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+          const cachedLocal = getAuthUser();
+          const isEmailVerified = Boolean(
+            fbUser.emailVerified ||
+            profileRes.profile?.emailVerified ||
+            (cachedLocal?.uid === fbUser.uid && cachedLocal?.emailVerified)
+          );
+
           const sessionUser = {
             uid: fbUser.uid,
             id: fbUser.uid,
@@ -499,11 +519,11 @@ export function watchAuthState(callback) {
             city: profileRes.profile?.city || 'Ivaiporã',
             role,
             badge: roleMeta.badge,
-            avatar: profileRes.profile?.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            avatar: profileRes.profile?.avatar || fbUser.photoURL || DEFAULT_AVATAR,
             isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? false : true),
             isVerifiedCompany: profileRes.profile?.isVerifiedCompany ?? (role === 'empresa'),
             ...(profileRes.profile || {}),
-            emailVerified: Boolean(fbUser.emailVerified),
+            emailVerified: isEmailVerified,
           };
           localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
           callback(sessionUser);
@@ -631,12 +651,20 @@ export async function sendEmailVerificationToUser() {
 export async function refreshEmailVerificationStatus() {
   try {
     const user = auth.currentUser;
-    if (!user) {
-      const local = getAuthUser();
-      return { success: true, emailVerified: Boolean(local?.emailVerified) };
+    const local = getAuthUser();
+    let verified = Boolean(local?.emailVerified);
+
+    if (user) {
+      try {
+        await reload(user);
+        if (user.emailVerified) verified = true;
+      } catch {}
+
+      const profileRes = await getUserProfile(user.uid);
+      if (profileRes.profile?.emailVerified) {
+        verified = true;
+      }
     }
-    await reload(user);
-    const verified = Boolean(user.emailVerified);
     const updated = updateAuthUser({ emailVerified: verified });
     return { success: true, emailVerified: verified, user: updated };
   } catch (error) {

@@ -99,6 +99,86 @@ export async function uploadUserProfilePicture(file, uid) {
 }
 
 /**
+ * Faz o upload da foto de capa / banner do perfil para o Firebase Storage.
+ * @param {File} file - Arquivo de imagem selecionado
+ * @param {string} uid - Identificador único do usuário
+ * @returns {Promise<{success: boolean, url?: string, error?: string}>}
+ */
+export async function uploadUserCoverPicture(file, uid) {
+  if (!file) {
+    return { success: false, error: 'Nenhum arquivo de imagem foi selecionado.' };
+  }
+
+  const maxSizeBytes = 8 * 1024 * 1024; // 8MB para capas
+  if (file.size > maxSizeBytes) {
+    return { success: false, error: 'A imagem de capa excede o limite de 8MB.' };
+  }
+
+  if (!file.type.startsWith('image/')) {
+    return { success: false, error: 'Formato inválido. Por favor, envie uma imagem (JPG, PNG, WEBP).' };
+  }
+
+  const cleanUid = String(uid || 'anon_' + Date.now());
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const filePath = `users/${cleanUid}/banner_${Date.now()}.${fileExt}`;
+  const storageRef = ref(storage, filePath);
+
+  const readLocalDataUrl = () => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+
+  try {
+    const metadata = {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: cleanUid,
+        uploadedAt: new Date().toISOString()
+      }
+    };
+
+    const cloudUpload = (async () => {
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      return await getDownloadURL(snapshot.ref);
+    })();
+
+    const timeoutLimit = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('storage/timeout')), 3500)
+    );
+
+    const downloadUrl = await Promise.race([cloudUpload, timeoutLimit]);
+
+    try {
+      await setDoc(doc(db, 'users', cleanUid), {
+        banner: downloadUrl,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (dbErr) {
+      console.warn('[Storage] Aviso ao atualizar banner no Firestore:', dbErr.message);
+    }
+
+    updateAuthUser({ banner: downloadUrl });
+    return { success: true, url: downloadUrl };
+  } catch (error) {
+    console.warn('[Firebase Storage] Fallback ativado para banner:', error.message);
+    const localDataUrl = await readLocalDataUrl();
+    if (localDataUrl) {
+      updateAuthUser({ banner: localDataUrl });
+      try {
+        await setDoc(doc(db, 'users', cleanUid), {
+          banner: localDataUrl,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch {}
+      return { success: true, url: localDataUrl, warning: 'Capa salva localmente.' };
+    }
+    return { success: false, error: 'Não foi possível carregar a imagem de capa.' };
+  }
+}
+
+/**
  * Faz o upload de documentos comprobatórios (Declaração Estudantil, Cartão CNPJ, Currículo PDF).
  * @param {File} file - Arquivo (PDF ou Imagem)
  * @param {string} uid - Identificador do usuário

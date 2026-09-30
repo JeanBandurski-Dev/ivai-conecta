@@ -4,7 +4,7 @@ import {
   Globe, CheckCircle2, Sparkles, Save, FolderGit2, Link2,
   User, Code2, Check, ExternalLink, AlertCircle
 } from 'lucide-react';
-import { validateSkill } from '../lib/ivaiConecta';
+import { validateSkill, DEFAULT_AVATAR } from '../lib/ivaiConecta';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -207,7 +207,7 @@ export default function EditProfileModal({
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="relative group shrink-0">
                     <img
-                      src={editData.avatar || AVATAR_PRESETS[0]}
+                      src={editData.avatar || DEFAULT_AVATAR}
                       alt="Pré-visualização"
                       className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800"
                     />

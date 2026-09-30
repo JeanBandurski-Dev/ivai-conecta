@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle, Bookmark, MessageSquare } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { isTalentFavorited } from '../lib/ivaiConecta';
+import { isTalentFavorited, DEFAULT_AVATAR } from '../lib/ivaiConecta';
 
 export default function TalentCard({ talent }) {
   const { favoriteTalents = [], toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
@@ -31,7 +31,7 @@ export default function TalentCard({ talent }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <img
-            src={avatar}
+            src={avatar || DEFAULT_AVATAR}
             alt={name}
             className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
           />
@@ -60,7 +60,17 @@ export default function TalentCard({ talent }) {
       {/* Endorsements, Student Verification Badges & Social Links */}
       <div className="flex items-center justify-between gap-1.5 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {talent.isVerifiedStudent && (
+          {talent.role === 'candidato' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 rounded-full">
+              Candidato / Profissional
+            </span>
+          )}
+          {talent.role === 'freelancer' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-full">
+              Freelancer
+            </span>
+          )}
+          {(!talent.role || talent.role === 'aluno') && talent.isVerifiedStudent && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-full">
               <CheckCircle size={11} /> Matrícula Verificada
             </span>
@@ -135,10 +145,10 @@ export default function TalentCard({ talent }) {
               e.stopPropagation();
               startChatWith({
                 name,
-                email: talent.email || 'aluno@ivaiconecta.com.br',
-                role: 'aluno',
+                email: talent.email || 'contato@ivaiconecta.com.br',
+                role: talent.role || 'candidato',
                 avatar
-              }, `Contato com Talento: ${name}`);
+              }, `Contato com ${name}`);
             }}
             className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"
             title={`Iniciar Chat com ${name}`}

@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare
+  Building2, Menu, X, Sun, Moon, MessageSquare
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
 import { subscribeToUnreadCount } from '../../services/chatService';
+import { DEFAULT_AVATAR } from '../../lib/ivaiConecta';
 
 export default function Navbar() {
   const { currentUser, theme, toggleTheme, logout, showToast, openChat } = useAppStore();
@@ -70,7 +71,7 @@ export default function Navbar() {
     const userIdentifier = currentUser.uid || currentUser.id;
     if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
     if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
-    if (userRole === 'freelancer') return '/servicos?view=dashboard';
+    if (userRole === 'freelancer') return userIdentifier ? `/freelancer/${userIdentifier}` : '/freelancer';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
@@ -136,12 +137,8 @@ export default function Navbar() {
                     className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary-blue dark:hover:border-blue-400 transition-colors duration-200 bg-white dark:bg-slate-800 shadow-xs cursor-pointer"
                     aria-label="Menu do usuário"
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
-                      {currentUser.avatar ? (
-                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <User size={15} className="text-primary-blue dark:text-blue-400" />
-                      )}
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-primary-blue/20 shrink-0">
+                      <img src={currentUser.avatar || DEFAULT_AVATAR} alt={currentUser.name} className="w-full h-full object-cover" />
                     </div>
                     <span className="text-sm font-semibold text-gray-700 dark:text-slate-200 max-w-[120px] truncate">
                       {currentUser.name.split(' ')[0]}
@@ -152,14 +149,8 @@ export default function Navbar() {
                   {dropdownOpen && (
                     <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                          {currentUser.avatar ? (
-                            <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
-                              {currentUser.name.charAt(0)}
-                            </div>
-                          )}
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 border border-primary-blue/30 shrink-0">
+                          <img src={currentUser.avatar || DEFAULT_AVATAR} alt={currentUser.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="overflow-hidden">
                           <div className="font-semibold text-sm text-gray-800 dark:text-white truncate">{currentUser.name}</div>
@@ -170,7 +161,7 @@ export default function Navbar() {
                       <div className="py-2">
                         <Link to={getProfileLink()} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Painel Freelancer' : 'Meu Perfil'}
+                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Perfil Freelancer' : 'Meu Perfil'}
                         </Link>
 
                         {(currentUser.role === 'aluno' || currentUser.role === 'candidato') && (
@@ -188,24 +179,12 @@ export default function Navbar() {
                         )}
 
                         {currentUser.role === 'empresa' && (
-                          <>
-                            <Link to="/gerenciamento-vagas" onClick={() => setDropdownOpen(false)}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                              <Building2 size={15} /> Gestão de Vagas &amp; Funil ATS
-                            </Link>
-                            <Link to="/talentos" onClick={() => setDropdownOpen(false)}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                              <Star size={15} /> Banco de Talentos
-                            </Link>
-                          </>
-                        )}
-
-                        {currentUser.role === 'freelancer' && (
-                          <Link to="/servicos?action=new" onClick={() => setDropdownOpen(false)}
+                          <Link to="/gerenciamento-vagas" onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                            <PlusCircle size={15} /> Cadastrar Novo Serviço
+                            <Building2 size={15} /> Gestão de Vagas &amp; Funil ATS
                           </Link>
                         )}
+
                       </div>
 
                       <div className="border-t border-gray-100 dark:border-slate-700 py-1.5">
@@ -272,14 +251,8 @@ export default function Navbar() {
                 <>
                   <div className="border-t border-gray-100 dark:border-slate-800 my-2.5" />
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                      {currentUser.avatar ? (
-                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
-                          {currentUser.name.charAt(0)}
-                        </div>
-                      )}
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 border border-primary-blue/30 shrink-0">
+                      <img src={currentUser.avatar || DEFAULT_AVATAR} alt={currentUser.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="overflow-hidden">
                       <div className="font-semibold text-base text-gray-800 dark:text-white truncate">{currentUser.name}</div>
@@ -322,6 +295,8 @@ export default function Navbar() {
                       <span className="flex items-center gap-2.5"><Building2 size={16} /> Gestão de Vagas &amp; Funil ATS</span>
                     </NavLink>
                   )}
+
+
 
                   <NavLink to="/configuracoes" className={mobileNavLinkClass} onClick={closeMobile}>
                     <span className="flex items-center gap-2.5"><Settings size={16} /> Configurações</span>

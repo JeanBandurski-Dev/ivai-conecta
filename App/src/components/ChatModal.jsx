@@ -12,14 +12,14 @@ import {
   markThreadAsRead,
   getThreadUnreadCount
 } from '../services/chatService';
-import { getUsersDB } from '../lib/ivaiConecta';
+import { getUsersDB, DEFAULT_AVATAR } from '../lib/ivaiConecta';
 
 function getOtherParticipant(thread, currentUser) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
   const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) || thread.lastSenderEmail || '';
   
   const name = thread.participantNames?.[otherEmail] || thread.participantName || 'Contato';
-  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || DEFAULT_AVATAR;
   const role = thread.participantRoles?.[otherEmail] || thread.participantRole || 'Usuário Conectado';
 
   return { email: otherEmail, name, avatar, role };
@@ -216,7 +216,7 @@ export default function ChatModal({ onClose }) {
                       }}
                       className="w-full text-left p-2 rounded-xl hover:bg-primary-blue/10 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer border border-transparent hover:border-primary-blue/20"
                     >
-                      <img src={c.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={c.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                      <img src={c.avatar || DEFAULT_AVATAR} alt={c.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{c.name}</div>
                         <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{c.email}</div>
@@ -393,7 +393,7 @@ export default function ChatModal({ onClose }) {
                       }}
                       className="p-3 bg-gray-50 dark:bg-slate-800/80 hover:bg-primary-blue/5 dark:hover:bg-primary-blue/10 border border-gray-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group"
                     >
-                      <img src={contact.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={contact.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      <img src={contact.avatar || DEFAULT_AVATAR} alt={contact.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="font-bold text-xs text-gray-900 dark:text-white truncate group-hover:text-primary-blue transition-colors">
                           {contact.name}

@@ -1,7 +1,7 @@
 import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
-import { calculateMatchScore, safeSkillsArray, isJobFavorited, getUserApplications } from '../lib/ivaiConecta';
+import { calculateMatchScore, safeSkillsArray, isJobFavorited, getUserApplications, DEFAULT_COMPANY_LOGO } from '../lib/ivaiConecta';
 
 export default function JobCard({ job, matchScore, onSelect }) {
   const { currentUser, favoriteJobs = [], toggleFavoriteJob, showToast } = useAppStore();
@@ -80,7 +80,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
             <img
-              src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+              src={companyLogo || DEFAULT_COMPANY_LOGO}
               alt={company}
               className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800 shadow-2xs"
             />

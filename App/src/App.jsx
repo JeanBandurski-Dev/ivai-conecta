@@ -20,6 +20,7 @@ const BancoDeTalentos = lazy(() => import('./pages/BancoDeTalentos'));
 const PerfilAluno = lazy(() => import('./pages/PerfilAluno'));
 const PerfilEmpresa = lazy(() => import('./pages/PerfilEmpresa'));
 const PerfilProfessor = lazy(() => import('./pages/PerfilProfessor'));
+const PerfilFreelancer = lazy(() => import('./pages/PerfilFreelancer'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const MinhasVagas = lazy(() => import('./pages/MinhasVagas'));
 const GerenciamentoVagasEmpresa = lazy(() => import('./pages/GerenciamentoVagasEmpresa'));
@@ -31,6 +32,20 @@ function MinhasVagasRoute() {
     return <GerenciamentoVagasEmpresa />;
   }
   return <MinhasVagas />;
+}
+
+function PerfilRoute() {
+  const { currentUser } = useAppStore();
+  if (currentUser?.role === 'empresa') {
+    return <PerfilEmpresa />;
+  }
+  if (currentUser?.role === 'professor') {
+    return <PerfilProfessor />;
+  }
+  if (currentUser?.role === 'freelancer') {
+    return <PerfilFreelancer />;
+  }
+  return <PerfilAluno />;
 }
 
 export default function App() {
@@ -88,8 +103,10 @@ export default function App() {
                 <Route path="/vagas"            element={<Vagas />} />
                 <Route path="/servicos"         element={<Servicos />} />
                 <Route path="/talentos"         element={<BancoDeTalentos />} />
-                <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+                <Route path="/perfil"           element={<ProtectedRoute><PerfilRoute /></ProtectedRoute>} />
                 <Route path="/perfil/:id"       element={<PerfilAluno />} />
+                <Route path="/freelancer"       element={<ProtectedRoute><PerfilFreelancer /></ProtectedRoute>} />
+                <Route path="/freelancer/:id"   element={<PerfilFreelancer />} />
                 <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
                 <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
                 <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />

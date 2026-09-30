@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, HelpCircle
+  BarChart3, CheckCircle2, AlertCircle, HelpCircle, User
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { getServices, addService, updateService, CITIES, maskPhone, matchCity } from '../lib/ivaiConecta';
@@ -262,9 +262,14 @@ export default function Servicos() {
                     </div>
                   </div>
 
-                  <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
-                    <Edit3 size={15} /> Editar Dados &amp; Localização
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link to="/freelancer" className="btn btn-secondary btn-sm font-bold shadow-xs flex items-center gap-1.5">
+                      <User size={15} /> Meu Perfil Freelancer
+                    </Link>
+                    <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-1.5">
+                      <Edit3 size={15} /> Editar Dados &amp; Localização
+                    </button>
+                  </div>
                 </div>
 
                 {/* CARDS DE ANALYTICS / DESEMPENHO DE VENDAS */}

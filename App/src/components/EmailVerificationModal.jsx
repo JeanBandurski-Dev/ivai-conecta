@@ -98,10 +98,39 @@ export default function EmailVerificationModal({ isOpen, onClose, onVerified }) 
     }
   };
 
+  const handlePaste = (e, targetIndex = 0) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData?.getData('text') || '';
+    const cleanVal = pastedText.replace(/\D/g, '');
+    if (!cleanVal) return;
+
+    const newDigits = [...digits];
+    // Se o usuário colou 6 dígitos ou estava no primeiro campo, preenche desde o início
+    const startIndex = cleanVal.length >= 6 ? 0 : targetIndex;
+    const chars = cleanVal.slice(0, 6 - startIndex).split('');
+
+    chars.forEach((char, i) => {
+      const pos = startIndex + i;
+      if (pos < 6) {
+        newDigits[pos] = char;
+      }
+    });
+
+    setDigits(newDigits);
+
+    // Focar no último campo preenchido ou no próximo vazio
+    const lastFilled = Math.min(startIndex + chars.length - 1, 5);
+    const nextEmpty = newDigits.findIndex(d => !d);
+    const focusIndex = nextEmpty !== -1 ? nextEmpty : lastFilled;
+    setTimeout(() => {
+      inputRefs.current[focusIndex]?.focus();
+    }, 10);
+  };
+
   const handleDigitChange = (index, value) => {
     const cleanVal = value.replace(/\D/g, '');
 
-    // Se o usuário colou múltiplos dígitos (ex: 6 dígitos de uma vez)
+    // Se múltiplos dígitos foram inseridos de uma vez (ex: autofill do navegador)
     if (cleanVal.length > 1) {
       const pastedDigits = cleanVal.slice(0, 6).split('');
       const newDigits = [...digits];
@@ -115,7 +144,7 @@ export default function EmailVerificationModal({ isOpen, onClose, onVerified }) 
     }
 
     const newDigits = [...digits];
-    newDigits[index] = cleanVal;
+    newDigits[index] = cleanVal ? cleanVal.slice(-1) : '';
     setDigits(newDigits);
 
     // Auto-avanço para o próximo campo
@@ -125,8 +154,17 @@ export default function EmailVerificationModal({ isOpen, onClose, onVerified }) 
   };
 
   const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) {
+    if (e.key === 'Backspace') {
+      if (!digits[index] && index > 0) {
+        // Se já está vazio, volta para o anterior e foca
+        inputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
       inputRefs.current[index - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      inputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -228,7 +266,10 @@ export default function EmailVerificationModal({ isOpen, onClose, onVerified }) 
                 <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 text-center mb-2.5">
                   Digite o código de 6 dígitos
                 </label>
-                <div className="flex justify-center items-center gap-2 sm:gap-2.5">
+                <div
+                  className="flex justify-center items-center gap-2 sm:gap-2.5"
+                  onPaste={e => handlePaste(e, 0)}
+                >
                   {digits.map((digit, idx) => (
                     <input
                       key={idx}
@@ -239,11 +280,17 @@ export default function EmailVerificationModal({ isOpen, onClose, onVerified }) 
                       value={digit}
                       onChange={e => handleDigitChange(idx, e.target.value)}
                       onKeyDown={e => handleKeyDown(idx, e)}
+                      onPaste={e => handlePaste(e, idx)}
+                      onFocus={e => e.target.select()}
                       autoFocus={idx === 0}
+                      aria-label={`Dígito ${idx + 1} do código de verificação`}
                       className="w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-bold font-mono rounded-xl border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-primary-blue dark:focus:border-blue-400 focus:ring-2 focus:ring-primary-blue/20 outline-hidden transition-all shadow-xs"
                     />
                   ))}
                 </div>
+                <p className="text-[11px] text-gray-400 dark:text-slate-500 text-center mt-2">
+                  Dica: Você pode colar o código completo com <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 font-mono text-[10px] text-gray-600 dark:text-slate-300">Ctrl + V</kbd>
+                </p>
               </div>
 
               {/* Informações de expiração */}

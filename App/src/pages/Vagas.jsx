@@ -42,6 +42,9 @@ export default function Vagas() {
   const { selectedCity, currentUser, showToast } = useAppStore();
   const [params, setParams] = useSearchParams();
 
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+
   const [query,         setQuery]         = useState(params.get('q') || '');
   const [filterCity,    setFilterCity]    = useState(selectedCity);
   const [filterType,    setFilterType]    = useState('Todos');
@@ -124,7 +127,6 @@ export default function Vagas() {
     setSortBy('match');
   };
 
-  const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const canSeeMatch = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
   const userSkills = useMemo(() => safeSkillsArray(currentUser?.skills), [currentUser?.skills]);
 
@@ -207,12 +209,14 @@ export default function Vagas() {
               </p>
             </div>
 
-            <button
-              onClick={handleOpenPublish}
-              className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
-            >
-              <Plus size={18} /> Publicar Nova Vaga
-            </button>
+            {isCompany && (
+              <button
+                onClick={handleOpenPublish}
+                className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
+              >
+                <Plus size={18} /> Publicar Nova Vaga
+              </button>
+            )}
           </div>
         </div>
       </header>
