@@ -217,11 +217,28 @@ function normalizeTeacherDoc(docData, docId) {
   };
 }
 
+const MOCK_TALENT_IDS = new Set([
+  'M1NwrT53x6fV2KK4mLvKp0ZczOx1',
+  '5PE9EpyL0SSkIyQK4vId32ag0uu1'
+]);
+const MOCK_TALENT_EMAILS = new Set([
+  'lucas.silva.tads@gmail.com',
+  'aluno@ivaiconecta.com.br'
+]);
+
 /**
  * Validador consistente para determinar se um documento de usuário é um talento profissional
  */
 export function isTalentUser(u) {
   if (!u || typeof u !== 'object') return false;
+  const uid = String(u.uid || u.id || u.firestoreId || '').trim();
+  const email = String(u.email || '').toLowerCase().trim();
+
+  // Purga e ignora registros legados de mock/seed que persistiram no banco Firestore
+  if (MOCK_TALENT_IDS.has(uid) || MOCK_TALENT_EMAILS.has(email)) {
+    return false;
+  }
+
   const role = String(u.role || '').toLowerCase().trim();
 
   // Exclui papéis expressamente não relacionados a talentos/estudantes/profissionais autônomos
