@@ -322,74 +322,34 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
   }
 }
 
-export const INSTITUTIONAL_FACULTY = [
-  {
-    id: 'prof_ronan_silva',
-    name: 'Prof. Dr. Ronan Silva',
-    email: 'ronan.silva@ifpr.edu.br',
-    institution: 'IFPR Campus Ivaiporã',
-    discipline: 'Programação de Computadores',
-    classes: ['Programação de Computadores', 'Desenvolvimento Web', 'Estrutura de Dados', 'Algoritmos'],
-    degree: 'Doutorado em Ciência da Computação',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    bio: 'Docente da área de Informática e Desenvolvimento de Software no IFPR Campus Ivaiporã.'
-  },
-  {
-    id: 'prof_mariana_santos',
-    name: 'Prof.ª Dr.ª Mariana Santos',
-    email: 'mariana.santos@ifpr.edu.br',
-    institution: 'IFPR Campus Ivaiporã',
-    discipline: 'Engenharia de Software',
-    classes: ['Engenharia de Software', 'Banco de Dados', 'Gestão de Projetos de TI'],
-    degree: 'Doutora em Engenharia de Software',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    bio: 'Professora titular do IFPR Campus Ivaiporã em Engenharia de Software e Banco de Dados.'
-  },
-  {
-    id: 'prof_carlos_lima',
-    name: 'Prof. Me. Carlos Eduardo Lima',
-    email: 'carlos.lima@univale.edu.br',
-    institution: 'Univale Ivaiporã',
-    discipline: 'Redes de Computadores',
-    classes: ['Redes de Computadores', 'Sistemas Operacionais', 'Segurança da Informação'],
-    degree: 'Mestre em Redes e Sistemas',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    bio: 'Professor na Univale Ivaiporã em infraestrutura de redes e segurança.'
-  },
-  {
-    id: 'prof_juliana_oliveira',
-    name: 'Prof.ª Ma. Juliana Oliveira',
-    email: 'juliana.oliveira@uenp.edu.br',
-    institution: 'UENP Campus Luiz Meneghel',
-    discipline: 'Inteligência Artificial & Ciência de Dados',
-    classes: ['Inteligência Artificial', 'Ciência de Dados', 'Estatística Aplicada'],
-    degree: 'Mestre em Ciência da Computação',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    bio: 'Docente pesquisadora da UENP em Inteligência Artificial e Ciência de Dados.'
-  }
-];
+export const INSTITUTIONAL_FACULTY = [];
 
 export function mergeWithInstitutionalFaculty(remoteTeachers = []) {
   const map = new Map();
-  // Inicia com o corpo docente institucional credenciado
-  for (const f of INSTITUTIONAL_FACULTY) {
-    map.set(f.email.toLowerCase().trim(), f);
-  }
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   // Mescla e prioriza professores cadastrados dinamicamente no Firestore
   for (const t of remoteTeachers) {
-    const email = (t.email || '').toLowerCase().trim();
-    if (email) {
-      map.set(email, { ...map.get(email), ...t });
-    } else if (t.id) {
-      map.set(String(t.id), t);
+    if (!t) continue;
+    const email = (t.profEmail || t.teacherEmail || t.email || '').toLowerCase().trim();
+    const uid = String(t.uid || t.id || t.firestoreId || '').trim();
+    if (mockTeacherIds.has(uid) || mockTeacherEmails.has(email) || uid.startsWith('prof_')) {
+      continue;
+    }
+    const key = email && email.includes('@') ? email : uid;
+    if (key) {
+      map.set(key, { ...map.get(key), ...t });
     }
   }
   return Array.from(map.values());
@@ -399,6 +359,19 @@ export function mergeWithInstitutionalFaculty(remoteTeachers = []) {
  * Escuta corpo docente em tempo real via Firestore onSnapshot da coleção 'users'
  */
 export function subscribeToTeachers(callback) {
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   // Callback imediato com dados disponíveis
   callback(getVerifiedTeachers());
 
@@ -410,6 +383,11 @@ export function subscribeToTeachers(callback) {
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => {
           const r = String(u.role || '').toLowerCase().trim();
+          const id = String(u.id || '');
+          const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+          if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+            return false;
+          }
           return r === 'professor' || r === 'docente';
         });
 
@@ -553,13 +531,35 @@ export function submitStudentVerification(raNumber, fileData) {
 
 export function getVerifiedTeachers() {
   let teachers = [];
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_TEACHERS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          teachers = parsed.filter(t => (t.role || '').toLowerCase() === 'professor');
+          teachers = parsed.filter(t => {
+            if (!t) return false;
+            const r = (t.role || '').toLowerCase();
+            const id = String(t.id || '');
+            const email = (t.profEmail || t.teacherEmail || t.email || '').toLowerCase().trim();
+            if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+              return false;
+            }
+            return r === 'professor' || r === 'docente';
+          });
         }
       } catch {}
     }
@@ -570,7 +570,11 @@ export function getVerifiedTeachers() {
       try {
         const auth = JSON.parse(rawAuth);
         if (auth && (auth.role === 'professor' || auth.role === 'docente')) {
-          teachers.push(normalizeTeacherDoc(auth, auth.uid || auth.id));
+          const authId = String(auth.uid || auth.id || '');
+          const authEmail = (auth.email || '').toLowerCase().trim();
+          if (!mockTeacherIds.has(authId) && !mockTeacherEmails.has(authEmail) && !authId.startsWith('prof_')) {
+            teachers.push(normalizeTeacherDoc(auth, auth.uid || auth.id));
+          }
         }
       } catch {}
     }
@@ -586,6 +590,11 @@ export function getVerifiedTeachers() {
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => {
           const r = String(u.role || '').toLowerCase().trim();
+          const id = String(u.id || '');
+          const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+          if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+            return false;
+          }
           return r === 'professor' || r === 'docente';
         });
 

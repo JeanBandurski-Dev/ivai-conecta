@@ -8,11 +8,11 @@ const path = require('path');
 const SRC_DIR = path.resolve(__dirname, '..', 'App', 'src');
 
 const SUSPICIOUS_PATTERNS = [
-  /\bconst\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
-  /\blet\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
-  /\bvar\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
+  /\bconst\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockTeachers|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
+  /\blet\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockTeachers|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
+  /\bvar\s+(?:mockJobs|mockCandidates|mockUsers|mockTalents|mockCompanies|mockTeachers|mockData|MOCK_[A-Z_]+)\s*=\s*\[/i,
   /\bexport\s+const\s+(?:MOCK_[A-Z_]+|mock[A-Z][a-zA-Z0-9_]*Data)\s*=/i,
-  /\[\s*\{\s*id:\s*['"]?mock_/i
+  /\[\s*\{\s*id:\s*['"]?(?:mock_|prof_)/i
 ];
 
 // Files or substrings that are allowed (e.g. sanitizers or no-op seed scripts)
