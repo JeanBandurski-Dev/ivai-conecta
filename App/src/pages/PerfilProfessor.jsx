@@ -81,13 +81,16 @@ export default function PerfilProfessor() {
 
   const endorsedStudents = useMemo(() => {
     if (!teacher) return [];
-    const profEmail = (teacher.email || '').toLowerCase().trim();
+    const profEmails = [teacher.profEmail, teacher.teacherEmail, teacher.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
     const profUid = String(teacher.firestoreId || teacher.id || teacher.uid || '');
 
     // 1. Alunos de liveTalents que já possuem este professor em t.endorsements
     const matchedFromTalents = (liveTalents || []).filter(t =>
       hasTeacherEndorsedStudent(t.endorsements || [], teacher) ||
-      (profEmail && t.endorsements?.some(e => (e.profEmail || '').toLowerCase().trim() === profEmail)) ||
+      (t.endorsements?.some(e => {
+        const eEmail = (e.profEmail || e.teacherEmail || e.email || '').toLowerCase().trim();
+        return eEmail && profEmails.includes(eEmail);
+      })) ||
       (profUid && t.endorsements?.some(e => String(e.profUid || '') === profUid))
     );
 
@@ -116,7 +119,7 @@ export default function PerfilProfessor() {
           id: `end_${resp.reqId || resp.timestamp || Date.now()}`,
           profUid: profUid || String(teacher.id || ''),
           profName: teacher.name || 'Professor Docente',
-          profEmail: teacher.email || '',
+          profEmail: teacher.profEmail || teacher.teacherEmail || teacher.email || '',
           institution: teacher.institution || 'IFPR Campus Ivaiporã',
           discipline: resp.discipline || teacher.discipline || 'Formação Acadêmica',
           quote: resp.quote || 'Estudante com excelente desempenho acadêmico e postura ética comprovada.',

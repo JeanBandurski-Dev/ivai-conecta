@@ -917,7 +917,9 @@ export async function completeUserProfile(uid, additionalData) {
       avatar: avatar,
       updatedAt: new Date().toISOString(),
       ...(additionalData.role === 'professor' ? {
-        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        institution: additionalData.institution || inferInstitutionFromEmail(additionalData.teacherEmail || additionalData.profEmail || email),
+        teacherEmail: (additionalData.teacherEmail || additionalData.profEmail || email).toLowerCase().trim(),
+        profEmail: (additionalData.profEmail || additionalData.teacherEmail || email).toLowerCase().trim(),
         degree: additionalData.degree || 'Docente / Pesquisador',
         discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
         verified: true
@@ -948,7 +950,9 @@ export async function completeUserProfile(uid, additionalData) {
       avatar: avatar,
       badge: roleMeta.badge,
       ...(additionalData.role === 'professor' ? {
-        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        institution: additionalData.institution || inferInstitutionFromEmail(additionalData.teacherEmail || additionalData.profEmail || email),
+        teacherEmail: (additionalData.teacherEmail || additionalData.profEmail || email).toLowerCase().trim(),
+        profEmail: (additionalData.profEmail || additionalData.teacherEmail || email).toLowerCase().trim(),
         degree: additionalData.degree || 'Docente / Pesquisador',
         discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
         verified: true

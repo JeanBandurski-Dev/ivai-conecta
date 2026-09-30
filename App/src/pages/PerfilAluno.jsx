@@ -19,6 +19,33 @@ import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import useAppStore from '../store/useAppStore';
 
+// Função auxiliar de montagem do perfil em fallback
+function buildFallbackTalent(user) {
+  if (!user) return null;
+  return {
+    id: user.uid || user.id || '',
+    firestoreId: user.uid || user.id || '',
+    name: user.name || user.displayName || 'Estudante',
+    course: user.course || '',
+    institution: user.institution || 'IFPR Campus Ivaiporã',
+    period: user.period || '',
+    city: user.city || 'Ivaiporã',
+    avatar: user.avatar || user.photoURL || '',
+    email: user.email || '',
+    skills: Array.isArray(user.skills) ? user.skills : [],
+    isVerifiedStudent: Boolean(user.isVerifiedStudent || user.emailVerified),
+    studentEmail: user.studentEmail || (validateStudentEmail(user.email)?.isValid ? user.email : ''),
+    raNumber: user.raNumber || '',
+    linkedin: user.linkedin || '',
+    github: user.github || '',
+    bio: user.bio || '',
+    experiences: Array.isArray(user.experiences) ? user.experiences : [],
+    projects: Array.isArray(user.projects) ? user.projects : [],
+    education: Array.isArray(user.education) ? user.education : [],
+    endorsements: Array.isArray(user.endorsements) ? user.endorsements : []
+  };
+}
+
 export default function PerfilAluno() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -27,8 +54,116 @@ export default function PerfilAluno() {
 
   const talentId = id || currentUser?.uid || currentUser?.id;
 
-  // Real-time student endorsement requests
+  // 1. Estados principais do Perfil e Carregamento (declarados no topo para evitar TDZ)
+  const [talent, setTalent] = useState(() => {
+    const local = getTalentById(talentId);
+    if (local) return local;
+    return buildFallbackTalent(currentUser);
+  });
+  const [loading, setLoading] = useState(!talent);
+
+  // 2. Pedidos de endosso e professores verificados
   const [studentRequests, setStudentRequests] = useState([]);
+  const [availableTeachers, setAvailableTeachers] = useState(() => getVerifiedTeachers());
+
+  // 3. Navegação, abas e modais
+  const [activeTab, setActiveTab] = useState('overview');
+  const [editModalOpen, setEditModalOpen] = useState(Boolean(searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true'));
+  const [requestModal, setRequestModal] = useState(false);
+  const [proactiveEndorseModal, setProactiveEndorseModal] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [successBanner, setSuccessBanner] = useState(null);
+
+  // 4. Formulários de endosso
+  const [proactiveQuote, setProactiveQuote] = useState('');
+  const [proactiveDiscipline, setProactiveDiscipline] = useState(currentUser?.discipline || 'Programação de Computadores');
+  const [requestForm, setRequestForm] = useState({ profName: '', profEmail: '', discipline: '', message: '' });
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [nameInputFocused, setNameInputFocused] = useState(false);
+  const [error, setError] = useState('');
+
+  // 5. Formulário completo de edição do perfil
+  const [editData, setEditData] = useState(() => ({
+    name: talent?.name || currentUser?.name || '',
+    avatar: talent?.avatar || currentUser?.avatar || '',
+    city: talent?.city || currentUser?.city || 'Ivaiporã',
+    institution: talent?.institution || currentUser?.institution || '',
+    course: talent?.course || currentUser?.course || '',
+    period: talent?.period || currentUser?.period || '',
+    bio: talent?.bio || currentUser?.bio || '',
+    linkedin: talent?.linkedin || currentUser?.linkedin || '',
+    github: talent?.github || currentUser?.github || '',
+    skills: Array.isArray(talent?.skills) ? [...talent.skills] : [],
+    experiences: Array.isArray(talent?.experiences) ? [...talent.experiences] : [],
+    projects: Array.isArray(talent?.projects) ? [...talent.projects] : [],
+    education: Array.isArray(talent?.education) ? [...talent.education] : [],
+    newSkill: ''
+  }));
+
+  const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
+  const [newProj, setNewProj] = useState({ title: '', tech: '', link: '', description: '' });
+  const [newEdu, setNewEdu] = useState({ degree: '', institution: '', period: '' });
+
+  // 6. Valores derivados e memorizados
+  const platformTeachers = useMemo(() => {
+    return availableTeachers.filter(t => t.firestoreId || (t.id && !String(t.id).startsWith('prof_')));
+  }, [availableTeachers]);
+
+  const institutionalTeachers = useMemo(() => {
+    return availableTeachers.filter(t => t.id && String(t.id).startsWith('prof_'));
+  }, [availableTeachers]);
+
+  const isOwner = Boolean(
+    currentUser && talent && (
+      (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
+      (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
+      (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
+      (!id) // Rota "/perfil" direta sem ID é sempre do usuário logado
+    )
+  );
+
+  const isProfessor = currentUser?.role === 'professor';
+
+  const uniqueEndorsements = useMemo(() => {
+    const fromTalent = Array.isArray(talent?.endorsements) ? talent.endorsements : [];
+    const fromApprovedRequests = (studentRequests || [])
+      .filter(r => r.status === 'Aprovado')
+      .map(r => ({
+        id: `end_${r.id || r.firestoreId || Date.now()}`,
+        profUid: r.profUid || r.targetTeacherId || '',
+        profName: r.profName || 'Professor Docente',
+        profEmail: r.profEmail || '',
+        institution: r.studentInstitution || 'IFPR Campus Ivaiporã',
+        discipline: r.discipline || 'Formação Acadêmica',
+        quote: r.quote || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio em projetos práticos.',
+        isVerified: true,
+        date: r.resolvedAt || r.requestedAt || new Date().toLocaleDateString('pt-BR'),
+        timestamp: r.requestedTimestamp || Date.now()
+      }));
+
+    return sanitizeUniqueEndorsements([...fromTalent, ...fromApprovedRequests]);
+  }, [talent?.endorsements, studentRequests]);
+
+  const hasAlreadyEndorsed = Boolean(
+    isProfessor && hasTeacherEndorsedStudent(uniqueEndorsements, currentUser)
+  );
+
+  const isTargetTeacherAlreadyEndorsed = Boolean(
+    (requestForm.profEmail || selectedTeacher) &&
+    hasTeacherEndorsedStudent(uniqueEndorsements, selectedTeacher || requestForm.profEmail)
+  );
+
+  const hasPendingRequestForTeacher = Boolean(
+    (requestForm.profEmail || selectedTeacher) &&
+    studentRequests.some(r =>
+      (isSameProfessor(r, selectedTeacher || requestForm.profEmail) ||
+        (requestForm.profEmail && String(r.profEmail || '').toLowerCase().trim() === requestForm.profEmail.toLowerCase().trim())) &&
+      r.status === 'Pendente'
+    )
+  );
+
+  // 7. Efeitos colaterais e assinaturas em tempo real (Firestore / Local)
   useEffect(() => {
     const studentUid = String(talentId || currentUser?.uid || currentUser?.id || '');
     if (!studentUid) return;
@@ -38,8 +173,6 @@ export default function PerfilAluno() {
     return () => unsub();
   }, [talentId, currentUser]);
 
-  // Verified teachers list for quick selection
-  const [availableTeachers, setAvailableTeachers] = useState(() => getVerifiedTeachers());
   useEffect(() => {
     const unsub = subscribeToTeachers((teachers) => {
       if (Array.isArray(teachers)) setAvailableTeachers(teachers);
@@ -47,15 +180,6 @@ export default function PerfilAluno() {
     return () => unsub();
   }, []);
 
-  const platformTeachers = useMemo(() => {
-    return availableTeachers.filter(t => t.firestoreId || (t.id && !String(t.id).startsWith('prof_')));
-  }, [availableTeachers]);
-
-  const institutionalTeachers = useMemo(() => {
-    return availableTeachers.filter(t => t.id && String(t.id).startsWith('prof_'));
-  }, [availableTeachers]);
-
-  // Sincroniza e higieniza pedidos de recomendação no documento do aluno no Firestore (deduplicação estrita)
   useEffect(() => {
     if (!currentUser || (currentUser.role !== 'aluno' && currentUser.role !== 'candidato')) return;
     const studentUid = String(currentUser.uid || currentUser.id || '');
@@ -69,12 +193,10 @@ export default function PerfilAluno() {
           const localReqs = getEndorsementRequests().filter(r => String(r.studentId) === studentUid);
           const cleaned = deduplicateRequestsByTeacher([...remoteReqs, ...localReqs]);
 
-          // Se havia duplicatas (ou diferenças em relação ao remoto), atualiza o Firestore e o cache local
           if (cleaned.length !== remoteReqs.length || JSON.stringify(cleaned) !== JSON.stringify(remoteReqs)) {
             setDoc(studentDocRef, { pendingEndorsementRequests: cleaned }, { merge: true });
           }
 
-          // Atualiza também o cache local
           const allOtherLocal = getEndorsementRequests().filter(r => String(r.studentId) !== studentUid);
           try {
             localStorage.setItem(STORAGE_KEY_ENDORSEMENT_REQUESTS, JSON.stringify([...cleaned, ...allOtherLocal]));
@@ -84,7 +206,6 @@ export default function PerfilAluno() {
     } catch {}
   }, [currentUser]);
 
-  // Sincroniza pareceres aprovados pelos professores diretamente no documento do aluno logado
   useEffect(() => {
     if (!currentUser || (currentUser.role !== 'aluno' && currentUser.role !== 'candidato')) return;
     const studentUid = String(currentUser.uid || currentUser.id || '');
@@ -120,42 +241,6 @@ export default function PerfilAluno() {
     }
   }, [currentUser, studentRequests, talent?.endorsements, talent?.isVerifiedStudent]);
 
-  // Estado reativo do talento com fallback local imediato
-  const buildFallbackTalent = (user) => {
-    if (!user) return null;
-    return {
-      id: user.uid || user.id || '',
-      firestoreId: user.uid || user.id || '',
-      name: user.name || user.displayName || 'Estudante',
-      course: user.course || '',
-      institution: user.institution || 'IFPR Campus Ivaiporã',
-      period: user.period || '',
-      city: user.city || 'Ivaiporã',
-      avatar: user.avatar || user.photoURL || '',
-      email: user.email || '',
-      skills: Array.isArray(user.skills) ? user.skills : [],
-      isVerifiedStudent: Boolean(user.isVerifiedStudent || user.emailVerified),
-      studentEmail: user.studentEmail || (validateStudentEmail(user.email)?.isValid ? user.email : ''),
-      raNumber: user.raNumber || '',
-      linkedin: user.linkedin || '',
-      github: user.github || '',
-      bio: user.bio || '',
-      experiences: Array.isArray(user.experiences) ? user.experiences : [],
-      projects: Array.isArray(user.projects) ? user.projects : [],
-      education: Array.isArray(user.education) ? user.education : [],
-      endorsements: Array.isArray(user.endorsements) ? user.endorsements : []
-    };
-  };
-
-  const [talent, setTalent] = useState(() => {
-    const local = getTalentById(talentId);
-    if (local) return local;
-    return buildFallbackTalent(currentUser);
-  });
-
-  const [loading, setLoading] = useState(!talent);
-
-  // Sincronização em tempo real do perfil direto do Cloud Firestore (multi-navegador e offline resilient)
   useEffect(() => {
     const targetId = id || currentUser?.uid || currentUser?.id;
     if (!targetId) {
@@ -211,9 +296,7 @@ export default function PerfilAluno() {
           newSkill: ''
         });
       } else {
-        // Fallback para cache local se ainda não existir documento no Firestore
         const fallback = getTalentById(targetId) || buildFallbackTalent(currentUser);
-        // Só substitui se tiver um fallback válido; preserva estado anterior se já tinha dados
         setTalent(prev => fallback || prev);
       }
       setLoading(false);
@@ -228,63 +311,11 @@ export default function PerfilAluno() {
     };
   }, [id, currentUser?.uid, currentUser?.id]);
 
-  // Permissão estrita do proprietário: id, uid, e-mail ou correspondência com usuário logado
-  const isOwner = Boolean(
-    currentUser && talent && (
-      (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
-      (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
-      (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
-      (!id) // Rota "/perfil" direta sem ID é sempre do usuário logado
-    )
-  );
-
-  const isProfessor = currentUser?.role === 'professor';
-
-  const uniqueEndorsements = useMemo(() => {
-    const fromTalent = Array.isArray(talent?.endorsements) ? talent.endorsements : [];
-    const fromApprovedRequests = (studentRequests || [])
-      .filter(r => r.status === 'Aprovado')
-      .map(r => ({
-        id: `end_${r.id || r.firestoreId || Date.now()}`,
-        profUid: r.profUid || r.targetTeacherId || '',
-        profName: r.profName || 'Professor Docente',
-        profEmail: r.profEmail || '',
-        institution: r.studentInstitution || 'IFPR Campus Ivaiporã',
-        discipline: r.discipline || 'Formação Acadêmica',
-        quote: r.quote || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio em projetos práticos.',
-        isVerified: true,
-        date: r.resolvedAt || r.requestedAt || new Date().toLocaleDateString('pt-BR'),
-        timestamp: r.requestedTimestamp || Date.now()
-      }));
-
-    return sanitizeUniqueEndorsements([...fromTalent, ...fromApprovedRequests]);
-  }, [talent?.endorsements, studentRequests]);
-
-  const hasAlreadyEndorsed = Boolean(
-    isProfessor && hasTeacherEndorsedStudent(uniqueEndorsements, currentUser)
-  );
-
-  const [activeTab, setActiveTab] = useState('overview');
-  const [editModalOpen, setEditModalOpen] = useState(Boolean(searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true'));
-
   useEffect(() => {
     if (searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true') {
       setEditModalOpen(true);
     }
   }, [searchParams]);
-
-  const handleCloseEditModal = () => {
-    setEditModalOpen(false);
-    if (searchParams.get('tab') || searchParams.get('edit')) {
-      navigate(window.location.pathname, { replace: true });
-    }
-  };
-
-  const [requestModal, setRequestModal] = useState(false);
-  const [proactiveEndorseModal, setProactiveEndorseModal] = useState(false);
-  const [pdfModalOpen, setPdfModalOpen] = useState(false);
-  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
-  const [successBanner, setSuccessBanner] = useState(null);
 
   useEffect(() => {
     if (!successBanner) return;
@@ -292,51 +323,12 @@ export default function PerfilAluno() {
     return () => clearTimeout(timer);
   }, [successBanner]);
 
-  // Form for proactive endorsement by teacher
-  const [proactiveQuote, setProactiveQuote] = useState('');
-  const [proactiveDiscipline, setProactiveDiscipline] = useState(currentUser?.discipline || 'Programação de Computadores');
-
-  const [requestForm, setRequestForm] = useState({ profName: '', profEmail: '', discipline: '', message: '' });
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [nameInputFocused, setNameInputFocused] = useState(false);
-  const [error, setError] = useState('');
-
-  // Comprehensive edit form state
-  const [editData, setEditData] = useState(() => ({
-    name: talent?.name || '',
-    avatar: talent?.avatar || '',
-    city: talent?.city || 'Ivaiporã',
-    institution: talent?.institution || '',
-    course: talent?.course || '',
-    period: talent?.period || '',
-    bio: talent?.bio || '',
-    linkedin: talent?.linkedin || '',
-    github: talent?.github || '',
-    skills: Array.isArray(talent?.skills) ? [...talent.skills] : [],
-    experiences: Array.isArray(talent?.experiences) ? [...talent.experiences] : [],
-    projects: Array.isArray(talent?.projects) ? [...talent.projects] : [],
-    education: Array.isArray(talent?.education) ? [...talent.education] : [],
-    newSkill: ''
-  }));
-
-  // Forms to add new experience, project, and education
-  const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
-  const [newProj, setNewProj] = useState({ title: '', tech: '', link: '', description: '' });
-  const [newEdu, setNewEdu] = useState({ degree: '', institution: '', period: '' });
-
-  const isTargetTeacherAlreadyEndorsed = Boolean(
-    (requestForm.profEmail || selectedTeacher) &&
-    hasTeacherEndorsedStudent(uniqueEndorsements, selectedTeacher || requestForm.profEmail)
-  );
-
-  const hasPendingRequestForTeacher = Boolean(
-    (requestForm.profEmail || selectedTeacher) &&
-    studentRequests.some(r =>
-      (isSameProfessor(r, selectedTeacher || requestForm.profEmail) ||
-        (requestForm.profEmail && String(r.profEmail || '').toLowerCase().trim() === requestForm.profEmail.toLowerCase().trim())) &&
-      r.status === 'Pendente'
-    )
-  );
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    if (searchParams.get('tab') || searchParams.get('edit')) {
+      navigate(window.location.pathname, { replace: true });
+    }
+  };
 
   const handleRequestSubmit = async (e) => {
     e.preventDefault();

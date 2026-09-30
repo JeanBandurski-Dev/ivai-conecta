@@ -25,7 +25,7 @@ export function getEndorsementProfessorKey(endorsementOrProf) {
   if (typeof endorsementOrProf === 'string') {
     return endorsementOrProf.toLowerCase().trim();
   }
-  const email = String(endorsementOrProf.profEmail || endorsementOrProf.email || '').toLowerCase().trim();
+  const email = String(endorsementOrProf.profEmail || endorsementOrProf.teacherEmail || endorsementOrProf.email || '').toLowerCase().trim();
   const uid = String(endorsementOrProf.profUid || endorsementOrProf.profId || endorsementOrProf.uid || endorsementOrProf.id || '').trim();
   if (email && email.includes('@')) return email;
   return uid;
@@ -38,14 +38,14 @@ export function getEndorsementProfessorKey(endorsementOrProf) {
 export function isSameProfessor(profA, profB) {
   if (!profA || !profB) return false;
 
-  const emailA = (typeof profA === 'string' && profA.includes('@'))
-    ? profA.toLowerCase().trim()
-    : String(profA.profEmail || profA.email || '').toLowerCase().trim();
-  const emailB = (typeof profB === 'string' && profB.includes('@'))
-    ? profB.toLowerCase().trim()
-    : String(profB.profEmail || profB.email || '').toLowerCase().trim();
+  const emailsA = typeof profA === 'string' && profA.includes('@')
+    ? [profA.toLowerCase().trim()]
+    : [profA.profEmail, profA.teacherEmail, profA.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
+  const emailsB = typeof profB === 'string' && profB.includes('@')
+    ? [profB.toLowerCase().trim()]
+    : [profB.profEmail, profB.teacherEmail, profB.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
 
-  if (emailA && emailB && emailA === emailB) return true;
+  if (emailsA.some(a => a && emailsB.includes(a))) return true;
 
   const uidA = (typeof profA === 'string' && !profA.includes('@'))
     ? profA.trim()
@@ -195,13 +195,16 @@ function normalizeUserDoc(docData, docId) {
  */
 function normalizeTeacherDoc(docData, docId) {
   const data = docData || {};
+  const profEmail = data.teacherEmail || data.profEmail || data.email || '';
   return {
     ...data,
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Docente',
     role: data.role || 'professor',
-    email: data.email || '',
+    email: data.email || profEmail,
+    profEmail: profEmail,
+    teacherEmail: profEmail,
     degree: data.degree || '',
     institution: data.institution || '',
     discipline: data.discipline || '',
@@ -757,9 +760,9 @@ export function getEndorsementRequests() {
  * Suporta busca por e-mail, UID ou nome institucional do professor.
  */
 export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
-  const profEmail = typeof teacherUserOrEmail === 'string' && teacherUserOrEmail.includes('@')
-    ? teacherUserOrEmail.toLowerCase().trim()
-    : String(teacherUserOrEmail?.email || (typeof teacherUserOrEmail === 'string' ? teacherUserOrEmail : '')).toLowerCase().trim();
+  const profEmails = typeof teacherUserOrEmail === 'string' && teacherUserOrEmail.includes('@')
+    ? [teacherUserOrEmail.toLowerCase().trim()]
+    : [teacherUserOrEmail?.profEmail, teacherUserOrEmail?.teacherEmail, teacherUserOrEmail?.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
 
   const profUid = typeof teacherUserOrEmail === 'object' && teacherUserOrEmail !== null
     ? String(teacherUserOrEmail.uid || teacherUserOrEmail.id || '')
@@ -779,7 +782,7 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
       const rName = String(r.profName || '').toLowerCase().trim();
 
       // 1. Match por email direto
-      if (profEmail && rEmail && rEmail === profEmail) return true;
+      if (rEmail && profEmails.includes(rEmail)) return true;
 
       // 2. Match por UID
       if (profUid && rUid && rUid === profUid) return true;
@@ -1024,6 +1027,8 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
     const verified = getVerifiedTeachers();
     resolvedTeacher = verified.find(t =>
       (t.email || '').toLowerCase().trim() === cleanEmail ||
+      (t.profEmail || '').toLowerCase().trim() === cleanEmail ||
+      (t.teacherEmail || '').toLowerCase().trim() === cleanEmail ||
       (profName && t.name && t.name.toLowerCase().trim() === profName.toLowerCase().trim())
     );
   }
@@ -1195,7 +1200,7 @@ export async function approveEndorsementRequest(requestId, quote, profUser) {
 
   if (!req) return { success: false, error: 'Solicitação não encontrada.' };
 
-  const cleanEmail = (req.profEmail || profUser?.email || '').toLowerCase().trim();
+  const cleanEmail = (req.profEmail || profUser?.profEmail || profUser?.teacherEmail || profUser?.email || '').toLowerCase().trim();
   const profUid = profUser?.uid || profUser?.id;
 
   // 1. Regra estrita: verificar se este professor já recomendou este aluno
