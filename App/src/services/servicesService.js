@@ -607,8 +607,8 @@ export async function createServiceOrder(orderData) {
 
   const clientEmail = (orderData.clientEmail || '').toLowerCase().trim();
   const providerEmail = (orderData.providerEmail || '').toLowerCase().trim();
-  const clientId = String(orderData.clientId || '').trim();
-  const providerId = String(orderData.providerId || '').trim();
+  const clientId = String(orderData.clientId || orderData.clientUid || '').trim();
+  const providerId = String(orderData.providerId || orderData.providerUid || '').trim();
 
   const newOrder = {
     status: 'solicitado',
@@ -624,7 +624,13 @@ export async function createServiceOrder(orderData) {
     ],
     ...orderData,
     id: orderId,
-    firestoreId: orderId
+    firestoreId: orderId,
+    clientId,
+    clientUid: clientId,
+    providerId,
+    providerUid: providerId,
+    clientEmail,
+    providerEmail
   };
 
   const participants = Array.from(new Set([
@@ -642,7 +648,9 @@ export async function createServiceOrder(orderData) {
       clientEmail,
       providerEmail,
       clientId,
+      clientUid: clientId,
       providerId,
+      providerUid: providerId,
       serviceOrder: newOrder,
       updatedAt: new Date().toISOString()
     });
@@ -812,10 +820,19 @@ export function subscribeToServiceOrders(user, callback) {
   const filterForUser = (orders) => {
     if (!user) return orders;
     const uid = String(user.uid || user.id || '').trim();
+    const email = (user.email || '').toLowerCase().trim();
 
-    return orders.filter(o => 
-      Boolean(uid && (String(o.providerId) === uid || String(o.clientId) === uid))
-    );
+    return orders.filter(o => {
+      const pId = String(o.providerId || o.providerUid || '').trim();
+      const cId = String(o.clientId || o.clientUid || '').trim();
+      const pEmail = String(o.providerEmail || '').toLowerCase().trim();
+      const cEmail = String(o.clientEmail || '').toLowerCase().trim();
+
+      const matchesUid = Boolean(uid && (pId === uid || cId === uid));
+      const matchesEmail = Boolean(email && (pEmail === email || cEmail === email));
+
+      return matchesUid || matchesEmail;
+    });
   };
 
   // Inicializa imediatamente com dados locais para resposta instantânea

@@ -1,7 +1,8 @@
 // Chat & Direct Messaging Service for Ivaí Conecta
 // Arquitetura Híbrida: LocalStorage (0ms) + BroadcastChannel + Firestore Realtime
+// Com Bloqueio Estrito de Linguagem Imprópria & Suporte a Todos os Usuários (Empresa, Freelancer, Aluno, Professor, Admin)
 
-import { db } from '../lib/firebase';
+import { db } from '../lib/firebase.js';
 import {
   collection,
   doc,
@@ -15,10 +16,116 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
+import { detectProfanity } from './jobTaxonomy.js';
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
 export const STORAGE_KEY_DELETED_THREADS = 'ivai_conecta_deleted_threads';
 export const STORAGE_KEY_CHAT_READ_TIMESTAMPS = 'ivai_conecta_chat_read_timestamps';
+
+// ─── CANAL DE COMUNICAÇÃO ENTRE ABAS LOCAIS ─────────────────────────────
+const chatChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ivai_conecta_chat_bus') : null;
+
+// ─── HELPERS DE IDENTIDADE E PERFIL ─────────────────────────────────────
+
+/**
+ * Resolve o nome de exibição para qualquer perfil de usuário
+ * Suporta Empresas (company, nomeFantasia, razaoSocial), Freelancers, Candidatos, Professores e Admins
+ */
+export function resolveDisplayName(user) {
+  if (!user) return 'Usuário Conectado';
+  if (typeof user === 'string') return user.trim();
+  const name =
+    user.company ||
+    user.nomeFantasia ||
+    user.razaoSocial ||
+    user.name ||
+    user.displayName ||
+    user.nome ||
+    user.contactName ||
+    (user.email ? user.email.split('@')[0] : 'Usuário Conectado');
+  return String(name).trim();
+}
+
+/**
+ * Resolve a imagem de avatar para qualquer perfil de usuário
+ */
+export function resolveAvatar(user) {
+  if (!user || typeof user === 'string') return '';
+  return user.logo || user.avatar || user.photoURL || user.foto || '';
+}
+
+/**
+ * Resolve o papel amigável formatado (Empresa, Prestador de Serviço, Aluno/Candidato, Docente, Administrador)
+ */
+export function resolveUserRole(user) {
+  if (!user) return 'Usuário Conectado';
+  const rawRole = (typeof user === 'object' ? user.role : user) || '';
+  const r = String(rawRole).toLowerCase().trim();
+
+  if (r === 'empresa' || r === 'company') return 'Empresa';
+  if (r === 'freelancer' || r === 'prestador' || r === 'talent') return 'Prestador de Serviço';
+  if (r === 'professor' || r === 'teacher' || r === 'docente') return 'Docente / Professor';
+  if (r === 'admin' || r === 'administrador') return 'Administrador';
+  return 'Aluno / Candidato';
+}
+
+/**
+ * Helper para verificar correspondência de e-mail entre participantes (case-insensitive)
+ */
+export function matchesUserEmail(participantEmail, userEmail) {
+  if (!participantEmail || !userEmail) return false;
+  return participantEmail.toLowerCase().trim() === userEmail.toLowerCase().trim();
+}
+
+/**
+ * Compara se dois usuários são a mesma pessoa (por UID ou E-mail)
+ */
+export function isSameUser(userA, userB) {
+  if (!userA || !userB) return false;
+  if (userA.uid && userB.uid && String(userA.uid) === String(userB.uid)) return true;
+  if (userA.id && userB.id && String(userA.id) === String(userB.id)) return true;
+  if (userA.uid && userB.id && String(userA.uid) === String(userB.id)) return true;
+  if (userA.id && userB.uid && String(userA.id) === String(userB.uid)) return true;
+  if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
+  return false;
+}
+
+// ─── VALIDAÇÃO RIGOROSA DE MENSAGENS (ANTI-PROFANIDADE E REGRAS) ─────────
+
+/**
+ * Valida o conteúdo da mensagem antes de enviar:
+ * 1. Não pode ser vazia ou apenas espaços em branco.
+ * 2. Limite razoável de caracteres (2.500 máx).
+ * 3. Bloqueia termos ofensivos, agressivos, palavrões e discursos inadequados.
+ */
+export function validateChatMessage(text) {
+  if (!text || typeof text !== 'string') {
+    return { valid: false, error: 'A mensagem não pode estar vazia.' };
+  }
+  const clean = text.trim();
+  if (clean.length === 0) {
+    return { valid: false, error: 'A mensagem não pode conter apenas espaços em branco.' };
+  }
+  if (clean.length > 2500) {
+    return { valid: false, error: 'A mensagem é muito longa (limite máximo de 2.500 caracteres por envio).' };
+  }
+
+  // Análise anti-profanidade e termos ofensivos
+  const profanityCheck = detectProfanity(clean);
+  if (profanityCheck && profanityCheck.hasProfanity) {
+    const termInfo = profanityCheck.matchedWord ? ` (termo detectado: "${profanityCheck.matchedWord}")` : '';
+    return {
+      valid: false,
+      hasProfanity: true,
+      matchedWord: profanityCheck.matchedWord || '',
+      error: `Mensagem bloqueada: contém linguagem imprópria ou termos ofensivos${termInfo}. Mantenha o respeito e o profissionalismo na plataforma Ivaí Conecta.`
+    };
+  }
+
+  return { valid: true, cleanText: clean };
+}
+
+// ─── GERENCIAMENTO DE LEITURA E NOTIFICAÇÕES ────────────────────────────
 
 export function getDeletedThreads() {
   if (typeof localStorage === 'undefined') return [];
@@ -44,17 +151,6 @@ export function saveReadTimestamps(map) {
     localStorage.setItem(STORAGE_KEY_CHAT_READ_TIMESTAMPS, JSON.stringify(map));
     window.dispatchEvent(new CustomEvent('ivai_chat_updated'));
   }
-}
-
-// Canal de comunicação instantâneo (0ms) entre abas normais no mesmo navegador
-const chatChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ivai_conecta_chat_bus') : null;
-
-// Helper para verificar correspondência de e-mail entre participantes
-export function matchesUserEmail(participantEmail, userEmail) {
-  if (!participantEmail || !userEmail) return false;
-  const p = participantEmail.toLowerCase().trim();
-  const u = userEmail.toLowerCase().trim();
-  return p === u;
 }
 
 /**
@@ -125,7 +221,6 @@ export function subscribeToUnreadCount(userEmail, callback) {
     callback(count);
   };
 
-  // Disparo inicial imediato
   emit();
 
   const handleUpdate = () => emit();
@@ -136,7 +231,6 @@ export function subscribeToUnreadCount(userEmail, callback) {
     chatChannel.addEventListener('message', handleUpdate);
   }
 
-  // Também assina a lista de conversas para atualizar quando chegarem mensagens remotas
   const unsubThreads = subscribeToUserThreads(cleanEmail, () => {
     emit();
   });
@@ -151,16 +245,7 @@ export function subscribeToUnreadCount(userEmail, callback) {
   };
 }
 
-export function isSameUser(userA, userB) {
-  if (!userA || !userB) return false;
-  if (userA.uid && userB.uid && String(userA.uid) === String(userB.uid)) return true;
-  if (userA.id && userB.id && String(userA.id) === String(userB.id)) return true;
-  if (userA.uid && userB.id && String(userA.uid) === String(userB.id)) return true;
-  if (userA.id && userB.uid && String(userA.id) === String(userB.uid)) return true;
-  if (userA.email && userB.email && userA.email.toLowerCase().trim() === userB.email.toLowerCase().trim()) return true;
-  
-  return false;
-}
+// ─── PERSISTÊNCIA E SINCRONIZAÇÃO DE THREADS ────────────────────────────
 
 export function getChatThreads() {
   if (typeof localStorage === 'undefined') return [];
@@ -181,7 +266,7 @@ export function saveChatThreads(threads) {
   }
 }
 
-// Sincronização via servidor local do Vite apenas em ambiente de desenvolvimento local
+// Sincronização via servidor local do Vite apenas em ambiente de desenvolvimento
 async function syncWithLocalServer() {
   if (!import.meta.env.DEV) return;
   try {
@@ -226,11 +311,13 @@ async function syncWithLocalServer() {
   } catch { }
 }
 
-// Exclui permanentemente uma conversa de todas as abas e janelas
+/**
+ * Exclui permanentemente uma conversa de todas as abas e janelas
+ */
 export async function deleteChatThread(threadId) {
-  if (!threadId) return;
+  if (!threadId) return [];
 
-  // 1. Remove da lista local de conversas
+  // 1. Remove da lista local
   const all = getChatThreads().filter(t => t.id !== threadId);
   saveChatThreads(all);
 
@@ -269,7 +356,8 @@ export async function deleteChatThread(threadId) {
   return all;
 }
 
-// 1. Escutar todas as conversas do usuário (Híbrido: LocalStorage + Broadcast + Firestore)
+// ─── 1. ASSINATURA EM TEMPO REAL: THREADS DO USUÁRIO ────────────────────
+
 export function subscribeToUserThreads(userEmail, callback) {
   if (!userEmail) return () => { };
   const cleanEmail = userEmail.toLowerCase().trim();
@@ -284,10 +372,9 @@ export function subscribeToUserThreads(userEmail, callback) {
     callback(myThreads);
   };
 
-  // Dispara imediatamente para a tela abrir em 0 milissegundos
+  // Disparo imediato (0ms de latência)
   emitLocal();
 
-  // Escuta atualizações locais entre abas
   const handleLocalUpdate = () => emitLocal();
   window.addEventListener('storage', handleLocalUpdate);
   window.addEventListener('ivai_chat_updated', handleLocalUpdate);
@@ -296,7 +383,7 @@ export function subscribeToUserThreads(userEmail, callback) {
     chatChannel.addEventListener('message', handleLocalUpdate);
   }
 
-  // Polling em dev para conectar com Guia Anônima
+  // Polling em dev para suporte a Guia Anônima
   let syncTimer = null;
   if (import.meta.env.DEV) {
     syncTimer = setInterval(async () => {
@@ -305,7 +392,7 @@ export function subscribeToUserThreads(userEmail, callback) {
     }, 1500);
   }
 
-  // Sincronização em tempo real com o Firestore
+  // Listener oficial em tempo real com o Cloud Firestore
   let unsubscribeFirestore = () => { };
   try {
     const q = query(
@@ -333,7 +420,11 @@ export function subscribeToUserThreads(userEmail, callback) {
             merged.push(rc);
             changed = true;
           } else {
-            merged[idx] = { ...merged[idx], ...rc, messages: merged[idx].messages || rc.messages || [] };
+            merged[idx] = {
+              ...merged[idx],
+              ...rc,
+              messages: merged[idx].messages || rc.messages || []
+            };
             changed = true;
           }
         });
@@ -343,8 +434,12 @@ export function subscribeToUserThreads(userEmail, callback) {
           emitLocal();
         }
       }
-    }, () => { });
-  } catch { }
+    }, (err) => {
+      console.warn('[Chat] Erro no listener do Firestore para conversas:', err);
+    });
+  } catch (err) {
+    console.warn('[Chat] Falha ao configurar listener de conversas:', err);
+  }
 
   return () => {
     if (syncTimer) clearInterval(syncTimer);
@@ -357,8 +452,8 @@ export function subscribeToUserThreads(userEmail, callback) {
   };
 }
 
-// 2. Escutar as mensagens de uma conversa aberta em TEMPO REAL (Firestore + Local)
-// 2. Escutar as mensagens de uma conversa aberta em TEMPO REAL (Firestore + Local) com validação de participante
+// ─── 2. ASSINATURA EM TEMPO REAL: MENSAGENS DE UM CHAT ESPECÍFICO ───────
+
 export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
   if (!chatId) return () => { };
 
@@ -372,8 +467,6 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
       return;
     }
 
-    // Isolamento estrito de segurança: se o e-mail do usuário logado foi informado,
-    // verifica se ele é realmente um dos participantes cadastrados nesta conversa.
     if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
       console.warn('[Chat] Acesso negado: usuário não é participante desta conversa.');
       callback([]);
@@ -418,36 +511,59 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
 
         const allThreads = getChatThreads();
         const threadIndex = allThreads.findIndex(t => t.id === chatId);
-        if (threadIndex !== -1) {
-          const thread = allThreads[threadIndex];
-          // Validação de participante antes de processar
-          if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
-            return;
+
+        // Se a conversa ainda não foi salva localmente neste dispositivo/navegador,
+        // criamos a entrada no estado para que as mensagens fiquem visíveis imediatamente!
+        if (threadIndex === -1) {
+          const lastMsg = firestoreMsgs[firestoreMsgs.length - 1];
+          const newThread = {
+            id: chatId,
+            participants: [cleanEmail].filter(Boolean),
+            lastMessage: lastMsg?.text || 'Nova mensagem',
+            lastMessageAt: lastMsg?.timestamp || 'Agora',
+            updatedAt: Date.now(),
+            messages: firestoreMsgs
+          };
+          allThreads.unshift(newThread);
+          saveChatThreads(allThreads);
+          callback(firestoreMsgs);
+          return;
+        }
+
+        const thread = allThreads[threadIndex];
+        if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+          return;
+        }
+
+        const existingMsgs = thread.messages || [];
+        const merged = [...existingMsgs];
+        let added = false;
+
+        firestoreMsgs.forEach(fm => {
+          if (!merged.some(m => m.id === fm.id || (m.text === fm.text && m.timestamp === fm.timestamp))) {
+            merged.push(fm);
+            added = true;
           }
+        });
 
-          const existingMsgs = thread.messages || [];
-          const merged = [...existingMsgs];
-          let added = false;
-
-          firestoreMsgs.forEach(fm => {
-            if (!merged.some(m => m.id === fm.id || (m.text === fm.text && m.timestamp === fm.timestamp))) {
-              merged.push(fm);
-              added = true;
-            }
-          });
-
-          if (added) {
-            merged.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-            allThreads[threadIndex].messages = merged;
-            allThreads[threadIndex].lastMessage = merged[merged.length - 1]?.text || allThreads[threadIndex].lastMessage;
-            allThreads[threadIndex].lastMessageAt = merged[merged.length - 1]?.timestamp || allThreads[threadIndex].lastMessageAt;
-            saveChatThreads(allThreads);
-            callback(merged);
-          }
+        if (added) {
+          merged.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+          allThreads[threadIndex].messages = merged;
+          allThreads[threadIndex].lastMessage = merged[merged.length - 1]?.text || allThreads[threadIndex].lastMessage;
+          allThreads[threadIndex].lastMessageAt = merged[merged.length - 1]?.timestamp || allThreads[threadIndex].lastMessageAt;
+          allThreads[threadIndex].updatedAt = Date.now();
+          saveChatThreads(allThreads);
+          callback(merged);
+        } else {
+          callback(existingMsgs);
         }
       }
-    }, () => { });
-  } catch { }
+    }, (err) => {
+      console.warn('[Chat] Erro no listener do Firestore para mensagens:', err);
+    });
+  } catch (err) {
+    console.warn('[Chat] Falha ao configurar listener de mensagens:', err);
+  }
 
   return () => {
     window.removeEventListener('storage', emitLocal);
@@ -459,21 +575,39 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
   };
 }
 
-// 3. Enviar uma mensagem
-export async function sendChatMessage(chatId, senderUser, text) {
-  if (!chatId || !text.trim() || !senderUser) return null;
+// ─── 3. ENVIO DE MENSAGEM COM VALIDAÇÃO ANTI-PROFANIDADE E PAPÉIS ────────
 
-  const cleanText = text.trim();
+export async function sendChatMessage(chatId, senderUser, text) {
+  if (!chatId || !senderUser) {
+    throw new Error('Identificação da conversa ou usuário remetente inválidos.');
+  }
+
+  // Validação estrita da mensagem
+  const validation = validateChatMessage(text);
+  if (!validation.valid) {
+    const error = new Error(validation.error);
+    error.hasProfanity = Boolean(validation.hasProfanity);
+    error.matchedWord = validation.matchedWord || null;
+    throw error;
+  }
+
+  const cleanText = validation.cleanText;
   const now = new Date();
   const timeFormatted = `${now.toLocaleDateString('pt-BR')} - ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  const senderEmail = (senderUser.email || '').toLowerCase().trim();
+  const senderName = resolveDisplayName(senderUser);
+  const senderAvatar = resolveAvatar(senderUser);
+  const senderRole = resolveUserRole(senderUser);
+  const senderUid = senderUser.uid || senderUser.id || 'user';
 
   const messageData = {
-    id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    senderId: senderUser.uid || senderUser.id || 'user',
-    sender: senderUser.name,
-    senderName: senderUser.name,
-    senderEmail: senderUser.email.toLowerCase().trim(),
-    senderAvatar: senderUser.avatar || '',
+    id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    senderId: senderUid,
+    sender: senderName,
+    senderName,
+    senderEmail,
+    senderAvatar,
+    senderRole,
     text: cleanText,
     timestamp: timeFormatted,
     createdAt: Date.now()
@@ -488,12 +622,13 @@ export async function sendChatMessage(chatId, senderUser, text) {
     currentThread.messages = [...(currentThread.messages || []), messageData];
     currentThread.lastMessage = cleanText;
     currentThread.lastMessageAt = timeFormatted;
-    currentThread.lastSenderEmail = messageData.senderEmail;
+    currentThread.lastSenderEmail = senderEmail;
+    currentThread.lastSenderName = senderName;
     currentThread.updatedAt = Date.now();
     saveChatThreads(allThreads);
   }
 
-  // 2. Transmite no servidor local (apenas se estiver rodando em dev)
+  // 2. Transmite no servidor local (apenas em dev)
   if (import.meta.env.DEV) {
     try {
       fetch('/api/chat/sync', {
@@ -520,31 +655,46 @@ export async function sendChatMessage(chatId, senderUser, text) {
     } catch { }
   }
 
-  // 4. Sincroniza em segundo plano no Firestore
+  // 4. Sincroniza no Firestore em tempo real
   try {
-    addDoc(collection(db, 'chats', chatId, 'messages'), {
+    const threadRef = doc(db, 'chats', chatId);
+    const messagesCol = collection(db, 'chats', chatId, 'messages');
+
+    addDoc(messagesCol, {
       ...messageData,
       createdAt: serverTimestamp()
-    }).catch(() => { });
+    }).catch(err => {
+      console.warn('[Chat] Falha na persistência da mensagem no Firestore:', err);
+    });
 
-    setDoc(doc(db, 'chats', chatId), {
+    const threadUpdate = {
       lastMessage: cleanText,
       lastMessageAt: timeFormatted,
-      lastSenderEmail: messageData.senderEmail,
-      updatedAt: serverTimestamp(),
-      ...(currentThread ? {
-        participants: currentThread.participants,
-        participantUids: currentThread.participantUids || [],
-        participantNames: currentThread.participantNames,
-        participantAvatars: currentThread.participantAvatars,
-        participantRoles: currentThread.participantRoles,
-        contextTitle: currentThread.contextTitle
-      } : {})
-    }, { merge: true }).catch(() => { });
-  } catch { }
+      lastSenderEmail: senderEmail,
+      lastSenderName: senderName,
+      updatedAt: serverTimestamp()
+    };
+
+    if (currentThread) {
+      if (currentThread.participants) threadUpdate.participants = currentThread.participants;
+      if (currentThread.participantUids) threadUpdate.participantUids = currentThread.participantUids;
+      if (currentThread.participantNames) threadUpdate.participantNames = currentThread.participantNames;
+      if (currentThread.participantAvatars) threadUpdate.participantAvatars = currentThread.participantAvatars;
+      if (currentThread.participantRoles) threadUpdate.participantRoles = currentThread.participantRoles;
+      if (currentThread.contextTitle) threadUpdate.contextTitle = currentThread.contextTitle;
+    }
+
+    setDoc(threadRef, threadUpdate, { merge: true }).catch(err => {
+      console.warn('[Chat] Falha ao atualizar dados da thread no Firestore:', err);
+    });
+  } catch (err) {
+    console.warn('[Chat] Erro inesperado ao gravar no Firestore:', err);
+  }
 
   return messageData;
 }
+
+// ─── 4. CRIAÇÃO / RECUPERAÇÃO DETERMINÍSTICA DE CHAT ────────────────────
 
 export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'Contato Direto') {
   if (!currentUser || !targetUser) {
@@ -563,11 +713,10 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
       if (userSnap.exists()) {
         const uData = userSnap.data();
         user2Email = (uData.email || uData.studentEmail || '').toLowerCase().trim();
-        if (!targetUser.name || targetUser.name === 'Usuário' || targetUser.name === 'Contato' || targetUser.name === 'Prestador de Serviço') {
-          targetUser.name = uData.name || uData.displayName || targetUser.name;
-        }
-        if (!targetUser.avatar) targetUser.avatar = uData.avatar || uData.photoURL || '';
-        if (!targetUser.role) targetUser.role = uData.role || targetUser.role;
+        targetUser.name = resolveDisplayName(uData) || targetUser.name;
+        targetUser.company = uData.company || uData.nomeFantasia || targetUser.company;
+        targetUser.avatar = resolveAvatar(uData) || targetUser.avatar;
+        targetUser.role = uData.role || targetUser.role;
       }
     } catch (err) {
       console.warn('[Chat] Não foi possível carregar usuário pelo UID:', err);
@@ -588,11 +737,17 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     throw new Error('Você não pode iniciar uma conversa consigo mesmo.');
   }
 
-  // Cria o ID determinístico único
+  // ID determinístico único
   const sortedEmails = [user1Email, user2Email].sort();
   const chatId = `chat_${sortedEmails[0].replace(/[@.]/g, '_')}_${sortedEmails[1].replace(/[@.]/g, '_')}`;
-
   const participantUids = [currentUid, targetUid].filter(Boolean);
+
+  const senderName = resolveDisplayName(currentUser);
+  const targetName = resolveDisplayName(targetUser);
+  const senderAvatar = resolveAvatar(currentUser);
+  const targetAvatar = resolveAvatar(targetUser);
+  const senderRole = resolveUserRole(currentUser);
+  const targetRole = resolveUserRole(targetUser);
 
   const allThreads = getChatThreads();
   let thread = allThreads.find(t => t.id === chatId);
@@ -603,16 +758,16 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
       participants: [user1Email, user2Email],
       participantUids,
       participantNames: {
-        [user1Email]: currentUser.name,
-        [user2Email]: targetUser.name
+        [user1Email]: senderName,
+        [user2Email]: targetName
       },
       participantAvatars: {
-        [user1Email]: currentUser.avatar || '',
-        [user2Email]: targetUser.avatar || ''
+        [user1Email]: senderAvatar,
+        [user2Email]: targetAvatar
       },
       participantRoles: {
-        [user1Email]: currentUser.role || 'aluno',
-        [user2Email]: targetUser.role || 'empresa'
+        [user1Email]: senderRole,
+        [user2Email]: targetRole
       },
       contextTitle,
       lastMessage: 'Conversa iniciada',
@@ -623,14 +778,24 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     allThreads.unshift(thread);
     saveChatThreads(allThreads);
   } else {
-    // Garante sincronização de participantUids
-    if (participantUids.length > 0 && (!thread.participantUids || thread.participantUids.length === 0)) {
-      thread.participantUids = participantUids;
+    // Atualiza nomes, papéis e contexto caso tenham mudado
+    thread.participantNames = {
+      ...thread.participantNames,
+      [user1Email]: senderName,
+      [user2Email]: targetName
+    };
+    thread.participantRoles = {
+      ...thread.participantRoles,
+      [user1Email]: senderRole,
+      [user2Email]: targetRole
+    };
+    if (participantUids.length > 0) {
+      thread.participantUids = Array.from(new Set([...(thread.participantUids || []), ...participantUids]));
     }
     if (contextTitle && thread.contextTitle !== contextTitle) {
       thread.contextTitle = contextTitle;
-      saveChatThreads(allThreads);
     }
+    saveChatThreads(allThreads);
   }
 
   // 1. Salva no Firestore para que o outro usuário encontre na nuvem
@@ -646,7 +811,9 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
       lastMessage: thread.lastMessage,
       lastMessageAt: thread.lastMessageAt,
       updatedAt: serverTimestamp()
-    }, { merge: true }).catch(() => { });
+    }, { merge: true }).catch(err => {
+      console.warn('[Chat] Erro ao sincronizar conversa com o Firestore:', err);
+    });
   } catch { }
 
   // 2. Sincroniza no servidor local (em dev)

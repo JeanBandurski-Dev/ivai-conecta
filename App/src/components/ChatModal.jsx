@@ -1,5 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Sparkles, Plus, Trash2, Users, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  MessageSquare,
+  X,
+  Send,
+  Sparkles,
+  Plus,
+  Trash2,
+  Users,
+  ArrowLeft,
+  AlertTriangle,
+  Search,
+  CheckCheck,
+  ShieldCheck,
+  ExternalLink
+} from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   subscribeToUserThreads,
@@ -10,25 +24,103 @@ import {
   matchesUserEmail,
   isSameUser,
   markThreadAsRead,
-  getThreadUnreadCount
+  getThreadUnreadCount,
+  validateChatMessage,
+  resolveDisplayName,
+  resolveAvatar,
+  resolveUserRole
 } from '../services/chatService';
 import { getUsersDB } from '../lib/ivaiConecta';
 import { db } from '../lib/firebase';
 import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 
+function getRoleBadge(role) {
+  const r = (role || '').toLowerCase();
+  if (r.includes('empresa') || r.includes('company')) {
+    return {
+      label: 'Empresa',
+      icon: '🏢',
+      classes: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+    };
+  }
+  if (r.includes('prestador') || r.includes('freelancer') || r.includes('talent')) {
+    return {
+      label: 'Prestador de Serviço',
+      icon: '💼',
+      classes: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+    };
+  }
+  if (r.includes('professor') || r.includes('docente') || r.includes('teacher')) {
+    return {
+      label: 'Docente / Professor',
+      icon: '👨‍🏫',
+      classes: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+    };
+  }
+  if (r.includes('admin') || r.includes('administrador')) {
+    return {
+      label: 'Administrador',
+      icon: '🛡️',
+      classes: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+    };
+  }
+  return {
+    label: 'Aluno / Candidato',
+    icon: '🎓',
+    classes: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
+  };
+}
+
+function UserAvatar({ src, name, className = 'w-9 h-9' }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = (name || 'U')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0].toUpperCase())
+    .join('');
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name || 'Usuário'}
+        onError={() => setImgError(true)}
+        className={`${className} rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${className} rounded-full bg-gradient-to-tr from-primary-blue to-blue-500 text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
+    >
+      {initials || 'U'}
+    </div>
+  );
+}
+
 function getOtherParticipant(thread, currentUser) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
   const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) || thread.lastSenderEmail || '';
-  
-  const name = thread.participantNames?.[otherEmail] || thread.participantName || 'Contato';
-  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+
+  const name = thread.participantNames?.[otherEmail] || thread.participantName || resolveDisplayName({ email: otherEmail });
+  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || '';
   const role = thread.participantRoles?.[otherEmail] || thread.participantRole || 'Usuário Conectado';
 
   return { email: otherEmail, name, avatar, role };
 }
 
 export default function ChatModal({ onClose }) {
-  const { currentUser, activeChatThreadId, chatDraftMessage, setChatDraftMessage, startChatWith } = useAppStore();
+  const {
+    currentUser,
+    activeChatThreadId,
+    chatDraftMessage,
+    setChatDraftMessage,
+    startChatWith,
+    showConfirm,
+    showToast
+  } = useAppStore();
 
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(activeChatThreadId || null);
@@ -38,6 +130,9 @@ export default function ChatModal({ onClose }) {
   const [showNewChat, setShowNewChat] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(Boolean(activeChatThreadId));
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sendError, setSendError] = useState(null);
+  const [isSending, setIsSending] = useState(false);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -45,7 +140,7 @@ export default function ChatModal({ onClose }) {
   // Carrega lista de usuários reais do Firestore para novos contatos
   useEffect(() => {
     try {
-      const q = query(collection(db, 'users'), limit(50));
+      const q = query(collection(db, 'users'), limit(60));
       const unsub = onSnapshot(q, (snap) => {
         const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
         setRemoteUsers(users);
@@ -64,18 +159,18 @@ export default function ChatModal({ onClose }) {
   useEffect(() => {
     if (chatDraftMessage) {
       setMessageInput(chatDraftMessage);
-      setChatDraftMessage(null); // Limpa depois de popular
-      
-      // Ajusta a altura inicial se a mensagem for longa
+      setChatDraftMessage(null);
+
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+          textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + 'px';
         }
       }, 50);
     }
   }, [chatDraftMessage, setChatDraftMessage]);
 
+  // Assinatura em tempo real de todas as conversas do usuário
   useEffect(() => {
     if (!currentUser?.email) {
       setThreads([]);
@@ -103,10 +198,10 @@ export default function ChatModal({ onClose }) {
     return () => unsubscribe();
   }, [currentUser?.email]);
 
-  // Conversa ativa validada: garante que o thread selecionado pertence exclusivamente ao usuário atual
   const activeThread = threads.find(t => t.id === activeThreadId);
   const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
+  // Assinatura em tempo real das mensagens da conversa selecionada
   useEffect(() => {
     if (!activeThreadId || !currentUser?.email || !activeThread) {
       setMessages([]);
@@ -120,7 +215,7 @@ export default function ChatModal({ onClose }) {
     return () => unsubscribe();
   }, [activeThreadId, currentUser?.email, Boolean(activeThread)]);
 
-  // Marca conversa ativa como lida
+  // Marca conversa como lida
   useEffect(() => {
     if (activeThreadId && currentUser?.email && activeThread) {
       markThreadAsRead(activeThreadId, currentUser.email);
@@ -131,16 +226,35 @@ export default function ChatModal({ onClose }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Envio de mensagem com bloqueio estrito de palavras ofensivas
   const handleSendMessage = async (e) => {
     e?.preventDefault();
-    if (!messageInput.trim() || !activeThreadId || !activeThread) return;
+    if (!messageInput.trim() || !activeThreadId || !activeThread || isSending) return;
 
-    const text = messageInput.trim();
-    setMessageInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; // Reseta a altura após o envio
+    const rawText = messageInput.trim();
+
+    // 1. Validação prévia no cliente (Anti-profanidade & regras de conduta)
+    const validation = validateChatMessage(rawText);
+    if (!validation.valid) {
+      setSendError(validation.error);
+      return;
     }
-    await sendChatMessage(activeThreadId, currentUser, text);
+
+    setSendError(null);
+    setIsSending(true);
+
+    try {
+      await sendChatMessage(activeThreadId, currentUser, rawText);
+      setMessageInput('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } catch (err) {
+      console.error('[Chat] Erro no envio:', err);
+      setSendError(err.message || 'Não foi possível enviar a mensagem no momento.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -152,71 +266,137 @@ export default function ChatModal({ onClose }) {
 
   const handleDeleteThread = async (threadId, e) => {
     e.stopPropagation();
-    await deleteChatThread(threadId);
-    const myEmail = currentUser?.email?.toLowerCase().trim();
-    const all = getChatThreads();
-    const remaining = all.filter(t => t.participants?.some(p => matchesUserEmail(p, myEmail)));
-    setThreads(remaining);
-    if (activeThreadId === threadId) {
-      setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
-      if (remaining.length === 0) setMobileShowChat(false);
+
+    const doDelete = async () => {
+      await deleteChatThread(threadId);
+      const myEmail = currentUser?.email?.toLowerCase().trim();
+      const all = getChatThreads();
+      const remaining = all.filter(t => t.participants?.some(p => matchesUserEmail(p, myEmail)));
+      setThreads(remaining);
+      if (activeThreadId === threadId) {
+        setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
+        if (remaining.length === 0) setMobileShowChat(false);
+      }
+      if (showToast) showToast('Conversa removida com sucesso.', 'info');
+    };
+
+    if (showConfirm) {
+      showConfirm({
+        title: 'Excluir conversa?',
+        message: 'Deseja realmente remover esta conversa? O histórico local e as mensagens serão excluídos.',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
+        onConfirm: doDelete
+      });
+    } else if (window.confirm('Deseja realmente excluir esta conversa?')) {
+      await doDelete();
     }
   };
 
   const allUsers = remoteUsers.length > 0 ? remoteUsers : (getUsersDB() || []);
   const myEmail = currentUser?.email?.toLowerCase().trim();
-  const availableContacts = allUsers.filter(u => 
-    !isSameUser(currentUser, u) && 
-    u.email &&
-    !matchesUserEmail(u.email, myEmail)
-  );
+  const availableContacts = allUsers.filter(u => {
+    const contactEmail = (u.email || u.studentEmail || '').toLowerCase().trim();
+    return (
+      !isSameUser(currentUser, u) &&
+      contactEmail &&
+      !matchesUserEmail(contactEmail, myEmail)
+    );
+  });
+
+  const filteredThreads = useMemo(() => {
+    if (!searchTerm.trim()) return threads;
+    const term = searchTerm.toLowerCase().trim();
+    return threads.filter(t => {
+      const other = getOtherParticipant(t, currentUser);
+      return (
+        other.name.toLowerCase().includes(term) ||
+        (t.contextTitle && t.contextTitle.toLowerCase().includes(term)) ||
+        (t.lastMessage && t.lastMessage.toLowerCase().includes(term))
+      );
+    });
+  }, [threads, searchTerm, currentUser]);
+
+  const currentRoleBadge = otherPerson ? getRoleBadge(otherPerson.role) : null;
+  const currentUserName = resolveDisplayName(currentUser);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
-        className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-4xl h-[85vh] sm:h-[82vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-4xl h-[86vh] sm:h-[84vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-4 sm:p-5 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        {/* Header Superior Principal */}
+        <div className="p-4 sm:p-5 bg-gray-50/90 dark:bg-slate-800/90 border-b border-gray-200/80 dark:border-slate-700/80 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             {mobileShowChat && (
               <button
                 onClick={() => setMobileShowChat(false)}
-                className="md:hidden p-1.5 -ml-1 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg"
+                className="md:hidden p-1.5 -ml-1 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
                 title="Voltar às conversas"
               >
                 <ArrowLeft size={18} />
               </button>
             )}
-            <div className="w-9 h-9 rounded-xl bg-primary-blue text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-              <MessageSquare size={18} />
+            <div className="w-10 h-10 rounded-2xl bg-primary-blue text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <MessageSquare size={19} />
             </div>
             <div className="min-w-0">
-              <h3 className="font-heading font-bold text-base text-primary-dark dark:text-white leading-tight truncate">
-                Mensagens Diretas &amp; Chat
-              </h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
-                Logado como: <strong className="text-primary-blue dark:text-blue-400">{currentUser?.name}</strong>
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white leading-tight truncate">
+                  Mensagens Diretas &amp; Chat
+                </h3>
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Em Tempo Real
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">
+                Logado como: <strong className="text-primary-blue dark:text-blue-400">{currentUserName}</strong>
+                <span className="ml-1.5 text-[11px] opacity-75">({resolveUserRole(currentUser)})</span>
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full text-gray-400 dark:text-slate-400 cursor-pointer">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200/70 dark:hover:bg-slate-700/70 rounded-full text-gray-400 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white transition-colors cursor-pointer"
+              title="Fechar chat"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Chat Body Responsivo */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-[290px_1fr] overflow-hidden">
-          {/* Painel Esquerdo: Lista de Conversas (Esconde no mobile quando um chat está aberto) */}
-          <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} border-r border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 overflow-y-auto p-3 space-y-2 flex-col h-full`}>
-            <div className="flex items-center justify-between px-1 mb-1">
-              <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase">Conversas Ativas</span>
-              <span className="text-[10px] bg-primary-blue/10 text-primary-blue px-2 py-0.5 rounded-full font-bold">{threads.length}</span>
+        {/* Corpo do Chat Responsivo */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-[300px_1fr] overflow-hidden">
+          {/* Painel Esquerdo: Lista de Conversas e Contatos */}
+          <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} border-r border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 overflow-y-auto p-3 space-y-2.5 flex-col h-full`}>
+            {/* Header da lista de conversas */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                Conversas Ativas
+              </span>
+              <span className="text-[10px] bg-primary-blue/10 text-primary-blue dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">
+                {threads.length}
+              </span>
             </div>
 
-            {/* Botão para Nova Conversa */}
+            {/* Barra de busca rápida */}
+            {threads.length > 0 && (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar conversa..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 focus:outline-hidden focus:border-primary-blue"
+                />
+              </div>
+            )}
+
+            {/* Botão Nova Conversa */}
             <button
               onClick={() => setShowNewChat(!showNewChat)}
               className="w-full btn btn-sm bg-primary-blue text-white hover:bg-blue-700 font-bold flex items-center justify-center gap-1.5 rounded-xl transition-all shadow-xs cursor-pointer text-xs py-2"
@@ -224,47 +404,71 @@ export default function ChatModal({ onClose }) {
               <Plus size={14} /> {showNewChat ? 'Fechar Contatos' : 'Nova Conversa'}
             </button>
 
-            {/* Modal/Menu para selecionar usuário */}
+            {/* Dropdown de Usuários Disponíveis */}
             {showNewChat && (
               <div className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-primary-blue/30 shadow-md space-y-2 animate-in fade-in zoom-in-95 duration-150">
-                <div className="text-[11px] font-bold text-gray-700 dark:text-slate-200 px-1 flex items-center gap-1">
-                  <Users size={12} className="text-primary-blue" /> Iniciar conversa com:
+                <div className="text-[11px] font-bold text-gray-700 dark:text-slate-200 px-1 flex items-center gap-1.5">
+                  <Users size={13} className="text-primary-blue" /> Iniciar conversa com:
                 </div>
-                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                  {availableContacts.map(c => (
-                    <button
-                      key={c.email}
-                      onClick={() => {
-                        startChatWith(c, 'Contato Direto');
-                        setShowNewChat(false);
-                        setMobileShowChat(true);
-                      }}
-                      className="w-full text-left p-2 rounded-xl hover:bg-primary-blue/10 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer border border-transparent hover:border-primary-blue/20"
-                    >
-                      <img src={c.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={c.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{c.name}</div>
-                        <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{c.email}</div>
-                      </div>
-                    </button>
-                  ))}
+                <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                  {availableContacts.length === 0 ? (
+                    <div className="text-center py-3 text-[11px] text-gray-400 dark:text-slate-500">
+                      Nenhum outro usuário disponível no momento.
+                    </div>
+                  ) : (
+                    availableContacts.map(c => {
+                      const cName = resolveDisplayName(c);
+                      const cAvatar = resolveAvatar(c);
+                      const cRole = resolveUserRole(c);
+                      const badge = getRoleBadge(cRole);
+
+                      return (
+                        <button
+                          key={c.email || c.uid}
+                          onClick={() => {
+                            startChatWith(c, 'Contato Direto');
+                            setShowNewChat(false);
+                            setMobileShowChat(true);
+                          }}
+                          className="w-full text-left p-2 rounded-xl hover:bg-primary-blue/10 dark:hover:bg-slate-700/80 flex items-center gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-primary-blue/20"
+                        >
+                          <UserAvatar src={cAvatar} name={cName} className="w-8 h-8 text-[11px]" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{cName}</div>
+                            <div className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1 truncate">
+                              <span>{badge.icon} {badge.label}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
 
+            {/* Lista de Threads */}
             {loading ? (
-              <div className="p-6 text-center text-xs text-gray-400">Carregando conversas...</div>
-            ) : threads.length === 0 ? (
+              <div className="p-6 text-center text-xs text-gray-400 flex flex-col items-center gap-2">
+                <span className="loading loading-spinner loading-xs text-primary-blue"></span>
+                Carregando conversas...
+              </div>
+            ) : filteredThreads.length === 0 ? (
               <div className="p-5 text-center space-y-2 bg-white dark:bg-slate-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 my-auto">
-                <p className="text-xs font-medium text-gray-500 dark:text-slate-400">Nenhuma conversa ativa.</p>
-                <p className="text-[11px] text-gray-400 dark:text-slate-500">Clique em "+ Nova Conversa" acima!</p>
+                <p className="text-xs font-semibold text-gray-600 dark:text-slate-300">
+                  {searchTerm ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa ativa.'}
+                </p>
+                <p className="text-[11px] text-gray-400 dark:text-slate-500">
+                  {searchTerm ? 'Tente outro termo de busca.' : 'Clique em "+ Nova Conversa" acima para iniciar!'}
+                </p>
               </div>
             ) : (
-              <div className="space-y-1.5 flex-1 overflow-y-auto">
-                {threads.map(t => {
+              <div className="space-y-1.5 flex-1 overflow-y-auto pr-0.5">
+                {filteredThreads.map(t => {
                   const other = getOtherParticipant(t, currentUser);
                   const isSelected = t.id === activeThreadId;
                   const threadUnread = getThreadUnreadCount(t, currentUser?.email);
+                  const badge = getRoleBadge(other.role);
 
                   return (
                     <div
@@ -275,28 +479,38 @@ export default function ChatModal({ onClose }) {
                       }}
                       className={`group p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 relative ${
                         isSelected
-                          ? 'bg-white dark:bg-slate-800 border border-primary-blue/40 shadow-xs'
-                          : 'hover:bg-gray-100 dark:hover:bg-slate-800/60'
+                          ? 'bg-white dark:bg-slate-800 border border-primary-blue/50 shadow-xs ring-1 ring-primary-blue/20'
+                          : 'hover:bg-gray-100 dark:hover:bg-slate-800/60 border border-transparent'
                       }`}
                     >
-                      <img src={other.avatar} alt={other.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
+                      <UserAvatar src={other.avatar} name={other.name} className="w-10 h-10" />
+
                       <div className="min-w-0 flex-1 pr-5">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold text-xs text-gray-800 dark:text-white truncate">{other.name}</span>
+                          <span className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                            {other.name}
+                          </span>
                           {threadUnread > 0 && (
-                            <span className="min-w-[17px] h-[17px] px-1 bg-red-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center shrink-0">
+                            <span className="min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shrink-0 animate-in zoom-in-75">
                               {threadUnread > 99 ? '99+' : threadUnread}
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 truncate">{t.contextTitle || 'Chat Direto'}</div>
-                        <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">{t.lastMessage || 'Conversa iniciada'}</div>
+
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1 truncate mt-0.5">
+                          <span>{badge.icon}</span>
+                          <span className="truncate">{t.contextTitle || badge.label}</span>
+                        </div>
+
+                        <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-1">
+                          {t.lastMessage || 'Conversa iniciada'}
+                        </div>
                       </div>
 
                       <button
                         onClick={(e) => handleDeleteThread(t.id, e)}
                         title="Remover conversa"
-                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-all absolute top-2.5 right-2"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-all absolute top-2.5 right-2 cursor-pointer"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -307,58 +521,89 @@ export default function ChatModal({ onClose }) {
             )}
           </div>
 
-          {/* Painel Direito: Mensagens (Exibe no mobile quando chat estiver ativo) */}
+          {/* Painel Direito: Janela de Mensagens */}
           <div className={`${!mobileShowChat ? 'hidden md:flex' : 'flex'} flex-col h-full bg-white dark:bg-slate-900 overflow-hidden`}>
             {activeThread && otherPerson ? (
               <div className="flex flex-col h-full">
                 {/* Header do Chat Ativo */}
-                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/30 dark:bg-slate-800/30 shrink-0">
-                  <div className="flex items-center gap-3">
-                    <img src={otherPerson.avatar} alt={otherPerson.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800" />
+                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <UserAvatar src={otherPerson.avatar} name={otherPerson.name} className="w-10 h-10" />
+
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
+                      <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
                         <span className="truncate">{otherPerson.name}</span>
-                        <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full shrink-0">
-                          Online
+                        <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${currentRoleBadge?.classes}`}>
+                          <span>{currentRoleBadge?.icon}</span>
+                          <span>{currentRoleBadge?.label}</span>
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
-                        <span>{otherPerson.role}</span>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+                        </span>
                         <span>·</span>
-                        <span>{activeThread.contextTitle || 'Chat Regional'}</span>
+                        <span className="truncate text-primary-blue dark:text-blue-400 font-medium">
+                          {activeThread.contextTitle || 'Contato Direto'}
+                        </span>
                       </div>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500 hidden sm:inline flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-emerald-500" /> Canal Seguro
+                    </span>
+                  </div>
                 </div>
 
-                {/* Lista de Mensagens */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/20 dark:bg-slate-900/40">
+                {/* Lista de Mensagens em Tempo Real */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-gray-50/20 dark:bg-slate-900/40">
                   {messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400">
-                      <Sparkles className="text-primary-blue mb-2" size={24} />
-                      <p className="text-xs font-semibold text-gray-600 dark:text-slate-300">Início da conversa com {otherPerson.name}</p>
-                      <p className="text-[11px]">Envie uma mensagem abaixo para começar a conversar!</p>
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400 space-y-2">
+                      <div className="w-12 h-12 rounded-2xl bg-primary-blue/10 text-primary-blue flex items-center justify-center mb-1">
+                        <Sparkles size={22} />
+                      </div>
+                      <p className="text-xs font-bold text-gray-700 dark:text-slate-200">
+                        Início da conversa com {otherPerson.name}
+                      </p>
+                      <p className="text-[11px] max-w-xs text-gray-500 dark:text-slate-400">
+                        Envie uma mensagem abaixo para iniciar a comunicação profissional em tempo real.
+                      </p>
                     </div>
                   ) : (
                     messages.map((m, idx) => {
                       const isMe = matchesUserEmail(m.senderEmail, currentUser?.email);
+                      const senderBadge = getRoleBadge(m.senderRole);
 
                       return (
-                        <div key={m.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                          <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-1 px-1">
-                            {m.senderName || m.sender} · {m.timestamp}
+                        <div key={m.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-1 duration-150`}>
+                          <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-1 px-1 flex items-center gap-1.5">
+                            <span className="font-medium text-gray-600 dark:text-slate-400">{m.senderName || m.sender}</span>
+                            <span>·</span>
+                            <span>{m.timestamp}</span>
+                            {isMe && <CheckCheck size={12} className="text-primary-blue" />}
                           </div>
+
                           <div
-                            className={`max-w-[85%] sm:max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                            className={`max-w-[85%] sm:max-w-[76%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
                               isMe
                                 ? 'bg-primary-blue text-white rounded-br-xs shadow-xs font-medium'
-                                : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
+                                : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
                             }`}
                           >
-                            {m.text?.split(/(https?:\/\/[^\s]+)/g).map((part, i) => 
+                            {m.text?.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
                               /(https?:\/\/[^\s]+)/g.test(part) ? (
-                                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`underline font-bold hover:opacity-80 break-all ${isMe ? 'text-white' : 'text-primary-blue dark:text-blue-400'}`}>
-                                  {part}
+                                <a
+                                  key={i}
+                                  href={part}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`underline font-bold inline-flex items-center gap-0.5 hover:opacity-80 break-all ${
+                                    isMe ? 'text-white' : 'text-primary-blue dark:text-blue-400'
+                                  }`}
+                                >
+                                  {part} <ExternalLink size={11} className="inline ml-0.5" />
                                 </a>
                               ) : (
                                 part
@@ -372,61 +617,105 @@ export default function ChatModal({ onClose }) {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Formulário de Envio */}
+                {/* Banner de Erro / Bloqueio de Palavras Ofensivas */}
+                {sendError && (
+                  <div className="mx-3 sm:mx-4 mb-2 p-3 rounded-2xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs flex items-start justify-between gap-2 shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0 leading-relaxed font-medium">
+                        {sendError}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSendError(null)}
+                      className="text-red-400 hover:text-red-700 p-0.5 rounded-lg shrink-0 cursor-pointer"
+                      title="Fechar aviso"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Formulário de Envio com Validação Estrita */}
                 <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex items-end gap-2 shrink-0">
-                  <textarea
-                    ref={textareaRef}
-                    value={messageInput}
-                    onChange={e => {
-                      setMessageInput(e.target.value);
-                      e.target.style.height = 'auto';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={`Mensagem para ${otherPerson.name}...`}
-                    className="flex-1 input input-bordered text-sm py-3 px-4 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue resize-none overflow-y-auto min-h-[44px] max-h-[160px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600"
-                    rows={1}
-                  />
+                  <div className="flex-1 relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={messageInput}
+                      onChange={e => {
+                        setMessageInput(e.target.value);
+                        if (sendError) setSendError(null);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                      }}
+                      onKeyDown={handleKeyDown}
+                      placeholder={`Mensagem para ${otherPerson.name}... (Enter para enviar, Shift+Enter para nova linha)`}
+                      className={`w-full input input-bordered text-sm py-3 px-4 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue resize-none overflow-y-auto min-h-[46px] max-h-[160px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 ${
+                        sendError ? 'border-red-400 dark:border-red-600 focus:border-red-500 ring-1 ring-red-400/20' : ''
+                      }`}
+                      rows={1}
+                      disabled={isSending}
+                    />
+                  </div>
                   <button
                     type="submit"
-                    disabled={!messageInput.trim()}
-                    className="btn btn-primary btn-sm px-4 rounded-xl flex items-center gap-1.5 font-bold cursor-pointer disabled:opacity-50"
+                    disabled={!messageInput.trim() || isSending}
+                    className="btn btn-primary btn-sm px-4 h-[46px] rounded-xl flex items-center gap-1.5 font-bold cursor-pointer disabled:opacity-50 shrink-0"
                   >
-                    <Send size={15} /> <span className="hidden sm:inline">Enviar</span>
+                    {isSending ? (
+                      <span className="loading loading-spinner loading-xs"></span>
+                    ) : (
+                      <>
+                        <Send size={15} /> <span className="hidden sm:inline">Enviar</span>
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
             ) : (
+              /* Empty State Quando Nenhuma Conversa Está Selecionada */
               <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-white dark:bg-slate-900">
-                <div className="w-14 h-14 rounded-2xl bg-primary-blue/10 text-primary-blue flex items-center justify-center mb-1">
-                  <MessageSquare size={28} />
+                <div className="w-16 h-16 rounded-3xl bg-primary-blue/10 text-primary-blue flex items-center justify-center mb-1">
+                  <MessageSquare size={32} />
                 </div>
                 <div>
-                  <h4 className="font-heading font-bold text-base text-gray-900 dark:text-white">Nenhuma conversa selecionada</h4>
+                  <h4 className="font-heading font-bold text-base text-gray-900 dark:text-white">
+                    Nenhuma conversa selecionada
+                  </h4>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-sm">
-                    Escolha um contato à esquerda ou selecione um abaixo para começar:
+                    Selecione uma conversa ao lado ou inicie contato com um dos usuários ativos abaixo:
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-md pt-2">
-                  {availableContacts.slice(0, 4).map(contact => (
-                    <button
-                      key={contact.email}
-                      onClick={() => {
-                        startChatWith(contact, 'Contato Geral');
-                        setMobileShowChat(true);
-                      }}
-                      className="p-3 bg-gray-50 dark:bg-slate-800/80 hover:bg-primary-blue/5 dark:hover:bg-primary-blue/10 border border-gray-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group"
-                    >
-                      <img src={contact.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} alt={contact.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-xs text-gray-900 dark:text-white truncate group-hover:text-primary-blue transition-colors">
-                          {contact.name}
+                  {availableContacts.slice(0, 4).map(contact => {
+                    const cName = resolveDisplayName(contact);
+                    const cAvatar = resolveAvatar(contact);
+                    const cRole = resolveUserRole(contact);
+                    const badge = getRoleBadge(cRole);
+
+                    return (
+                      <button
+                        key={contact.email || contact.uid}
+                        onClick={() => {
+                          startChatWith(contact, 'Contato Geral');
+                          setMobileShowChat(true);
+                        }}
+                        className="p-3 bg-gray-50 dark:bg-slate-800/80 hover:bg-primary-blue/5 dark:hover:bg-primary-blue/10 border border-gray-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group"
+                      >
+                        <UserAvatar src={cAvatar} name={cName} className="w-9 h-9" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-xs text-gray-900 dark:text-white truncate group-hover:text-primary-blue transition-colors">
+                            {cName}
+                          </div>
+                          <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                            <span>{badge.icon} {badge.label}</span>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-gray-400 dark:text-slate-400 truncate">{contact.email}</div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

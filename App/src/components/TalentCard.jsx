@@ -26,18 +26,18 @@ export default function TalentCard({ talent }) {
   };
 
   return (
-    <div className="card gap-3 relative">
+    <div className="card gap-3 relative min-w-0 overflow-hidden w-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
+      <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
           <img
             src={avatar}
             alt={name}
             className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">{name}</h3>
-            <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5">{course || 'Perfil em formação'}</div>
+            <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5 truncate">{course || 'Perfil em formação'}</div>
             <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 truncate">{institution ? `${institution} · ` : ''}{city}</div>
           </div>
         </div>
@@ -58,15 +58,15 @@ export default function TalentCard({ talent }) {
       </div>
 
       {/* Endorsements, Student Verification Badges & Social Links */}
-      <div className="flex items-center justify-between gap-1.5 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center justify-between gap-1.5 flex-wrap min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           {talent.isVerifiedStudent && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-full">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-full shrink-0">
               <CheckCircle size={11} /> Matrícula Verificada
             </span>
           )}
           {endorsements.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-400 border border-blue-200/70 dark:border-blue-800/60 rounded-full">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-400 border border-blue-200/70 dark:border-blue-800/60 rounded-full shrink-0">
               <CheckCircle size={10} className="shrink-0" />
               {endorsements.length} Recomendaç{endorsements.length === 1 ? 'ão' : 'ões'}
             </span>
@@ -74,7 +74,7 @@ export default function TalentCard({ talent }) {
         </div>
 
         {/* Links diretos para LinkedIn e GitHub */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
           {talent.linkedin && (
             <a
               href={talent.linkedin}
@@ -104,12 +104,12 @@ export default function TalentCard({ talent }) {
 
       {/* Skills */}
       {skills.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 min-w-0">
           {skills.slice(0, 4).map(skill => (
-            <span key={skill} className="tag">{skill}</span>
+            <span key={skill} className="tag truncate max-w-[130px]">{skill}</span>
           ))}
           {skills.length > 4 && (
-            <span className="tag">+{skills.length - 4}</span>
+            <span className="tag shrink-0">+{skills.length - 4}</span>
           )}
         </div>
       ) : (
@@ -119,12 +119,12 @@ export default function TalentCard({ talent }) {
       )}
 
       {/* Action & Direct Social Links */}
-      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2">
+      <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2 min-w-0">
         <Link
           to={`/perfil/${id}`}
-          className="btn btn-outline btn-sm flex-1 text-xs font-bold text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-700 text-center"
+          className="btn btn-outline btn-sm flex-1 min-w-0 text-xs font-bold text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-700 text-center truncate"
         >
-          Ver Perfil Completo
+          Ver Perfil
         </Link>
 
         {/* Botão de Chat Direto com o Talento */}

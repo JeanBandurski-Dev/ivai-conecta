@@ -51,10 +51,7 @@ export default function Servicos() {
 
   const [activeTab,    setActiveTab]    = useState(() => {
     const v = params.get('view');
-    if (v === 'orders') {
-      if (isCompany) return 'explore';
-      return 'orders';
-    }
+    if (v === 'orders') return 'orders';
     if (!isFreelancer) return 'explore';
     return v === 'dashboard' ? 'dashboard' : 'explore';
   });
@@ -71,13 +68,9 @@ export default function Servicos() {
   useEffect(() => {
     const v = params.get('view');
     if (v === 'orders') {
-      if (isCompany) {
-        setActiveTab('explore');
-      } else {
-        setActiveTab('orders');
-        if (currentUser?.role !== UserRole.FREELANCER) {
-          setOrderSubTab('sent');
-        }
+      setActiveTab('orders');
+      if (currentUser?.role !== UserRole.FREELANCER) {
+        setOrderSubTab('sent');
       }
     } else if (currentUser?.role === UserRole.FREELANCER) {
       if (v === 'dashboard') setActiveTab('dashboard');
@@ -85,7 +78,7 @@ export default function Servicos() {
     } else if (v === 'explore') {
       setActiveTab('explore');
     }
-  }, [params, currentUser?.role, isCompany]);
+  }, [params, currentUser?.role]);
 
   useEffect(() => {
     if (selectedCity) setCity(selectedCity);
@@ -339,8 +332,8 @@ export default function Servicos() {
             </div>
           )}
 
-          {/* Abas para Clientes (Alunos / Candidatos) */}
-          {currentUser && currentUser.role !== 'freelancer' && !isCompany && currentUser.role !== 'professor' && (
+          {/* Abas para Clientes e Empresas Contratantes */}
+          {currentUser && currentUser.role !== 'freelancer' && (
             <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('explore')}
@@ -372,7 +365,7 @@ export default function Servicos() {
       <main className="container section">
 
         {/* ── ABA MINHAS DEMANDAS & ORDENS DE SERVIÇO ── */}
-        {activeTab === 'orders' && !isCompany ? (
+        {activeTab === 'orders' ? (
           !currentUser ? (
             <div className="card p-12 text-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl space-y-4 max-w-lg mx-auto">
               <FileText size={48} className="mx-auto text-primary-blue/60" />

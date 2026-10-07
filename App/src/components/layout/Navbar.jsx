@@ -52,7 +52,7 @@ export default function Navbar() {
   };
 
   const navLinkClass = ({ isActive }) =>
-    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${isActive
+    `text-xs lg:text-sm xl:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative whitespace-nowrap ${isActive
       ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
       : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
     }`;
@@ -82,20 +82,20 @@ export default function Navbar() {
   return (
     <>
       <nav className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 dark:border-slate-800 shadow-xs transition-colors duration-300">
-        <div className="container">
-          <div className="flex items-center justify-between h-[74px] gap-6 whitespace-nowrap">
+        <div className="container mx-auto">
+          <div className="flex items-center justify-between h-[74px] gap-3 lg:gap-6 w-full max-w-full">
 
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 shrink-0">
-              <Logo size={40} />
-              <span className="text-xl font-heading font-extrabold tracking-tight">
+            <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <Logo size={38} />
+              <span className="text-lg sm:text-xl font-heading font-extrabold tracking-tight">
                 <span className="text-primary-dark dark:text-white">Ivaí</span>{' '}
                 <span className="text-primary-blue dark:text-blue-400">Conecta</span>
               </span>
             </Link>
 
             {/* Nav links — desktop centered */}
-            <ul className="hidden md:flex items-center gap-8 list-none mx-auto">
+            <ul className="hidden md:flex items-center gap-4 lg:gap-6 xl:gap-8 list-none mx-auto whitespace-nowrap">
               <li><NavLink to="/" end className={navLinkClass}>Início</NavLink></li>
               <li><NavLink to="/vagas" className={navLinkClass}>Vagas &amp; Match</NavLink></li>
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>

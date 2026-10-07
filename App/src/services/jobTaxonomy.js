@@ -211,16 +211,16 @@ export const STANDARD_BENEFITS = [
 export const PROFANITY_ROOTS = [
   'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
   'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
-  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp', 'chupa', 'cacete', 'krl', 'kct', 'trouxa', 'babaca',
-  'cuzin', 'cuzao', 'cuzão', 'otari'
+  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp', 'pqp', 'chupa', 'cacete', 'krl', 'kct', 'trouxa', 'babaca',
+  'cuzin', 'cuzao', 'cuzão', 'otari', 'fuder', 'fudeu', 'fodasse', 'fodase'
 ];
 
 export const PROFANITY_LIST = [
   'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
   'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
   'piroca', 'viado', 'viadagem', 'corno', 'otario', 'otaria', 'vagabundo', 'safado',
-  'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'chupa', 'rola', 'penis', 'vagina',
-  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'trouxa', 'babaca'
+  'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'pqp', 'chupa', 'rola', 'penis', 'vagina',
+  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'cuzinho', 'trouxa', 'babaca'
 ];
 
 // 6.1 LISTA DE TERMOS TROLL, BRINCADEIRAS, ALIMENTOS E PALAVRAS INAPROPRIADAS PARA RH
@@ -231,13 +231,51 @@ export const GENERAL_TROLL_WORDS = new Set([
   'pitanga', 'jabuticaba', 'maracuja', 'maracujá', 'melao', 'melão',
   'coxinha', 'pastel', 'pizza', 'churrasco', 'pipoca', 'hamburguer', 'hotdog',
   'cerveja', 'chopp', 'chope', 'pinga', 'cachaca', 'cachaça', 'vodka', 'vinho', 'whisky', 'energetico',
-  'cigarro', 'narguile', 'fumo',
-  // Gírias, brincadeiras, zoeiras e termos sem contexto de RH
-  'fofoca', 'namoro', 'sexo', 'zoeira', 'palhacada', 'palhaçada', 'piada', 'preguica', 'preguiça',
-  'sono', 'dormir', 'mentira', 'besteira', 'bobagem', 'troca', 'fake', 'teste', 'asdf', 'qwert',
-  'jogo', 'truco', 'videogame', 'playstation', 'xbox', 'free fire', 'tinder', 'balada', 'festa',
-  'ping pong', 'ping-pong', 'sinuca', 'pebolim', 'futebol'
+  'cigarro', 'narguile', 'fumo', 'sorvete', 'acai', 'açaí', 'lanche', 'salgado', 'biscoito', 'bolacha',
+  'marmita', 'almoço', 'almoco', 'jantar', 'pao', 'pão',
+  // Gírias, brincadeiras, zoeiras e termos sem contexto de serviços
+  'comer', 'beber', 'dormir', 'roncar', 'brincar', 'fofoca', 'namoro', 'sexo', 'zoeira',
+  'palhacada', 'palhaçada', 'piada', 'preguica', 'preguiça', 'sono', 'mentira', 'besteira',
+  'bobagem', 'troca', 'fake', 'teste', 'asdf', 'qwert', 'jogo', 'truco', 'videogame',
+  'playstation', 'xbox', 'free fire', 'tinder', 'balada', 'festa', 'ping pong', 'ping-pong',
+  'sinuca', 'pebolim', 'futebol'
 ]);
+
+/**
+ * Verifica se uma palavra é um termo troll, brincadeira, fruta/comida solta ou gíria inapropriada
+ */
+export function isTrollWord(word) {
+  if (!word || typeof word !== 'string') return false;
+  const lower = word.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!lower || lower.length < 3) return false;
+
+  if (GENERAL_TROLL_WORDS.has(lower)) return true;
+
+  // Trata plurais e variações comuns em português (abacaxis -> abacaxi, bananas -> banana, pasteis -> pastel)
+  if (lower.endsWith('s')) {
+    const s1 = lower.slice(0, -1);
+    if (GENERAL_TROLL_WORDS.has(s1)) return true;
+    if (lower.endsWith('es')) {
+      const s2 = lower.slice(0, -2);
+      if (GENERAL_TROLL_WORDS.has(s2)) return true;
+    }
+    if (lower.endsWith('is')) {
+      const s3 = lower.slice(0, -2) + 'l';
+      if (GENERAL_TROLL_WORDS.has(s3)) return true;
+    }
+  }
+
+  // Raízes de palavras troll
+  const trollRoots = [
+    'abacaxi', 'banana', 'melancia', 'pastel', 'pizza', 'coxinha', 'cerveja', 'churrasco',
+    'pipoca', 'hamburguer', 'fofoca', 'namoro', 'zoeira', 'palhacada', 'bobagem', 'besteira'
+  ];
+  for (const root of trollRoots) {
+    if (lower.includes(root)) return true;
+  }
+
+  return false;
+}
 
 /**
  * Validador de Número de Telefone no Padrão Brasileiro (DDD + 8 ou 9 dígitos)
@@ -1258,31 +1296,49 @@ export function validateResponsibility(activity) {
 }
 
 /**
- * Verifica se um texto contém linguagem inapropriada / palavrões.
- * Usado como filtro leve para publicações no banco de dados (sem rejeitar 
- * títulos de cargos que não estão na lista padronizada).
+ * Detecta e identifica linguagem inapropriada / ofensas em um texto.
+ * Retorna se possui profanidade e qual raiz/palavra foi identificada.
  */
-export function hasProfanity(text) {
-  if (!text || typeof text !== 'string') return false;
+export function detectProfanity(text) {
+  if (!text || typeof text !== 'string') return { hasProfanity: false };
   const lower = text.toLowerCase().trim();
   const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
+  if (!cleanAlpha) return { hasProfanity: false };
 
+  // 1. Checa raízes ofensivas
   for (const root of PROFANITY_ROOTS) {
-    if (cleanAlpha.includes(root)) return true;
-  }
-
-  for (const b of PROFANITY_LIST) {
-    if (b.length >= 3) {
-      if (lower.includes(b) || cleanAlpha.includes(b)) return true;
+    if (cleanAlpha.includes(root)) {
+      return { hasProfanity: true, matchedWord: root };
     }
   }
 
-  // Termos curtos como 'cu' isolados
-  const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão)/i;
-  if (regexCu.test(lower) || (cleanAlpha === 'cu') || (cleanAlpha.startsWith('cu') && !['curso', 'curriculo', 'currículo', 'custom', 'custos', 'cuidados', 'cultura', 'cuidado', 'curadoria'].some(ok => cleanAlpha.startsWith(ok)))) {
-    return true;
+  // 2. Checa termos da lista
+  for (const b of PROFANITY_LIST) {
+    if (b.length >= 3) {
+      if (lower.includes(b) || cleanAlpha.includes(b)) {
+        return { hasProfanity: true, matchedWord: b };
+      }
+    }
   }
 
-  return false;
+  // 3. Termos curtos como 'cu' isolados ou compostos
+  const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão|zinh[oa])/i;
+  if (regexCu.test(lower) || cleanAlpha === 'cu') {
+    return { hasProfanity: true, matchedWord: 'termo impróprio' };
+  }
+
+  if (/^cu(zao|zão|dao|dão|bost|merd|lhao|lhão|zinh[oa])/i.test(cleanAlpha)) {
+    return { hasProfanity: true, matchedWord: 'termo impróprio' };
+  }
+
+  return { hasProfanity: false };
+}
+
+/**
+ * Verifica se um texto contém linguagem inapropriada / palavrões.
+ * Usado como filtro leve para publicações no banco de dados.
+ */
+export function hasProfanity(text) {
+  return detectProfanity(text).hasProfanity;
 }
 

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Send, Sparkles, AlertCircle, CheckCircle2, MapPin, DollarSign,
-  Calendar, Phone, MessageSquare, ThumbsUp, Check
+  Calendar, Phone, MessageSquare, ThumbsUp, Check, Building2
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { createServiceOrder, maskPhone, CITIES } from '../lib/ivaiConecta';
 import { validatePhoneNumber } from '../services/jobTaxonomy';
 import {
   validateServiceRequestDescription,
+  validateServiceDeadline,
   formatCurrencyBRL,
   maskCurrencyLive,
   validateCurrency,
@@ -20,15 +21,41 @@ import {
 export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
   const { currentUser, showToast } = useAppStore();
 
+  // Identificação do tipo de contratante (Empresa vs Pessoa Física)
+  const isCompanyUser = Boolean(
+    currentUser?.role === 'empresa' ||
+    currentUser?.role === 'company' ||
+    currentUser?.role === 'recrutador' ||
+    currentUser?.company ||
+    currentUser?.companyName ||
+    currentUser?.razaoSocial ||
+    currentUser?.cnpj
+  );
+
+  const clientName = (
+    currentUser?.company ||
+    currentUser?.companyName ||
+    currentUser?.tradeName ||
+    currentUser?.razaoSocial ||
+    currentUser?.nomeFantasia ||
+    currentUser?.name ||
+    (isCompanyUser ? 'Empresa Regional' : 'Cliente Ivaí Conecta')
+  ).trim();
+
   const [description, setDescription] = useState('');
   const [city, setCity] = useState(currentUser?.city || service?.city || 'Ivaiporã');
   const [budget, setBudget] = useState('A combinar');
   const [deadline, setDeadline] = useState('A combinar com o prestador');
-  const [phone, setPhone] = useState(currentUser?.phone ? maskPhone(currentUser.phone) : '');
+  const [phone, setPhone] = useState(
+    currentUser?.phone || currentUser?.contactPhone || currentUser?.whatsapp
+      ? maskPhone(currentUser?.phone || currentUser?.contactPhone || currentUser?.whatsapp)
+      : ''
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [touchedDesc, setTouchedDesc] = useState(false);
   const [touchedPhone, setTouchedPhone] = useState(false);
+  const [touchedDeadline, setTouchedDeadline] = useState(false);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -47,6 +74,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
   const descVal = validateServiceRequestDescription(description, { minLength: 20, maxLength: 800 });
   const phoneVal = validatePhoneNumber(phone, true);
   const budgetVal = validateCurrency(budget, { min: 10, max: 200000, required: false });
+  const deadlineVal = validateServiceDeadline(deadline, { required: true });
 
   const handleChipClick = (chipText) => {
     setErrorMsg('');
@@ -87,6 +115,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
 
     setTouchedDesc(true);
     setTouchedPhone(true);
+    setTouchedDeadline(true);
 
     const descCheck = validateServiceRequestDescription(description, { minLength: 20, maxLength: 800 });
     if (!descCheck.valid) {
@@ -106,24 +135,37 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
       return;
     }
 
+    const deadlineCheck = validateServiceDeadline(deadline, { required: true });
+    if (!deadlineCheck.valid) {
+      setErrorMsg(deadlineCheck.error);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMsg('');
 
     try {
+      const clientId = currentUser.uid || currentUser.id || 'usr_guest';
+      const providerId = service.createdBy || service.providerUid || '';
+
       const order = await createServiceOrder({
         serviceId: service.firestoreId || service.id,
         serviceTitle,
-        providerId: service.createdBy || service.providerUid || '',
+        providerId,
+        providerUid: providerId,
         providerName,
         providerEmail: service.providerEmail || '',
-        clientId: currentUser.uid || currentUser.id || 'usr_guest',
-        clientName: currentUser.name || 'Cliente Ivaí Conecta',
-        clientEmail: currentUser.email || '',
-        clientPhone: phone || currentUser.phone || '',
+        clientId,
+        clientUid: clientId,
+        clientName,
+        clientRole: isCompanyUser ? 'empresa' : (currentUser?.role || 'cliente'),
+        isCompanyOrder: isCompanyUser,
+        clientEmail: (currentUser.email || '').toLowerCase().trim(),
+        clientPhone: phone || currentUser.phone || currentUser.contactPhone || '',
         city,
         description: description.trim(),
         budget: budget.trim() || 'A combinar',
-        deadline: deadline.trim() || 'A combinar'
+        deadline: deadline.trim() || 'A combinar com o prestador'
       });
 
       showToast('🎉 Demanda de serviço enviada com sucesso! O prestador receberá a notificação.');
@@ -166,9 +208,19 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
             <span>Solicitação Formal de Serviço / Orçamento</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold font-heading">{serviceTitle}</h2>
-          <p className="text-xs text-blue-200 mt-0.5">
-            Prestador: <span className="font-semibold text-white">{providerName}</span> • {service.city || 'Vale do Ivaí'}
-          </p>
+
+          <div className="flex items-center justify-between text-xs text-blue-200 mt-2 pt-2 border-t border-white/15 flex-wrap gap-2">
+            <p>
+              Prestador: <span className="font-semibold text-white">{providerName}</span> • {service.city || 'Vale do Ivaí'}
+            </p>
+            {currentUser && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/15 text-[11px] font-semibold text-sky-200">
+                {isCompanyUser ? <Building2 size={13} className="text-amber-300" /> : null}
+                <span>{isCompanyUser ? 'Empresa Solicitante:' : 'Solicitante:'}</span>
+                <strong className="text-white">{clientName}</strong>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Formulário com Validação Aprimorada */}
@@ -192,12 +244,16 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
               {/* Indicador de Validação e Contador */}
               <div className="flex items-center gap-2 text-[11px]">
                 {descVal.valid ? (
-                  <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                  <span className="text-green-600 dark:text-green-400 font-bold flex items-center gap-1">
                     <CheckCircle2 size={13} /> Escopo Válido
                   </span>
-                ) : description.trim().length > 0 ? (
+                ) : description.trim().length > 0 && description.trim().length < 20 ? (
                   <span className="text-amber-600 dark:text-amber-400 font-medium">
-                    Faltam {20 - description.trim().length} letras
+                    Faltam {20 - description.trim().length} {20 - description.trim().length === 1 ? 'letra' : 'letras'}
+                  </span>
+                ) : description.trim().length >= 20 && !descVal.valid ? (
+                  <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1">
+                    <AlertCircle size={13} /> {descVal.errorTitle || 'Revise o texto'}
                   </span>
                 ) : null}
                 <span className="font-mono text-gray-400 dark:text-slate-500">
@@ -218,14 +274,25 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
                 onBlur={() => setTouchedDesc(true)}
                 placeholder="Ex: Preciso de uma reforma na fiação do escritório com 4 tomadas novas e revisão do disjuntor principal..."
                 className={`input w-full text-xs sm:text-sm resize-none rounded-2xl p-3.5 leading-relaxed transition-all ${
-                  touchedDesc && !descVal.valid && description.trim().length > 0
-                    ? 'border-amber-400 focus:ring-amber-400'
+                  (touchedDesc || description.trim().length >= 20) && !descVal.valid && description.trim().length > 0
+                    ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20 dark:bg-red-950/10'
                     : descVal.valid
-                    ? 'border-green-400 focus:ring-green-400'
+                    ? 'border-green-400 focus:ring-green-400 focus:border-green-500'
                     : ''
                 }`}
               />
             </div>
+
+            {/* Alerta Detalhado de Validação da Descrição */}
+            {(touchedDesc || description.trim().length >= 20) && !descVal.valid && description.trim().length > 0 && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-2 text-xs font-medium text-red-700 dark:text-red-300 animate-in fade-in">
+                <AlertCircle size={15} className="shrink-0 text-red-500 mt-0.5" />
+                <div className="flex-1">
+                  <span className="font-bold block">{descVal.errorTitle}:</span>
+                  <span>{descVal.error}</span>
+                </div>
+              </div>
+            )}
 
             {/* Sugestões Rápidas de Demanda */}
             <div className="pt-1 space-y-1.5">
@@ -358,19 +425,51 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
-                Prazo Desejado
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-gray-700 dark:text-slate-300">
+                  Prazo Desejado <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1 text-[11px]">
+                  {deadlineVal.valid && deadline.trim().length > 0 ? (
+                    <span className="text-green-600 dark:text-green-400 font-bold flex items-center gap-0.5">
+                      <CheckCircle2 size={11} /> Válido
+                    </span>
+                  ) : (touchedDeadline || deadline.trim().length >= 3) && !deadlineVal.valid ? (
+                    <span className="text-red-500 font-bold flex items-center gap-0.5">
+                      <AlertCircle size={11} /> {deadlineVal.errorTitle || 'Inválido'}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
               <div className="relative">
                 <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 pointer-events-none" />
                 <input
                   type="text"
+                  required
                   value={deadline}
-                  onChange={e => setDeadline(e.target.value)}
+                  onChange={e => {
+                    setDeadline(e.target.value);
+                    setErrorMsg('');
+                  }}
+                  onBlur={() => setTouchedDeadline(true)}
                   placeholder="Ex: Até sexta-feira / Imediato"
-                  className="input pl-9.5 w-full text-xs rounded-xl"
+                  className={`input pl-9.5 w-full text-xs rounded-xl transition-all ${
+                    (touchedDeadline || deadline.trim().length >= 3) && !deadlineVal.valid
+                      ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20 dark:bg-red-950/10'
+                      : deadlineVal.valid && deadline.trim().length > 0
+                      ? 'border-green-400'
+                      : ''
+                  }`}
                 />
               </div>
+
+              {/* Alerta de Erro do Prazo */}
+              {(touchedDeadline || deadline.trim().length >= 3) && !deadlineVal.valid && (
+                <span className="text-[10px] text-red-500 font-semibold mt-1 flex items-center gap-1 animate-in fade-in">
+                  <AlertCircle size={11} className="shrink-0" />
+                  {deadlineVal.error}
+                </span>
+              )}
 
               {/* Botões Rápidos de Prazo */}
               <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -378,10 +477,14 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setDeadline(opt)}
+                    onClick={() => {
+                      setDeadline(opt);
+                      setTouchedDeadline(true);
+                      setErrorMsg('');
+                    }}
                     className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold transition-all border cursor-pointer ${
                       deadline === opt
-                        ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300'
+                        ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 font-bold shadow-xs'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                     }`}
                   >
@@ -409,9 +512,9 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !descVal.valid || !phoneVal.valid}
+                disabled={isSubmitting || !descVal.valid || !phoneVal.valid || !budgetVal.valid || !deadlineVal.valid}
                 className={`btn btn-sm text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer ${
-                  descVal.valid && phoneVal.valid
+                  descVal.valid && phoneVal.valid && budgetVal.valid && deadlineVal.valid
                     ? 'btn-primary'
                     : 'bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                 }`}

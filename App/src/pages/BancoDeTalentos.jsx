@@ -132,24 +132,26 @@ export default function BancoDeTalentos() {
   return (
     <>
       {/* Hero Header */}
-      <header className="bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 relative overflow-hidden">
-        <div className="container relative z-10">
+      <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-10 lg:py-14 overflow-hidden w-full">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(0,82,255,0.25),transparent_50%)] pointer-events-none" />
+
+        <div className="container mx-auto px-4 sm:px-6 relative z-10 w-full max-w-full">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-6 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-5 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
           >
             <ArrowLeft size={14} /> Voltar para a tela anterior
           </button>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div>
+            <div className="max-w-2xl">
               <div className="flex items-center gap-2 text-accent-sky text-xs font-bold uppercase tracking-wider mb-2">
                 <Sparkles size={16} /> Banco de Talentos Regional
               </div>
-              <h1 className="text-3xl sm:text-4xl font-heading font-extrabold text-white mb-2">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-extrabold text-white mb-2 leading-tight">
                 Talentos &amp; Docentes do Vale do Ivaí
               </h1>
-              <p className="text-gray-300 text-base max-w-2xl">
+              <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
                 Encontre estudantes qualificados, profissionais técnicos e professores orientadores do IFPR, Univale e UENP.
               </p>
             </div>
@@ -165,10 +167,10 @@ export default function BancoDeTalentos() {
           </div>
 
           {/* Abas de Navegação */}
-          <div className="flex items-center gap-3 mt-8 border-b border-white/15 pt-2">
+          <div className="flex items-center gap-2 sm:gap-3 mt-6 sm:mt-8 border-b border-white/15 pt-2 overflow-x-auto scrollbar-none w-full max-w-full">
             <button
               onClick={() => setActiveTab('talents')}
-              className={`px-5 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === 'talents' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -177,7 +179,7 @@ export default function BancoDeTalentos() {
 
             <button
               onClick={() => setActiveTab('teachers')}
-              className={`px-5 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === 'teachers' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -188,24 +190,24 @@ export default function BancoDeTalentos() {
         </div>
       </header>
 
-      <main className="container section space-y-8">
+      <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8 w-full max-w-full">
 
         {/* ── ABA PROFESSORES VERIFICADOS ── */}
         {activeTab === 'teachers' && (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                   <Award className="text-amber-400 fill-amber-400" size={24} /> Corpo Docente do Vale do Ivaí
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-slate-400">
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
                   Professores e orientadores das universidades parceiras (IFPR, Univale, UENP) habilitados no sistema.
                 </p>
               </div>
             </div>
 
             {teachers.length === 0 ? (
-              <div className="card p-12 text-center space-y-4 max-w-md mx-auto my-8 border border-gray-100 dark:border-slate-800">
+              <div className="card p-10 text-center space-y-4 max-w-md mx-auto my-8 border border-gray-100 dark:border-slate-800">
                 <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
                   <Award size={32} />
                 </div>
@@ -219,16 +221,16 @@ export default function BancoDeTalentos() {
                 </div>
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                 {teachers.map(t => (
-                  <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between">
+                  <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between min-w-0 overflow-hidden">
                     <div className="space-y-3">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-4 min-w-0">
                         <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white dark:bg-slate-800" />
-                        <div>
-                          <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug">{t.name}</h3>
-                          <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5">{t.degree || 'Docente / Orientador'}</div>
-                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">{t.institution}</div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug truncate">{t.name}</h3>
+                          <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5 truncate">{t.degree || 'Docente / Orientador'}</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium truncate">{t.institution}</div>
                         </div>
                       </div>
 
@@ -266,31 +268,33 @@ export default function BancoDeTalentos() {
 
         {/* ── ABA ALUNOS & TALENTOS ── */}
         {activeTab === 'talents' && (
-          <>
+          <div className="space-y-8 w-full">
             {/* Destaques */}
             {!hasActiveFilters && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 w-full">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
-                      <Sparkles className="text-amber-400 fill-amber-400" size={22} /> Talentos em Destaque na Região
+                    <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                      <Sparkles className="text-amber-400 fill-amber-400 shrink-0" size={22} /> Talentos em Destaque na Região
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">Estudantes com matrícula autenticada e pareceres docentes validados.</p>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+                      Estudantes com matrícula autenticada e pareceres docentes validados.
+                    </p>
                   </div>
-                  <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full shrink-0">
                     Selo de Excelência
                   </span>
                 </div>
 
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
                   {highlightedTalents.map(t => (
-                    <div key={t.id} className="card p-5 space-y-3 border-amber-200/60 dark:border-amber-900/60 bg-gradient-to-b from-amber-50/20 dark:from-amber-950/30 to-white dark:to-slate-800 hover:border-amber-400 transition-all flex flex-col justify-between">
+                    <div key={t.id} className="card p-5 space-y-3 border-amber-200/60 dark:border-amber-900/60 bg-gradient-to-b from-amber-50/20 dark:from-amber-950/30 to-white dark:to-slate-800 hover:border-amber-400 transition-all flex flex-col justify-between min-w-0 overflow-hidden">
                       <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 shadow-xs" />
-                          <div>
-                            <div className="font-bold text-gray-800 dark:text-white text-sm leading-tight">{t.name}</div>
-                            <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold truncate max-w-[140px]">{t.course}</div>
+                        <div className="flex items-center gap-3 mb-2 min-w-0">
+                          <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 shadow-xs shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-gray-800 dark:text-white text-sm leading-tight truncate">{t.name}</div>
+                            <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold truncate max-w-full">{t.course}</div>
                           </div>
                         </div>
 
@@ -300,13 +304,13 @@ export default function BancoDeTalentos() {
 
                         <div className="flex flex-wrap gap-1">
                           {t.skills.slice(0, 3).map(s => (
-                            <span key={s} className="tag text-[10px]">{s}</span>
+                            <span key={s} className="tag text-[10px] truncate max-w-[120px]">{s}</span>
                           ))}
                         </div>
                       </div>
 
                       <div className="pt-3 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between gap-2">
-                        <button onClick={() => navigate(`/perfil/${t.id}`)} className="text-xs font-bold text-primary-blue dark:text-blue-400 hover:underline">
+                        <button onClick={() => navigate(`/perfil/${t.id}`)} className="text-xs font-bold text-primary-blue dark:text-blue-400 hover:underline cursor-pointer">
                           Ver Perfil
                         </button>
                       </div>
@@ -317,49 +321,49 @@ export default function BancoDeTalentos() {
             )}
 
             {/* ── PAINEL DE FILTROS ── */}
-            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-brand-sm space-y-4 transition-colors duration-300">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-center">
-                <div className="lg:col-span-5 flex items-center gap-2.5 border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-gray-50/50 dark:bg-slate-800/50 focus-within:bg-white dark:focus-within:bg-slate-800 focus-within:border-primary-blue">
+            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-brand-sm space-y-4 transition-colors duration-300 w-full max-w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center w-full">
+                <div className="sm:col-span-2 lg:col-span-5 flex items-center gap-2.5 border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 bg-gray-50/50 dark:bg-slate-800/50 focus-within:bg-white dark:focus-within:bg-slate-800 focus-within:border-primary-blue min-w-0">
                   <Search size={17} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Busque por nome, curso, instituição ou habilidade..."
-                    className="text-sm sm:text-base text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full"
+                    className="text-sm text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full min-w-0"
                   />
                   {query && (
-                    <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full">
+                    <button onClick={() => setQuery('')} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full shrink-0 cursor-pointer">
                       <X size={14} className="text-gray-400" />
                     </button>
                   )}
                 </div>
 
-                <div className="lg:col-span-3">
+                <div className="sm:col-span-1 lg:col-span-3 min-w-0">
                   <select
                     value={city}
                     onChange={e => setCity(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium truncate"
                   >
                     {CITIES.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
                   </select>
                 </div>
 
-                <div className="lg:col-span-2">
+                <div className="sm:col-span-1 lg:col-span-2 min-w-0">
                   <select
                     value={area}
                     onChange={e => setArea(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium truncate"
                   >
                     {AREAS.map(a => <option key={a.value} value={a.value} className="dark:bg-slate-800 dark:text-white">{a.label}</option>)}
                   </select>
                 </div>
 
-                <div className="lg:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-2 min-w-0">
                   <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 cursor-pointer font-medium truncate"
                   >
                     <option value="endorsements" className="dark:bg-slate-800 dark:text-white">Mais Recomendados</option>
                     <option value="name" className="dark:bg-slate-800 dark:text-white">Nome (A-Z)</option>
@@ -371,25 +375,25 @@ export default function BancoDeTalentos() {
 
             {/* ── GRID DE TALENTOS ── */}
             {filtered.length === 0 ? (
-              <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
+              <div className="py-16 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs w-full">
                 <div className="flex justify-center mb-4">
                   <Search size={48} className="text-gray-300 dark:text-slate-600" />
                 </div>
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhum talento encontrado com os filtros selecionados.</p>
                 <p className="text-sm text-gray-400 dark:text-slate-400 mb-5">Estudantes pendentes de verificação de matrícula ficam ocultos até realizarem a autenticação.</p>
-                <button onClick={resetFilters} className="btn btn-outline btn-sm">
+                <button onClick={resetFilters} className="btn btn-outline btn-sm cursor-pointer">
                   <RotateCcw size={14} /> Restaurar Filtros
                 </button>
               </div>
             ) : (
-              <div className="grid-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full max-w-full">
                 {filtered.map(t => <TalentCard key={t.id} talent={t} />)}
               </div>
             )}
-          </>
+          </div>
         )}
 
-      </main>
+      </section>
 
       {/* Modal: Alunos Recomendados pelo Professor Específico */}
       {selectedTeacherForEndorsements && (
