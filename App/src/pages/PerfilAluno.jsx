@@ -3,20 +3,21 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, CheckCircle2, Clock, ChevronDown, User, Mail, Loader2
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, CheckCircle2, Clock, ChevronDown, User, Mail
 } from 'lucide-react';
 import {
   getTalentById, requestTeacherEndorsement, updateTalentProfile,
-  proactiveEndorseStudent, uploadUserProfilePicture, subscribeToTalentById,
+  proactiveEndorseStudent, uploadUserProfilePicture,
   subscribeToStudentEndorsementRequests, getVerifiedTeachers, subscribeToTeachers,
   hasTeacherEndorsedStudent, sanitizeUniqueEndorsements, getEndorsementRequests,
   deduplicateRequestsByTeacher, isSameProfessor, STORAGE_KEY_ENDORSEMENT_REQUESTS,
   validateStudentEmail
 } from '../lib/ivaiConecta';
 import { db } from '../lib/firebase.js';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 
 // Função auxiliar de montagem do perfil em fallback
@@ -58,7 +59,7 @@ export default function PerfilAluno() {
   const [talent, setTalent] = useState(() => {
     const local = getTalentById(talentId);
     if (local) return local;
-    return buildFallbackTalent(currentUser);
+    return id ? null : buildFallbackTalent(currentUser);
   });
   const [loading, setLoading] = useState(!talent);
 
@@ -296,8 +297,54 @@ export default function PerfilAluno() {
           newSkill: ''
         });
       } else {
-        const fallback = getTalentById(targetId) || buildFallbackTalent(currentUser);
-        setTalent(prev => fallback || prev);
+        const fallback = getTalentById(targetId) || (!id ? buildFallbackTalent(currentUser) : null);
+        if (fallback) {
+          setTalent(fallback);
+        } else if (id) {
+          try {
+            const cleanTarget = decodeURIComponent(String(targetId)).trim();
+            const cleanLower = cleanTarget.toLowerCase();
+            const usersCol = collection(db, 'users');
+            const queries = cleanLower.includes('@')
+              ? [query(usersCol, where('email', '==', cleanLower), limit(1))]
+              : [
+                  query(usersCol, where('name', '==', cleanTarget), limit(1)),
+                  query(usersCol, where('displayName', '==', cleanTarget), limit(1))
+                ];
+            Promise.all(queries.map(q => getDocs(q))).then(results => {
+              if (!isMounted) return;
+              for (const r of results) {
+                if (!r.empty) {
+                  const uDoc = r.docs[0];
+                  const d = uDoc.data();
+                  setTalent({
+                    id: uDoc.id,
+                    firestoreId: uDoc.id,
+                    name: d.name || d.displayName || cleanTarget,
+                    course: d.course || 'Graduação / Ensino Técnico',
+                    institution: d.institution || 'IFPR Campus Ivaiporã',
+                    period: d.period || 'Em andamento',
+                    city: d.city || 'Ivaiporã',
+                    avatar: d.avatar || d.photoURL || '',
+                    skills: Array.isArray(d.skills) ? d.skills : [],
+                    isVerifiedStudent: Boolean(d.isVerifiedStudent || d.emailVerified),
+                    studentEmail: d.studentEmail || (validateStudentEmail(d.email)?.isValid ? d.email : ''),
+                    email: d.email || '',
+                    raNumber: d.raNumber || '',
+                    linkedin: d.linkedin || '',
+                    github: d.github || '',
+                    bio: d.bio || '',
+                    experiences: Array.isArray(d.experiences) ? d.experiences : [],
+                    projects: Array.isArray(d.projects) ? d.projects : [],
+                    education: Array.isArray(d.education) ? d.education : [],
+                    endorsements: Array.isArray(d.endorsements) ? d.endorsements : []
+                  });
+                  break;
+                }
+              }
+            }).catch(() => {});
+          } catch {}
+        }
       }
       setLoading(false);
     }, (err) => {
@@ -446,7 +493,7 @@ export default function PerfilAluno() {
     }
 
     setTalent(prev => ({
-      ...(prev || {}),
+      ...prev,
       ...editData
     }));
 
@@ -538,7 +585,7 @@ export default function PerfilAluno() {
     );
   }
 
-  const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
+  const hasCustomAvatar = talent.avatar && !isGenericPlaceholderAvatar(talent.avatar);
 
   return (
     <>
@@ -573,11 +620,19 @@ export default function PerfilAluno() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 max-w-full flex-1">
               <div className="relative group shrink-0">
-                <img
-                  src={talent.avatar || defaultAvatar}
-                  alt={talent.name}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
-                />
+                {hasCustomAvatar ? (
+                  <img
+                    src={talent.avatar}
+                    alt={talent.name}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
+                  />
+                ) : (
+                  <div
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(talent.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
+                  >
+                    {(talent.name || 'A').slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 {isOwner && (
                   <button
                     onClick={() => setActiveTab('edit')}

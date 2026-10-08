@@ -1027,7 +1027,7 @@ export default function GerenciamentoVagasEmpresa() {
       course: newCandidateForm.course,
       institution: newCandidateForm.institution,
       city: newCandidateForm.city,
-      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250`,
+      avatar: '',
       matchScore: Number(newCandidateForm.matchScore) || 85,
       stage: addCandidateTargetStage,
       appliedAt: new Date().toLocaleDateString('pt-BR'),

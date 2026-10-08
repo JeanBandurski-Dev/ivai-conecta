@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, MessageSquare, Trash2, FileText } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { deleteService } from '../lib/ivaiConecta';
+import { isGenericPlaceholderAvatar } from '../services/chatService';
 import SolicitarServicoModal from './SolicitarServicoModal';
 
 export default function ServiceCard({ service, onDelete, onRequestService }) {
@@ -69,7 +70,7 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
       email: targetEmail,
       uid: targetUid,
       role: 'freelancer',
-      avatar: avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
+      avatar: (avatar && !isGenericPlaceholderAvatar(avatar)) ? avatar : ''
     }, `Serviço: ${serviceTitle}`, null, draft);
   };
 

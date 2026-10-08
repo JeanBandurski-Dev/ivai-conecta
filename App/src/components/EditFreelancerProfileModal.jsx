@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { CITIES, maskPhone, maskCNPJ } from '../lib/ivaiConecta';
 import { validatePhoneNumber } from '../services/jobTaxonomy';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 
 const FREELANCER_AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -570,11 +571,11 @@ export default function EditFreelancerProfileModal({
                 </label>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 dark:bg-slate-800 border-2 border-primary-blue/30 shrink-0">
-                    {editData?.avatar ? (
+                    {editData?.avatar && !isGenericPlaceholderAvatar(editData.avatar) ? (
                       <img src={editData.avatar} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold text-lg">
-                        {editData?.name?.charAt(0) || 'F'}
+                      <div className={`w-full h-full flex items-center justify-center text-white bg-gradient-to-tr ${getAvatarGradient(editData?.name)} font-bold text-lg`}>
+                        {(editData?.name || 'F').charAt(0).toUpperCase()}
                       </div>
                     )}
                   </div>

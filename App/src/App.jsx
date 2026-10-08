@@ -12,7 +12,6 @@ import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
-import { auth } from './lib/firebase';
 
 // Lazy-loaded pages for fast initial page load & code-splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));

@@ -3,10 +3,8 @@
  * @description Repositório de dados para a coleção 'services' (Serviços e Freelancers Locais).
  */
 
-import { where, query, getDocs } from 'firebase/firestore';
 import { BaseRepository, handleFirestoreError } from './BaseRepository.js';
 import { normalizeServiceDTO, validateServiceDTO } from '../models/ServiceDTO.js';
-import { ServiceStatus } from '../models/enums.js';
 
 export class ServiceRepository extends BaseRepository {
   constructor() {

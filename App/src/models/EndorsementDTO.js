@@ -8,7 +8,6 @@ import {
   validateString,
   validateEmail,
   validationResult,
-  ValidationError,
 } from './schemaValidator.js';
 
 /**

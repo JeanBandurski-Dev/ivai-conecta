@@ -1,15 +1,13 @@
 // Talents & Teachers Service for Ivaí Conecta (Firestore 'users' and 'endorsement_requests' collections)
 import { db } from '../lib/firebase.js';
-import { collection, getDoc, getDocs, doc, setDoc, addDoc, updateDoc, arrayUnion, increment, onSnapshot } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, updateDoc, arrayUnion, increment, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
   STORAGE_KEY_ENDORSEMENT_REQUESTS,
 } from '../data/seedData.js';
-import { userRepository, endorsementRepository } from '../repositories/index.js';
-import { EndorsementStatus, UserRole } from '../models/enums.js';
-import { normalizeEndorsementDTO, normalizeEndorsementRequestDTO } from '../models/EndorsementDTO.js';
-import { normalizeUserDTO } from '../models/UserDTO.js';
+import { endorsementRepository } from '../repositories/index.js';
+import { EndorsementStatus } from '../models/enums.js';
 
 import { matchCity } from '../utils/searchUtils.js';
 import { isInstitutionalEmail } from './authService.js';
@@ -470,8 +468,18 @@ export function getTalents(city = 'Todas as Cidades') {
 
 export function getTalentById(id) {
   if (!id) return null;
+  const idStr = String(id).toLowerCase().trim();
   const talents = getTalents('Todas as Cidades');
-  const found = talents.find(t => t.id === Number(id) || t.id === id || String(t.id) === String(id) || t.firestoreId === id);
+  const found = talents.find(t =>
+    t.id === Number(id) ||
+    t.id === id ||
+    String(t.id).toLowerCase() === idStr ||
+    String(t.firestoreId || '').toLowerCase() === idStr ||
+    String(t.uid || '').toLowerCase() === idStr ||
+    (t.email && t.email.toLowerCase().trim() === idStr) ||
+    (t.studentEmail && t.studentEmail.toLowerCase().trim() === idStr) ||
+    (t.name && t.name.toLowerCase().trim() === idStr)
+  );
   if (found) return found;
 
   if (typeof localStorage !== 'undefined') {
@@ -479,7 +487,12 @@ export function getTalentById(id) {
     if (rawAuth) {
       try {
         const auth = JSON.parse(rawAuth);
-        if (auth && (String(auth.id) === String(id) || String(auth.uid) === String(id) || auth.email === id || id === 'me')) {
+        if (auth && (
+          String(auth.id || '').toLowerCase() === idStr ||
+          String(auth.uid || '').toLowerCase() === idStr ||
+          (auth.email && auth.email.toLowerCase().trim() === idStr) ||
+          id === 'me'
+        )) {
           return normalizeUserDoc(auth, auth.uid || auth.id);
         }
       } catch {}
@@ -794,10 +807,6 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
     ? String(teacherUserOrEmail.uid || teacherUserOrEmail.id || '')
     : (typeof teacherUserOrEmail === 'string' && !teacherUserOrEmail.includes('@') ? teacherUserOrEmail.trim() : '');
 
-  const profName = typeof teacherUserOrEmail === 'object' && teacherUserOrEmail !== null
-    ? String(teacherUserOrEmail.name || '').toLowerCase().trim()
-    : '';
-
   const filterForTeacher = (allRequests) => {
     if (!Array.isArray(allRequests)) return [];
 
@@ -805,7 +814,6 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
       if (!r) return false;
       const rEmail = String(r.profEmail || '').toLowerCase().trim();
       const rUid = String(r.profUid || r.targetTeacherId || '').trim();
-      const rName = String(r.profName || '').toLowerCase().trim();
 
       // 1. Match por email direto
       if (rEmail && profEmails.includes(rEmail)) return true;

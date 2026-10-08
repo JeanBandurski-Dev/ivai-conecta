@@ -487,7 +487,7 @@ export function validateServiceDeadline(deadline, { required = true, minLength =
   ];
 
   // Regex para padrões de data (ex: 15/10, 20/11/2026) ou horas/dias com números (ex: 2 dias, 24h, 48hrs)
-  const hasDateOrNumericPattern = /\b\d{1,2}[\/\-\.]\d{1,2}\b/.test(clean) ||
+  const hasDateOrNumericPattern = /\b\d{1,2}[/\-.]\d{1,2}\b/.test(clean) ||
     /\b\d+\s*(h|hrs|hr|horas|d|dias|sem|semanas|m|mes|meses)\b/i.test(clean) ||
     /\bdia\s+\d{1,2}\b/i.test(norm);
 

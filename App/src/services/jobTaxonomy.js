@@ -209,18 +209,23 @@ export const STANDARD_BENEFITS = [
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
 export const PROFANITY_ROOTS = [
-  'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
-  'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
-  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp', 'pqp', 'chupa', 'cacete', 'krl', 'kct', 'trouxa', 'babaca',
-  'cuzin', 'cuzao', 'cuzão', 'otari', 'fuder', 'fudeu', 'fodasse', 'fodase'
+  'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'fuder', 'fudeu', 'fudid', 'fudeo', 'fodass', 'fudass',
+  'puta', 'puto', 'putaria', 'putinh', 'putao', 'putão',
+  'porra', 'porrin', 'caralh', 'karalh', 'carai', 'karaio', 'bucet', 'piroca', 'arromb', 'viad', 'viadagem', 'bicha', 'travec', 'sapatao', 'sapatão',
+  'vagabund', 'safad', 'desgrac', 'desgraç', 'vsf', 'vtnc', 'tmnc', 'tnc', 'fdp', 'pqp', 'chupa', 'cacete', 'krl', 'crl', 'kct',
+  'trouxa', 'babaca', 'imbecil', 'idiot', 'escrot', 'canalha', 'cretin',
+  'cuzin', 'cuzao', 'cuzão', 'cuzaum', 'cuzoe', 'cuzõe',
+  'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu', 'tomarnoseucu', 'tomanoseucu',
+  'otari', 'otário', 'inutil', 'inútil', 'retardad', 'vadi'
 ];
 
 export const PROFANITY_LIST = [
   'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
-  'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
-  'piroca', 'viado', 'viadagem', 'corno', 'otario', 'otaria', 'vagabundo', 'safado',
-  'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'pqp', 'chupa', 'rola', 'penis', 'vagina',
-  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'cuzinho', 'trouxa', 'babaca'
+  'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'fuder', 'fudeu', 'fudido', 'fudida',
+  'carai', 'cacete', 'buceta', 'piroca', 'viado', 'viadagem', 'corno', 'corna', 'otario', 'otaria', 'vagabundo', 'safado',
+  'desgraca', 'desgraça', 'vsf', 'vtnc', 'tmnc', 'tnc', 'fdp', 'pqp', 'chupa', 'rola', 'penis', 'vagina',
+  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'cuzinho', 'trouxa', 'babaca',
+  'imbecil', 'idiota', 'escroto', 'escrota', 'inutil', 'inútil', 'retardado', 'retardada', 'vadia'
 ];
 
 // 6.1 LISTA DE TERMOS TROLL, BRINCADEIRAS, ALIMENTOS E PALAVRAS INAPROPRIADAS PARA RH
@@ -1301,34 +1306,103 @@ export function validateResponsibility(activity) {
  */
 export function detectProfanity(text) {
   if (!text || typeof text !== 'string') return { hasProfanity: false };
-  const lower = text.toLowerCase().trim();
-  const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
+
+  // 1. Normalização profunda (remoção de acentos e leetspeak)
+  const rawClean = text.toLowerCase().trim();
+  if (!rawClean) return { hasProfanity: false };
+
+  // Remove acentuação
+  let normalized = rawClean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Mapeamento leetspeak clássico para detectar evasões como v4i t0m4r n0 s3ucu, etc.
+  const leetMap = {
+    '@': 'a', '4': 'a',
+    '0': 'o',
+    '1': 'i', '!': 'i', '|': 'i',
+    '3': 'e',
+    '5': 's', '$': 's',
+    '7': 't',
+    '8': 'b'
+  };
+  normalized = normalized.replace(/[@01!|35$784]/g, m => leetMap[m] || m);
+
+  // Reduz caracteres repetidos (ex: cuuuuu -> cu, lixoooo -> lixo, porrrrra -> porra)
+  const collapsedRepeats = normalized.replace(/(.)\1{2,}/g, '$1$1');
+
+  // String pura sem espaços nem pontuações para evasões de espaçamento (ex: v.t.n.c -> vtnc, s e u c u -> seucu)
+  const cleanAlpha = collapsedRepeats.replace(/[^a-z0-9]/g, '');
   if (!cleanAlpha) return { hasProfanity: false };
 
-  // 1. Checa raízes ofensivas
+  // 2. Expressões compostas explícitas e insultos com 'cu' (ex: "vai tomar no seucu", "tomar no cu", "seu cu", "vai tomar no cu", etc.)
+  const cuPatterns = [
+    /(vai|vou|va|vao)?\s*(tomar?|toma|enfiar?|enfia|da|dar|enfie)\s*(no|pra|pro|o)?\s*(seu|teu)?\s*cu\b/i,
+    /\b(seu|teu|meu|no|no\s+seu|no\s+teu|pra|pro|pau\s+no)\s*cu\b/i,
+    /\bcu\b/i,
+    /\bc[\W_]*u\b/i,
+    /\bk[\W_]*u\b/i
+  ];
+
+  for (const pat of cuPatterns) {
+    if (pat.test(normalized) || pat.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
+    }
+  }
+
+  // Evasões coladas em cleanAlpha para 'cu'
+  const cuAlphaEvasions = [
+    'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu',
+    'tomarnoseucu', 'tomanoseucu', 'vaitomarnocu', 'vaitomarnoseucu',
+    'enfianocu', 'enfianoseucu', 'darocu', 'daocu', 'cuzao', 'cuzinho', 'cuzaum',
+    'vtnc', 'tmnc', 'tnc', 'arrombado', 'arrombada'
+  ];
+  for (const ev of cuAlphaEvasions) {
+    if (cleanAlpha.includes(ev)) {
+      return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
+    }
+  }
+
+  // 3. Insultos direcionados usando termos como "lixo" (ex.: "oi lixo", "seu lixo", "lixo humano", ou mensagem apenas "lixo")
+  const lixoPatterns = [
+    /\b(oi|ola|seu|sua|um|uma|vc|voce|você|tu|eh|e|é|inutil|tão|tao|muito)\s+lixo\b/i,
+    /\blixo\s+(humano|de\s+pessoa|do\s+caralho|demais)\b/i,
+    /\b(vc|voce|você|tu)\s+(eh|é|e)\s+(um\s+)?lixo\b/i,
+    /^(oi|ola)?\s*lixo[s]?$/i
+  ];
+  for (const lp of lixoPatterns) {
+    if (lp.test(normalized) || lp.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
+    }
+  }
+
+  if (['lixo', 'lixos', 'oilixo', 'olalixo', 'seulixo', 'sualixo', 'vceumlixo', 'voceeumlixo'].includes(cleanAlpha) || cleanAlpha.includes('lixohumano')) {
+    return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
+  }
+
+  // 4. Insultos e ofensas diretas no diálogo (ex: "seu idiota", "inútil", "babaca", "otário", etc.)
+  const directInsults = [
+    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(otario|otaria|babaca|trouxa|imbecil|idiota|inutil|inútil|escroto|escrota|canalha|corno|corna|cretino|cretina|retardado|retardada)\b/i,
+    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(burro|burra)\b/i
+  ];
+  for (const di of directInsults) {
+    if (di.test(normalized) || di.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'ofensa pessoal' };
+    }
+  }
+
+  // 5. Checa raízes ofensivas em cleanAlpha
   for (const root of PROFANITY_ROOTS) {
     if (cleanAlpha.includes(root)) {
       return { hasProfanity: true, matchedWord: root };
     }
   }
 
-  // 2. Checa termos da lista
+  // 6. Checa termos da lista
   for (const b of PROFANITY_LIST) {
     if (b.length >= 3) {
-      if (lower.includes(b) || cleanAlpha.includes(b)) {
+      if (normalized.includes(b) || cleanAlpha.includes(b)) {
         return { hasProfanity: true, matchedWord: b };
       }
     }
-  }
-
-  // 3. Termos curtos como 'cu' isolados ou compostos
-  const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão|zinh[oa])/i;
-  if (regexCu.test(lower) || cleanAlpha === 'cu') {
-    return { hasProfanity: true, matchedWord: 'termo impróprio' };
-  }
-
-  if (/^cu(zao|zão|dao|dão|bost|merd|lhao|lhão|zinh[oa])/i.test(cleanAlpha)) {
-    return { hasProfanity: true, matchedWord: 'termo impróprio' };
   }
 
   return { hasProfanity: false };

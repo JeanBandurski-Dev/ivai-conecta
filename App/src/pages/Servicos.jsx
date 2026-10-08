@@ -47,7 +47,6 @@ export default function Servicos() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const isFreelancer = currentUser?.role === UserRole.FREELANCER;
-  const isCompany = currentUser?.role === UserRole.EMPRESA || currentUser?.role === 'empresa' || currentUser?.role === 'company' || currentUser?.role === 'recrutador';
 
   const [activeTab,    setActiveTab]    = useState(() => {
     const v = params.get('view');

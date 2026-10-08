@@ -28,6 +28,82 @@ const chatChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChann
 // ─── HELPERS DE IDENTIDADE E PERFIL ─────────────────────────────────────
 
 /**
+ * Conhecidos IDs de stock photos de pessoas / avatares genéricos no Unsplash
+ */
+export const GENERIC_STOCK_AVATAR_IDS = [
+  'photo-1534528741775-53994a69daeb',
+  'photo-1507003211169-0a1dd7228f2d',
+  'photo-1494790108377-be9c29b29330',
+  'photo-1517841905240-472988babdf9',
+  'photo-1500648767791-00dcc994a43e',
+  'photo-1573496359142-b8d87734a5a2',
+  'photo-1560250097-0b93528c311a'
+];
+
+/**
+ * Verifica se a URL de avatar informada é um placeholder genérico de banco de fotos
+ */
+export function isGenericPlaceholderAvatar(url) {
+  if (!url || typeof url !== 'string') return true;
+  const u = url.trim().toLowerCase();
+  if (!u) return true;
+  for (const stockId of GENERIC_STOCK_AVATAR_IDS) {
+    if (u.includes(stockId)) return true;
+  }
+  return false;
+}
+
+/**
+ * Retorna um gradiente determinístico atraente baseado no nome do usuário para o avatar de iniciais
+ */
+export function getAvatarGradient(name = '') {
+  const gradients = [
+    'from-blue-600 to-indigo-600',
+    'from-emerald-600 to-teal-600',
+    'from-violet-600 to-purple-600',
+    'from-amber-600 to-orange-600',
+    'from-rose-600 to-pink-600',
+    'from-cyan-600 to-blue-600',
+    'from-fuchsia-600 to-pink-600',
+    'from-teal-600 to-emerald-700'
+  ];
+  let hash = 0;
+  const str = String(name || 'U');
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+}
+
+/**
+ * Sanitiza avatares de uma thread de conversa, removendo referências a fotos genéricas
+ */
+export function sanitizeThreadAvatars(thread) {
+  if (!thread) return thread;
+  const copy = { ...thread };
+  if (copy.participantAvatars && typeof copy.participantAvatars === 'object') {
+    const cleaned = {};
+    for (const [k, v] of Object.entries(copy.participantAvatars)) {
+      cleaned[k] = isGenericPlaceholderAvatar(v) ? '' : v;
+    }
+    copy.participantAvatars = cleaned;
+  }
+  if (copy.participantAvatar && isGenericPlaceholderAvatar(copy.participantAvatar)) {
+    copy.participantAvatar = '';
+  }
+  if (Array.isArray(copy.messages)) {
+    copy.messages = copy.messages.map(m => {
+      if (m.senderAvatar && isGenericPlaceholderAvatar(m.senderAvatar)) {
+        return { ...m, senderAvatar: '' };
+      }
+      return m;
+    });
+  }
+  return copy;
+}
+
+/**
  * Resolve o nome de exibição para qualquer perfil de usuário
  * Suporta Empresas (company, nomeFantasia, razaoSocial), Freelancers, Candidatos, Professores e Admins
  */
@@ -51,7 +127,9 @@ export function resolveDisplayName(user) {
  */
 export function resolveAvatar(user) {
   if (!user || typeof user === 'string') return '';
-  return user.logo || user.avatar || user.photoURL || user.foto || '';
+  const raw = user.logo || user.avatar || user.photoURL || user.foto || '';
+  if (isGenericPlaceholderAvatar(raw)) return '';
+  return raw;
 }
 
 /**
@@ -253,7 +331,9 @@ export function getChatThreads() {
   if (raw !== null) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map(sanitizeThreadAvatars);
+      }
     } catch { }
   }
   return [];
@@ -415,15 +495,16 @@ export function subscribeToUserThreads(userEmail, callback) {
         let changed = false;
 
         remoteChats.forEach(rc => {
-          const idx = merged.findIndex(m => m.id === rc.id);
+          const sanitizedRc = sanitizeThreadAvatars(rc);
+          const idx = merged.findIndex(m => m.id === sanitizedRc.id);
           if (idx === -1) {
-            merged.push(rc);
+            merged.push(sanitizedRc);
             changed = true;
           } else {
             merged[idx] = {
               ...merged[idx],
-              ...rc,
-              messages: merged[idx].messages || rc.messages || []
+              ...sanitizedRc,
+              messages: merged[idx].messages || sanitizedRc.messages || []
             };
             changed = true;
           }

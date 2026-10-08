@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, FileText, Camera,
+  Building2, Camera,
   Search, Loader2, AlertCircle, RefreshCw, Check,
   Wrench, Briefcase, GraduationCap
 } from 'lucide-react';
@@ -13,11 +13,9 @@ import useAppStore from '../store/useAppStore';
 import {
   updateAuthUser,
   submitCompanyVerification,
-  verifyStudentAccount,
   sendStudentVerificationEmail,
   checkStudentVerification,
   validateStudentEmail,
-  getInstitutionFromEmail,
   uploadUserProfilePicture,
   uploadUserDocument,
   maskCNPJ,
@@ -27,6 +25,7 @@ import {
   updateUserPassword,
   isGoogleOnlyAuthUser
 } from '../lib/ivaiConecta';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 
 export default function Configuracoes() {
   const { currentUser, setCurrentUser, logout, showToast, showConfirm } = useAppStore();
@@ -39,10 +38,22 @@ export default function Configuracoes() {
   const [email, setEmail] = useState(currentUser?.email || '');
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
   const [github, setGithub] = useState(currentUser?.github || '');
-  const [avatar, setAvatar] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250');
+  const [avatar, setAvatar] = useState(
+    isGenericPlaceholderAvatar(currentUser?.avatar) ? '' : (currentUser?.avatar || '')
+  );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [selectedRole, setSelectedRole] = useState(currentUser?.role || 'candidato');
   const [switchingRole, setSwitchingRole] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.avatar) {
+      if (!isGenericPlaceholderAvatar(currentUser.avatar)) {
+        setAvatar(currentUser.avatar);
+      } else {
+        setAvatar('');
+      }
+    }
+  }, [currentUser?.avatar]);
 
   useEffect(() => {
     if (currentUser?.role) {
@@ -315,85 +326,6 @@ export default function Configuracoes() {
     }
   };
 
-  // Student file drop / select
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processStudentFile(file);
-  };
-
-  const processStudentFile = (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('O arquivo selecionado excede o limite máximo de 5MB.');
-      return;
-    }
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
-      showToast('Formato não permitido. Envie um arquivo PDF, PNG ou JPG.');
-      return;
-    }
-    setSelectedFile(file);
-    showToast(`Arquivo "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) selecionado!`);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
-    else if (e.type === 'dragleave') setDragActive(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processStudentFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleVerificationSubmit = async (e) => {
-    e.preventDefault();
-    if (!raNumber.trim()) {
-      showToast('Por favor, informe seu RA / Número de Matrícula.');
-      return;
-    }
-    if (!selectedFile && !currentUser?.isVerifiedStudent) {
-      showToast('Por favor, selecione o arquivo PDF ou imagem da sua declaração de matrícula.');
-      return;
-    }
-
-    setSubmittingStudent(true);
-    showToast('Processando e autenticando declaração...');
-
-    try {
-      let uploadedDocUrl = null;
-      if (selectedFile) {
-        const uploadRes = await uploadUserDocument(selectedFile, currentUser.uid || currentUser.id, 'student_proof');
-        if (uploadRes.success) {
-          uploadedDocUrl = uploadRes.url;
-        }
-      }
-
-      const res = submitStudentVerification(raNumber, selectedFile);
-      if (res.success) {
-        setVerificationSubmitted(true);
-        const updated = updateAuthUser({
-          isVerifiedStudent: true,
-          raNumber,
-          studentProofUrl: uploadedDocUrl,
-          studentProofName: selectedFile?.name || 'Declaracao_Matricula.pdf'
-        });
-        if (updated) {
-          setCurrentUser(updated);
-        }
-        showToast('Matrícula autenticada! Seu perfil de estudante está ativo e visível.');
-      }
-    } finally {
-      setSubmittingStudent(false);
-    }
-  };
-
   const handleCnpjChange = (e) => {
     const raw = e.target.value;
     const masked = maskCNPJ(raw);
@@ -633,11 +565,19 @@ export default function Configuracoes() {
                 {/* Foto de Perfil / Avatar com Firebase Storage */}
                 <div className="bg-gray-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700/80 flex flex-wrap items-center gap-5">
                   <div className="relative shrink-0">
-                    <img
-                      src={avatar}
-                      alt={name}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
-                    />
+                    {avatar && !isGenericPlaceholderAvatar(avatar) ? (
+                      <img
+                        src={avatar}
+                        alt={name}
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
+                      />
+                    ) : (
+                      <div
+                        className={`w-16 h-16 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(name)} text-white font-extrabold text-xl flex items-center justify-center border-2 border-primary-blue shadow-sm`}
+                      >
+                        {(name || 'U').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     {uploadingAvatar && (
                       <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
                         Enviando...

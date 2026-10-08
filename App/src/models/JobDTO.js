@@ -5,7 +5,7 @@
  */
 
 import { JobStatus, JobType, isValidJobStatus } from './enums.js';
-import { validationResult, validateString, validateEmail, sanitizeStringArray, validateNumber } from './schemaValidator.js';
+import { validationResult, validateString, validateEmail, sanitizeStringArray } from './schemaValidator.js';
 
 /**
  * Normaliza um documento bruto de vaga do Firestore ou cache local

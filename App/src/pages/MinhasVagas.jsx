@@ -14,6 +14,7 @@ import {
   getTeacherEndorsedStudents, syncFulfilledEndorsementRequests, isSameProfessor
 } from '../lib/ivaiConecta';
 import { subscribeToJobs, subscribeToApplications, subscribeToJobApplicants, subscribeToCompanyApplications } from '../services/jobsService.js';
+import { isGenericPlaceholderAvatar } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
 import JobActionModal from '../components/JobActionModal';
@@ -877,7 +878,7 @@ export default function MinhasVagas() {
                                 email: targetEmail,
                                 uid: targetUid,
                                 role: 'empresa',
-                                avatar: app.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'
+                                avatar: (app.companyLogo && !isGenericPlaceholderAvatar(app.companyLogo)) ? app.companyLogo : ''
                               }, `Candidatura: ${app.title}`);
                             }}
                             className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs rounded-xl"
@@ -1021,7 +1022,7 @@ export default function MinhasVagas() {
                             email: candEmail,
                             uid: candUid,
                             role: 'aluno',
-                            avatar: cand.candidateAvatar || cand.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+                            avatar: ((cand.candidateAvatar || cand.avatar) && !isGenericPlaceholderAvatar(cand.candidateAvatar || cand.avatar)) ? (cand.candidateAvatar || cand.avatar) : ''
                           }, `Processo Seletivo: ${selectedJobApplicants.title}`);
                           setSelectedJobApplicants(null);
                         }}

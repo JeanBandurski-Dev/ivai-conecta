@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { CheckCircle, Bookmark, MessageSquare } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { isTalentFavorited } from '../lib/ivaiConecta';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 
 export default function TalentCard({ talent }) {
   const { favoriteTalents = [], toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
@@ -30,11 +31,19 @@ export default function TalentCard({ talent }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <img
-            src={avatar}
-            alt={name}
-            className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
-          />
+          {avatar && !isGenericPlaceholderAvatar(avatar) ? (
+            <img
+              src={avatar}
+              alt={name}
+              className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
+            />
+          ) : (
+            <div
+              className={`w-11 h-11 rounded-full bg-gradient-to-tr ${getAvatarGradient(name)} text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
+            >
+              {(name || 'T').slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">{name}</h3>
             <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5 truncate">{course || 'Perfil em formação'}</div>
@@ -146,7 +155,7 @@ export default function TalentCard({ talent }) {
                 email: targetEmail,
                 uid: targetUid,
                 role: 'aluno',
-                avatar
+                avatar: (avatar && !isGenericPlaceholderAvatar(avatar)) ? avatar : ''
               }, `Contato com Talento: ${name}`);
             }}
             className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"

@@ -1,10 +1,8 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
-  addDoc,
   doc,
   updateDoc,
-  deleteDoc,
   onSnapshot,
   setDoc,
   query,
@@ -12,9 +10,6 @@ import {
 } from 'firebase/firestore';
 import { STORAGE_KEY_SERVICES, CITIES } from '../data/seedData.js';
 import { serviceRepository, serviceOrderRepository } from '../repositories/index.js';
-import { ServiceStatus, ServiceOrderStatus } from '../models/enums.js';
-import { normalizeServiceDTO } from '../models/ServiceDTO.js';
-import { normalizeServiceOrderDTO } from '../models/ServiceOrderDTO.js';
 import {
   hasProfanity,
   validateProfessionalText,

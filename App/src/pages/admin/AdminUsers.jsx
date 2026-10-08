@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Users,
   Search,
-  Filter,
   UserX,
   UserCheck,
   Shield,
@@ -11,9 +10,7 @@ import {
   Edit2,
   RefreshCw,
   AlertCircle,
-  CheckCircle2,
-  ShieldAlert,
-  ChevronRight
+  CheckCircle2
 } from 'lucide-react';
 import {
   fetchAllUsers,

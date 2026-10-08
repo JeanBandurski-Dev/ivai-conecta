@@ -5,6 +5,7 @@ import {
   User, ExternalLink, AlertCircle
 } from 'lucide-react';
 import { validateSkill } from '../lib/ivaiConecta';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -219,11 +220,19 @@ export default function EditProfileModal({
 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="relative group shrink-0">
-                    <img
-                      src={editData.avatar || AVATAR_PRESETS[0]}
-                      alt="Pré-visualização"
-                      className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800"
-                    />
+                    {editData.avatar && !isGenericPlaceholderAvatar(editData.avatar) ? (
+                      <img
+                        src={editData.avatar}
+                        alt="Pré-visualização"
+                        className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800"
+                      />
+                    ) : (
+                      <div
+                        className={`w-20 h-20 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(editData.name)} text-white font-extrabold text-2xl flex items-center justify-center border-2 border-primary-blue shadow-md`}
+                      >
+                        {(editData.name || 'U').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none">
                       <Camera size={18} />
                     </div>

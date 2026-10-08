@@ -89,21 +89,35 @@ export default function JobCard({ job, matchScore, onSelect }) {
     showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 
+  const companyLinkTarget = `/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`;
+
   return (
     <div className="card p-5 sm:p-5.5 gap-3.5 hover:border-primary-blue/40 transition-all group flex flex-col justify-between h-full relative rounded-2xl sm:rounded-3xl">
       <div className="space-y-3">
         {/* Top row */}
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
-              alt={company}
-              className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800 shadow-2xs"
-            />
+            <Link
+              to={companyLinkTarget}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 group/logo"
+              title={`Ver perfil da empresa ${company}`}
+            >
+              <img
+                src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+                alt={company}
+                className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800 shadow-2xs group-hover/logo:scale-105 group-hover/logo:border-primary-blue/50 transition-all cursor-pointer"
+              />
+            </Link>
             <div className="min-w-0">
-              <div className="font-bold text-gray-900 dark:text-white text-sm leading-tight group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors truncate">
+              <Link
+                to={companyLinkTarget}
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-gray-900 dark:text-white text-sm leading-tight hover:text-primary-blue dark:hover:text-blue-400 transition-colors truncate block cursor-pointer"
+                title={`Ver perfil da empresa ${company}`}
+              >
                 {company}
-              </div>
+              </Link>
               <div className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span className="flex items-center gap-1 font-medium text-[11px]">
                   <ShieldCheck size={12} className="text-green-600 dark:text-green-400 shrink-0" />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare,
   X,
@@ -28,9 +29,13 @@ import {
   validateChatMessage,
   resolveDisplayName,
   resolveAvatar,
-  resolveUserRole
+  resolveUserRole,
+  isGenericPlaceholderAvatar,
+  getAvatarGradient
 } from '../services/chatService';
+import { detectProfanity } from '../services/jobTaxonomy';
 import { getUsersDB } from '../lib/ivaiConecta';
+import { getUserProfile } from '../services/authService';
 import { db } from '../lib/firebase';
 import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 
@@ -80,7 +85,10 @@ function UserAvatar({ src, name, className = 'w-9 h-9' }) {
     .map(p => p[0].toUpperCase())
     .join('');
 
-  if (src && !imgError) {
+  const isInvalidOrPlaceholder = !src || isGenericPlaceholderAvatar(src) || imgError;
+  const gradientClass = getAvatarGradient(name);
+
+  if (!isInvalidOrPlaceholder) {
     return (
       <img
         src={src}
@@ -93,7 +101,7 @@ function UserAvatar({ src, name, className = 'w-9 h-9' }) {
 
   return (
     <div
-      className={`${className} rounded-full bg-gradient-to-tr from-primary-blue to-blue-500 text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
+      className={`${className} rounded-full bg-gradient-to-tr ${gradientClass} text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
     >
       {initials || 'U'}
     </div>
@@ -102,13 +110,20 @@ function UserAvatar({ src, name, className = 'w-9 h-9' }) {
 
 function getOtherParticipant(thread, currentUser) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
+  const myUid = String(currentUser?.uid || currentUser?.id || '');
   const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) || thread.lastSenderEmail || '';
 
   const name = thread.participantNames?.[otherEmail] || thread.participantName || resolveDisplayName({ email: otherEmail });
-  const avatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || '';
+  const rawAvatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || '';
+  const avatar = isGenericPlaceholderAvatar(rawAvatar) ? '' : rawAvatar;
   const role = thread.participantRoles?.[otherEmail] || thread.participantRole || 'Usuário Conectado';
 
-  return { email: otherEmail, name, avatar, role };
+  let uid = '';
+  if (Array.isArray(thread.participantUids)) {
+    uid = thread.participantUids.find(u => String(u) !== myUid) || '';
+  }
+
+  return { email: otherEmail, name, avatar, role, uid };
 }
 
 export default function ChatModal({ onClose }) {
@@ -140,7 +155,7 @@ export default function ChatModal({ onClose }) {
   // Carrega lista de usuários reais do Firestore para novos contatos
   useEffect(() => {
     try {
-      const q = query(collection(db, 'users'), limit(60));
+      const q = query(collection(db, 'users'), limit(150));
       const unsub = onSnapshot(q, (snap) => {
         const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
         setRemoteUsers(users);
@@ -317,8 +332,75 @@ export default function ChatModal({ onClose }) {
     });
   }, [threads, searchTerm, currentUser]);
 
+  const navigate = useNavigate();
+
   const currentRoleBadge = otherPerson ? getRoleBadge(otherPerson.role) : null;
   const currentUserName = resolveDisplayName(currentUser);
+
+  // Encontra os dados completos do outro usuário no banco para navegação ao perfil
+  const otherUserData = useMemo(() => {
+    if (!otherPerson) return null;
+    const all = remoteUsers.length > 0 ? remoteUsers : (getUsersDB() || []);
+    const targetEmail = (otherPerson.email || '').toLowerCase().trim();
+    const targetUid = String(otherPerson.uid || '').trim();
+    const targetName = (otherPerson.name || '').toLowerCase().trim();
+
+    return all.find(u => {
+      const uUid = String(u.uid || u.id || '').trim();
+      const uEmail = String(u.email || u.studentEmail || '').toLowerCase().trim();
+      const uName = String(u.name || u.displayName || u.company || u.nomeFantasia || '').toLowerCase().trim();
+      if (targetUid && uUid === targetUid) return true;
+      if (targetEmail && uEmail === targetEmail) return true;
+      if (targetName && uName === targetName) return true;
+      return false;
+    }) || null;
+  }, [otherPerson, remoteUsers]);
+
+  const [asyncOtherUser, setAsyncOtherUser] = useState(null);
+
+  useEffect(() => {
+    if (!otherPerson) {
+      setAsyncOtherUser(null);
+      return;
+    }
+    if (otherUserData) {
+      setAsyncOtherUser(otherUserData);
+      return;
+    }
+    const target = otherPerson.uid || otherPerson.email || otherPerson.name;
+    if (!target) return;
+
+    let isMounted = true;
+    getUserProfile(target).then(res => {
+      if (isMounted && res && res.success && res.profile) {
+        setAsyncOtherUser(res.profile);
+      }
+    }).catch(() => {});
+
+    return () => { isMounted = false; };
+  }, [otherPerson, otherUserData]);
+
+  const handleOpenUserProfile = () => {
+    if (!otherPerson) return;
+    const resolvedUser = asyncOtherUser || otherUserData || otherPerson;
+    const roleRaw = String(resolvedUser?.role || resolvedUser?.activeRole || resolvedUser?.selectedRole || otherPerson.role || '').toLowerCase();
+    const targetId = resolvedUser?.uid || resolvedUser?.id || otherPerson.uid || resolvedUser?.name || otherPerson.name || otherPerson.email;
+    if (!targetId) return;
+
+    let path = `/perfil/${encodeURIComponent(targetId)}`;
+    if (roleRaw.includes('empresa') || roleRaw.includes('company') || roleRaw.includes('recrutador')) {
+      path = `/empresa/${encodeURIComponent(resolvedUser?.uid || resolvedUser?.id || resolvedUser?.nomeFantasia || resolvedUser?.razaoSocial || otherPerson.name || targetId)}`;
+    } else if (roleRaw.includes('professor') || roleRaw.includes('docente') || roleRaw.includes('teacher')) {
+      path = `/professor/${encodeURIComponent(targetId)}`;
+    } else if (roleRaw.includes('freelancer') || roleRaw.includes('prestador')) {
+      path = `/freelancer/${encodeURIComponent(targetId)}`;
+    } else {
+      path = `/perfil/${encodeURIComponent(targetId)}`;
+    }
+
+    if (onClose) onClose();
+    navigate(path);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
@@ -503,7 +585,17 @@ export default function ChatModal({ onClose }) {
                         </div>
 
                         <div className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-1">
-                          {t.lastMessage || 'Conversa iniciada'}
+                          {(() => {
+                            const pCheck = detectProfanity(t.lastMessage || '');
+                            if (pCheck.hasProfanity) {
+                              return (
+                                <span className="text-red-500/90 dark:text-red-400 font-medium italic">
+                                  [Mensagem moderada: conteúdo impróprio]
+                                </span>
+                              );
+                            }
+                            return t.lastMessage || 'Conversa iniciada';
+                          })()}
                         </div>
                       </div>
 
@@ -526,13 +618,22 @@ export default function ChatModal({ onClose }) {
             {activeThread && otherPerson ? (
               <div className="flex flex-col h-full">
                 {/* Header do Chat Ativo */}
-                <div className="p-3.5 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <UserAvatar src={otherPerson.avatar} name={otherPerson.name} className="w-10 h-10" />
+                <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/40 dark:bg-slate-800/40 shrink-0 gap-3">
+                  <div
+                    onClick={handleOpenUserProfile}
+                    className="flex items-center gap-3 min-w-0 cursor-pointer group hover:opacity-95 transition-all"
+                    title={`Ver perfil de ${otherPerson.name}`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleOpenUserProfile(); }}
+                  >
+                    <UserAvatar src={otherPerson.avatar} name={otherPerson.name} className="w-10 h-10 group-hover:scale-105 group-hover:ring-2 group-hover:ring-primary-blue/30 transition-all shadow-2xs" />
 
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
-                        <span className="truncate">{otherPerson.name}</span>
+                        <span className="truncate group-hover:text-primary-blue dark:group-hover:text-blue-400 group-hover:underline transition-colors">
+                          {otherPerson.name}
+                        </span>
                         <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${currentRoleBadge?.classes}`}>
                           <span>{currentRoleBadge?.icon}</span>
                           <span>{currentRoleBadge?.label}</span>
@@ -550,8 +651,17 @@ export default function ChatModal({ onClose }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[11px] text-gray-400 dark:text-slate-500 hidden sm:inline flex items-center gap-1">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleOpenUserProfile}
+                      className="btn btn-outline btn-sm text-xs font-bold py-1.5 px-3 rounded-xl border border-gray-200 dark:border-slate-700 hover:border-primary-blue hover:text-primary-blue dark:hover:text-blue-400 bg-white dark:bg-slate-800 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title={`Ver perfil completo de ${otherPerson.name}`}
+                    >
+                      <ExternalLink size={13} />
+                      <span className="hidden sm:inline">Ver Perfil</span>
+                    </button>
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500 hidden md:inline flex items-center gap-1 pl-1">
                       <ShieldCheck size={13} className="text-emerald-500" /> Canal Seguro
                     </span>
                   </div>
@@ -574,7 +684,7 @@ export default function ChatModal({ onClose }) {
                   ) : (
                     messages.map((m, idx) => {
                       const isMe = matchesUserEmail(m.senderEmail, currentUser?.email);
-                      const senderBadge = getRoleBadge(m.senderRole);
+                      const pCheck = detectProfanity(m.text || '');
 
                       return (
                         <div key={m.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-1 duration-150`}>
@@ -585,31 +695,46 @@ export default function ChatModal({ onClose }) {
                             {isMe && <CheckCheck size={12} className="text-primary-blue" />}
                           </div>
 
-                          <div
-                            className={`max-w-[85%] sm:max-w-[76%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                              isMe
-                                ? 'bg-primary-blue text-white rounded-br-xs shadow-xs font-medium'
-                                : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
-                            }`}
-                          >
-                            {m.text?.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                              /(https?:\/\/[^\s]+)/g.test(part) ? (
-                                <a
-                                  key={i}
-                                  href={part}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`underline font-bold inline-flex items-center gap-0.5 hover:opacity-80 break-all ${
-                                    isMe ? 'text-white' : 'text-primary-blue dark:text-blue-400'
-                                  }`}
-                                >
-                                  {part} <ExternalLink size={11} className="inline ml-0.5" />
-                                </a>
-                              ) : (
-                                part
-                              )
-                            )}
-                          </div>
+                          {pCheck.hasProfanity ? (
+                            <div
+                              className={`max-w-[85%] sm:max-w-[76%] px-3.5 py-2.5 rounded-2xl text-xs flex items-center gap-2 border shadow-xs ${
+                                isMe
+                                  ? 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/30'
+                                  : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/60'
+                              }`}
+                            >
+                              <AlertTriangle size={15} className="shrink-0 text-red-500" />
+                              <span className="italic font-medium">
+                                Mensagem ocultada pela moderação (conteúdo impróprio detectado)
+                              </span>
+                            </div>
+                          ) : (
+                            <div
+                              className={`max-w-[85%] sm:max-w-[76%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                                isMe
+                                  ? 'bg-primary-blue text-white rounded-br-xs shadow-xs font-medium'
+                                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-slate-700 rounded-bl-xs shadow-xs'
+                              }`}
+                            >
+                              {m.text?.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                                /(https?:\/\/[^\s]+)/g.test(part) ? (
+                                  <a
+                                    key={i}
+                                    href={part}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`underline font-bold inline-flex items-center gap-0.5 hover:opacity-80 break-all ${
+                                      isMe ? 'text-white' : 'text-primary-blue dark:text-blue-400'
+                                    }`}
+                                  >
+                                    {part} <ExternalLink size={11} className="inline ml-0.5" />
+                                  </a>
+                                ) : (
+                                  part
+                                )
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })
