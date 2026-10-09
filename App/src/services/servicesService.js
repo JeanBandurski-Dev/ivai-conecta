@@ -15,7 +15,8 @@ import {
   validateProfessionalText,
   validatePhoneNumber,
   GENERAL_TROLL_WORDS,
-  STANDARD_JOB_TITLES
+  STANDARD_JOB_TITLES,
+  isTrollWord
 } from './jobTaxonomy.js';
 import { matchCity } from '../utils/searchUtils.js';
 
@@ -31,42 +32,6 @@ export const SERVICE_CATEGORIES = [
   'Artesanato & Moda',
   'Jurídico & Contábil'
 ];
-
-/**
- * Verifica se uma palavra é um termo troll, brincadeira, fruta/comida solta ou gíria inapropriada
- */
-export function isTrollWord(word) {
-  if (!word || typeof word !== 'string') return false;
-  const lower = word.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (!lower || lower.length < 3) return false;
-
-  if (GENERAL_TROLL_WORDS.has(lower)) return true;
-
-  // Trata plurais e variações comuns em português (abacaxis -> abacaxi, bananas -> banana, pasteis -> pastel)
-  if (lower.endsWith('s')) {
-    const s1 = lower.slice(0, -1);
-    if (GENERAL_TROLL_WORDS.has(s1)) return true;
-    if (lower.endsWith('es')) {
-      const s2 = lower.slice(0, -2);
-      if (GENERAL_TROLL_WORDS.has(s2)) return true;
-    }
-    if (lower.endsWith('is')) {
-      const s3 = lower.slice(0, -2) + 'l';
-      if (GENERAL_TROLL_WORDS.has(s3)) return true;
-    }
-  }
-
-  // Raízes de palavras troll
-  const trollRoots = [
-    'abacaxi', 'banana', 'melancia', 'pastel', 'pizza', 'coxinha', 'cerveja', 'churrasco',
-    'pipoca', 'hamburguer', 'fofoca', 'namoro', 'zoeira', 'palhacada', 'bobagem', 'besteira'
-  ];
-  for (const root of trollRoots) {
-    if (lower.includes(root)) return true;
-  }
-
-  return false;
-}
 
 /**
  * Validação rigorosa do título do serviço freelance.
