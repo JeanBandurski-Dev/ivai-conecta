@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Wrench, MapPin, Phone, Star, ShieldCheck, CheckCircle2,
   Edit3, ArrowLeft, Plus, MessageSquare, Globe, ExternalLink,
@@ -22,13 +22,21 @@ const DEFAULT_COVER = 'https://images.unsplash.com/photo-1517245386807-bb43f82c3
 
 export default function PerfilFreelancer() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, showToast, startChatWith } = useAppStore();
 
   const freelancerId = id || (currentUser?.role === 'freelancer' ? (currentUser?.uid || currentUser?.id) : null);
 
   const [liveUserDoc, setLiveUserDoc] = useState(null);
-  const [activeTab, setActiveTab] = useState('services'); // 'services' | 'about' | 'reviews'
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'reviews' ? 'reviews' : 'services'); // 'services' | 'about' | 'reviews'
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab === 'reviews' || requestedTab === 'about' || requestedTab === 'services') {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);

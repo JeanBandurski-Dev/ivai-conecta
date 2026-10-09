@@ -388,6 +388,64 @@ export async function incrementServiceContact(id) {
 let _memServicesCache = null;
 
 /**
+ * Enriquece os dados de um serviço consolidando avaliações provenientes de ordens de serviço finalizadas
+ */
+export function enrichServiceWithOrders(service, orders = []) {
+  if (!service) return service;
+  const ordersWithReviews = (orders || []).filter(o => o.status === 'avaliado' && o.review);
+  if (ordersWithReviews.length === 0) return service;
+
+  const sId = String(service.firestoreId || service.id || '').trim();
+  const sProvUid = String(service.createdBy || service.providerUid || '').trim();
+  const sTitle = String(service.title || service.name || '').trim();
+
+  const matchingOrders = ordersWithReviews.filter(o => {
+    if (o.serviceId && String(o.serviceId).trim() === sId) return true;
+    const oProvUid = String(o.providerUid || o.providerId || '').trim();
+    const oTitle = String(o.serviceTitle || '').trim();
+    if (sProvUid && oProvUid === sProvUid && (!oTitle || !sTitle || oTitle === sTitle)) return true;
+    return false;
+  });
+
+  if (matchingOrders.length === 0) return service;
+
+  const orderReviews = matchingOrders.map(o => ({
+    orderId: String(o.id || o.firestoreId),
+    rating: Number(o.review.rating) || 5,
+    stars: Number(o.review.rating) || 5,
+    comment: o.review.comment,
+    author: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+    client: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+    avatar: o.review.avatar || '',
+    date: o.review.date || o.createdAt,
+    timestamp: o.review.timestamp || Date.now()
+  }));
+
+  const existingReviews = Array.isArray(service.reviews) ? service.reviews : [];
+  const combined = [...existingReviews];
+  const seen = new Set(existingReviews.map(r => `${r.orderId || ''}_${r.author || r.client}_${r.comment}`));
+
+  for (const or of orderReviews) {
+    const key = `${or.orderId || ''}_${or.author || or.client}_${or.comment}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      combined.push(or);
+    }
+  }
+
+  const totalRating = combined.reduce((sum, r) => sum + (Number(r.rating || r.stars) || 5), 0);
+  const avgRating = combined.length > 0 ? Number((totalRating / combined.length).toFixed(1)) : (service.rating || 5.0);
+
+  return {
+    ...service,
+    reviews: combined,
+    reviewsCount: combined.length,
+    reviewCount: combined.length,
+    rating: avgRating
+  };
+}
+
+/**
  * Escuta serviços em tempo real via Firestore onSnapshot e eventos locais
  */
 export function subscribeToServices(city = 'Todas as Cidades', callback) {
@@ -395,24 +453,34 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
 
   const handleCustomEvent = (e) => {
     if (Array.isArray(e.detail)) {
-      const filtered = e.detail.filter(s => matchCity(s.city, city));
+      const orders = getServiceOrders();
+      const enriched = e.detail.map(s => enrichServiceWithOrders(s, orders));
+      const filtered = enriched.filter(s => matchCity(s.city, city));
       callback(filtered);
     }
   };
+
+  const handleOrdersUpdated = () => {
+    callback(getServices(city));
+  };
+
   if (typeof window !== 'undefined') {
     window.addEventListener('ivai:services-updated', handleCustomEvent);
+    window.addEventListener('ivai_service_orders_updated', handleOrdersUpdated);
   }
 
   try {
     const unsub = serviceRepository.subscribeToServices((remoteServices) => {
-      _memServicesCache = remoteServices;
+      const orders = getServiceOrders();
+      const enriched = remoteServices.map(s => enrichServiceWithOrders(s, orders));
+      _memServicesCache = enriched;
       if (typeof localStorage !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(remoteServices));
+          localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(enriched));
         } catch {}
       }
 
-      const filtered = remoteServices.filter(s => matchCity(s.city, city));
+      const filtered = enriched.filter(s => matchCity(s.city, city));
       callback(filtered);
     }, (error) => {
       console.warn('[Firestore Services Listener] Offline fallback:', error.message);
@@ -423,6 +491,7 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
       unsub();
       if (typeof window !== 'undefined') {
         window.removeEventListener('ivai:services-updated', handleCustomEvent);
+        window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
       }
     };
   } catch (error) {
@@ -431,6 +500,7 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('ivai:services-updated', handleCustomEvent);
+        window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
       }
     };
   }
@@ -454,6 +524,12 @@ export function getServices(city = 'Todas as Cidades') {
         }
       } catch {}
     }
+  }
+
+  // Enriquece os serviços locais com avaliações de ordens finalizadas
+  const orders = getServiceOrders();
+  if (orders.length > 0) {
+    services = services.map(s => enrichServiceWithOrders(s, orders));
   }
 
   if (!city || city === 'Todas as Cidades') return services;
@@ -527,7 +603,11 @@ export async function updateService(id, serviceData) {
     }
   }
 
-  const updated = services.map(s => (s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id ? { ...s, ...serviceData } : s));
+  const exists = services.some(s => s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id);
+  const updated = exists
+    ? services.map(s => (s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id ? { ...s, ...serviceData } : s))
+    : [{ id: docId, firestoreId: docId, ...serviceData }, ...services];
+
   _memServicesCache = updated;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(updated));
@@ -623,6 +703,12 @@ export async function createServiceOrder(orderData) {
       }
     ],
     ...orderData,
+    clientId,
+    clientUid: clientId,
+    providerId,
+    providerUid: providerId,
+    clientEmail,
+    providerEmail,
     id: orderId,
     firestoreId: orderId
   };
@@ -652,7 +738,7 @@ export async function createServiceOrder(orderData) {
 
   // 2. Tenta também registrar na coleção direta 'service_orders'
   try {
-    await setDoc(doc(db, 'service_orders', orderId), newOrder);
+    await setDoc(doc(db, 'service_orders', orderId), newOrder, { merge: true });
   } catch {}
 
   // 3. Atualiza cache local e notifica componentes
@@ -716,7 +802,7 @@ export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
 
   // 2. Tenta atualizar 'service_orders'
   try {
-    await updateDoc(doc(db, 'service_orders', docId), patch);
+    await setDoc(doc(db, 'service_orders', docId), patch, { merge: true });
   } catch {}
 
   // 3. Atualiza cache local e notifica
@@ -730,11 +816,23 @@ export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
   return { success: true, status: newStatus };
 }
 
-export async function submitServiceReview(orderId, { rating, comment, serviceId, clientName, clientAvatar }) {
+export async function submitServiceReview(orderId, {
+  rating,
+  comment,
+  serviceId,
+  providerId,
+  providerEmail,
+  serviceTitle,
+  clientName,
+  clientAvatar
+}) {
   const reviewData = {
+    orderId: String(orderId),
     rating: Number(rating) || 5,
+    stars: Number(rating) || 5,
     comment: String(comment || '').trim(),
     author: clientName || 'Cliente Ivaí Conecta',
+    client: clientName || 'Cliente Ivaí Conecta',
     avatar: clientAvatar || '',
     date: new Date().toLocaleDateString('pt-BR'),
     timestamp: Date.now()
@@ -747,62 +845,108 @@ export async function submitServiceReview(orderId, { rating, comment, serviceId,
   try {
     await updateDoc(doc(db, 'chats', docId), {
       'serviceOrder.review': reviewData,
+      'serviceOrder.rating': reviewData.rating,
       'serviceOrder.status': 'avaliado',
       updatedAt: new Date().toISOString()
     });
   } catch {
     try {
       await setDoc(doc(db, 'chats', docId), {
-        serviceOrder: { review: reviewData, status: 'avaliado' },
+        serviceOrder: { review: reviewData, rating: reviewData.rating, status: 'avaliado' },
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch {}
   }
 
-  try {
-    await updateDoc(doc(db, 'service_orders', docId), {
-      review: reviewData,
-      status: 'avaliado'
-    });
-  } catch {}
-
-  // Atualiza cache local com review
+  // Atualiza cache local com review e prepara patch com identificadores para Firestore
   const currentOrders = getServiceOrders();
-  const updatedOrders = currentOrders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, review: reviewData, status: 'avaliado' } : o));
+  const existingOrder = currentOrders.find(o => o.id === orderId || o.firestoreId === orderId);
+
+  const orderPatch = {
+    review: reviewData,
+    rating: reviewData.rating,
+    status: 'avaliado',
+    updatedAt: new Date().toISOString(),
+    ...(existingOrder ? {
+      clientId: existingOrder.clientId || existingOrder.clientUid,
+      clientUid: existingOrder.clientUid || existingOrder.clientId,
+      providerId: existingOrder.providerId || existingOrder.providerUid,
+      providerUid: existingOrder.providerUid || existingOrder.providerId,
+      serviceId: existingOrder.serviceId || serviceId,
+      serviceTitle: existingOrder.serviceTitle || serviceTitle
+    } : {})
+  };
+
+  try {
+    await setDoc(doc(db, 'service_orders', docId), orderPatch, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore service_orders] Erro ao persistir avaliação:', err.message);
+  }
+
+  const updatedOrders = currentOrders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, ...orderPatch } : o));
   saveServiceOrders(updatedOrders);
   notifyOrdersUpdated(updatedOrders);
 
   // 2. Atualiza estatísticas e histórico do serviço correspondente
-  if (serviceId) {
-    try {
-      const targetService = getServiceById(serviceId);
-      if (targetService) {
-        const currentReviews = targetService.reviews || [];
-        const updatedReviews = [reviewData, ...currentReviews];
-        const totalScore = updatedReviews.reduce((acc, r) => acc + (Number(r.rating || r.stars) || 5), 0);
-        const newAverage = Number((totalScore / updatedReviews.length).toFixed(1));
+  try {
+    const allServices = getServices('Todas as Cidades');
+    const targetServiceId = serviceId || existingOrder?.serviceId;
+    const targetProvId = providerId || existingOrder?.providerId || existingOrder?.providerUid;
+    const targetProvEmail = providerEmail || existingOrder?.providerEmail;
+    const targetTitle = serviceTitle || existingOrder?.serviceTitle;
 
-        const currentClosed = targetService.analytics?.closedDeals || 0;
-        const newClosed = currentClosed + 1;
-        const views = targetService.analytics?.views || 1;
-        const newConversion = `${Math.min(100, Math.round((newClosed / Math.max(1, views)) * 100))}%`;
+    let targetService = targetServiceId ? getServiceById(targetServiceId) : null;
 
-        const updatedAnalytics = {
-          ...targetService.analytics,
-          closedDeals: newClosed,
-          conversionRate: newConversion
-        };
-
-        await updateService(serviceId, {
-          rating: newAverage,
-          reviewsCount: updatedReviews.length,
-          reviews: updatedReviews,
-          analytics: updatedAnalytics
-        });
-      }
-    } catch (err) {
-      console.warn('[Firestore] Erro ao atualizar notas do serviço:', err.message);
+    if (!targetService) {
+      targetService = allServices.find(s => {
+        if (targetServiceId && (s.id === targetServiceId || s.firestoreId === targetServiceId || String(s.id) === String(targetServiceId))) return true;
+        if (targetProvId && (String(s.createdBy) === String(targetProvId) || String(s.providerUid) === String(targetProvId))) {
+          if (!targetTitle || s.title === targetTitle || s.name === targetTitle) return true;
+        }
+        if (targetProvEmail && s.providerEmail && s.providerEmail.toLowerCase() === targetProvEmail.toLowerCase()) {
+          if (!targetTitle || s.title === targetTitle || s.name === targetTitle) return true;
+        }
+        return false;
+      });
     }
+
+    if (!targetService && targetServiceId) {
+      try {
+        targetService = await serviceRepository.findById(String(targetServiceId));
+      } catch {}
+    }
+
+    if (targetService) {
+      const currentReviews = Array.isArray(targetService.reviews) ? targetService.reviews : [];
+      const alreadyHasReview = currentReviews.some(r => r.orderId === String(orderId) || (r.author === reviewData.author && r.comment === reviewData.comment));
+      const updatedReviews = alreadyHasReview ? currentReviews : [reviewData, ...currentReviews];
+      const totalScore = updatedReviews.reduce((acc, r) => acc + (Number(r.rating || r.stars) || 5), 0);
+      const newAverage = Number((totalScore / updatedReviews.length).toFixed(1));
+
+      const currentClosed = targetService.analytics?.closedDeals || 0;
+      const newClosed = alreadyHasReview ? currentClosed : currentClosed + 1;
+      const views = targetService.analytics?.views || 1;
+      const newConversion = `${Math.min(100, Math.round((newClosed / Math.max(1, views)) * 100))}%`;
+
+      const updatedAnalytics = {
+        ...targetService.analytics,
+        closedDeals: newClosed,
+        conversionRate: newConversion
+      };
+
+      const patch = {
+        rating: newAverage,
+        reviewsCount: updatedReviews.length,
+        reviewCount: updatedReviews.length,
+        reviews: updatedReviews,
+        analytics: updatedAnalytics
+      };
+
+      const docIdToUpdate = targetService.firestoreId || targetService.id || targetServiceId;
+      await updateService(docIdToUpdate, patch);
+    }
+  } catch (err) {
+    console.warn('[Firestore] Erro ao atualizar notas do serviço:', err.message);
   }
 
   return { success: true };

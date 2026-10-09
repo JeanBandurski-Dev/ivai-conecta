@@ -26,19 +26,30 @@ export function normalizeServiceOrderDTO(raw, fallbackId = '') {
     serviceId: String(data.serviceId || '').trim(),
     serviceTitle: String(data.serviceTitle || data.title || 'Serviço Solicitado').trim(),
     providerUid,
+    providerId: providerUid,
     providerEmail: String(data.providerEmail || '').toLowerCase().trim(),
     providerName: String(data.providerName || 'Prestador').trim(),
     clientUid,
+    clientId: clientUid,
     clientEmail: String(data.clientEmail || data.buyerEmail || '').toLowerCase().trim(),
     clientName: String(data.clientName || data.buyerName || 'Contratante').trim(),
     clientPhone: String(data.clientPhone || '').trim(),
     details: String(data.details || data.description || '').trim(),
+    description: String(data.description || data.details || '').trim(),
     deadline: String(data.deadline || '').trim(),
     budget: data.budget !== undefined && data.budget !== null ? data.budget : 'A Combinar',
-    status: String(data.status || ServiceOrderStatus.PENDENTE).trim(),
-    review: data.review ? String(data.review).trim() : null,
-    rating: typeof data.rating === 'number' ? data.rating : null,
+    status: String(data.status || 'solicitado').trim(),
+    review: (typeof data.review === 'object' && data.review !== null)
+      ? data.review
+      : (typeof data.review === 'string' && data.review.trim()
+          ? { comment: data.review.trim(), rating: typeof data.rating === 'number' ? data.rating : 5 }
+          : null),
+    rating: typeof data.rating === 'number'
+      ? data.rating
+      : (data.review && typeof data.review.rating === 'number' ? data.review.rating : null),
+    history: Array.isArray(data.history) ? data.history : [],
     createdAt: data.createdAt || new Date().toISOString(),
+    createdAtTimestamp: data.createdAtTimestamp || (data.createdAt ? new Date(data.createdAt).getTime() : Date.now()),
     updatedAt: data.updatedAt || new Date().toISOString()
   };
 }

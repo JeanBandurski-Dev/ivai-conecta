@@ -61,6 +61,9 @@ export default function AvaliarServicoModal({ order, onClose, onSuccess }) {
         rating,
         comment: comment.trim(),
         serviceId: order.serviceId,
+        providerId: order.providerId || order.providerUid,
+        providerEmail: order.providerEmail,
+        serviceTitle: order.serviceTitle,
         clientName: currentUser?.name || order.clientName || 'Cliente Ivaí Conecta',
         clientAvatar: currentUser?.avatar || ''
       });

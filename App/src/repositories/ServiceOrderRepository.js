@@ -85,6 +85,27 @@ export class ServiceOrderRepository extends BaseRepository {
   }
 
   /**
+   * Registra a avaliação do cliente na ordem de serviço.
+   * @param {string} orderId
+   * @param {Object} reviewData
+   * @returns {Promise<Object>}
+   */
+  async addReview(orderId, reviewData) {
+    const order = await this.findById(orderId);
+    if (!order) throw new Error(`Ordem não encontrada: ${orderId}`);
+
+    const updates = {
+      status: ServiceOrderStatus.AVALIADO,
+      review: reviewData,
+      rating: reviewData.rating || 5,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.update(orderId, updates);
+    return normalizeServiceOrderDTO({ ...order, ...updates });
+  }
+
+  /**
    * Assina ordens de um usuário (como cliente ou prestador).
    * @param {string} userId
    * @param {string} [roleField='clientId']

@@ -75,6 +75,18 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
 
   const providerProfileId = createdBy || service.providerUid || service.userId;
 
+  const totalReviews = typeof reviewsCount === 'number'
+    ? reviewsCount
+    : (typeof service.reviewCount === 'number'
+        ? service.reviewCount
+        : (Array.isArray(service.reviews) ? service.reviews.length : 0));
+
+  const displayRating = (typeof rating === 'number' && rating > 0)
+    ? rating.toFixed(1)
+    : (Array.isArray(service.reviews) && service.reviews.length > 0
+        ? (service.reviews.reduce((acc, r) => acc + (Number(r.rating || r.stars) || 5), 0) / service.reviews.length).toFixed(1)
+        : (typeof rating === 'number' ? rating.toFixed(1) : (rating || '5.0')));
+
   return (
     <div className="card gap-3 hover:border-primary-blue/30 transition-all flex flex-col h-full">
       {/* Top row */}
@@ -116,15 +128,35 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
       <div className="flex items-center gap-1.5 text-sm">
         <Star size={14} className="text-amber-400 fill-amber-400 shrink-0" />
         <span className="font-bold text-gray-800 dark:text-slate-200">
-          {typeof rating === 'number' ? rating.toFixed(1) : (rating || '5.0')}
+          {displayRating}
         </span>
-        <span className="text-gray-500 dark:text-slate-400 text-xs">
-          ({reviewsCount || 0} {(reviewsCount || 0) === 1 ? 'avaliação' : 'avaliações'})
-        </span>
+        {providerProfileId ? (
+          <Link
+            to={`/freelancer/${providerProfileId}?tab=reviews`}
+            className="text-gray-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400 text-xs transition-colors hover:underline cursor-pointer"
+            title="Ver avaliações deste prestador"
+          >
+            ({totalReviews} {totalReviews === 1 ? 'avaliação' : 'avaliações'})
+          </Link>
+        ) : (
+          <span className="text-gray-500 dark:text-slate-400 text-xs">
+            ({totalReviews} {totalReviews === 1 ? 'avaliação' : 'avaliações'})
+          </span>
+        )}
         {badge && (
           <span className="ml-auto text-xs font-semibold text-accent-green dark:text-green-400">{badge}</span>
         )}
       </div>
+
+      {/* Destaque da avaliação mais recente */}
+      {Array.isArray(service.reviews) && service.reviews.length > 0 && service.reviews[0]?.comment && (
+        <div className="text-[11px] bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 rounded-xl px-2.5 py-1.5 text-amber-900 dark:text-amber-200 italic line-clamp-2">
+          "{service.reviews[0].comment}"
+          <span className="block not-italic text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
+            — {service.reviews[0].author || service.reviews[0].client || 'Cliente'} ({service.reviews[0].rating || service.reviews[0].stars || 5}★)
+          </span>
+        </div>
+      )}
 
       <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed flex-1">{description}</p>
 
