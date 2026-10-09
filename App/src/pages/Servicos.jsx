@@ -63,6 +63,7 @@ export default function Servicos() {
   const [showModal,    setModal]        = useState(params.get('action') === 'new');
   const [editModal,    setEditModal]    = useState(false);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
+  const [orderSubTab,  setOrderSubTab]  = useState('received'); // 'received' | 'sent'
 
   useEffect(() => {
     const v = params.get('view');
@@ -83,7 +84,7 @@ export default function Servicos() {
     if (selectedCity) setCity(selectedCity);
   }, [selectedCity]);
 
-  const { services: all } = useServices('Todas as Cidades');
+  const { services: all, refresh: refreshServices } = useServices('Todas as Cidades');
   const myServices = all.filter(s => 
     (currentUser?.uid && (s.createdBy === currentUser.uid || s.providerUid === currentUser.uid)) ||
     (currentUser?.id && (s.createdBy === currentUser.id || s.providerUid === currentUser.id))
@@ -118,7 +119,6 @@ export default function Servicos() {
   // ── Service Orders Lifecycle State ──
   const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
   const [evaluatingOrder, setEvaluatingOrder] = useState(null);
-  const [orderSubTab, setOrderSubTab] = useState('received'); // 'received' | 'sent'
 
   useEffect(() => {
     if (!currentUser) return;
@@ -862,8 +862,8 @@ export default function Servicos() {
       {showModal && (
         <PublishServiceModal
           onClose={() => setModal(false)}
-          onSuccess={(created) => {
-            setLiveServices(prev => [created, ...prev.filter(s => s.id !== created.id && s.firestoreId !== created.id)]);
+          onSuccess={() => {
+            refreshServices?.();
             setActiveTab('explore');
             setCity('Todas as Cidades');
             setCategory('Todas');

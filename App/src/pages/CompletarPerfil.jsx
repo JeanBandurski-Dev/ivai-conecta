@@ -44,10 +44,14 @@ export default function CompletarPerfil() {
     // Se não houver usuário no Google ou no store, volta para login
     if (!currentUser && !auth.currentUser) {
       navigate('/login');
-    } else if (currentUser?.name && !name) {
-      setName(currentUser.name);
     }
   }, [currentUser, navigate]);
+
+  useEffect(() => {
+    if (currentUser?.name) {
+      setName(prev => prev || currentUser.name);
+    }
+  }, [currentUser?.name]);
 
   const handleCnpjChange = (e) => {
     const rawValue = e.target.value;

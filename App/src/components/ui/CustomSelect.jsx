@@ -17,7 +17,7 @@ export default function CustomSelect({
   className = '',
   searchable = false,
   size = 'md', // 'sm' | 'md' | 'lg'
-  name: _name = '',
+  name = '',
   id = ''
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -132,6 +132,8 @@ export default function CustomSelect({
           {label}
         </label>
       )}
+
+      {name && <input type="hidden" name={name} value={value ?? ''} />}
 
       {/* Botão Gatilho do Dropdown */}
       <button

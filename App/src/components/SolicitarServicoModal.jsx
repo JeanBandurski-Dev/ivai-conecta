@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Send, Sparkles, AlertCircle, CheckCircle2, MapPin, DollarSign,
@@ -22,7 +22,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
   const { currentUser, showToast } = useAppStore();
 
   // Identificação do tipo de contratante (Empresa vs Pessoa Física)
-  const isCompanyUser = Boolean(
+  const isCompanyUser = useMemo(() => Boolean(
     currentUser?.role === 'empresa' ||
     currentUser?.role === 'company' ||
     currentUser?.role === 'recrutador' ||
@@ -30,9 +30,9 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
     currentUser?.companyName ||
     currentUser?.razaoSocial ||
     currentUser?.cnpj
-  );
+  ), [currentUser]);
 
-  const clientName = (
+  const clientName = useMemo(() => (
     currentUser?.company ||
     currentUser?.companyName ||
     currentUser?.tradeName ||
@@ -40,7 +40,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
     currentUser?.nomeFantasia ||
     currentUser?.name ||
     (isCompanyUser ? 'Empresa Regional' : 'Cliente Ivaí Conecta')
-  ).trim();
+  ).trim(), [currentUser, isCompanyUser]);
 
   const [description, setDescription] = useState('');
   const [city, setCity] = useState(currentUser?.city || service?.city || 'Ivaiporã');
@@ -60,23 +60,36 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [onClose, isSubmitting]);
 
-  if (!service) return null;
+  // Validações em tempo real memorizadas
+  const descVal = useMemo(
+    () => validateServiceRequestDescription(description, { minLength: 20, maxLength: 800 }),
+    [description]
+  );
+  const phoneVal = useMemo(() => validatePhoneNumber(phone, true), [phone]);
+  const budgetVal = useMemo(
+    () => validateCurrency(budget, { min: 10, max: 200000, required: false }),
+    [budget]
+  );
+  const deadlineVal = useMemo(
+    () => validateServiceDeadline(deadline, { required: true }),
+    [deadline]
+  );
 
-  const serviceTitle = service.title || service.name || 'Serviço Profissional';
-  const providerName = service.providerName || 'Profissional Regional';
-
-  // Validações em tempo real
-  const descVal = validateServiceRequestDescription(description, { minLength: 20, maxLength: 800 });
-  const phoneVal = validatePhoneNumber(phone, true);
-  const budgetVal = validateCurrency(budget, { min: 10, max: 200000, required: false });
-  const deadlineVal = validateServiceDeadline(deadline, { required: true });
-
-  const handleChipClick = (chipText) => {
+  const handleChipClick = useCallback((chipText) => {
     setErrorMsg('');
     setTouchedDesc(true);
     setDescription(prev => {
@@ -85,7 +98,12 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
       if (current.includes(chipText)) return current;
       return `${current} ${chipText}`;
     });
-  };
+  }, []);
+
+  if (!service) return null;
+
+  const serviceTitle = service.title || service.name || 'Serviço Profissional';
+  const providerName = service.providerName || 'Profissional Regional';
 
   const handleBudgetChange = (e) => {
     const raw = e.target.value;

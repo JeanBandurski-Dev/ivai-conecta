@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "baseUrl": "./App",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "App/src/**/*",
+    "App/src/vite-env.d.ts"
+  ],
+  "exclude": [
+    "App/node_modules",
+    "App/dist",
+    "node_modules",
+    "dist"
+  ]
+}

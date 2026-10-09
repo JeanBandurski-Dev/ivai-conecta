@@ -1619,6 +1619,26 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
         } catch {}
       }
 
+      // Sincroniza no cache de candidaturas para atualizar visões locais
+      try {
+        const allApps = getUserApplications();
+        const updatedApps = allApps.map(a => {
+          if (a.id === appDocId || a.firestoreId === appDocId || String(a.candidateUid) === String(cand.id)) {
+            return {
+              ...a,
+              stage: 'entrevista',
+              status: 'Entrevista',
+              interview: interviewData,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return a;
+        });
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updatedApps));
+        }
+      } catch {}
+
       return {
         ...cand,
         stage: 'entrevista',
@@ -1635,6 +1655,11 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_JOB_CANDIDATES, JSON.stringify(map));
   }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ivai_applications_updated'));
+  }
+
   return updatedList;
 }
 

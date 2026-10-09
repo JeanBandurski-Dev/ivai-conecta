@@ -2,7 +2,9 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
-  onSnapshot
+  onSnapshot,
+  query,
+  where
 } from 'firebase/firestore';
 import { getJobs, subscribeToJobs, isJobActive } from './jobsService.js';
 import { getTalents, subscribeToTalents } from './talentsService.js';

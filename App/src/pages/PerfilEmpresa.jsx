@@ -51,6 +51,8 @@ export default function PerfilEmpresa() {
     instagram: currentUser?.instagram || '',
   });
 
+  const [, setRefreshKey] = useState(0);
+
   const [company, setCompany] = useState(() => {
     const isOwner = Boolean(
       currentUser && currentUser.role === 'empresa' && (

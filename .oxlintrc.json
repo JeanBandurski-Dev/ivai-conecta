@@ -1,0 +1,15 @@
+{
+  "$schema": "./App/node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "unicorn",
+    "typescript",
+    "oxc",
+    "react"
+  ],
+  "rules": {
+    "react/set-state-in-effect": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/purity": "off",
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}

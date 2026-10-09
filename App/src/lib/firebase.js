@@ -3,7 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
-const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+const env = import.meta.env || {};
 
 const firebaseConfig = {
   apiKey:            env.VITE_FIREBASE_API_KEY || 'AIzaSyD0vBDSVrmerUmsqWee1aWvFB2NdGdyaSo',

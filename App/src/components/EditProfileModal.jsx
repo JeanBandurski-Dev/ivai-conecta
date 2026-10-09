@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
   Globe, Sparkles, Save, FolderGit2,
@@ -35,18 +35,24 @@ export default function EditProfileModal({
   removeExperience,
   addProject,
   removeProject,
-  addEducation: _addEducation,
-  removeEducation: _removeEducation,
   newExp = { role: '', company: '', period: '', description: '' },
   setNewExp,
   newProj = { title: '', tech: '', link: '', description: '' },
-  setNewProj,
-  newEdu: _newEdu = { degree: '', institution: '', period: '' },
-  setNewEdu: _setNewEdu
+  setNewProj
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const [skillInputError, setSkillInputError] = useState('');
   const [isCurrentlyWorking, setIsCurrentlyWorking] = useState(false);
+
+  // Fechamento pelo botão Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Calcula a taxa de completude do perfil em tempo real
   const completionPercentage = useMemo(() => {
@@ -61,6 +67,14 @@ export default function EditProfileModal({
     if (editData?.linkedin?.trim() || editData?.github?.trim()) score += 5;
     return Math.min(100, score);
   }, [editData]);
+
+  const TABS = useMemo(() => [
+    { id: 'general', label: 'Dados Gerais', icon: User, badge: null },
+    { id: 'experience', label: 'Experiências', icon: Briefcase, badge: editData?.experiences?.length || null },
+    { id: 'projects', label: 'Projetos', icon: FolderGit2, badge: editData?.projects?.length || null },
+    { id: 'skills', label: 'Habilidades', icon: Sparkles, badge: editData?.skills?.length || null },
+    { id: 'links', label: 'Redes & Contato', icon: Globe, badge: null }
+  ], [editData?.experiences?.length, editData?.projects?.length, editData?.skills?.length]);
 
   if (!isOpen) return null;
 
@@ -80,7 +94,7 @@ export default function EditProfileModal({
       return;
     }
     setSkillInputError('');
-    if (!editData.skills.some(s => s.toLowerCase() === sk.toLowerCase())) {
+    if (!editData.skills?.some(s => s.toLowerCase() === sk.toLowerCase())) {
       setEditData(d => ({ ...d, skills: [...(d.skills || []), sk], newSkill: '' }));
     } else {
       setEditData(d => ({ ...d, newSkill: '' }));
@@ -90,14 +104,6 @@ export default function EditProfileModal({
   const handleRemoveSkillLocal = (skToRemove) => {
     setEditData(d => ({ ...d, skills: (d.skills || []).filter(s => s !== skToRemove) }));
   };
-
-  const TABS = [
-    { id: 'general', label: 'Dados Gerais', icon: User, badge: null },
-    { id: 'experience', label: 'Experiências', icon: Briefcase, badge: editData?.experiences?.length || null },
-    { id: 'projects', label: 'Projetos', icon: FolderGit2, badge: editData?.projects?.length || null },
-    { id: 'skills', label: 'Habilidades', icon: Sparkles, badge: editData?.skills?.length || null },
-    { id: 'links', label: 'Redes & Contato', icon: Globe, badge: null }
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">

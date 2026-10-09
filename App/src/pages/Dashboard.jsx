@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, X, Sparkles, MapPin, Briefcase, Users, Wrench,
@@ -112,7 +112,7 @@ export default function Dashboard() {
 
   const totalMatches = filteredTalents.length + filteredJobs.length + filteredServices.length;
 
-  const handleExecuteSearch = (termToSearch) => {
+  const handleExecuteSearch = useCallback((termToSearch) => {
     const cleanTerm = typeof termToSearch === 'string' ? termToSearch.trim() : searchQuery.trim();
     setActiveSearch(cleanTerm);
     setSelectedSector('todos');
@@ -121,15 +121,15 @@ export default function Dashboard() {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  };
+  }, [searchQuery]);
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     setActiveSearch('');
     setSelectedSector('todos');
-  };
+  }, []);
 
-  const metrics = [
+  const metrics = useMemo(() => [
     {
       value: `${platformMetrics.talentsCount || 0}`,
       label: 'Talentos Registrados',
@@ -150,7 +150,7 @@ export default function Dashboard() {
       label: 'Serviços no Marketplace',
       color: 'text-[#FBBF24]'
     },
-  ];
+  ], [platformMetrics]);
 
   return (
     <>

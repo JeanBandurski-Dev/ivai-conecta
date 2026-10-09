@@ -1,4 +1,4 @@
-import { getOrCreateChat, isSameUser } from '../services/chatService';
+import { getOrCreateChat, isSameUser, sendChatMessage } from '../services/chatService';
 import { create } from 'zustand';
 import {
   getAuthUser,
@@ -248,7 +248,6 @@ const useAppStore = create((set, get) => ({
       const chatId = await getOrCreateChat(currentUser, targetUser, contextTitle);
 
       if (initialMessage) {
-        const { sendChatMessage } = await import('../services/chatService');
         await sendChatMessage(chatId, currentUser, initialMessage);
       }
 

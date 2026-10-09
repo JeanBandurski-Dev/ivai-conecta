@@ -106,8 +106,9 @@ export default function MinhasVagas() {
 
   const savedJobsList = useMemo(() => {
     if (!Array.isArray(favoriteJobs) || favoriteJobs.length === 0) return [];
-    return safeLiveJobs.filter(j => isJobFavorited(j, favoriteJobs));
-  }, [safeLiveJobs, favoriteJobs]);
+    const list = Array.isArray(liveJobs) ? liveJobs : [];
+    return list.filter(j => isJobFavorited(j, favoriteJobs));
+  }, [liveJobs, favoriteJobs]);
 
   const companyJobs = safeLiveJobs.filter(j =>
     j && (
@@ -228,7 +229,8 @@ export default function MinhasVagas() {
     if (!selectedJobApplicants) return [];
     const jId = String(selectedJobApplicants.id || '');
     const jFId = selectedJobApplicants.firestoreId ? String(selectedJobApplicants.firestoreId) : '';
-    const fromApps = apps.filter(a => {
+    const appsList = Array.isArray(liveApps) ? liveApps : [];
+    const fromApps = appsList.filter(a => {
       const aJobId = String(a.jobId || '');
       const aFsId = a.firestoreJobId ? String(a.firestoreJobId) : '';
       const aOrigId = a.originalJobId ? String(a.originalJobId) : '';
@@ -241,7 +243,7 @@ export default function MinhasVagas() {
       if (key && !map.has(key)) map.set(key, item);
     });
     return Array.from(map.values());
-  }, [selectedJobApplicants, jobApplicants, apps]);
+  }, [selectedJobApplicants, jobApplicants, liveApps]);
 
   if (!currentUser) {
     return (

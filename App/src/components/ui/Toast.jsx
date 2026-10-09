@@ -8,9 +8,9 @@ export default function Toast() {
 
   useEffect(() => {
     toasts.forEach(t => {
-      if (!visible[t.id]) {
-        setTimeout(() => setVisible(v => ({ ...v, [t.id]: true })), 10);
-      }
+      setTimeout(() => {
+        setVisible(v => (v[t.id] ? v : { ...v, [t.id]: true }));
+      }, 10);
     });
   }, [toasts]);
 

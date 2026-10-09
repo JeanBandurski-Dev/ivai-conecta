@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Briefcase, Check, Sparkles, ChevronDown, X } from 'lucide-react';
+import { Briefcase, Check, Sparkles, ChevronDown, X, AlertCircle } from 'lucide-react';
 import { STANDARD_JOB_TITLES, validateJobTitle } from '../../lib/ivaiConecta';
 
 /**

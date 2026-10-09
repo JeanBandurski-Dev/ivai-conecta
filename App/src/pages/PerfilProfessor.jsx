@@ -37,20 +37,22 @@ export default function PerfilProfessor() {
     } catch {}
   }, [teacherId]);
 
-  const teacher = liveTeacherDoc || getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
-    id: currentUser.uid || currentUser.id,
-    firestoreId: currentUser.uid || currentUser.id,
-    name: currentUser.name || 'Professor Docente',
-    email: currentUser.email || '',
-    degree: currentUser.degree || 'Docente / Pesquisador',
-    institution: currentUser.institution || 'IFPR Campus Ivaiporã',
-    discipline: currentUser.discipline || 'Ensino Superior & Técnico',
-    endorsementCount: currentUser.endorsementCount || 0,
-    avatar: currentUser.avatar || '',
-    bio: currentUser.bio || '',
-    classes: currentUser.classes || [],
-    education: currentUser.education || [],
-  } : null);
+  const teacher = useMemo(() => {
+    return liveTeacherDoc || getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
+      id: currentUser.uid || currentUser.id,
+      firestoreId: currentUser.uid || currentUser.id,
+      name: currentUser.name || 'Professor Docente',
+      email: currentUser.email || '',
+      degree: currentUser.degree || 'Docente / Pesquisador',
+      institution: currentUser.institution || 'IFPR Campus Ivaiporã',
+      discipline: currentUser.discipline || 'Ensino Superior & Técnico',
+      endorsementCount: currentUser.endorsementCount || 0,
+      avatar: currentUser.avatar || '',
+      bio: currentUser.bio || '',
+      classes: currentUser.classes || [],
+      education: currentUser.education || [],
+    } : null);
+  }, [liveTeacherDoc, teacherId, currentUser]);
 
   const isOwner = Boolean(
     currentUser && teacher && (

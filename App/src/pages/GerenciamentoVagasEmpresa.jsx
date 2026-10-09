@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle2, Clock,
@@ -183,7 +183,7 @@ export default function GerenciamentoVagasEmpresa() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [updateCount, forceUpdate] = useState(0);
+  const [_updateCount, forceUpdate] = useState(0);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -197,13 +197,16 @@ export default function GerenciamentoVagasEmpresa() {
     const lower = String(t).toLowerCase().trim();
     if (lower === 'jobs_list' || lower === 'minhas-vagas' || lower === 'minhas_vagas' || lower === 'vagas' || lower === 'jobs') return 'jobs_list';
     if (lower === 'pipeline' || lower === 'kanban' || lower === 'funil') return 'pipeline';
+    if (lower === 'interview_history' || lower === 'entrevistas' || lower === 'entrevista' || lower === 'interviews' || lower === 'historico_entrevistas' || lower === 'historico-entrevistas') return 'interview_history';
     if (lower === 'stage_settings' || lower === 'etapas' || lower === 'configurar-etapas' || lower === 'configurar_etapas') return 'stage_settings';
     if (lower === 'analytics' || lower === 'indicadores' || lower === 'metricas') return 'analytics';
     return null;
   };
 
+  const isInternalTabChangeRef = useRef(false);
+
   // ── Tab Navigation ──
-  // 'pipeline' | 'jobs_list' | 'stage_settings' | 'analytics'
+  // 'pipeline' | 'jobs_list' | 'interview_history' | 'stage_settings' | 'analytics'
   const [activeTab, setActiveTab] = useState(() => {
     // 1. Prioridade máxima: parâmetro da URL ?tab=...
     const fromUrl = normalizeTab(searchParams.get('tab'));
@@ -225,6 +228,7 @@ export default function GerenciamentoVagasEmpresa() {
   // Função para troca explícita de aba (atualiza state, URL e localStorage de forma imediata)
   const handleTabChange = (newTab) => {
     const norm = normalizeTab(newTab) || newTab;
+    isInternalTabChangeRef.current = true;
     setActiveTab(norm);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('ivai_empresa_gerenciamento_active_tab', norm);
@@ -236,30 +240,36 @@ export default function GerenciamentoVagasEmpresa() {
     }, { replace: true });
   };
 
-  // Sincroniza parâmetros na URL e localStorage quando o estado mudar
+  // Sincroniza parâmetros na URL e localStorage sem causar loops ou missing-deps
   useEffect(() => {
-    if (!activeTab) return;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('ivai_empresa_gerenciamento_active_tab', activeTab);
+    if (isInternalTabChangeRef.current) {
+      isInternalTabChangeRef.current = false;
+      return;
     }
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      let changed = false;
-      if (next.get('tab') !== activeTab) {
-        next.set('tab', activeTab);
-        changed = true;
-      }
-      return changed ? next : prev;
-    }, { replace: true });
-  }, [activeTab, setSearchParams]);
-
-  // Sincroniza se o usuário usar os botões Voltar / Avançar do navegador
-  useEffect(() => {
     const urlTab = normalizeTab(searchParams.get('tab'));
-    if (urlTab && urlTab !== activeTab) {
-      setActiveTab(urlTab);
+    if (urlTab) {
+      setActiveTab(prev => {
+        if (prev !== urlTab) {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('ivai_empresa_gerenciamento_active_tab', urlTab);
+          }
+          return urlTab;
+        }
+        return prev;
+      });
+    } else {
+      // Se não há tab na URL, grava a aba atual na URL de forma transparente
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        const currentStored = normalizeTab(typeof localStorage !== 'undefined' ? localStorage.getItem('ivai_empresa_gerenciamento_active_tab') : null) || 'pipeline';
+        if (next.get('tab') !== currentStored) {
+          next.set('tab', currentStored);
+          return next;
+        }
+        return prev;
+      }, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   // ── Company Jobs State ──
   const [liveJobs, setLiveJobs] = useState(() => getJobs('Todas as Cidades'));
@@ -431,6 +441,30 @@ export default function GerenciamentoVagasEmpresa() {
     notes: ''
   });
 
+  // Helper central para abrir o modal do candidato sincronizando abas e formulários
+  const handleOpenCandidateModal = (cand, initialTab = 'overview') => {
+    if (!cand) return;
+    setSelectedCandidate(cand);
+    setActiveModalTab(initialTab);
+    if (cand.interview) {
+      setInterviewForm({
+        date: cand.interview.date || '',
+        time: cand.interview.time || '',
+        format: cand.interview.format || 'Google Meet',
+        link: cand.interview.link || '',
+        notes: cand.interview.notes || ''
+      });
+    } else {
+      setInterviewForm({
+        date: '',
+        time: '',
+        format: 'Google Meet',
+        link: '',
+        notes: ''
+      });
+    }
+  };
+
   // Custom Stages State for selected job
   const [customStages, setCustomStages] = useState(() => (getJobCustomStages(currentJob?.id) || []).map(sanitizeStageItem));
   const [draggedStageIdx, setDraggedStageIdx] = useState(null);
@@ -442,7 +476,7 @@ export default function GerenciamentoVagasEmpresa() {
     } else if (currentJob) {
       setCustomStages((getJobCustomStages(currentJob.id) || []).map(sanitizeStageItem));
     }
-  }, [currentJob?.id, selectedJobId]);
+  }, [currentJob, selectedJobId]);
 
   // Edit / New Job Modal State
   const [showNewJobModal, setShowNewJobModal] = useState(false);
@@ -450,9 +484,9 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Candidates for selected job
   const jobCandidates = useMemo(() => {
-    if (!currentJob) return [];
+    if (!currentJob || _updateCount < 0) return [];
     return getJobCandidates(currentJob);
-  }, [currentJob, selectedJobId, updateCount]);
+  }, [currentJob, _updateCount]);
 
   const interviewsNow = useMemo(() => {
     return jobCandidates.map(c => {
@@ -584,6 +618,7 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Coleta todos os candidatos com entrevista de todas as vagas da empresa
   const allInterviewsList = useMemo(() => {
+    if (_updateCount < 0) return [];
     const list = [];
     allCompanyJobs.forEach(job => {
       const cands = getJobCandidates(job.id) || [];
@@ -599,7 +634,7 @@ export default function GerenciamentoVagasEmpresa() {
       });
     });
     return list;
-  }, [allCompanyJobs, updateCount]);
+  }, [allCompanyJobs, _updateCount]);
 
   // Estatísticas de Entrevistas
   const interviewStats = useMemo(() => {
@@ -681,7 +716,7 @@ export default function GerenciamentoVagasEmpresa() {
       approvedCandidatesCount,
       avgCandidates
     };
-  }, [allCompanyJobs, updateCount]);
+  }, [allCompanyJobs]);
 
   // Filtered & Sorted Jobs for "Minhas Vagas" Tab
   const filteredCompanyJobs = useMemo(() => {
@@ -714,7 +749,7 @@ export default function GerenciamentoVagasEmpresa() {
         }
         return (b.id || 0) - (a.id || 0);
       });
-  }, [allCompanyJobs, jobListSearch, jobListStatusFilter, jobListModalityFilter, jobListTypeFilter, jobListSort, updateCount]);
+  }, [allCompanyJobs, jobListSearch, jobListStatusFilter, jobListModalityFilter, jobListTypeFilter, jobListSort]);
 
   // Stats calculation
   const _stats = useMemo(() => {
@@ -736,7 +771,7 @@ export default function GerenciamentoVagasEmpresa() {
     });
 
     return { totalJobs, activeJobs, totalApplicants, inReview, inInterview, approved, talentPool };
-  }, [allCompanyJobs, updateCount]);
+  }, [allCompanyJobs]);
 
   // ── Stage Color Helper ──
   const getStageStyle = (stageId, stageColor) => {
@@ -768,14 +803,13 @@ export default function GerenciamentoVagasEmpresa() {
 
     if (selectedCandidate && selectedCandidate.id === candidateId) {
       setSelectedCandidate(prev => ({ ...prev, stage: newStage }));
-      if (newStage === 'entrevista' && !selectedCandidate.interview) {
+      if (newStage === 'entrevista') {
         setActiveModalTab('interview');
       }
     } else if (newStage === 'entrevista') {
       const cand = jobCandidates.find(c => c.id === candidateId || String(c.id) === String(candidateId));
-      if (cand && !cand.interview) {
-        setSelectedCandidate({ ...cand, stage: newStage });
-        setActiveModalTab('interview');
+      if (cand) {
+        handleOpenCandidateModal({ ...cand, stage: newStage }, 'interview');
       }
     }
   };
@@ -787,14 +821,13 @@ export default function GerenciamentoVagasEmpresa() {
 
     if (selectedCandidate && selectedCandidate.id === candidateId) {
       setSelectedCandidate(prev => ({ ...prev, stage: newStage }));
-      if (newStage === 'entrevista' && !selectedCandidate.interview) {
+      if (newStage === 'entrevista') {
         setActiveModalTab('interview');
       }
     } else if (newStage === 'entrevista') {
       const cand = jobCandidates.find(c => String(c.id) === String(candidateId));
-      if (cand && !cand.interview) {
-        setSelectedCandidate({ ...cand, stage: newStage });
-        setActiveModalTab('interview');
+      if (cand) {
+        handleOpenCandidateModal({ ...cand, stage: newStage }, 'interview');
       }
     }
   };
@@ -957,51 +990,70 @@ export default function GerenciamentoVagasEmpresa() {
 
   const handleScheduleInterview = (e) => {
     e.preventDefault();
-    if (!selectedCandidate || !currentJob) return;
+    if (!selectedCandidate) return;
+
+    const targetJobId = selectedCandidate.jobId || currentJob?.id;
+    const targetJob = allCompanyJobs.find(j => String(j.id) === String(targetJobId) || (j.firestoreId && String(j.firestoreId) === String(targetJobId))) || currentJob;
+
+    if (!targetJobId) {
+      showToast('Selecione uma vaga para agendar a entrevista.');
+      return;
+    }
 
     const finalDate = interviewForm.date || selectedCandidate.interview?.date;
     const finalTime = interviewForm.time || selectedCandidate.interview?.time;
     const finalFormat = interviewForm.format || selectedCandidate.interview?.format || 'Google Meet';
 
     if (!finalDate || !finalTime) {
-      showToast('Por favor, selecione data e horário.');
+      showToast('Por favor, selecione data e horário da entrevista.');
       return;
     }
 
     const finalForm = {
       date: finalDate,
       time: finalTime,
-      format: finalFormat
+      format: finalFormat,
+      link: interviewForm.link || selectedCandidate.interview?.link || '',
+      notes: interviewForm.notes || selectedCandidate.interview?.notes || ''
     };
 
     const isAlteration = Boolean(selectedCandidate.interview?.date);
 
-    scheduleCandidateInterview(currentJob.id, selectedCandidate.id, finalForm);
+    scheduleCandidateInterview(targetJobId, selectedCandidate.id, finalForm);
+
+    const jobTitle = targetJob?.title || selectedCandidate.jobTitle || 'Vaga';
 
     // Message logic
     let msg = '';
     if (isAlteration) {
-      msg = `Olá ${selectedCandidate.name}! O horário da sua entrevista para a vaga de ${currentJob.title} foi alterado para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
+      msg = `Olá ${selectedCandidate.name}! O horário da sua entrevista para a vaga de ${jobTitle} foi alterado para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
     } else {
-      msg = `Olá ${selectedCandidate.name}! Sua entrevista para a vaga de ${currentJob.title} foi agendada para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
+      msg = `Olá ${selectedCandidate.name}! Sua entrevista para a vaga de ${jobTitle} foi agendada para ${finalDate.split('-').reverse().join('/')} às ${finalTime}.\n\nFormato: ${finalFormat}\n\nO link oficial da sala será enviado por aqui minutos antes do nosso horário. Por favor, confirme sua presença!`;
     }
 
     const candEmail = selectedCandidate.candidateEmail || selectedCandidate.email || '';
     const candUid = selectedCandidate.candidateUid || selectedCandidate.candidateId || selectedCandidate.uid || selectedCandidate.id || '';
 
-    startChatWith({
-      name: selectedCandidate.name,
-      email: candEmail,
-      uid: candUid,
-      role: 'aluno',
-      avatar: selectedCandidate.avatar
-    }, `Entrevista: ${currentJob.title}`, isAlteration ? null : msg, isAlteration ? msg : null);
+    try {
+      if (candEmail || candUid) {
+        startChatWith({
+          name: selectedCandidate.name,
+          email: candEmail,
+          uid: candUid,
+          role: 'aluno',
+          avatar: selectedCandidate.avatar
+        }, `Entrevista: ${jobTitle}`, isAlteration ? null : msg, isAlteration ? msg : null);
+      }
+    } catch (chatErr) {
+      console.warn('Erro ao notificar candidato no chat:', chatErr);
+    }
 
     if (isAlteration) {
-      showToast(`Horário alterado! Revise o convite no chat antes de enviar.`);
+      showToast('Horário alterado com sucesso!');
     } else {
-      showToast(`Entrevista agendada e convite enviado no chat!`);
+      showToast('Entrevista agendada com sucesso! Candidato movido para etapa "Entrevista".');
     }
+    setInterviewForm({ date: '', time: '', format: 'Google Meet', link: '', notes: '' });
     setSelectedCandidate(null);
     forceUpdate(n => n + 1);
   };
@@ -1387,7 +1439,7 @@ export default function GerenciamentoVagasEmpresa() {
           <div className="border-t border-gray-100 dark:border-slate-800/80 mt-6">
             <div className="flex items-center overflow-x-auto scrollbar-none gap-6 pt-1">
               <button
-                onClick={() => setActiveTab('pipeline')}
+                onClick={() => handleTabChange('pipeline')}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'pipeline'
                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
@@ -1397,7 +1449,7 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
 
               <button
-                onClick={() => setActiveTab('jobs_list')}
+                onClick={() => handleTabChange('jobs_list')}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'jobs_list'
                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
@@ -1407,7 +1459,7 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
 
               <button
-                onClick={() => setActiveTab('interview_history')}
+                onClick={() => handleTabChange('interview_history')}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'interview_history'
                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
@@ -1422,7 +1474,7 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
 
               <button
-                onClick={() => setActiveTab('stage_settings')}
+                onClick={() => handleTabChange('stage_settings')}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'stage_settings'
                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
@@ -1432,7 +1484,7 @@ export default function GerenciamentoVagasEmpresa() {
               </button>
 
               <button
-                onClick={() => setActiveTab('analytics')}
+                onClick={() => handleTabChange('analytics')}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${activeTab === 'analytics'
                     ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
@@ -2079,8 +2131,7 @@ export default function GerenciamentoVagasEmpresa() {
                                                 e.stopPropagation();
                                                 return;
                                               }
-                                              setSelectedCandidate(cand);
-                                              setActiveModalTab('overview');
+                                              handleOpenCandidateModal(cand, 'overview');
                                             }}
                                             className={`group relative bg-white dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700/80 hover:border-primary-blue/60 dark:hover:border-blue-400 rounded-2xl p-3.5 shadow-2xs hover:shadow-brand-md transition-all duration-300 ease-out cursor-grab active:cursor-grabbing flex flex-col gap-2.5 ${isBeingDragged
                                                 ? 'opacity-40 ring-2 ring-primary-blue rotate-2 scale-95 shadow-xl'
@@ -2162,7 +2213,14 @@ export default function GerenciamentoVagasEmpresa() {
                                               const Icon = currentStatus?.icon;
 
                                               return (
-                                                <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-1">
+                                                <div
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenCandidateModal(cand, 'interview');
+                                                  }}
+                                                  className="flex flex-col gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                                  title="Ver ou alterar detalhes da entrevista"
+                                                >
                                                   <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                                                     <Calendar size={11} />
                                                     <span>
@@ -2177,6 +2235,22 @@ export default function GerenciamentoVagasEmpresa() {
                                                 </div>
                                               );
                                             })()}
+
+                                            {/* Botão de Agendamento se candidato estiver na etapa Entrevista sem entrevista agendada */}
+                                            {cand.stage === 'entrevista' && (!cand.interview || !cand.interview.date) && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleOpenCandidateModal(cand, 'interview');
+                                                }}
+                                                className="mt-1 w-full py-1.5 px-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                                title="Agendar entrevista para este candidato agora"
+                                              >
+                                                <Calendar size={12} className="text-purple-600" />
+                                                Agendar Entrevista
+                                              </button>
+                                            )}
 
                                             {/* ── Skills Chips ── */}
                                             <div className="flex flex-wrap gap-1">
@@ -2233,6 +2307,18 @@ export default function GerenciamentoVagasEmpresa() {
                                                   <ChevronRight size={13} />
                                                 </button>
 
+                                                {/* Interview Button */}
+                                                <button
+                                                  onClick={() => handleOpenCandidateModal(cand, 'interview')}
+                                                  className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer border ${
+                                                    cand.interview
+                                                      ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                                      : 'text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-700 border-transparent'
+                                                  }`}
+                                                  title={cand.interview ? 'Ver / Reagendar entrevista' : 'Agendar entrevista'}
+                                                >
+                                                  <Calendar size={11} />
+                                                </button>
 
                                                 {/* Chat Button */}
                                                 <button
@@ -2722,7 +2808,17 @@ export default function GerenciamentoVagasEmpresa() {
                                       <div style={{ width: `${(desafioCount / candidates.length) * 100}%` }} className="bg-amber-500 h-full" title={`Desafio / Análise: ${desafioCount}`} />
                                     )}
                                     {entrevistaCount > 0 && (
-                                      <div style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }} className="bg-purple-500 h-full" title={`Entrevista: ${entrevistaCount}`} />
+                                      <div
+                                        style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }}
+                                        className="bg-purple-500 h-full cursor-pointer hover:opacity-80 transition-opacity"
+                                        title={`Entrevista: ${entrevistaCount} (Clique para ver entrevistas)`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedJobId(job.id);
+                                          setHistoryJobFilter(String(job.id));
+                                          handleTabChange('interview_history');
+                                        }}
+                                      />
                                     )}
                                     {aprovadosCount > 0 && (
                                       <div style={{ width: `${(aprovadosCount / candidates.length) * 100}%` }} className="bg-emerald-500 h-full" title={`Aprovados: ${aprovadosCount}`} />
@@ -2735,7 +2831,18 @@ export default function GerenciamentoVagasEmpresa() {
                                   <div className="flex items-center justify-between text-[10px] font-medium text-gray-500 dark:text-slate-400 flex-wrap gap-1">
                                     <span>Triagem ({triagemCount})</span>
                                     <span>Desafio ({desafioCount})</span>
-                                    <span>Entrevista ({entrevistaCount})</span>
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedJobId(job.id);
+                                        setHistoryJobFilter(String(job.id));
+                                        handleTabChange('interview_history');
+                                      }}
+                                      className={`cursor-pointer hover:underline transition-colors ${entrevistaCount > 0 ? 'text-purple-600 dark:text-purple-400 font-bold' : ''}`}
+                                      title="Ver histórico de entrevistas desta vaga"
+                                    >
+                                      Entrevista ({entrevistaCount})
+                                    </span>
                                     <span className="text-emerald-600 dark:text-emerald-400 font-bold">Aprovados ({aprovadosCount})</span>
                                   </div>
                                 </div>
@@ -2895,12 +3002,33 @@ export default function GerenciamentoVagasEmpresa() {
                                       <div className="space-y-1">
                                         <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
                                           <div style={{ width: `${(triagemCount / candidates.length) * 100}%` }} className="bg-blue-500 h-full" />
-                                          <div style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }} className="bg-purple-500 h-full" />
+                                          <div
+                                            style={{ width: `${(entrevistaCount / candidates.length) * 100}%` }}
+                                            className="bg-purple-500 h-full cursor-pointer hover:opacity-80 transition-opacity"
+                                            title={`Entrevista: ${entrevistaCount} (Clique para ver)`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedJobId(job.id);
+                                              setHistoryJobFilter(String(job.id));
+                                              handleTabChange('interview_history');
+                                            }}
+                                          />
                                           <div style={{ width: `${(aprovadosCount / candidates.length) * 100}%` }} className="bg-emerald-500 h-full" />
                                         </div>
                                         <div className="text-[10px] text-gray-400 flex items-center justify-between">
                                           <span>Tri: {triagemCount}</span>
-                                          <span>Ent: {entrevistaCount}</span>
+                                          <span
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedJobId(job.id);
+                                              setHistoryJobFilter(String(job.id));
+                                              handleTabChange('interview_history');
+                                            }}
+                                            className={`cursor-pointer hover:underline transition-colors ${entrevistaCount > 0 ? 'text-purple-600 dark:text-purple-400 font-bold' : ''}`}
+                                            title="Ver entrevistas desta vaga"
+                                          >
+                                            Ent: {entrevistaCount}
+                                          </span>
                                           <span className="text-emerald-500 font-bold">Apr: {aprovadosCount}</span>
                                         </div>
                                       </div>
@@ -3051,6 +3179,18 @@ export default function GerenciamentoVagasEmpresa() {
                         className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 px-3.5 py-2 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                       >
                         <Download size={14} /> Exportar CSV
+                      </button>
+
+                      {/* Agendar no Funil */}
+                      <button
+                        onClick={() => {
+                          setSelectedStageFilter('entrevista');
+                          handleTabChange('pipeline');
+                        }}
+                        className="bg-primary-blue hover:bg-blue-600 text-white px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-brand-sm"
+                        title="Ir para o Funil Kanban e gerenciar entrevistas"
+                      >
+                        <Calendar size={14} /> Agendar no Funil ATS
                       </button>
                     </div>
                   </div>
@@ -3215,17 +3355,28 @@ export default function GerenciamentoVagasEmpresa() {
                       <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
                         Nenhum registro de entrevista corresponde aos filtros ou busca selecionados.
                       </p>
-                      <button
-                        onClick={() => {
-                          setHistorySearch('');
-                          setHistoryJobFilter('todos');
-                          setHistoryStatusFilter('todos');
-                          setHistoryFormatFilter('todos');
-                        }}
-                        className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer"
-                      >
-                        Limpar Filtros
-                      </button>
+                      <div className="flex items-center justify-center gap-3 pt-1">
+                        <button
+                          onClick={() => {
+                            setHistorySearch('');
+                            setHistoryJobFilter('todos');
+                            setHistoryStatusFilter('todos');
+                            setHistoryFormatFilter('todos');
+                          }}
+                          className="btn btn-outline btn-sm font-bold text-xs rounded-xl cursor-pointer"
+                        >
+                          Limpar Filtros
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedStageFilter('entrevista');
+                            handleTabChange('pipeline');
+                          }}
+                          className="btn btn-primary btn-sm font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 shadow-brand-sm"
+                        >
+                          <Calendar size={13} /> Ir para Funil e Agendar
+                        </button>
+                      </div>
                     </div>
                   ) : historyViewMode === 'grid' ? (
 
@@ -3422,11 +3573,20 @@ export default function GerenciamentoVagasEmpresa() {
                                   <X size={12} strokeWidth={3} /> Banco
                                 </button>
 
-                                {/* Open Drawer */}
+                                {/* Reagendar / Detalhes */}
                                 <button
                                   onClick={() => {
-                                    setSelectedCandidate(cand);
-                                    setActiveModalTab('overview');
+                                    handleOpenCandidateModal(cand, 'interview');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 font-bold text-xs rounded-xl flex items-center gap-1 transition-all cursor-pointer border border-purple-200 dark:border-purple-800"
+                                  title="Editar ou reagendar entrevista"
+                                >
+                                  <Calendar size={12} /> Reagendar
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    handleOpenCandidateModal(cand, 'overview');
                                   }}
                                   className="p-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl transition-colors cursor-pointer"
                                   title="Ver ficha completa do candidato"
@@ -3620,8 +3780,17 @@ export default function GerenciamentoVagasEmpresa() {
 
                                       <button
                                         onClick={() => {
-                                          setSelectedCandidate(cand);
-                                          setActiveModalTab('overview');
+                                          handleOpenCandidateModal(cand, 'interview');
+                                        }}
+                                        className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 rounded-lg cursor-pointer"
+                                        title="Reagendar Entrevista"
+                                      >
+                                        <Calendar size={13} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => {
+                                          handleOpenCandidateModal(cand, 'overview');
                                         }}
                                         className="p-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg cursor-pointer"
                                         title="Ver Detalhes"
@@ -4326,7 +4495,18 @@ export default function GerenciamentoVagasEmpresa() {
                 </button>
 
                 <button
-                  onClick={() => setActiveModalTab('interview')}
+                  onClick={() => {
+                    setActiveModalTab('interview');
+                    if (selectedCandidate.interview) {
+                      setInterviewForm({
+                        date: selectedCandidate.interview.date || '',
+                        time: selectedCandidate.interview.time || '',
+                        format: selectedCandidate.interview.format || 'Google Meet',
+                        link: selectedCandidate.interview.link || '',
+                        notes: selectedCandidate.interview.notes || ''
+                      });
+                    }
+                  }}
                   className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeModalTab === 'interview'
                       ? 'border-primary-blue text-primary-blue font-semibold'
                       : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400'
@@ -4387,6 +4567,33 @@ export default function GerenciamentoVagasEmpresa() {
                       />
                       <span className="text-[10px] text-gray-400 block mt-1">Salvo automaticamente ao clicar fora da caixa.</span>
                     </div>
+
+                    {!selectedCandidate.interview && (
+                      <div className="bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/80 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0">
+                            <Calendar size={18} />
+                          </div>
+                          <div>
+                            <h5 className="font-bold text-xs text-purple-950 dark:text-purple-200">
+                              Nenhuma entrevista agendada
+                            </h5>
+                            <p className="text-[11px] text-purple-700/80 dark:text-purple-400">
+                              Defina data, horário e formato com envio automático de convite via chat.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setActiveModalTab('interview');
+                            setInterviewForm({ date: '', time: '', format: 'Google Meet', link: '', notes: '' });
+                          }}
+                          className="btn btn-sm text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-3.5 py-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                        >
+                          Agendar Entrevista
+                        </button>
+                      </div>
+                    )}
 
                     {selectedCandidate.interview && (() => {
                       const hasDateAndTime = selectedCandidate.interview.date && selectedCandidate.interview.time;
@@ -4741,7 +4948,7 @@ export default function GerenciamentoVagasEmpresa() {
           onClose={() => setShowNewJobModal(false)}
           onJobCreated={(created) => {
             try {
-              setActiveTab('jobs_list');
+              handleTabChange('jobs_list');
               if (created?.id) {
                 setSelectedJobId(created.id);
               }

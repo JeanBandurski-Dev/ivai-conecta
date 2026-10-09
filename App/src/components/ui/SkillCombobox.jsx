@@ -1,6 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Sparkles, Plus, Check, Search, AlertCircle, X, ChevronDown } from 'lucide-react';
 import { STANDARD_SKILLS, validateSkill } from '../../lib/ivaiConecta';
+
+const normalizeText = (str) =>
+  (str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 /**
  * SkillCombobox - Caixa de pesquisa e seleção inteligente de competências profissionais
@@ -20,24 +26,25 @@ export default function SkillCombobox({
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  const normalize = (str) =>
-    (str || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-
-  const queryNorm = normalize(inputValue);
+  const queryNorm = normalizeText(inputValue);
 
   // Filtra habilidades do catálogo
-  const filteredSkills = queryNorm.trim()
-    ? STANDARD_SKILLS.filter(s => normalize(s).includes(queryNorm))
-    : STANDARD_SKILLS.slice(0, 18);
+  const filteredSkills = useMemo(() => {
+    const q = queryNorm.trim();
+    return q
+      ? STANDARD_SKILLS.filter(s => normalizeText(s).includes(q))
+      : STANDARD_SKILLS.slice(0, 18);
+  }, [queryNorm]);
 
   // Validação em tempo real do texto digitado
-  const currentValidation = inputValue.trim() ? validateSkill(inputValue) : null;
-  const isExactMatchInCatalog = STANDARD_SKILLS.some(
-    s => normalize(s) === queryNorm.trim()
-  );
+  const currentValidation = useMemo(() => {
+    return inputValue.trim() ? validateSkill(inputValue) : null;
+  }, [inputValue]);
+
+  const isExactMatchInCatalog = useMemo(() => {
+    const q = queryNorm.trim();
+    return STANDARD_SKILLS.some(s => normalizeText(s) === q);
+  }, [queryNorm]);
 
   // Fechar ao clicar fora
   useEffect(() => {
@@ -55,7 +62,7 @@ export default function SkillCombobox({
     };
   }, []);
 
-  const handleAdd = (skillToAdd) => {
+  const handleAdd = useCallback((skillToAdd) => {
     const clean = (skillToAdd || '').trim();
     if (!clean) return;
 
@@ -70,7 +77,7 @@ export default function SkillCombobox({
     setInputValue('');
     setIsOpen(false);
     setHighlightedIndex(-1);
-  };
+  }, [onAddSkill]);
 
   const handleKeyDown = (e) => {
     if (!isOpen) {

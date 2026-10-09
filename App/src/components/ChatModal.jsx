@@ -214,11 +214,12 @@ export default function ChatModal({ onClose }) {
   }, [currentUser?.email]);
 
   const activeThread = threads.find(t => t.id === activeThreadId);
+  const hasActiveThread = Boolean(activeThread);
   const otherPerson = activeThread ? getOtherParticipant(activeThread, currentUser) : null;
 
   // Assinatura em tempo real das mensagens da conversa selecionada
   useEffect(() => {
-    if (!activeThreadId || !currentUser?.email || !activeThread) {
+    if (!activeThreadId || !currentUser?.email || !hasActiveThread) {
       setMessages([]);
       return;
     }
@@ -228,14 +229,14 @@ export default function ChatModal({ onClose }) {
     }, currentUser.email);
 
     return () => unsubscribe();
-  }, [activeThreadId, currentUser?.email, Boolean(activeThread)]);
+  }, [activeThreadId, currentUser?.email, hasActiveThread]);
 
   // Marca conversa como lida
   useEffect(() => {
-    if (activeThreadId && currentUser?.email && activeThread) {
+    if (activeThreadId && currentUser?.email && hasActiveThread) {
       markThreadAsRead(activeThreadId, currentUser.email);
     }
-  }, [activeThreadId, currentUser?.email, messages, Boolean(activeThread)]);
+  }, [activeThreadId, currentUser?.email, messages, hasActiveThread]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

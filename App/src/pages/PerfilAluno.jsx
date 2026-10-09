@@ -104,7 +104,6 @@ export default function PerfilAluno() {
 
   const [newExp, setNewExp] = useState({ role: '', company: '', period: '', description: '' });
   const [newProj, setNewProj] = useState({ title: '', tech: '', link: '', description: '' });
-  const [newEdu, setNewEdu] = useState({ degree: '', institution: '', period: '' });
 
   // 6. Valores derivados e memorizados
   const platformTeachers = useMemo(() => {
@@ -356,7 +355,7 @@ export default function PerfilAluno() {
       isMounted = false;
       unsubscribe();
     };
-  }, [id, currentUser?.uid, currentUser?.id]);
+  }, [id, currentUser]);
 
   useEffect(() => {
     if (searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true') {
@@ -501,26 +500,6 @@ export default function PerfilAluno() {
     handleCloseEditModal();
   };
 
-  const addEducation = (e) => {
-    if (e) e.preventDefault();
-    if (!newEdu.degree.trim() || !newEdu.institution.trim()) {
-      showToast('Preencha o curso/titulação e a instituição.');
-      return;
-    }
-    const eduItem = {
-      id: `edu_${Date.now()}`,
-      degree: newEdu.degree.trim(),
-      institution: newEdu.institution.trim(),
-      period: newEdu.period.trim() || 'Concluído'
-    };
-    setEditData(prev => ({ ...prev, education: [eduItem, ...(prev.education || [])] }));
-    setNewEdu({ degree: '', institution: '', period: '' });
-    showToast('Formação acadêmica adicionada!');
-  };
-
-  const removeEducation = (eduId) => {
-    setEditData(prev => ({ ...prev, education: (prev.education || []).filter(e => e.id !== eduId && String(e.id) !== String(eduId)) }));
-  };
 
   const addExperience = (e) => {
     e.preventDefault();
@@ -1444,14 +1423,10 @@ export default function PerfilAluno() {
         removeExperience={removeExperience}
         addProject={addProject}
         removeProject={removeProject}
-        addEducation={addEducation}
-        removeEducation={removeEducation}
         newExp={newExp}
         setNewExp={setNewExp}
         newProj={newProj}
         setNewProj={setNewProj}
-        newEdu={newEdu}
-        setNewEdu={setNewEdu}
       />
     </>
   );

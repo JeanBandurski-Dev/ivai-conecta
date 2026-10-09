@@ -1119,6 +1119,68 @@ export function validateSalary(salary, isRequired = true) {
   return { valid: true };
 }
 
+// Conceitos reais de horários, turnos, escalas e regimes de trabalho
+const SCHEDULE_CONCEPTS = [
+  'semanais', 'semanal', 'diarias', 'diárias', 'diaria', 'diária',
+  'segunda', 'sexta', 'sabado', 'sábado', 'domingo', 'escala',
+  '12x36', '6x1', '5x2', 'flexivel', 'flexível', 'comercial',
+  'plantao', 'plantão', 'a combinar', 'integral', 'meio periodo', 'meio período',
+  'estagio', 'estágio', 'aprendiz', 'turno', 'diurno', 'noturno', 'horas', 'hora'
+];
+
+// Vocabulário de contexto corporativo e de trabalho
+const CORPORATE_CONTEXT_KEYWORDS = [
+  'empresa', 'equipe', 'time', 'trabalho', 'rotina', 'atendimento', 'desenvolvimento',
+  'processo', 'cliente', 'atividade', 'responsavel', 'responsabilidades', 'experiencia',
+  'atuar', 'apoio', 'sistema', 'execucao', 'servico', 'vaga', 'setor', 'horario',
+  'funcao', 'conhecimento', 'oportunidade', 'requisito', 'requisitos', 'profissional',
+  'qualificacao', 'habilidades', 'comunicacao', 'beneficios', 'salario', 'remuneracao',
+  'candidato', 'candidata', 'missao', 'organizacao', 'unidade', 'loja', 'escritorio',
+  'obra', 'fabrica', 'producao', 'area', 'gestao', 'projeto', 'rotinas', 'vendas',
+  'mercado', 'ambiente', 'perfil', 'dinamico', 'busca', 'proativo'
+];
+
+// Raízes de verbos de ação e termos ocupacionais típicos de responsabilidades
+const ACTION_OCCUPATIONAL_STEMS = [
+  'atend', 'execut', 'realiz', 'elabor', 'desenvolv', 'organiz', 'apoi', 'control',
+  'acompanh', 'gerenci', 'mant', 'oper', 'auxili', 'prepar', 'analis', 'confer',
+  'coorden', 'particip', 'contat', 'vend', 'prospect', 'registr', 'emit', 'program',
+  'planej', 'limp', 'arrum', 'conduz', 'instal', 'monitor', 'aliment', 'prest',
+  'assegur', 'garant', 'cuid', 'ministr', 'recepcion', 'orient', 'trein', 'supervision',
+  'verific', 'rotin', 'process', 'document', 'relatori', 'estoqu', 'sistem', 'client',
+  'equip', 'servi', 'taref', 'pedid', 'venda', 'caixa', 'chamad', 'suport', 'comunic',
+  'entreg', 'carg', 'descarg', 'produ', 'inspecion', 'digit', 'arquiv', 'ligac',
+  'reuniao', 'financeir', 'faturament', 'fechament', 'cobranc', 'supriment'
+];
+
+// Expressões compostas explícitas e insultos
+const CU_PATTERNS = [
+  /(vai|vou|va|vao)?\s*(tomar?|toma|enfiar?|enfia|da|dar|enfie)\s*(no|pra|pro|o)?\s*(seu|teu)?\s*cu\b/i,
+  /\b(seu|teu|meu|no|no\s+seu|no\s+teu|pra|pro|pau\s+no)\s*cu\b/i,
+  /\bcu\b/i,
+  /\bc[\W_]*u\b/i,
+  /\bk[\W_]*u\b/i
+];
+
+const CU_ALPHA_EVASIONS = [
+  'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu',
+  'tomarnoseucu', 'tomanoseucu', 'vaitomarnocu', 'vaitomarnoseucu',
+  'enfianocu', 'enfianoseucu', 'darocu', 'daocu', 'cuzao', 'cuzinho', 'cuzaum',
+  'vtnc', 'tmnc', 'tnc', 'arrombado', 'arrombada'
+];
+
+const LIXO_PATTERNS = [
+  /\b(oi|ola|seu|sua|um|uma|vc|voce|você|tu|eh|e|é|inutil|tão|tao|muito)\s+lixo\b/i,
+  /\blixo\s+(humano|de\s+pessoa|do\s+caralho|demais)\b/i,
+  /\b(vc|voce|você|tu)\s+(eh|é|e)\s+(um\s+)?lixo\b/i,
+  /^(oi|ola)?\s*lixo[s]?$/i
+];
+
+const DIRECT_INSULTS = [
+  /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(otario|otaria|babaca|trouxa|imbecil|idiota|inutil|inútil|escroto|escrota|canalha|corno|corna|cretino|cretina|retardado|retardada)\b/i,
+  /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(burro|burra)\b/i
+];
+
 /**
  * Validador Inteligente de Carga Horária / Jornada de Trabalho
  */
@@ -1152,15 +1214,6 @@ export function validateWorkingHours(hours) {
       };
     }
   }
-
-  // Conceitos reais de horários, turnos, escalas e regimes de trabalho
-  const SCHEDULE_CONCEPTS = [
-    'semanais', 'semanal', 'diarias', 'diárias', 'diaria', 'diária',
-    'segunda', 'sexta', 'sabado', 'sábado', 'domingo', 'escala',
-    '12x36', '6x1', '5x2', 'flexivel', 'flexível', 'comercial',
-    'plantao', 'plantão', 'a combinar', 'integral', 'meio periodo', 'meio período',
-    'estagio', 'estágio', 'aprendiz', 'turno', 'diurno', 'noturno', 'horas', 'hora'
-  ];
 
   const hasScheduleConcept = SCHEDULE_CONCEPTS.some(concept => norm.includes(concept)) || /\d+\s*h|\d+:\d+/.test(norm);
 
@@ -1206,18 +1259,6 @@ export function validateJobDescription(description) {
       };
     }
   }
-
-  // Vocabulário de contexto corporativo e de trabalho
-  const CORPORATE_CONTEXT_KEYWORDS = [
-    'empresa', 'equipe', 'time', 'trabalho', 'rotina', 'atendimento', 'desenvolvimento',
-    'processo', 'cliente', 'atividade', 'responsavel', 'responsabilidades', 'experiencia',
-    'atuar', 'apoio', 'sistema', 'execucao', 'servico', 'vaga', 'setor', 'horario',
-    'funcao', 'conhecimento', 'oportunidade', 'requisito', 'requisitos', 'profissional',
-    'qualificacao', 'habilidades', 'comunicacao', 'beneficios', 'salario', 'remuneracao',
-    'candidato', 'candidata', 'missao', 'organizacao', 'unidade', 'loja', 'escritorio',
-    'obra', 'fabrica', 'producao', 'area', 'gestao', 'projeto', 'rotinas', 'vendas',
-    'mercado', 'ambiente', 'perfil', 'dinamico', 'busca', 'proativo'
-  ];
 
   const hasCorporateContext = CORPORATE_CONTEXT_KEYWORDS.some(kw => norm.includes(kw));
 
@@ -1275,19 +1316,6 @@ export function validateResponsibility(activity) {
     }
   }
 
-  // Raízes de verbos de ação e termos ocupacionais típicos de responsabilidades
-  const ACTION_OCCUPATIONAL_STEMS = [
-    'atend', 'execut', 'realiz', 'elabor', 'desenvolv', 'organiz', 'apoi', 'control',
-    'acompanh', 'gerenci', 'mant', 'oper', 'auxili', 'prepar', 'analis', 'confer',
-    'coorden', 'particip', 'contat', 'vend', 'prospect', 'registr', 'emit', 'program',
-    'planej', 'limp', 'arrum', 'conduz', 'instal', 'monitor', 'aliment', 'prest',
-    'assegur', 'garant', 'cuid', 'ministr', 'recepcion', 'orient', 'trein', 'supervision',
-    'verific', 'rotin', 'process', 'document', 'relatori', 'estoqu', 'sistem', 'client',
-    'equip', 'servi', 'taref', 'pedid', 'venda', 'caixa', 'chamad', 'suport', 'comunic',
-    'entreg', 'carg', 'descarg', 'produ', 'inspecion', 'digit', 'arquiv', 'ligac',
-    'reuniao', 'financeir', 'faturament', 'fechament', 'cobranc', 'supriment'
-  ];
-
   const hasActionOrDuty = ACTION_OCCUPATIONAL_STEMS.some(stem => norm.includes(stem));
 
   if (!hasActionOrDuty) {
@@ -1333,42 +1361,22 @@ export function detectProfanity(text) {
   const cleanAlpha = collapsedRepeats.replace(/[^a-z0-9]/g, '');
   if (!cleanAlpha) return { hasProfanity: false };
 
-  // 2. Expressões compostas explícitas e insultos com 'cu' (ex: "vai tomar no seucu", "tomar no cu", "seu cu", "vai tomar no cu", etc.)
-  const cuPatterns = [
-    /(vai|vou|va|vao)?\s*(tomar?|toma|enfiar?|enfia|da|dar|enfie)\s*(no|pra|pro|o)?\s*(seu|teu)?\s*cu\b/i,
-    /\b(seu|teu|meu|no|no\s+seu|no\s+teu|pra|pro|pau\s+no)\s*cu\b/i,
-    /\bcu\b/i,
-    /\bc[\W_]*u\b/i,
-    /\bk[\W_]*u\b/i
-  ];
-
-  for (const pat of cuPatterns) {
+  // 2. Expressões compostas explícitas e insultos com 'cu'
+  for (const pat of CU_PATTERNS) {
     if (pat.test(normalized) || pat.test(collapsedRepeats)) {
       return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
     }
   }
 
   // Evasões coladas em cleanAlpha para 'cu'
-  const cuAlphaEvasions = [
-    'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu',
-    'tomarnoseucu', 'tomanoseucu', 'vaitomarnocu', 'vaitomarnoseucu',
-    'enfianocu', 'enfianoseucu', 'darocu', 'daocu', 'cuzao', 'cuzinho', 'cuzaum',
-    'vtnc', 'tmnc', 'tnc', 'arrombado', 'arrombada'
-  ];
-  for (const ev of cuAlphaEvasions) {
+  for (const ev of CU_ALPHA_EVASIONS) {
     if (cleanAlpha.includes(ev)) {
       return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
     }
   }
 
-  // 3. Insultos direcionados usando termos como "lixo" (ex.: "oi lixo", "seu lixo", "lixo humano", ou mensagem apenas "lixo")
-  const lixoPatterns = [
-    /\b(oi|ola|seu|sua|um|uma|vc|voce|você|tu|eh|e|é|inutil|tão|tao|muito)\s+lixo\b/i,
-    /\blixo\s+(humano|de\s+pessoa|do\s+caralho|demais)\b/i,
-    /\b(vc|voce|você|tu)\s+(eh|é|e)\s+(um\s+)?lixo\b/i,
-    /^(oi|ola)?\s*lixo[s]?$/i
-  ];
-  for (const lp of lixoPatterns) {
+  // 3. Insultos direcionados usando termos como "lixo"
+  for (const lp of LIXO_PATTERNS) {
     if (lp.test(normalized) || lp.test(collapsedRepeats)) {
       return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
     }
@@ -1378,12 +1386,8 @@ export function detectProfanity(text) {
     return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
   }
 
-  // 4. Insultos e ofensas diretas no diálogo (ex: "seu idiota", "inútil", "babaca", "otário", etc.)
-  const directInsults = [
-    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(otario|otaria|babaca|trouxa|imbecil|idiota|inutil|inútil|escroto|escrota|canalha|corno|corna|cretino|cretina|retardado|retardada)\b/i,
-    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(burro|burra)\b/i
-  ];
-  for (const di of directInsults) {
+  // 4. Insultos e ofensas diretas no diálogo
+  for (const di of DIRECT_INSULTS) {
     if (di.test(normalized) || di.test(collapsedRepeats)) {
       return { hasProfanity: true, matchedWord: 'ofensa pessoal' };
     }

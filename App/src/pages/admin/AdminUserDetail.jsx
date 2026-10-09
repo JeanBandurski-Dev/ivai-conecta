@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -37,7 +37,7 @@ export default function AdminUserDetail() {
   const [selectedRole, setSelectedRole] = useState('aluno');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -53,11 +53,11 @@ export default function AdminUserDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     loadUser();
-  }, [userId]);
+  }, [loadUser]);
 
   const handleToggleStatus = async (reason) => {
     if (!user) return;

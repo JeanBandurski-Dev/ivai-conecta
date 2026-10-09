@@ -74,7 +74,7 @@ export default function Vagas() {
         setParams({});
       }
     }
-  }, [params, currentUser]);
+  }, [params, currentUser, setParams, showToast]);
 
   useEffect(() => {
     if (selectedCity) {

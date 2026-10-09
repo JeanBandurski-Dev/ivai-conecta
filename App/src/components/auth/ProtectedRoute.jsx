@@ -69,7 +69,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     if (auth.currentUser) {
       setIsVerified(Boolean(auth.currentUser.emailVerified));
     }
-  }, [currentUser, auth.currentUser?.emailVerified]);
+  }, [currentUser, userRole]);
 
   // Checagem silenciosa automática ao montar o componente (apenas para alunos)
   useEffect(() => {
@@ -80,12 +80,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
           await auth.currentUser.reload();
           if (auth.currentUser.emailVerified && isMounted) {
             setIsVerified(true);
-            const updated = {
-              ...currentUser,
+            setCurrentUser(prev => ({
+              ...prev,
               emailVerified: true,
               isVerifiedStudent: true
-            };
-            setCurrentUser(updated);
+            }));
           }
         } catch {
           // Falhas silenciosas ignoradas; botão manual "Já verifiquei" permanece ativo
@@ -96,7 +95,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.role]);
+  }, [userRole, setCurrentUser]);
 
   // Timer regressivo para o botão de reenvio
   useEffect(() => {
