@@ -55,6 +55,24 @@ export default function Vagas() {
 
   const { jobs: allJobs, refresh: refreshJobs } = useJobs('Todas as Cidades');
 
+  const userRole = String(currentUser?.role || '').toLowerCase().trim();
+  const isCompany = Boolean(
+    currentUser && (
+      userRole === UserRole.EMPRESA ||
+      userRole === 'empresa' ||
+      userRole === 'company' ||
+      userRole === 'recrutador'
+    )
+  );
+  const canSeeMatch = Boolean(
+    currentUser && (
+      userRole === 'aluno' ||
+      userRole === 'candidato' ||
+      userRole === 'estudante' ||
+      userRole === 'student'
+    )
+  );
+
   // Check jobId param in URL
   useEffect(() => {
     const jId = params.get('jobId');
@@ -66,15 +84,14 @@ export default function Vagas() {
 
   useEffect(() => {
     if (params.get('action') === 'new') {
-      const uRole = String(currentUser?.role || '').toLowerCase().trim();
-      if (uRole === UserRole.EMPRESA || uRole === 'company' || uRole === 'recrutador') {
+      if (isCompany) {
         setShowModal(true);
       } else {
         showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
         setParams({});
       }
     }
-  }, [params, currentUser]);
+  }, [params, isCompany, showToast, setParams]);
 
   useEffect(() => {
     if (selectedCity) {
@@ -83,8 +100,7 @@ export default function Vagas() {
   }, [selectedCity]);
 
   const handleOpenPublish = () => {
-    const uRole = String(currentUser?.role || '').toLowerCase().trim();
-    if (uRole === UserRole.EMPRESA || uRole === 'company' || uRole === 'recrutador') {
+    if (isCompany) {
       setShowModal(true);
     } else {
       showToast('⚠️ Apenas empresas cadastradas podem publicar vagas.');
@@ -114,8 +130,6 @@ export default function Vagas() {
     setSortBy('match');
   };
 
-  const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const canSeeMatch = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato' || userRole === 'estudante' || userRole === 'student'));
   const userSkills = useMemo(() => safeSkillsArray(currentUser?.skills), [currentUser?.skills]);
 
   const filtered = useMemo(() => {
@@ -197,12 +211,14 @@ export default function Vagas() {
               </p>
             </div>
 
-            <button
-              onClick={handleOpenPublish}
-              className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
-            >
-              <Plus size={18} /> Publicar Nova Vaga
-            </button>
+            {isCompany && (
+              <button
+                onClick={handleOpenPublish}
+                className="btn btn-teal px-6 py-3.5 font-bold shadow-lg shrink-0 flex items-center gap-2 cursor-pointer"
+              >
+                <Plus size={18} /> Publicar Nova Vaga
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -417,14 +433,16 @@ export default function Vagas() {
       )}
 
       {/* New Job Modal (Padrão Vale do Ivaí / 3 Passos Completo) */}
-      <PublishJobModal
-        isOpen={showNewModal}
-        onClose={() => {
-          setShowModal(false);
-          setParams({});
-        }}
-        onJobCreated={handleJobCreated}
-      />
+      {isCompany && (
+        <PublishJobModal
+          isOpen={showNewModal}
+          onClose={() => {
+            setShowModal(false);
+            setParams({});
+          }}
+          onJobCreated={handleJobCreated}
+        />
+      )}
     </>
   );
 }
