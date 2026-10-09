@@ -9,11 +9,7 @@ import {
   Clock,
   Trash2,
   RefreshCw,
-  AlertCircle,
-  RotateCcw,
-  Eye,
-  ShieldCheck,
-  AlertTriangle
+  AlertCircle
 } from 'lucide-react';
 import {
   fetchAllJobs,

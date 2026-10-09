@@ -3,10 +3,8 @@ import { db, auth } from '../lib/firebase.js';
 import {
   collection,
   getDocs,
-  addDoc,
   doc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   onSnapshot,
@@ -14,9 +12,7 @@ import {
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, STORAGE_KEY_AUTH_USER, STORAGE_KEY_USERS_DB } from '../data/seedData.js';
 import { jobRepository, applicationRepository } from '../repositories/index.js';
-import { JobStatus, ApplicationStage, ApplicationStatus } from '../models/enums.js';
-import { normalizeJobDTO } from '../models/JobDTO.js';
-import { normalizeApplicationDTO } from '../models/ApplicationDTO.js';
+import { JobStatus } from '../models/enums.js';
 import {
   validateJobTitle,
   validateSkill,
@@ -30,6 +26,7 @@ import {
   hasProfanity
 } from './jobTaxonomy.js';
 import { calculateMatchScore, safeSkillsArray } from './matchService.js';
+import { isGenericPlaceholderAvatar } from './chatService.js';
 import { matchCity } from '../utils/searchUtils.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
@@ -1440,7 +1437,7 @@ export function getJobCandidates(jobOrId) {
             course: app.candidateCourse || 'Análise e Desenvolvimento de Sistemas',
             institution: app.candidateInstitution || 'IFPR Campus Ivaiporã',
             city: app.candidateCity || 'Ivaiporã',
-            avatar: app.candidateAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+            avatar: (app.candidateAvatar && !isGenericPlaceholderAvatar(app.candidateAvatar)) ? app.candidateAvatar : '',
             matchScore: computedScore,
             stage: app.stage || stageMap[app.status] || 'triagem',
             appliedAt: app.appliedAt || new Date().toLocaleDateString('pt-BR'),

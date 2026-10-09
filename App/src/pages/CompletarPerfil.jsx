@@ -29,6 +29,11 @@ export default function CompletarPerfil() {
   const googleStudentValidation = validateStudentEmail(userEmail);
   const inputStudentValidation = validateStudentEmail(studentEmail);
 
+  // Teacher Email State (Professor / Docente)
+  const [teacherEmail, setTeacherEmail] = useState('');
+  const googleTeacherValidation = isInstitutionalEmail(userEmail);
+  const inputTeacherValidation = isInstitutionalEmail(teacherEmail);
+
   // CNPJ Empresa State
   const [cnpj, setCnpj]                 = useState(currentUser?.cnpj || '');
   const [cnpjLoading, setCnpjLoading]   = useState(false);
@@ -135,8 +140,8 @@ export default function CompletarPerfil() {
 
     if (selectedRole === 'aluno') {
       const googleCheck = validateStudentEmail(email);
-      if (googleCheck.isValid && auth.currentUser?.emailVerified) {
-        isStudentVerified = true;
+      if (googleCheck.isValid) {
+        isStudentVerified = Boolean(auth.currentUser?.emailVerified ?? true);
         finalStudentEmail = email;
         studentInstitution = googleCheck.institution;
       } else {
@@ -151,10 +156,21 @@ export default function CompletarPerfil() {
       }
     }
 
+    let finalTeacherEmail = null;
+    let teacherInstitution = null;
+
     if (selectedRole === 'professor') {
-      if (!isInstitutionalEmail(email)) {
-        setAlert('Para atuar com o perfil de Professor/Docente, sua conta Google/e-mail deve utilizar um domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer domínio .edu.br).');
-        return;
+      if (isInstitutionalEmail(email)) {
+        finalTeacherEmail = email.toLowerCase().trim();
+        teacherInstitution = inferInstitutionFromEmail(email);
+      } else {
+        const cleanTeacher = (teacherEmail || '').toLowerCase().trim();
+        if (!cleanTeacher || !isInstitutionalEmail(cleanTeacher)) {
+          setAlert('Para atuar com o perfil de Professor/Docente, é obrigatório informar um e-mail com domínio institucional válido (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @uel.br, @uem.br, @seed.pr.gov.br ou qualquer domínio .edu.br).');
+          return;
+        }
+        finalTeacherEmail = cleanTeacher;
+        teacherInstitution = inferInstitutionFromEmail(finalTeacherEmail);
       }
     }
 
@@ -173,7 +189,9 @@ export default function CompletarPerfil() {
         studentEmailVerifiedAt: isStudentVerified ? new Date().toISOString() : null
       }),
       ...(selectedRole === 'professor' && {
-        institution: inferInstitutionFromEmail(email),
+        institution: teacherInstitution || inferInstitutionFromEmail(email),
+        teacherEmail: finalTeacherEmail,
+        profEmail: finalTeacherEmail,
         degree: 'Docente / Pesquisador',
         discipline: 'Docência & Orientação Acadêmica',
         verified: true
@@ -355,6 +373,82 @@ export default function CompletarPerfil() {
                 <div className="text-xs text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
                   <AlertCircle size={14} className="shrink-0 text-amber-500" />
                   <span>{inputStudentValidation.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Comprovação de Vínculo Docente (Professor) */}
+          {selectedRole === 'professor' && googleTeacherValidation && (
+            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                  E-mail Institucional Docente Reconhecido
+                </span>
+                <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full">
+                  Docente Verificado
+                </span>
+              </div>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                Sua conta Google (<strong>{userEmail}</strong>) foi identificada como vínculo acadêmico oficial com <strong>{inferInstitutionFromEmail(userEmail)}</strong>.
+              </p>
+            </div>
+          )}
+
+          {selectedRole === 'professor' && !googleTeacherValidation && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="form-label text-gray-900 dark:text-white font-bold text-sm flex items-center gap-1.5 mb-0">
+                  <UserCheck size={16} className="text-primary-blue dark:text-blue-400" />
+                  E-mail Institucional do Docente
+                </label>
+                <span className="text-[10px] font-semibold text-primary-blue dark:text-blue-400 bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                  Obrigatório para Professor
+                </span>
+              </div>
+
+              <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
+                Sua conta Google conectada (<strong>{userEmail}</strong>) é pessoal. Para comprovar sua atuação docente e emitir pareceres acadêmicos para seus alunos, informe seu e-mail institucional oficial (ex: @ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @seed.pr.gov.br ou qualquer domínio .edu.br).
+              </p>
+
+              <div className="relative">
+                <input
+                  type="email"
+                  value={teacherEmail}
+                  onChange={e => setTeacherEmail(e.target.value)}
+                  className={`form-control pr-10 ${
+                    teacherEmail.trim()
+                      ? inputTeacherValidation
+                        ? 'border-emerald-500 focus:border-emerald-500'
+                        : 'border-amber-400 focus:border-amber-500'
+                      : ''
+                  }`}
+                  placeholder="seu.nome@ifpr.edu.br"
+                  required
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  {teacherEmail.trim() && (
+                    inputTeacherValidation ? (
+                      <CheckCircle2 size={18} className="text-emerald-500" />
+                    ) : (
+                      <AlertCircle size={18} className="text-amber-500" />
+                    )
+                  )}
+                </div>
+              </div>
+
+              {teacherEmail.trim() && inputTeacherValidation && (
+                <div className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="shrink-0 text-emerald-500" />
+                  <span>Instituição Confirmada: {inferInstitutionFromEmail(teacherEmail)}</span>
+                </div>
+              )}
+
+              {teacherEmail.trim() && !inputTeacherValidation && teacherEmail.length > 3 && (
+                <div className="text-xs text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                  <AlertCircle size={14} className="shrink-0 text-amber-500" />
+                  <span>Insira um domínio acadêmico oficial (@ifpr.edu.br, @uenp.edu.br, @univale.edu.br, @seed.pr.gov.br ou .edu.br).</span>
                 </div>
               )}
             </div>

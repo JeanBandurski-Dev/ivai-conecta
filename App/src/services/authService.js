@@ -12,7 +12,7 @@ import {
   reauthenticateWithPopup,
   sendEmailVerification,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
 import {
@@ -20,6 +20,7 @@ import {
   sendStudentVerificationEmail,
   checkStudentVerification,
 } from './studentVerificationService.js';
+import { isGenericPlaceholderAvatar } from './chatService.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -38,7 +39,7 @@ export function getUsersDB() {
       if (Array.isArray(parsed)) {
         users = parsed.map(u => {
           if (u && typeof u === 'object') {
-            const { password, ...safeUser } = u;
+            const { password: _password, ...safeUser } = u;
             return safeUser;
           }
           return u;
@@ -63,7 +64,7 @@ export function purgePasswordsFromLocalStorage() {
         const sanitized = parsed.map(user => {
           if (user && typeof user === 'object' && 'password' in user) {
             hasPassword = true;
-            const { password, ...clean } = user;
+            const { password: _password, ...clean } = user;
             return clean;
           }
           return user;
@@ -200,12 +201,59 @@ async function ensureUserProfile(fbUser, preferredRole = null) {
 }
 
 export async function getUserProfile(uid) {
+  if (!uid) return { success: false, errorCode: 'profile/invalid-id' };
   try {
-    const userDocRef = doc(db, 'users', uid);
+    const cleanId = String(uid).trim();
+    const userDocRef = doc(db, 'users', cleanId);
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
-      return { success: true, profile: snap.data() };
+      return { success: true, profile: { uid: snap.id, id: snap.id, ...snap.data() } };
     }
+
+    const cleanLower = cleanId.toLowerCase();
+
+    // 1. Busca por e-mail
+    if (cleanLower.includes('@')) {
+      const qEmail = query(collection(db, 'users'), where('email', '==', cleanLower), limit(1));
+      const qSnap = await getDocs(qEmail);
+      if (!qSnap.empty) {
+        const found = qSnap.docs[0];
+        return { success: true, profile: { uid: found.id, id: found.id, ...found.data() } };
+      }
+    }
+
+    // 2. Busca por nome, razão social ou nome fantasia
+    const usersCol = collection(db, 'users');
+    const queries = [
+      query(usersCol, where('name', '==', cleanId), limit(1)),
+      query(usersCol, where('nomeFantasia', '==', cleanId), limit(1)),
+      query(usersCol, where('razaoSocial', '==', cleanId), limit(1))
+    ];
+
+    for (const q of queries) {
+      try {
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          const found = qSnap.docs[0];
+          return { success: true, profile: { uid: found.id, id: found.id, ...found.data() } };
+        }
+      } catch {}
+    }
+
+    // 3. Fallback no cache local
+    const localUsers = getUsersDB();
+    const localFound = localUsers.find(u =>
+      (u.uid && String(u.uid).toLowerCase() === cleanLower) ||
+      (u.id && String(u.id).toLowerCase() === cleanLower) ||
+      (u.email && u.email.toLowerCase() === cleanLower) ||
+      (u.name && u.name.toLowerCase() === cleanLower) ||
+      (u.nomeFantasia && u.nomeFantasia.toLowerCase() === cleanLower) ||
+      (u.razaoSocial && u.razaoSocial.toLowerCase() === cleanLower)
+    );
+    if (localFound) {
+      return { success: true, profile: localFound };
+    }
+
     return { success: false, errorCode: 'profile/not-found' };
   } catch (error) {
     return { success: false, errorCode: error.code || error.message };
@@ -584,7 +632,7 @@ export async function login(email, password) {
           city: 'Ivaiporã',
           role: guessedRole,
           badge: guessedRoleMeta.badge,
-          avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+          avatar: (fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '',
           ...(guessedRole === 'professor' ? {
             institution: inferInstitutionFromEmail(cleanEmail),
             degree: 'Docente / Pesquisador',
@@ -633,7 +681,7 @@ export async function login(email, password) {
       avatar: profileData.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileData.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileData.isVerifiedCompany ?? (role === 'empresa'),
-      ...(profileData || {}),
+      ...profileData,
       emailVerified: role === 'aluno' ? Boolean(fbUser.emailVerified || profileData?.emailVerified) : true
     };
 
@@ -766,7 +814,7 @@ export async function register(data) {
       city: city || 'Ivaiporã',
       role: selectedRole,
       badge: roleMeta.badge,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: (fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...roleSpecific,
@@ -864,7 +912,9 @@ export async function loginWithGoogle() {
       activeRole: role,
       selectedRole: role,
       badge: roleMeta.badge,
-      avatar: fbUser.photoURL || profileRes.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      avatar: (fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL))
+        ? fbUser.photoURL
+        : ((profileRes.profile?.avatar && !isGenericPlaceholderAvatar(profileRes.profile.avatar)) ? profileRes.profile.avatar : ''),
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? isGoogleStudent : false),
       isVerifiedCompany: role === 'empresa',
       ...(role === 'aluno' && isGoogleStudent && !profileRes.profile?.institution ? {
@@ -877,7 +927,7 @@ export async function loginWithGoogle() {
         discipline: 'Docência & Orientação Acadêmica',
         verified: true
       } : {}),
-      ...(profileRes.profile || {})
+      ...profileRes.profile
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -897,7 +947,8 @@ export async function loginWithGoogle() {
 export async function completeUserProfile(uid, additionalData) {
   try {
     const roleMeta = USER_ROLES[additionalData.role] || USER_ROLES.aluno;
-    const avatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+    const rawAvatar = additionalData.avatar || auth.currentUser?.photoURL || getAuthUser()?.avatar || '';
+    const avatar = isGenericPlaceholderAvatar(rawAvatar) ? '' : rawAvatar;
     const email = (additionalData.email || auth.currentUser?.email || '').toLowerCase().trim();
 
     const candidateEmail = (additionalData.studentEmail || additionalData.email || '').toLowerCase().trim();
@@ -917,7 +968,9 @@ export async function completeUserProfile(uid, additionalData) {
       avatar: avatar,
       updatedAt: new Date().toISOString(),
       ...(additionalData.role === 'professor' ? {
-        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        institution: additionalData.institution || inferInstitutionFromEmail(additionalData.teacherEmail || additionalData.profEmail || email),
+        teacherEmail: (additionalData.teacherEmail || additionalData.profEmail || email).toLowerCase().trim(),
+        profEmail: (additionalData.profEmail || additionalData.teacherEmail || email).toLowerCase().trim(),
         degree: additionalData.degree || 'Docente / Pesquisador',
         discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
         verified: true
@@ -948,7 +1001,9 @@ export async function completeUserProfile(uid, additionalData) {
       avatar: avatar,
       badge: roleMeta.badge,
       ...(additionalData.role === 'professor' ? {
-        institution: additionalData.institution || inferInstitutionFromEmail(email),
+        institution: additionalData.institution || inferInstitutionFromEmail(additionalData.teacherEmail || additionalData.profEmail || email),
+        teacherEmail: (additionalData.teacherEmail || additionalData.profEmail || email).toLowerCase().trim(),
+        profEmail: (additionalData.profEmail || additionalData.teacherEmail || email).toLowerCase().trim(),
         degree: additionalData.degree || 'Docente / Pesquisador',
         discipline: additionalData.discipline || 'Docência & Orientação Acadêmica',
         verified: true
@@ -1244,9 +1299,9 @@ export function watchAuthState(callback) {
             selectedRole: role,
             badge: roleMeta.badge,
             avatar:
-              profileRes.profile?.avatar ||
-              fbUser.photoURL ||
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+              ((profileRes.profile?.avatar && !isGenericPlaceholderAvatar(profileRes.profile.avatar)) ? profileRes.profile.avatar : '') ||
+              ((fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '') ||
+              '',
             isVerifiedStudent: isStudentVerified,
             isVerifiedCompany:
               profileRes.profile?.isVerifiedCompany ??
@@ -1258,10 +1313,7 @@ export function watchAuthState(callback) {
               degree: 'Docente / Pesquisador',
               discipline: 'Docência & Orientação Acadêmica',
               verified: true
-            } : {}),
-            ...(profileRes.profile || {}),
-            emailVerified: role === 'aluno' ? isStudentVerified : true,
-            isVerifiedStudent: isStudentVerified
+            } : {})
           };
 
           localStorage.setItem(

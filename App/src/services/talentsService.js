@@ -1,15 +1,13 @@
 // Talents & Teachers Service for Ivaí Conecta (Firestore 'users' and 'endorsement_requests' collections)
 import { db } from '../lib/firebase.js';
-import { collection, getDoc, getDocs, doc, setDoc, addDoc, updateDoc, arrayUnion, increment, onSnapshot } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, setDoc, updateDoc, arrayUnion, increment, onSnapshot } from 'firebase/firestore';
 import {
   STORAGE_KEY_TALENTS,
   STORAGE_KEY_TEACHERS,
   STORAGE_KEY_ENDORSEMENT_REQUESTS,
 } from '../data/seedData.js';
-import { userRepository, endorsementRepository } from '../repositories/index.js';
-import { EndorsementStatus, UserRole } from '../models/enums.js';
-import { normalizeEndorsementDTO, normalizeEndorsementRequestDTO } from '../models/EndorsementDTO.js';
-import { normalizeUserDTO } from '../models/UserDTO.js';
+import { endorsementRepository } from '../repositories/index.js';
+import { EndorsementStatus } from '../models/enums.js';
 
 import { matchCity } from '../utils/searchUtils.js';
 import { isInstitutionalEmail } from './authService.js';
@@ -25,7 +23,7 @@ export function getEndorsementProfessorKey(endorsementOrProf) {
   if (typeof endorsementOrProf === 'string') {
     return endorsementOrProf.toLowerCase().trim();
   }
-  const email = String(endorsementOrProf.profEmail || endorsementOrProf.email || '').toLowerCase().trim();
+  const email = String(endorsementOrProf.profEmail || endorsementOrProf.teacherEmail || endorsementOrProf.email || '').toLowerCase().trim();
   const uid = String(endorsementOrProf.profUid || endorsementOrProf.profId || endorsementOrProf.uid || endorsementOrProf.id || '').trim();
   if (email && email.includes('@')) return email;
   return uid;
@@ -38,14 +36,14 @@ export function getEndorsementProfessorKey(endorsementOrProf) {
 export function isSameProfessor(profA, profB) {
   if (!profA || !profB) return false;
 
-  const emailA = (typeof profA === 'string' && profA.includes('@'))
-    ? profA.toLowerCase().trim()
-    : String(profA.profEmail || profA.email || '').toLowerCase().trim();
-  const emailB = (typeof profB === 'string' && profB.includes('@'))
-    ? profB.toLowerCase().trim()
-    : String(profB.profEmail || profB.email || '').toLowerCase().trim();
+  const emailsA = typeof profA === 'string' && profA.includes('@')
+    ? [profA.toLowerCase().trim()]
+    : [profA.profEmail, profA.teacherEmail, profA.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
+  const emailsB = typeof profB === 'string' && profB.includes('@')
+    ? [profB.toLowerCase().trim()]
+    : [profB.profEmail, profB.teacherEmail, profB.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
 
-  if (emailA && emailB && emailA === emailB) return true;
+  if (emailsA.some(a => a && emailsB.includes(a))) return true;
 
   const uidA = (typeof profA === 'string' && !profA.includes('@'))
     ? profA.trim()
@@ -195,13 +193,16 @@ function normalizeUserDoc(docData, docId) {
  */
 function normalizeTeacherDoc(docData, docId) {
   const data = docData || {};
+  const profEmail = data.teacherEmail || data.profEmail || data.email || '';
   return {
     ...data,
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Docente',
     role: data.role || 'professor',
-    email: data.email || '',
+    email: data.email || profEmail,
+    profEmail: profEmail,
+    teacherEmail: profEmail,
     degree: data.degree || '',
     institution: data.institution || '',
     discipline: data.discipline || '',
@@ -214,11 +215,28 @@ function normalizeTeacherDoc(docData, docId) {
   };
 }
 
+const MOCK_TALENT_IDS = new Set([
+  'M1NwrT53x6fV2KK4mLvKp0ZczOx1',
+  '5PE9EpyL0SSkIyQK4vId32ag0uu1'
+]);
+const MOCK_TALENT_EMAILS = new Set([
+  'lucas.silva.tads@gmail.com',
+  'aluno@ivaiconecta.com.br'
+]);
+
 /**
  * Validador consistente para determinar se um documento de usuário é um talento profissional
  */
 export function isTalentUser(u) {
   if (!u || typeof u !== 'object') return false;
+  const uid = String(u.uid || u.id || u.firestoreId || '').trim();
+  const email = String(u.email || '').toLowerCase().trim();
+
+  // Purga e ignora registros legados de mock/seed que persistiram no banco Firestore
+  if (MOCK_TALENT_IDS.has(uid) || MOCK_TALENT_EMAILS.has(email)) {
+    return false;
+  }
+
   const role = String(u.role || '').toLowerCase().trim();
 
   // Exclui papéis expressamente não relacionados a talentos/estudantes/profissionais autônomos
@@ -319,74 +337,34 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
   }
 }
 
-export const INSTITUTIONAL_FACULTY = [
-  {
-    id: 'prof_ronan_silva',
-    name: 'Prof. Dr. Ronan Silva',
-    email: 'ronan.silva@ifpr.edu.br',
-    institution: 'IFPR Campus Ivaiporã',
-    discipline: 'Programação de Computadores',
-    classes: ['Programação de Computadores', 'Desenvolvimento Web', 'Estrutura de Dados', 'Algoritmos'],
-    degree: 'Doutorado em Ciência da Computação',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    bio: 'Docente da área de Informática e Desenvolvimento de Software no IFPR Campus Ivaiporã.'
-  },
-  {
-    id: 'prof_mariana_santos',
-    name: 'Prof.ª Dr.ª Mariana Santos',
-    email: 'mariana.santos@ifpr.edu.br',
-    institution: 'IFPR Campus Ivaiporã',
-    discipline: 'Engenharia de Software',
-    classes: ['Engenharia de Software', 'Banco de Dados', 'Gestão de Projetos de TI'],
-    degree: 'Doutora em Engenharia de Software',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
-    bio: 'Professora titular do IFPR Campus Ivaiporã em Engenharia de Software e Banco de Dados.'
-  },
-  {
-    id: 'prof_carlos_lima',
-    name: 'Prof. Me. Carlos Eduardo Lima',
-    email: 'carlos.lima@univale.edu.br',
-    institution: 'Univale Ivaiporã',
-    discipline: 'Redes de Computadores',
-    classes: ['Redes de Computadores', 'Sistemas Operacionais', 'Segurança da Informação'],
-    degree: 'Mestre em Redes e Sistemas',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    bio: 'Professor na Univale Ivaiporã em infraestrutura de redes e segurança.'
-  },
-  {
-    id: 'prof_juliana_oliveira',
-    name: 'Prof.ª Ma. Juliana Oliveira',
-    email: 'juliana.oliveira@uenp.edu.br',
-    institution: 'UENP Campus Luiz Meneghel',
-    discipline: 'Inteligência Artificial & Ciência de Dados',
-    classes: ['Inteligência Artificial', 'Ciência de Dados', 'Estatística Aplicada'],
-    degree: 'Mestre em Ciência da Computação',
-    role: 'professor',
-    verified: true,
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    bio: 'Docente pesquisadora da UENP em Inteligência Artificial e Ciência de Dados.'
-  }
-];
+export const INSTITUTIONAL_FACULTY = [];
 
 export function mergeWithInstitutionalFaculty(remoteTeachers = []) {
   const map = new Map();
-  // Inicia com o corpo docente institucional credenciado
-  for (const f of INSTITUTIONAL_FACULTY) {
-    map.set(f.email.toLowerCase().trim(), f);
-  }
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   // Mescla e prioriza professores cadastrados dinamicamente no Firestore
   for (const t of remoteTeachers) {
-    const email = (t.email || '').toLowerCase().trim();
-    if (email) {
-      map.set(email, { ...map.get(email), ...t });
-    } else if (t.id) {
-      map.set(String(t.id), t);
+    if (!t) continue;
+    const email = (t.profEmail || t.teacherEmail || t.email || '').toLowerCase().trim();
+    const uid = String(t.uid || t.id || t.firestoreId || '').trim();
+    if (mockTeacherIds.has(uid) || mockTeacherEmails.has(email) || uid.startsWith('prof_')) {
+      continue;
+    }
+    const key = email && email.includes('@') ? email : uid;
+    if (key) {
+      map.set(key, { ...map.get(key), ...t });
     }
   }
   return Array.from(map.values());
@@ -396,6 +374,19 @@ export function mergeWithInstitutionalFaculty(remoteTeachers = []) {
  * Escuta corpo docente em tempo real via Firestore onSnapshot da coleção 'users'
  */
 export function subscribeToTeachers(callback) {
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   // Callback imediato com dados disponíveis
   callback(getVerifiedTeachers());
 
@@ -407,6 +398,11 @@ export function subscribeToTeachers(callback) {
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => {
           const r = String(u.role || '').toLowerCase().trim();
+          const id = String(u.id || '');
+          const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+          if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+            return false;
+          }
           return r === 'professor' || r === 'docente';
         });
 
@@ -472,8 +468,18 @@ export function getTalents(city = 'Todas as Cidades') {
 
 export function getTalentById(id) {
   if (!id) return null;
+  const idStr = String(id).toLowerCase().trim();
   const talents = getTalents('Todas as Cidades');
-  const found = talents.find(t => t.id === Number(id) || t.id === id || String(t.id) === String(id) || t.firestoreId === id);
+  const found = talents.find(t =>
+    t.id === Number(id) ||
+    t.id === id ||
+    String(t.id).toLowerCase() === idStr ||
+    String(t.firestoreId || '').toLowerCase() === idStr ||
+    String(t.uid || '').toLowerCase() === idStr ||
+    (t.email && t.email.toLowerCase().trim() === idStr) ||
+    (t.studentEmail && t.studentEmail.toLowerCase().trim() === idStr) ||
+    (t.name && t.name.toLowerCase().trim() === idStr)
+  );
   if (found) return found;
 
   if (typeof localStorage !== 'undefined') {
@@ -481,7 +487,12 @@ export function getTalentById(id) {
     if (rawAuth) {
       try {
         const auth = JSON.parse(rawAuth);
-        if (auth && (String(auth.id) === String(id) || String(auth.uid) === String(id) || auth.email === id || id === 'me')) {
+        if (auth && (
+          String(auth.id || '').toLowerCase() === idStr ||
+          String(auth.uid || '').toLowerCase() === idStr ||
+          (auth.email && auth.email.toLowerCase().trim() === idStr) ||
+          id === 'me'
+        )) {
           return normalizeUserDoc(auth, auth.uid || auth.id);
         }
       } catch {}
@@ -550,13 +561,35 @@ export function submitStudentVerification(raNumber, fileData) {
 
 export function getVerifiedTeachers() {
   let teachers = [];
+  const mockTeacherEmails = new Set([
+    'ronan.silva@ifpr.edu.br',
+    'mariana.santos@ifpr.edu.br',
+    'carlos.lima@univale.edu.br',
+    'juliana.oliveira@uenp.edu.br'
+  ]);
+  const mockTeacherIds = new Set([
+    'prof_ronan_silva',
+    'prof_mariana_santos',
+    'prof_carlos_lima',
+    'prof_juliana_oliveira'
+  ]);
+
   if (typeof localStorage !== 'undefined') {
     const raw = localStorage.getItem(STORAGE_KEY_TEACHERS);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          teachers = parsed.filter(t => (t.role || '').toLowerCase() === 'professor');
+          teachers = parsed.filter(t => {
+            if (!t) return false;
+            const r = (t.role || '').toLowerCase();
+            const id = String(t.id || '');
+            const email = (t.profEmail || t.teacherEmail || t.email || '').toLowerCase().trim();
+            if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+              return false;
+            }
+            return r === 'professor' || r === 'docente';
+          });
         }
       } catch {}
     }
@@ -567,7 +600,11 @@ export function getVerifiedTeachers() {
       try {
         const auth = JSON.parse(rawAuth);
         if (auth && (auth.role === 'professor' || auth.role === 'docente')) {
-          teachers.push(normalizeTeacherDoc(auth, auth.uid || auth.id));
+          const authId = String(auth.uid || auth.id || '');
+          const authEmail = (auth.email || '').toLowerCase().trim();
+          if (!mockTeacherIds.has(authId) && !mockTeacherEmails.has(authEmail) && !authId.startsWith('prof_')) {
+            teachers.push(normalizeTeacherDoc(auth, auth.uid || auth.id));
+          }
         }
       } catch {}
     }
@@ -583,6 +620,11 @@ export function getVerifiedTeachers() {
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => {
           const r = String(u.role || '').toLowerCase().trim();
+          const id = String(u.id || '');
+          const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+          if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+            return false;
+          }
           return r === 'professor' || r === 'docente';
         });
 
@@ -757,17 +799,13 @@ export function getEndorsementRequests() {
  * Suporta busca por e-mail, UID ou nome institucional do professor.
  */
 export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
-  const profEmail = typeof teacherUserOrEmail === 'string' && teacherUserOrEmail.includes('@')
-    ? teacherUserOrEmail.toLowerCase().trim()
-    : String(teacherUserOrEmail?.email || (typeof teacherUserOrEmail === 'string' ? teacherUserOrEmail : '')).toLowerCase().trim();
+  const profEmails = typeof teacherUserOrEmail === 'string' && teacherUserOrEmail.includes('@')
+    ? [teacherUserOrEmail.toLowerCase().trim()]
+    : [teacherUserOrEmail?.profEmail, teacherUserOrEmail?.teacherEmail, teacherUserOrEmail?.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
 
   const profUid = typeof teacherUserOrEmail === 'object' && teacherUserOrEmail !== null
     ? String(teacherUserOrEmail.uid || teacherUserOrEmail.id || '')
     : (typeof teacherUserOrEmail === 'string' && !teacherUserOrEmail.includes('@') ? teacherUserOrEmail.trim() : '');
-
-  const profName = typeof teacherUserOrEmail === 'object' && teacherUserOrEmail !== null
-    ? String(teacherUserOrEmail.name || '').toLowerCase().trim()
-    : '';
 
   const filterForTeacher = (allRequests) => {
     if (!Array.isArray(allRequests)) return [];
@@ -776,10 +814,9 @@ export function subscribeToEndorsementRequests(teacherUserOrEmail, callback) {
       if (!r) return false;
       const rEmail = String(r.profEmail || '').toLowerCase().trim();
       const rUid = String(r.profUid || r.targetTeacherId || '').trim();
-      const rName = String(r.profName || '').toLowerCase().trim();
 
       // 1. Match por email direto
-      if (profEmail && rEmail && rEmail === profEmail) return true;
+      if (rEmail && profEmails.includes(rEmail)) return true;
 
       // 2. Match por UID
       if (profUid && rUid && rUid === profUid) return true;
@@ -1024,6 +1061,8 @@ export async function requestTeacherEndorsement(profEmail, profName, discipline,
     const verified = getVerifiedTeachers();
     resolvedTeacher = verified.find(t =>
       (t.email || '').toLowerCase().trim() === cleanEmail ||
+      (t.profEmail || '').toLowerCase().trim() === cleanEmail ||
+      (t.teacherEmail || '').toLowerCase().trim() === cleanEmail ||
       (profName && t.name && t.name.toLowerCase().trim() === profName.toLowerCase().trim())
     );
   }
@@ -1195,7 +1234,7 @@ export async function approveEndorsementRequest(requestId, quote, profUser) {
 
   if (!req) return { success: false, error: 'Solicitação não encontrada.' };
 
-  const cleanEmail = (req.profEmail || profUser?.email || '').toLowerCase().trim();
+  const cleanEmail = (req.profEmail || profUser?.profEmail || profUser?.teacherEmail || profUser?.email || '').toLowerCase().trim();
   const profUid = profUser?.uid || profUser?.id;
 
   // 1. Regra estrita: verificar se este professor já recomendou este aluno

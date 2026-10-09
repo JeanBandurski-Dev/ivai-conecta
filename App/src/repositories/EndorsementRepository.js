@@ -9,7 +9,6 @@ import {
   normalizeEndorsementRequestDTO,
   validateEndorsementRequestCreateDTO,
 } from '../models/EndorsementDTO.js';
-import { EndorsementStatus } from '../models/enums.js';
 
 export class EndorsementRepository extends BaseRepository {
   constructor() {

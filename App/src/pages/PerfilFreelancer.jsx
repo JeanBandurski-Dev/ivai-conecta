@@ -17,6 +17,7 @@ import ServiceCard from '../components/ServiceCard';
 import SolicitarServicoModal from '../components/SolicitarServicoModal';
 import EditFreelancerProfileModal from '../components/EditFreelancerProfileModal';
 import PublishServiceModal from '../components/PublishServiceModal';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=1200';
 
@@ -336,12 +337,12 @@ export default function PerfilFreelancer() {
               <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 text-center sm:text-left">
                 <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden bg-gradient-to-tr from-primary-blue to-teal-400 p-1 shadow-xl shrink-0">
                   <div className="w-full h-full rounded-[22px] overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
-                    {profileAvatar ? (
+                    {profileAvatar && !isGenericPlaceholderAvatar(profileAvatar) ? (
                       <img src={profileAvatar} alt={profileName} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-3xl font-extrabold text-primary-blue">
-                        {profileName.charAt(0)}
-                      </span>
+                      <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(profileName)} flex items-center justify-center text-white text-3xl font-extrabold`}>
+                        {profileName.charAt(0).toUpperCase()}
+                      </div>
                     )}
                   </div>
                   {isOwner && (

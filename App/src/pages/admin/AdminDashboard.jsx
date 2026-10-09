@@ -4,7 +4,6 @@ import {
   Users,
   Briefcase,
   Wrench,
-  ShieldCheck,
   Building2,
   GraduationCap,
   Award,

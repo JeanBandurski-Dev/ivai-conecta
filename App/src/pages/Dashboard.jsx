@@ -28,7 +28,7 @@ const PILLARS = [
 ];
 
 const POPULAR_SEARCH_SUGGESTIONS = [
-  'Lucas', 'Pedreiro', 'React', 'Eletricista', 'Estágio', 'Administração', 'Vendas', 'Enfermagem'
+  'Tecnologia', 'Pedreiro', 'React', 'Eletricista', 'Estágio', 'Administração', 'Vendas', 'Enfermagem'
 ];
 
 export default function Dashboard() {

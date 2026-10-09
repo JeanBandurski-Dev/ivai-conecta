@@ -406,7 +406,7 @@ export default function Servicos() {
             </div>
           )}
 
-          {/* Abas para Clientes */}
+          {/* Abas para Clientes e Empresas Contratantes */}
           {currentUser && currentUser.role !== 'freelancer' && (
             <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 flex-wrap">
               <button

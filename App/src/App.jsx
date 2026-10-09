@@ -12,7 +12,6 @@ import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
-import { auth } from './lib/firebase';
 
 // Lazy-loaded pages for fast initial page load & code-splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -53,10 +52,10 @@ function AppContent() {
   const { isChatOpen, closeChat } = useAppStore();
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex flex-col min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       {!isAdminRoute && <Navbar />}
 
-      <main className="flex-1">
+      <main className="flex-1 w-full max-w-full overflow-x-hidden">
         <ErrorBoundary>
           <Suspense fallback={
             <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">

@@ -209,18 +209,23 @@ export const STANDARD_BENEFITS = [
 
 // 6. LISTA NEGRA DE PALAVRÕES, TERMOS PEJORATIVOS E OFENSAS REAIS
 export const PROFANITY_ROOTS = [
-  'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'puta', 'puto', 'putaria',
-  'porra', 'caralh', 'bucet', 'piroca', 'arromb', 'viad', 'vagabund', 'safad',
-  'desgrac', 'desgraç', 'vsf', 'vtnc', 'fdp', 'chupa', 'cacete', 'krl', 'kct', 'trouxa', 'babaca',
-  'cuzin', 'cuzao', 'cuzão', 'otari'
+  'bost', 'merd', 'foder', 'foda', 'fode', 'fodid', 'fodao', 'fodão', 'fuder', 'fudeu', 'fudid', 'fudeo', 'fodass', 'fudass',
+  'puta', 'puto', 'putaria', 'putinh', 'putao', 'putão',
+  'porra', 'porrin', 'caralh', 'karalh', 'carai', 'karaio', 'bucet', 'piroca', 'arromb', 'viad', 'viadagem', 'bicha', 'travec', 'sapatao', 'sapatão',
+  'vagabund', 'safad', 'desgrac', 'desgraç', 'vsf', 'vtnc', 'tmnc', 'tnc', 'fdp', 'pqp', 'chupa', 'cacete', 'krl', 'crl', 'kct',
+  'trouxa', 'babaca', 'imbecil', 'idiot', 'escrot', 'canalha', 'cretin',
+  'cuzin', 'cuzao', 'cuzão', 'cuzaum', 'cuzoe', 'cuzõe',
+  'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu', 'tomarnoseucu', 'tomanoseucu',
+  'otari', 'otário', 'inutil', 'inútil', 'retardad', 'vadi'
 ];
 
 export const PROFANITY_LIST = [
   'bosta', 'bostinha', 'merda', 'merdinha', 'caralho', 'porra', 'puta', 'putaria',
-  'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'carai', 'cacete', 'buceta',
-  'piroca', 'viado', 'viadagem', 'corno', 'otario', 'otaria', 'vagabundo', 'safado',
-  'desgraca', 'desgraça', 'vsf', 'vtnc', 'fdp', 'chupa', 'rola', 'penis', 'vagina',
-  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'trouxa', 'babaca'
+  'pinto', 'foder', 'foda', 'fode', 'fodido', 'fodida', 'fuder', 'fudeu', 'fudido', 'fudida',
+  'carai', 'cacete', 'buceta', 'piroca', 'viado', 'viadagem', 'corno', 'corna', 'otario', 'otaria', 'vagabundo', 'safado',
+  'desgraca', 'desgraça', 'vsf', 'vtnc', 'tmnc', 'tnc', 'fdp', 'pqp', 'chupa', 'rola', 'penis', 'vagina',
+  'arrombado', 'arrombada', 'krl', 'kct', 'cu', 'cuzao', 'cuzão', 'cuzinho', 'trouxa', 'babaca',
+  'imbecil', 'idiota', 'escroto', 'escrota', 'inutil', 'inútil', 'retardado', 'retardada', 'vadia'
 ];
 
 // 6.1 LISTA DE TERMOS TROLL, BRINCADEIRAS, ALIMENTOS E PALAVRAS INAPROPRIADAS PARA RH
@@ -231,13 +236,51 @@ export const GENERAL_TROLL_WORDS = new Set([
   'pitanga', 'jabuticaba', 'maracuja', 'maracujá', 'melao', 'melão',
   'coxinha', 'pastel', 'pizza', 'churrasco', 'pipoca', 'hamburguer', 'hotdog',
   'cerveja', 'chopp', 'chope', 'pinga', 'cachaca', 'cachaça', 'vodka', 'vinho', 'whisky', 'energetico',
-  'cigarro', 'narguile', 'fumo',
-  // Gírias, brincadeiras, zoeiras e termos sem contexto de RH
-  'fofoca', 'namoro', 'sexo', 'zoeira', 'palhacada', 'palhaçada', 'piada', 'preguica', 'preguiça',
-  'sono', 'dormir', 'mentira', 'besteira', 'bobagem', 'troca', 'fake', 'teste', 'asdf', 'qwert',
-  'jogo', 'truco', 'videogame', 'playstation', 'xbox', 'free fire', 'tinder', 'balada', 'festa',
-  'ping pong', 'ping-pong', 'sinuca', 'pebolim', 'futebol'
+  'cigarro', 'narguile', 'fumo', 'sorvete', 'acai', 'açaí', 'lanche', 'salgado', 'biscoito', 'bolacha',
+  'marmita', 'almoço', 'almoco', 'jantar', 'pao', 'pão',
+  // Gírias, brincadeiras, zoeiras e termos sem contexto de serviços
+  'comer', 'beber', 'dormir', 'roncar', 'brincar', 'fofoca', 'namoro', 'sexo', 'zoeira',
+  'palhacada', 'palhaçada', 'piada', 'preguica', 'preguiça', 'sono', 'mentira', 'besteira',
+  'bobagem', 'troca', 'fake', 'teste', 'asdf', 'qwert', 'jogo', 'truco', 'videogame',
+  'playstation', 'xbox', 'free fire', 'tinder', 'balada', 'festa', 'ping pong', 'ping-pong',
+  'sinuca', 'pebolim', 'futebol'
 ]);
+
+/**
+ * Verifica se uma palavra é um termo troll, brincadeira, fruta/comida solta ou gíria inapropriada
+ */
+export function isTrollWord(word) {
+  if (!word || typeof word !== 'string') return false;
+  const lower = word.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!lower || lower.length < 3) return false;
+
+  if (GENERAL_TROLL_WORDS.has(lower)) return true;
+
+  // Trata plurais e variações comuns em português (abacaxis -> abacaxi, bananas -> banana, pasteis -> pastel)
+  if (lower.endsWith('s')) {
+    const s1 = lower.slice(0, -1);
+    if (GENERAL_TROLL_WORDS.has(s1)) return true;
+    if (lower.endsWith('es')) {
+      const s2 = lower.slice(0, -2);
+      if (GENERAL_TROLL_WORDS.has(s2)) return true;
+    }
+    if (lower.endsWith('is')) {
+      const s3 = lower.slice(0, -2) + 'l';
+      if (GENERAL_TROLL_WORDS.has(s3)) return true;
+    }
+  }
+
+  // Raízes de palavras troll
+  const trollRoots = [
+    'abacaxi', 'banana', 'melancia', 'pastel', 'pizza', 'coxinha', 'cerveja', 'churrasco',
+    'pipoca', 'hamburguer', 'fofoca', 'namoro', 'zoeira', 'palhacada', 'bobagem', 'besteira'
+  ];
+  for (const root of trollRoots) {
+    if (lower.includes(root)) return true;
+  }
+
+  return false;
+}
 
 /**
  * Validador de Número de Telefone no Padrão Brasileiro (DDD + 8 ou 9 dígitos)
@@ -1258,31 +1301,118 @@ export function validateResponsibility(activity) {
 }
 
 /**
- * Verifica se um texto contém linguagem inapropriada / palavrões.
- * Usado como filtro leve para publicações no banco de dados (sem rejeitar 
- * títulos de cargos que não estão na lista padronizada).
+ * Detecta e identifica linguagem inapropriada / ofensas em um texto.
+ * Retorna se possui profanidade e qual raiz/palavra foi identificada.
  */
-export function hasProfanity(text) {
-  if (!text || typeof text !== 'string') return false;
-  const lower = text.toLowerCase().trim();
-  const cleanAlpha = lower.replace(/[^a-z0-9]/g, '');
+export function detectProfanity(text) {
+  if (!text || typeof text !== 'string') return { hasProfanity: false };
 
-  for (const root of PROFANITY_ROOTS) {
-    if (cleanAlpha.includes(root)) return true;
-  }
+  // 1. Normalização profunda (remoção de acentos e leetspeak)
+  const rawClean = text.toLowerCase().trim();
+  if (!rawClean) return { hasProfanity: false };
 
-  for (const b of PROFANITY_LIST) {
-    if (b.length >= 3) {
-      if (lower.includes(b) || cleanAlpha.includes(b)) return true;
+  // Remove acentuação
+  let normalized = rawClean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Mapeamento leetspeak clássico para detectar evasões como v4i t0m4r n0 s3ucu, etc.
+  const leetMap = {
+    '@': 'a', '4': 'a',
+    '0': 'o',
+    '1': 'i', '!': 'i', '|': 'i',
+    '3': 'e',
+    '5': 's', '$': 's',
+    '7': 't',
+    '8': 'b'
+  };
+  normalized = normalized.replace(/[@01!|35$784]/g, m => leetMap[m] || m);
+
+  // Reduz caracteres repetidos (ex: cuuuuu -> cu, lixoooo -> lixo, porrrrra -> porra)
+  const collapsedRepeats = normalized.replace(/(.)\1{2,}/g, '$1$1');
+
+  // String pura sem espaços nem pontuações para evasões de espaçamento (ex: v.t.n.c -> vtnc, s e u c u -> seucu)
+  const cleanAlpha = collapsedRepeats.replace(/[^a-z0-9]/g, '');
+  if (!cleanAlpha) return { hasProfanity: false };
+
+  // 2. Expressões compostas explícitas e insultos com 'cu' (ex: "vai tomar no seucu", "tomar no cu", "seu cu", "vai tomar no cu", etc.)
+  const cuPatterns = [
+    /(vai|vou|va|vao)?\s*(tomar?|toma|enfiar?|enfia|da|dar|enfie)\s*(no|pra|pro|o)?\s*(seu|teu)?\s*cu\b/i,
+    /\b(seu|teu|meu|no|no\s+seu|no\s+teu|pra|pro|pau\s+no)\s*cu\b/i,
+    /\bcu\b/i,
+    /\bc[\W_]*u\b/i,
+    /\bk[\W_]*u\b/i
+  ];
+
+  for (const pat of cuPatterns) {
+    if (pat.test(normalized) || pat.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
     }
   }
 
-  // Termos curtos como 'cu' isolados
-  const regexCu = /(^|\W|_|\d)cu($|\W|_|\d|zao|zão|dao|dão|bost|merd|lhao|lhão)/i;
-  if (regexCu.test(lower) || (cleanAlpha === 'cu') || (cleanAlpha.startsWith('cu') && !['curso', 'curriculo', 'currículo', 'custom', 'custos', 'cuidados', 'cultura', 'cuidado', 'curadoria'].some(ok => cleanAlpha.startsWith(ok)))) {
-    return true;
+  // Evasões coladas em cleanAlpha para 'cu'
+  const cuAlphaEvasions = [
+    'seucu', 'teucu', 'meucu', 'paunocu', 'nocu', 'tomarnocu', 'tomanocu',
+    'tomarnoseucu', 'tomanoseucu', 'vaitomarnocu', 'vaitomarnoseucu',
+    'enfianocu', 'enfianoseucu', 'darocu', 'daocu', 'cuzao', 'cuzinho', 'cuzaum',
+    'vtnc', 'tmnc', 'tnc', 'arrombado', 'arrombada'
+  ];
+  for (const ev of cuAlphaEvasions) {
+    if (cleanAlpha.includes(ev)) {
+      return { hasProfanity: true, matchedWord: 'linguagem imprópria / ofensa' };
+    }
   }
 
-  return false;
+  // 3. Insultos direcionados usando termos como "lixo" (ex.: "oi lixo", "seu lixo", "lixo humano", ou mensagem apenas "lixo")
+  const lixoPatterns = [
+    /\b(oi|ola|seu|sua|um|uma|vc|voce|você|tu|eh|e|é|inutil|tão|tao|muito)\s+lixo\b/i,
+    /\blixo\s+(humano|de\s+pessoa|do\s+caralho|demais)\b/i,
+    /\b(vc|voce|você|tu)\s+(eh|é|e)\s+(um\s+)?lixo\b/i,
+    /^(oi|ola)?\s*lixo[s]?$/i
+  ];
+  for (const lp of lixoPatterns) {
+    if (lp.test(normalized) || lp.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
+    }
+  }
+
+  if (['lixo', 'lixos', 'oilixo', 'olalixo', 'seulixo', 'sualixo', 'vceumlixo', 'voceeumlixo'].includes(cleanAlpha) || cleanAlpha.includes('lixohumano')) {
+    return { hasProfanity: true, matchedWord: 'lixo (termo ofensivo)' };
+  }
+
+  // 4. Insultos e ofensas diretas no diálogo (ex: "seu idiota", "inútil", "babaca", "otário", etc.)
+  const directInsults = [
+    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(otario|otaria|babaca|trouxa|imbecil|idiota|inutil|inútil|escroto|escrota|canalha|corno|corna|cretino|cretina|retardado|retardada)\b/i,
+    /\b(seu|sua|vc\s+e|voce\s+e|você\s+é|tu\s+é|tu\s+e)?\s*(burro|burra)\b/i
+  ];
+  for (const di of directInsults) {
+    if (di.test(normalized) || di.test(collapsedRepeats)) {
+      return { hasProfanity: true, matchedWord: 'ofensa pessoal' };
+    }
+  }
+
+  // 5. Checa raízes ofensivas em cleanAlpha
+  for (const root of PROFANITY_ROOTS) {
+    if (cleanAlpha.includes(root)) {
+      return { hasProfanity: true, matchedWord: root };
+    }
+  }
+
+  // 6. Checa termos da lista
+  for (const b of PROFANITY_LIST) {
+    if (b.length >= 3) {
+      if (normalized.includes(b) || cleanAlpha.includes(b)) {
+        return { hasProfanity: true, matchedWord: b };
+      }
+    }
+  }
+
+  return { hasProfanity: false };
+}
+
+/**
+ * Verifica se um texto contém linguagem inapropriada / palavrões.
+ * Usado como filtro leve para publicações no banco de dados.
+ */
+export function hasProfanity(text) {
+  return detectProfanity(text).hasProfanity;
 }
 

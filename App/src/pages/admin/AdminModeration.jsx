@@ -4,13 +4,8 @@ import {
   ShieldAlert,
   Briefcase,
   UserX,
-  UserCheck,
-  CheckCircle2,
-  XCircle,
-  Clock,
   RefreshCw,
   AlertCircle,
-  ArrowRight,
   ShieldCheck
 } from 'lucide-react';
 import {

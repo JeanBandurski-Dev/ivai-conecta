@@ -6,7 +6,6 @@
 import { where, query, getDocs } from 'firebase/firestore';
 import { BaseRepository, handleFirestoreError } from './BaseRepository.js';
 import { normalizeJobDTO, validateJobDTO } from '../models/JobDTO.js';
-import { JobStatus } from '../models/enums.js';
 
 export class JobRepository extends BaseRepository {
   constructor() {

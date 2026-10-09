@@ -2,21 +2,16 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  User,
   Mail,
   MapPin,
   Calendar,
   Shield,
-  Building2,
-  GraduationCap,
-  Award,
   CheckCircle2,
   UserX,
   UserCheck,
   Trash2,
   Edit2,
   AlertCircle,
-  FileText,
   BadgeCheck
 } from 'lucide-react';
 import {

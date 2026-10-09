@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  Settings,
-  Shield,
   Server,
   Database,
-  Radio,
   RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
-  Lock,
-  Cpu,
-  Layers
+  Lock
 } from 'lucide-react';
 import { fetchSystemHealth } from '../../services/adminService';
 

@@ -182,7 +182,6 @@ export function validateStudentEmail(email) {
     };
   }
 
-  const localPart = parts[0];
   const domain = parts[1];
 
   // 1. Checa se é um domínio público pessoal

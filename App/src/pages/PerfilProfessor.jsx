@@ -14,6 +14,7 @@ import { db } from '../lib/firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
 import TalentCard from '../components/TalentCard';
 import EditTeacherProfileModal from '../components/EditTeacherProfileModal';
+import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 
 export default function PerfilProfessor() {
@@ -81,13 +82,16 @@ export default function PerfilProfessor() {
 
   const endorsedStudents = useMemo(() => {
     if (!teacher) return [];
-    const profEmail = (teacher.email || '').toLowerCase().trim();
+    const profEmails = [teacher.profEmail, teacher.teacherEmail, teacher.email].filter(Boolean).map(e => String(e).toLowerCase().trim());
     const profUid = String(teacher.firestoreId || teacher.id || teacher.uid || '');
 
     // 1. Alunos de liveTalents que já possuem este professor em t.endorsements
     const matchedFromTalents = (liveTalents || []).filter(t =>
       hasTeacherEndorsedStudent(t.endorsements || [], teacher) ||
-      (profEmail && t.endorsements?.some(e => (e.profEmail || '').toLowerCase().trim() === profEmail)) ||
+      (t.endorsements?.some(e => {
+        const eEmail = (e.profEmail || e.teacherEmail || e.email || '').toLowerCase().trim();
+        return eEmail && profEmails.includes(eEmail);
+      })) ||
       (profUid && t.endorsements?.some(e => String(e.profUid || '') === profUid))
     );
 
@@ -116,7 +120,7 @@ export default function PerfilProfessor() {
           id: `end_${resp.reqId || resp.timestamp || Date.now()}`,
           profUid: profUid || String(teacher.id || ''),
           profName: teacher.name || 'Professor Docente',
-          profEmail: teacher.email || '',
+          profEmail: teacher.profEmail || teacher.teacherEmail || teacher.email || '',
           institution: teacher.institution || 'IFPR Campus Ivaiporã',
           discipline: resp.discipline || teacher.discipline || 'Formação Acadêmica',
           quote: resp.quote || 'Estudante com excelente desempenho acadêmico e postura ética comprovada.',
@@ -232,11 +236,19 @@ export default function PerfilProfessor() {
 
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 flex-1 max-w-full">
-              <img
-                src={teacher.avatar}
-                alt={teacher.name}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
-              />
+              {teacher.avatar && !isGenericPlaceholderAvatar(teacher.avatar) ? (
+                <img
+                  src={teacher.avatar}
+                  alt={teacher.name}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
+                />
+              ) : (
+                <div
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(teacher.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
+                >
+                  {(teacher.name || 'P').slice(0, 2).toUpperCase()}
+                </div>
+              )}
 
               <div className="min-w-0 flex-1 max-w-full">
                 <div className="flex items-center gap-2 flex-wrap mb-1">

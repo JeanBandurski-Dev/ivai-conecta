@@ -81,7 +81,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
           if (auth.currentUser.emailVerified && isMounted) {
             setIsVerified(true);
             const updated = {
-              ...(currentUser || {}),
+              ...currentUser,
               emailVerified: true,
               isVerifiedStudent: true
             };
@@ -225,7 +225,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
         // 2. Atualizar estado global Zustand e localStorage
         const updatedUser = {
-          ...(currentUser || {}),
+          ...currentUser,
           emailVerified: true,
           ...(isStudentVerified ? { isVerifiedStudent: true } : {})
         };

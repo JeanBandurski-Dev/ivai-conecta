@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
-  Building2, PlusCircle, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert, FileText
+  Building2, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert, FileText
 } from 'lucide-react';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
-import { subscribeToUnreadCount } from '../../services/chatService';
+import { subscribeToUnreadCount, isGenericPlaceholderAvatar, getAvatarGradient } from '../../services/chatService';
 import { normalizeUserRole } from '../../services/authService';
 
 export default function Navbar() {
@@ -52,7 +52,7 @@ export default function Navbar() {
   };
 
   const navLinkClass = ({ isActive }) =>
-    `text-sm lg:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative ${isActive
+    `text-xs lg:text-sm xl:text-base font-semibold transition-all duration-200 py-6 border-b-[3px] relative whitespace-nowrap ${isActive
       ? 'text-primary-blue dark:text-blue-400 border-primary-blue dark:border-blue-400 font-bold'
       : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-primary-blue dark:hover:text-blue-400'
     }`;
@@ -67,33 +67,35 @@ export default function Navbar() {
   const isCompany = Boolean(currentUser && userRole === 'empresa');
   const isAdmin = Boolean(currentUser && userRole === 'admin');
   const isStudentOrCandidate = Boolean(currentUser && (userRole === 'aluno' || userRole === 'candidato'));
+  const isFreelancer = Boolean(currentUser && userRole === 'freelancer');
+  const isProfessor = Boolean(currentUser && (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher'));
 
   const getProfileLink = () => {
     if (!currentUser) return '/login';
     const userIdentifier = currentUser.uid || currentUser.id;
     if (isCompany) return userIdentifier ? `/empresa/${userIdentifier}` : '/empresa';
-    if (userRole === 'professor' || userRole === 'docente' || userRole === 'teacher') return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
-    if (userRole === 'freelancer') return userIdentifier ? `/freelancer/${userIdentifier}` : '/freelancer';
+    if (isProfessor) return userIdentifier ? `/professor/${userIdentifier}` : '/professor';
+    if (isFreelancer) return userIdentifier ? `/freelancer/${userIdentifier}` : '/freelancer';
     return userIdentifier ? `/perfil/${userIdentifier}` : '/perfil';
   };
 
   return (
     <>
       <nav className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 dark:border-slate-800 shadow-xs transition-colors duration-300">
-        <div className="container">
-          <div className="flex items-center justify-between h-[74px] gap-6 whitespace-nowrap">
+        <div className="container mx-auto">
+          <div className="flex items-center justify-between h-[74px] gap-3 lg:gap-6 w-full max-w-full">
 
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 shrink-0">
-              <Logo size={40} />
-              <span className="text-xl font-heading font-extrabold tracking-tight">
+            <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <Logo size={38} />
+              <span className="text-lg sm:text-xl font-heading font-extrabold tracking-tight">
                 <span className="text-primary-dark dark:text-white">Ivaí</span>{' '}
                 <span className="text-primary-blue dark:text-blue-400">Conecta</span>
               </span>
             </Link>
 
             {/* Nav links — desktop centered */}
-            <ul className="hidden md:flex items-center gap-8 list-none mx-auto">
+            <ul className="hidden md:flex items-center gap-4 lg:gap-6 xl:gap-8 list-none mx-auto whitespace-nowrap">
               <li><NavLink to="/" end className={navLinkClass}>Início</NavLink></li>
               <li><NavLink to="/vagas" className={navLinkClass}>Vagas &amp; Match</NavLink></li>
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>
@@ -149,10 +151,12 @@ export default function Navbar() {
                     aria-label="Menu do usuário"
                   >
                     <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
-                      {currentUser.avatar ? (
+                      {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
                         <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                       ) : (
-                        <User size={15} className="text-primary-blue dark:text-blue-400" />
+                        <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold text-xs flex items-center justify-center`}>
+                          {(currentUser.name || 'U').charAt(0).toUpperCase()}
+                        </div>
                       )}
                     </div>
                     <span className="text-sm font-semibold text-gray-700 dark:text-slate-200 max-w-[120px] truncate">
@@ -165,11 +169,11 @@ export default function Navbar() {
                     <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                          {currentUser.avatar ? (
+                          {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
                             <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
-                              {currentUser.name.charAt(0)}
+                            <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold flex items-center justify-center`}>
+                              {(currentUser.name || 'U').charAt(0).toUpperCase()}
                             </div>
                           )}
                         </div>
@@ -189,15 +193,17 @@ export default function Navbar() {
 
                         <Link to={getProfileLink()} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
-                          <User size={15} /> {currentUser.role === 'empresa' ? 'Perfil da Empresa' : currentUser.role === 'freelancer' ? 'Meu Perfil Freelancer' : 'Meu Perfil'}
+                          <User size={15} /> {isCompany ? 'Perfil da Empresa' : isFreelancer ? 'Meu Perfil Freelancer' : 'Meu Perfil'}
                         </Link>
 
-                        {currentUser.role === 'freelancer' ? (
+                        {isFreelancer && (
                           <Link to="/servicos?view=orders" onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
                             <FileText size={15} /> Demandas &amp; Pedidos de Serviços
                           </Link>
-                        ) : (
+                        )}
+
+                        {isStudentOrCandidate && (
                           <Link to="/servicos?view=orders" onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
                             <FileText size={15} /> Meus Pedidos de Serviços
@@ -225,14 +231,14 @@ export default function Navbar() {
                           </>
                         )}
 
-                        {currentUser.role === 'professor' && (
+                        {isProfessor && (
                           <Link to="/minhas-vagas" onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
                             <Star size={15} /> Pareceres e Recomendações
                           </Link>
                         )}
 
-                        {currentUser.role === 'empresa' && (
+                        {isCompany && (
                           <>
                             <Link to="/gerenciamento-vagas" onClick={() => setDropdownOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-primary-blue dark:hover:text-blue-400 transition-colors">
@@ -311,11 +317,11 @@ export default function Navbar() {
                   <div className="border-t border-gray-100 dark:border-slate-800 my-2.5" />
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                      {currentUser.avatar ? (
+                      {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
                         <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-primary-blue font-bold">
-                          {currentUser.name.charAt(0)}
+                        <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold flex items-center justify-center`}>
+                          {(currentUser.name || 'U').charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -332,14 +338,16 @@ export default function Navbar() {
                   )}
 
                   <NavLink to={getProfileLink()} className={mobileNavLinkClass} onClick={closeMobile}>
-                    <span className="flex items-center gap-2.5"><User size={16} /> Meu Perfil</span>
+                    <span className="flex items-center gap-2.5"><User size={16} /> {isCompany ? 'Perfil da Empresa' : isFreelancer ? 'Meu Perfil Freelancer' : 'Meu Perfil'}</span>
                   </NavLink>
 
-                  {currentUser.role === 'freelancer' ? (
+                  {isFreelancer && (
                     <NavLink to="/servicos?view=orders" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><FileText size={16} /> Demandas &amp; Pedidos</span>
                     </NavLink>
-                  ) : (
+                  )}
+
+                  {isStudentOrCandidate && (
                     <NavLink to="/servicos?view=orders" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><FileText size={16} /> Meus Pedidos de Serviços</span>
                     </NavLink>
@@ -379,16 +387,21 @@ export default function Navbar() {
                     </>
                   )}
 
-                  {currentUser.role === 'professor' && (
+                  {isProfessor && (
                     <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                       <span className="flex items-center gap-2.5"><Star size={16} /> Pareceres e Recomendações</span>
                     </NavLink>
                   )}
 
-                  {currentUser.role === 'empresa' && (
-                    <NavLink to="/gerenciamento-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
-                      <span className="flex items-center gap-2.5"><Building2 size={16} /> Gestão de Vagas &amp; Funil ATS</span>
-                    </NavLink>
+                  {isCompany && (
+                    <>
+                      <NavLink to="/gerenciamento-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
+                        <span className="flex items-center gap-2.5"><Building2 size={16} /> Gestão de Vagas &amp; Funil ATS</span>
+                      </NavLink>
+                      <NavLink to="/talentos" className={mobileNavLinkClass} onClick={closeMobile}>
+                        <span className="flex items-center gap-2.5"><Star size={16} /> Banco de Talentos</span>
+                      </NavLink>
+                    </>
                   )}
 
                   <NavLink to="/configuracoes" className={mobileNavLinkClass} onClick={closeMobile}>

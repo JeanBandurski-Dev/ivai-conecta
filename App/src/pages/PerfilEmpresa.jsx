@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Building2, MapPin, Users, Briefcase, ArrowLeft,
-  Edit3, ShieldCheck, CheckCircle2, X, Plus, HeartHandshake,
-  BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Image as ImageIcon, Check, Loader2, ShieldAlert
+  Edit3, ShieldCheck, CheckCircle2, Plus, HeartHandshake,
+  BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Loader2, ShieldAlert
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
 import { getUserProfile } from '../services/authService';
@@ -51,21 +51,54 @@ export default function PerfilEmpresa() {
     instagram: currentUser?.instagram || '',
   });
 
-  const [company, setCompany] = useState({
-    name:     currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || 'Empresa Cadastrada',
-    city:     currentUser?.city || 'Ivaiporã',
-    sector:   currentUser?.sector || 'Comércio & Serviços',
-    size:     currentUser?.size || '1-10 funcionários',
-    cnpj:     currentUser?.cnpj || '',
-    rating:   currentUser?.rating || 5.0,
-    reviews:  currentUser?.reviewsCount || 0,
-    logo:     currentUser?.avatar || '',
-    banner:   currentUser?.banner || DEFAULT_BANNER,
-    website:  currentUser?.website || '',
-    phone:    currentUser?.phone || currentUser?.whatsapp || '',
-    about:    currentUser?.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
-    history:  currentUser?.history || '',
-    perks:    currentUser?.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+  const [company, setCompany] = useState(() => {
+    const isOwner = Boolean(
+      currentUser && currentUser.role === 'empresa' && (
+        !id ||
+        String(id) === 'empresa' ||
+        String(id) === String(currentUser.uid) ||
+        String(id) === String(currentUser.id)
+      )
+    );
+    if (isOwner && currentUser) {
+      return {
+        name:     currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada',
+        city:     currentUser.city || 'Ivaiporã',
+        sector:   currentUser.sector || 'Comércio & Serviços',
+        size:     currentUser.size || '1-10 funcionários',
+        cnpj:     currentUser.cnpj || '',
+        rating:   currentUser.rating || 5.0,
+        reviews:  currentUser.reviewsCount || 0,
+        logo:     currentUser.avatar || '',
+        banner:   currentUser.banner || DEFAULT_BANNER,
+        website:  currentUser.website || '',
+        phone:    currentUser.phone || currentUser.whatsapp || '',
+        about:    currentUser.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
+        history:  currentUser.history || '',
+        perks:    currentUser.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+        blocked:  currentUser.blocked || currentUser.status === 'blocked',
+        blockedReason: currentUser.blockedReason || null,
+      };
+    }
+    const decodedName = id && String(id) !== 'empresa' ? decodeURIComponent(id) : 'Empresa Cadastrada';
+    return {
+      name:     decodedName,
+      city:     'Ivaiporã',
+      sector:   'Comércio & Serviços',
+      size:     '10-50 colaboradores',
+      cnpj:     '',
+      rating:   5.0,
+      reviews:  0,
+      logo:     '',
+      banner:   DEFAULT_BANNER,
+      website:  '',
+      phone:    '',
+      about:    'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
+      history:  '',
+      perks:    ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
+      blocked:  false,
+      blockedReason: null,
+    };
   });
 
   const isCompanyOwner = Boolean(
@@ -109,27 +142,35 @@ export default function PerfilEmpresa() {
         blockedReason: currentUser.blockedReason || null,
       });
     } else if (id) {
+      const decodedId = decodeURIComponent(id).toLowerCase().trim();
       // Busca dados atualizados do perfil no Firestore
       if (typeof getUserProfile === 'function') {
         getUserProfile(id).then(res => {
           if (res && res.success && res.profile) {
             setCompany(prev => ({
               ...prev,
+              uid: res.profile.uid || res.profile.id,
+              id: res.profile.uid || res.profile.id,
               blocked: res.profile.blocked || res.profile.status === 'blocked',
               status: res.profile.status || (res.profile.blocked ? 'blocked' : 'active'),
               blockedReason: res.profile.blockedReason || null,
               name: res.profile.razaoSocial || res.profile.nomeFantasia || res.profile.name || prev.name,
               city: res.profile.city || prev.city,
               sector: res.profile.sector || prev.sector,
+              size: res.profile.size || prev.size,
+              cnpj: res.profile.cnpj || prev.cnpj,
+              rating: res.profile.rating || prev.rating,
+              reviews: res.profile.reviewsCount || res.profile.reviews || prev.reviews,
               logo: res.profile.avatar || prev.logo,
               banner: res.profile.banner || prev.banner,
-              about: res.profile.about || prev.about
+              about: res.profile.about || prev.about,
+              website: res.profile.website || prev.website,
+              phone: res.profile.phone || res.profile.whatsapp || prev.phone,
             }));
           }
         }).catch(() => {});
       }
       const allCompanies = getCompanies('Todas as Cidades');
-      const decodedId = decodeURIComponent(id).toLowerCase().trim();
       const matchCompany = allCompanies.find(c =>
         (c.id && String(c.id).toLowerCase() === decodedId) ||
         (c.uid && String(c.uid).toLowerCase() === decodedId) ||
@@ -139,6 +180,8 @@ export default function PerfilEmpresa() {
       if (matchCompany) {
         setCompany(prev => ({
           ...prev,
+          uid: matchCompany.uid || matchCompany.id,
+          id: matchCompany.id || matchCompany.uid,
           name: matchCompany.name || prev.name,
           city: matchCompany.city || prev.city,
           sector: matchCompany.sector || prev.sector,
@@ -157,28 +200,18 @@ export default function PerfilEmpresa() {
       } else {
         const allJobs = getJobs('Todas as Cidades');
         const matchJob = allJobs.find(j =>
-          (j.createdBy && String(j.createdBy) === String(id)) ||
-          (j.company && j.company.toLowerCase() === decodedId)
+          (j.createdBy && String(j.createdBy).toLowerCase() === decodedId) ||
+          (j.companyUid && String(j.companyUid).toLowerCase() === decodedId) ||
+          (j.company && j.company.toLowerCase().trim() === decodedId)
         );
         if (matchJob) {
           setCompany(prev => ({
             ...prev,
+            uid: matchJob.companyUid || matchJob.createdBy,
             name: matchJob.company || prev.name,
             city: matchJob.city || prev.city,
             logo: matchJob.companyLogo || prev.logo,
             banner: prev.banner || DEFAULT_BANNER,
-          }));
-        } else if (currentUser && currentUser.role === 'empresa') {
-          setCompany(prev => ({
-            ...prev,
-            name: currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || prev.name,
-            city: currentUser.city || prev.city,
-            sector: currentUser.sector || prev.sector,
-            logo: currentUser.avatar || prev.logo,
-            banner: currentUser.banner || prev.banner || DEFAULT_BANNER,
-            website: currentUser.website || prev.website || '',
-            phone: currentUser.phone || prev.phone || '',
-            about: currentUser.about || prev.about,
           }));
         }
       }
@@ -196,9 +229,13 @@ export default function PerfilEmpresa() {
     }
     if (id) {
       const targetId = String(id).trim();
+      const decodedTarget = decodeURIComponent(targetId).toLowerCase().trim();
+      const compName = (company?.name || '').toLowerCase().trim();
       return (
         (j.createdBy && String(j.createdBy) === targetId) ||
-        (j.companyUid && String(j.companyUid) === targetId)
+        (j.companyUid && String(j.companyUid) === targetId) ||
+        (j.company && j.company.toLowerCase().trim() === decodedTarget) ||
+        (compName && j.company && j.company.toLowerCase().trim() === compName)
       );
     }
     return false;

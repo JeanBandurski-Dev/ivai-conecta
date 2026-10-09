@@ -172,40 +172,57 @@ service cloud.firestore {
     // -------------------------------------------------------------
     match /chats/{chatId} {
       allow get: if isAuthenticated() && (
-        request.auth.token.email in resource.data.participants ||
+        (request.auth.token.email != null && (
+          request.auth.token.email in resource.data.participants ||
+          request.auth.token.email.lower() in resource.data.participants
+        )) ||
         (resource.data.participantUids != null && request.auth.uid in resource.data.participantUids)
       );
       
       allow list: if isAuthenticated();
 
       allow create: if isAuthenticated() && (
-        request.auth.token.email in request.resource.data.participants ||
+        (request.auth.token.email != null && (
+          request.auth.token.email in request.resource.data.participants ||
+          request.auth.token.email.lower() in request.resource.data.participants
+        )) ||
         (request.resource.data.participantUids != null && request.auth.uid in request.resource.data.participantUids)
       );
 
       allow update, delete: if isAuthenticated() && (
-        request.auth.token.email in resource.data.participants ||
+        (request.auth.token.email != null && (
+          request.auth.token.email in resource.data.participants ||
+          request.auth.token.email.lower() in resource.data.participants
+        )) ||
         (resource.data.participantUids != null && request.auth.uid in resource.data.participantUids)
       );
 
       match /messages/{messageId} {
         allow read: if isAuthenticated() && (
-          request.auth.token.email in get(/databases/$(database)/documents/chats/$(chatId)).data.participants ||
+          (request.auth.token.email != null && (
+            request.auth.token.email in get(/databases/$(database)/documents/chats/$(chatId)).data.participants ||
+            request.auth.token.email.lower() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          )) ||
           (get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids != null &&
            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids)
         );
 
         allow create: if isAuthenticated() && (
-          request.auth.token.email in get(/databases/$(database)/documents/chats/$(chatId)).data.participants ||
+          (request.auth.token.email != null && (
+            request.auth.token.email in get(/databases/$(database)/documents/chats/$(chatId)).data.participants ||
+            request.auth.token.email.lower() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          )) ||
           (get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids != null &&
            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids)
         ) && (
           request.resource.data.senderEmail == request.auth.token.email ||
+          request.resource.data.senderEmail == request.auth.token.email.lower() ||
           request.resource.data.senderId == request.auth.uid
         );
 
         allow update, delete: if isAuthenticated() && (
           resource.data.senderEmail == request.auth.token.email ||
+          resource.data.senderEmail == request.auth.token.email.lower() ||
           resource.data.senderId == request.auth.uid
         );
       }

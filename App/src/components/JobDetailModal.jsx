@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
   Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users, Bookmark,
-  Wrench, GraduationCap, ShieldAlert, AlertCircle
+  Wrench, GraduationCap, ShieldAlert, AlertCircle, ExternalLink
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -270,16 +270,30 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
           </div>
 
           <div className="flex items-start gap-4 sm:gap-5">
-            <img
-              src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
-              alt={company}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white dark:bg-slate-800"
-            />
+            <Link
+              to={`/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`}
+              onClick={onClose}
+              className="shrink-0 group/logo"
+              title={`Ver perfil da empresa ${company}`}
+            >
+              <img
+                src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
+                alt={company}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white dark:bg-slate-800 group-hover/logo:scale-105 group-hover/logo:border-white/60 transition-all cursor-pointer"
+              />
+            </Link>
             <div className="pr-8">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-xs font-bold uppercase tracking-wider text-accent-sky bg-white/10 px-2.5 py-0.5 rounded-md">
-                  {company}
-                </span>
+                <Link
+                  to={`/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`}
+                  onClick={onClose}
+                  className="text-xs font-bold uppercase tracking-wider text-accent-sky bg-white/10 hover:bg-white/20 hover:text-white px-2.5 py-0.5 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title={`Ver perfil da empresa ${company}`}
+                >
+                  <Building2 size={13} />
+                  <span>{company}</span>
+                  <ExternalLink size={11} className="opacity-75" />
+                </Link>
                 {currentStatus === 'Encerrada' ? (
                   <span className="bg-red-500/20 text-red-300 border border-red-400/30 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     <XCircle size={12} /> Vaga Encerrada
@@ -481,9 +495,19 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
         {/* Modal Footer */}
         <div className="p-5 sm:p-6 bg-gray-50 dark:bg-slate-800/80 border-t border-gray-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
-          <button onClick={onClose} className="btn btn-outline btn-sm font-semibold text-gray-600 dark:text-slate-300">
-            Fechar
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button onClick={onClose} className="btn btn-outline btn-sm font-semibold text-gray-600 dark:text-slate-300">
+              Fechar
+            </button>
+            <Link
+              to={`/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`}
+              onClick={onClose}
+              className="btn btn-outline btn-sm text-xs font-bold text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600 hover:border-primary-blue hover:text-primary-blue dark:hover:text-blue-400 transition-all flex items-center gap-1.5 cursor-pointer"
+              title={`Ver perfil da empresa ${company}`}
+            >
+              <Building2 size={14} /> Ver Empresa
+            </Link>
+          </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             {currentUser && !isJobOwner && !isCompany && (
@@ -509,6 +533,17 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               <Bookmark size={14} className={isFavorite ? 'fill-amber-500 text-amber-500' : ''} />
               <span>{isFavorite ? 'Salva nos Favoritos' : 'Salvar Vaga'}</span>
             </button>
+
+            {/* Link para o perfil completo da empresa */}
+            <Link
+              to={`/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`}
+              onClick={onClose}
+              className="btn btn-outline btn-sm text-xs font-bold text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:border-primary-blue hover:text-primary-blue dark:hover:text-blue-400 bg-white dark:bg-slate-800 transition-all flex items-center gap-1.5 rounded-xl cursor-pointer"
+              title={`Ver perfil completo da empresa ${company}`}
+            >
+              <Building2 size={14} className="text-primary-blue dark:text-blue-400" />
+              <span className="hidden sm:inline">Ver Empresa</span>
+            </Link>
 
             {isJobOwner ? (
               <div className="flex items-center gap-2">

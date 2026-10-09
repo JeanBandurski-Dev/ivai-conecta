@@ -5,7 +5,7 @@
  */
 
 import { ApplicationStatus, ApplicationStage } from './enums.js';
-import { validationResult, validateString, validateEmail, sanitizeStringArray } from './schemaValidator.js';
+import { validationResult, validateEmail, sanitizeStringArray } from './schemaValidator.js';
 
 /**
  * Normaliza um documento bruto de candidatura do Firestore ou cache
