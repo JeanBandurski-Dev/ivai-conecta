@@ -78,10 +78,14 @@ export const ServiceStatus = Object.freeze({
 });
 
 export const ServiceOrderStatus = Object.freeze({
-  PENDENTE: 'Pendente',
-  EM_ANDAMENTO: 'Em Andamento',
-  CONCLUIDO: 'Concluído',
-  CANCELADO: 'Cancelado'
+  SOLICITADO: 'solicitado',
+  PENDENTE: 'solicitado',
+  ACEITO: 'aceito',
+  EM_ANDAMENTO: 'em_andamento',
+  CONCLUIDO: 'concluido',
+  AVALIADO: 'avaliado',
+  RECUSADO: 'recusado',
+  CANCELADO: 'cancelado'
 });
 
 export const EndorsementStatus = Object.freeze({

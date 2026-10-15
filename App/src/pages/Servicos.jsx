@@ -85,10 +85,107 @@ export default function Servicos() {
   }, [selectedCity]);
 
   const { services: all, refresh: refreshServices } = useServices('Todas as Cidades');
-  const myServices = all.filter(s => 
-    (currentUser?.uid && (s.createdBy === currentUser.uid || s.providerUid === currentUser.uid)) ||
-    (currentUser?.id && (s.createdBy === currentUser.id || s.providerUid === currentUser.id))
-  );
+
+  // ── Service Orders Lifecycle State ──
+  const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
+  const [evaluatingOrder, setEvaluatingOrder] = useState(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = subscribeToServiceOrders(currentUser, (data) => {
+      if (Array.isArray(data)) setLiveOrders(data);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleOrdersUpdated = (e) => {
+      if (Array.isArray(e.detail)) setLiveOrders(e.detail);
+      else setLiveOrders(getServiceOrders());
+    };
+    window.addEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+    return () => window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
+  }, []);
+
+  // Consolidação de avaliações das ordens nos serviços do Marketplace
+  const enrichedServices = useMemo(() => {
+    const ordersWithReviews = (liveOrders || []).filter(o => o.status === 'avaliado' && o.review);
+
+    return all.map(s => {
+      const sId = String(s.firestoreId || s.id || '').trim();
+      const sProvUid = String(s.createdBy || s.providerUid || '').trim();
+      const sTitle = String(s.title || s.name || '').trim();
+
+      const matchingOrders = ordersWithReviews.filter(o => {
+        if (o.serviceId && String(o.serviceId).trim() === sId) return true;
+        const oProvUid = String(o.providerUid || o.providerId || '').trim();
+        const oTitle = String(o.serviceTitle || '');
+        if (sProvUid && oProvUid === sProvUid && (!oTitle || !sTitle || oTitle === sTitle)) return true;
+        return false;
+      });
+
+      if (matchingOrders.length === 0) return s;
+
+      const orderReviews = matchingOrders.map(o => ({
+        orderId: String(o.id || o.firestoreId),
+        rating: Number(o.review.rating) || 5,
+        stars: Number(o.review.rating) || 5,
+        comment: o.review.comment,
+        author: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+        client: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+        avatar: o.review.avatar || '',
+        date: o.review.date || o.createdAt,
+        timestamp: o.review.timestamp || Date.now()
+      }));
+
+      const existingReviews = Array.isArray(s.reviews) ? s.reviews : [];
+      const combined = [...existingReviews];
+      const seen = new Set(existingReviews.map(r => `${r.orderId || ''}_${r.author || r.client}_${r.comment}`));
+
+      for (const or of orderReviews) {
+        const key = `${or.orderId || ''}_${or.author || or.client}_${or.comment}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          combined.push(or);
+        }
+      }
+
+      const totalRating = combined.reduce((sum, r) => sum + (Number(r.rating || r.stars) || 5), 0);
+      const avgRating = combined.length > 0 ? Number((totalRating / combined.length).toFixed(1)) : (s.rating || 5.0);
+
+      return {
+        ...s,
+        reviews: combined,
+        reviewsCount: combined.length,
+        reviewCount: combined.length,
+        rating: avgRating
+      };
+    });
+  }, [all, liveOrders]);
+
+  // Sincroniza em segundo plano avaliações pendentes com o documento de serviço no Firestore
+  useEffect(() => {
+    enrichedServices.forEach(s => {
+      const raw = all.find(r => (r.id === s.id || r.firestoreId === s.id));
+      if (raw && (s.reviewsCount || 0) > (raw.reviewsCount || 0)) {
+        updateService(s.firestoreId || s.id, {
+          rating: s.rating,
+          reviewsCount: s.reviewsCount,
+          reviewCount: s.reviewsCount,
+          reviews: s.reviews
+        }).catch(() => {});
+      }
+    });
+  }, [enrichedServices, all]);
+
+  const myServices = useMemo(() => {
+    return enrichedServices.filter(s => 
+      (currentUser?.uid && (s.createdBy === currentUser.uid || s.providerUid === currentUser.uid)) ||
+      (currentUser?.id && (s.createdBy === currentUser.id || s.providerUid === currentUser.id))
+    );
+  }, [enrichedServices, currentUser]);
   const currentService = myServices[0] || null;
 
   // Service Edit Form State
@@ -116,34 +213,12 @@ export default function Servicos() {
     }
   }, [currentService, currentUser]);
 
-  // ── Service Orders Lifecycle State ──
-  const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
-  const [evaluatingOrder, setEvaluatingOrder] = useState(null);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const unsub = subscribeToServiceOrders(currentUser, (data) => {
-      if (Array.isArray(data)) setLiveOrders(data);
-    });
-    return () => {
-      if (typeof unsub === 'function') unsub();
-    };
-  }, [currentUser]);
-
-  useEffect(() => {
-    const handleOrdersUpdated = (e) => {
-      if (Array.isArray(e.detail)) setLiveOrders(e.detail);
-      else setLiveOrders(getServiceOrders());
-    };
-    window.addEventListener('ivai_service_orders_updated', handleOrdersUpdated);
-    return () => window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
-  }, []);
 
   const receivedOrders = useMemo(() => {
     if (!currentUser) return [];
     const uid = String(currentUser.uid || currentUser.id || '');
     return liveOrders.filter(o =>
-      Boolean(uid && String(o.providerId) === uid)
+      Boolean(uid && (String(o.providerId) === uid || String(o.providerUid) === uid))
     );
   }, [liveOrders, currentUser]);
 
@@ -151,7 +226,7 @@ export default function Servicos() {
     if (!currentUser) return [];
     const uid = String(currentUser.uid || currentUser.id || '');
     return liveOrders.filter(o =>
-      Boolean(uid && String(o.clientId) === uid)
+      Boolean(uid && (String(o.clientId) === uid || String(o.clientUid) === uid))
     );
   }, [liveOrders, currentUser]);
 
@@ -215,7 +290,7 @@ export default function Servicos() {
   };
 
   const filtered = useMemo(() => {
-    return all
+    return enrichedServices
       .filter(s => {
         const mCity = matchCity(s.city, city);
         const mCat  = category === 'Todas' || s.category === category;
@@ -243,7 +318,7 @@ export default function Servicos() {
         if (sortBy === 'name') return (a.providerName || '').localeCompare(b.providerName || '');
         return 0;
       });
-  }, [all, city, category, badgeFilter, minRating, query, sortBy]);
+  }, [enrichedServices, city, category, badgeFilter, minRating, query, sortBy]);
 
   const handleUpdateService = async (e) => {
     e.preventDefault();

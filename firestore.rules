@@ -123,13 +123,15 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
+        resource.data.providerUid == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics', 'rating', 'reviewsCount', 'reviewCount', 'reviews', 'updatedAt'])
       );
 
       allow delete: if isAuthenticated() && (
         isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
+        resource.data.providerUid == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email
       );
     }
@@ -166,7 +168,7 @@ service cloud.firestore {
 
     // -------------------------------------------------------------
     // 7. Coleção CHATS & Subcoleção MESSAGES
-    // Apenas os participantes da conversa têm acesso à thread e às mensagens.
+    // Apenas os participantes da conversa (por e-mail ou UID) têm acesso à thread e às mensagens.
     // -------------------------------------------------------------
     match /chats/{chatId} {
       allow get: if isAuthenticated() && (
@@ -242,27 +244,33 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         isAdmin() ||
         resource.data.clientUid == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
         resource.data.clientEmail == request.auth.token.email ||
         resource.data.providerUid == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email
       );
 
       allow create: if isAuthenticated() && (
         request.resource.data.clientUid == request.auth.uid ||
+        request.resource.data.clientId == request.auth.uid ||
         request.resource.data.clientEmail == request.auth.token.email
       );
 
       allow update: if isAuthenticated() && (
         isAdmin() ||
         resource.data.clientUid == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
         resource.data.clientEmail == request.auth.token.email ||
         resource.data.providerUid == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email
       );
 
       allow delete: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.clientUid == request.auth.uid
+        resource.data.clientUid == request.auth.uid ||
+        resource.data.clientId == request.auth.uid
       );
     }
   }
