@@ -912,7 +912,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto custom-scrollbar">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
         
         {/* ── HEADER MODERNO & ORGANIZADO ── */}
@@ -1020,7 +1020,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
         </div>
 
         {/* ── MODAL BODY: SPLIT VIEW COM FORMULÁRIO (ESQ) E PRÉVIA EM TEMPO REAL (DIR) ── */}
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="overflow-y-auto flex-1 p-6 custom-scrollbar">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
             {/* COLUNA ESQUERDA: FORMULÁRIO WIZARD (7 COLUNAS EM TELAS GRANDES) */}
@@ -1674,7 +1674,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
         </div>
 
         {/* ── MODAL FOOTER ACTIONS ── */}
-        <div className="p-4 sm:p-5 bg-gray-50/90 dark:bg-slate-850 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
             {step === 1 ? (
               <button

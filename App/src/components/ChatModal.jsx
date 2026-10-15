@@ -31,7 +31,8 @@ import {
   resolveAvatar,
   resolveUserRole,
   isGenericPlaceholderAvatar,
-  getAvatarGradient
+  getAvatarGradient,
+  getMessageTime
 } from '../services/chatService';
 import { detectProfanity } from '../services/jobTaxonomy';
 import { getUsersDB } from '../lib/ivaiConecta';
@@ -238,9 +239,27 @@ export default function ChatModal({ onClose }) {
     }
   }, [activeThreadId, currentUser?.email, messages, hasActiveThread]);
 
+  // Ordenação cronológica estrita defensiva (mensagens mais antigas no topo, mais recentes embaixo)
+  const sortedMessages = useMemo(() => {
+    if (!Array.isArray(messages)) return [];
+    const copy = [...messages];
+    copy.sort((a, b) => getMessageTime(a) - getMessageTime(b));
+    return copy;
+  }, [messages]);
+
+  // Garante rolagem para a mensagem mais recente ao abrir conversa
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [activeThreadId]);
+
+  // Rola para a mensagem mais recente quando novas mensagens chegam
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [sortedMessages]);
 
   // Envio de mensagem com bloqueio estrito de palavras ofensivas
   const handleSendMessage = async (e) => {
@@ -669,8 +688,8 @@ export default function ChatModal({ onClose }) {
                 </div>
 
                 {/* Lista de Mensagens em Tempo Real */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-gray-50/20 dark:bg-slate-900/40">
-                  {messages.length === 0 ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-gray-50/20 dark:bg-slate-900/40 custom-scrollbar">
+                  {sortedMessages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400 space-y-2">
                       <div className="w-12 h-12 rounded-2xl bg-primary-blue/10 text-primary-blue flex items-center justify-center mb-1">
                         <Sparkles size={22} />
@@ -683,7 +702,7 @@ export default function ChatModal({ onClose }) {
                       </p>
                     </div>
                   ) : (
-                    messages.map((m, idx) => {
+                    sortedMessages.map((m, idx) => {
                       const isMe = matchesUserEmail(m.senderEmail, currentUser?.email);
                       const pCheck = detectProfanity(m.text || '');
 

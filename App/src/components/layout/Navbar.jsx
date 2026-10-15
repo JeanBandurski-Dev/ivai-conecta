@@ -217,7 +217,7 @@ export default function Navbar() {
                               <Briefcase size={15} /> Minhas Candidaturas
                             </Link>
 
-                            <Link to="/minhas-vagas?tab=favorites" onClick={() => setDropdownOpen(false)}
+                            <Link to="/vagas?tab=favorites" onClick={() => setDropdownOpen(false)}
                               className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                               <span className="flex items-center gap-3">
                                 <Bookmark size={15} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas
@@ -259,7 +259,7 @@ export default function Navbar() {
                                 </span>
                               )}
                             </Link>
-                            <Link to="/minhas-vagas?tab=favorites" onClick={() => setDropdownOpen(false)}
+                            <Link to="/vagas?tab=favorites" onClick={() => setDropdownOpen(false)}
                               className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
                               <span className="flex items-center gap-3">
                                 <Bookmark size={15} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas
@@ -394,7 +394,7 @@ export default function Navbar() {
                       <NavLink to="/minhas-vagas" className={mobileNavLinkClass} onClick={closeMobile}>
                         <span className="flex items-center gap-2.5"><Briefcase size={16} /> Minhas Candidaturas</span>
                       </NavLink>
-                      <NavLink to="/minhas-vagas?tab=favorites" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <NavLink to="/vagas?tab=favorites" className={mobileNavLinkClass} onClick={closeMobile}>
                         <span className="flex items-center justify-between w-full">
                           <span className="flex items-center gap-2.5">
                             <Bookmark size={16} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas
@@ -435,7 +435,7 @@ export default function Navbar() {
                           )}
                         </span>
                       </NavLink>
-                      <NavLink to="/minhas-vagas?tab=favorites" className={mobileNavLinkClass} onClick={closeMobile}>
+                      <NavLink to="/vagas?tab=favorites" className={mobileNavLinkClass} onClick={closeMobile}>
                         <span className="flex items-center justify-between w-full">
                           <span className="flex items-center gap-2.5">
                             <Bookmark size={16} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas

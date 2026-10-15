@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench } from 'lucide-react';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench, Bookmark, Briefcase } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity,
-  useJobs, UserRole, WorkplaceType
+  useJobs, UserRole, WorkplaceType, isJobFavorited
 } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
@@ -39,14 +39,19 @@ const POPULAR_SKILLS = [
 ];
 
 export default function Vagas() {
-  const { selectedCity, currentUser, showToast } = useAppStore();
+  const { selectedCity, currentUser, showToast, favoriteJobs = [] } = useAppStore();
   const [params, setParams] = useSearchParams();
+
+  const tabParam = params.get('tab');
+  const initialTab = tabParam === 'favorites' || tabParam === 'salvas' ? 'favorites' : 'all';
+  const [activeTab,     setActiveTab]     = useState(initialTab); // 'all' | 'favorites'
 
   const [query,         setQuery]         = useState(params.get('q') || '');
   const [filterCity,    setFilterCity]    = useState(selectedCity);
   const [filterType,    setFilterType]    = useState('Todos');
   const [filterModality,setFilterModality]= useState('Todas');
   const [minMatch,      setMinMatch]      = useState(0);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedSkills,setSelectedSkills]= useState([]);
   const [sortBy,        setSortBy]        = useState('match');
   const [showNewModal,  setShowModal]     = useState(params.get('action') === 'new');
@@ -94,6 +99,28 @@ export default function Vagas() {
   }, [params, isCompany, showToast, setParams]);
 
   useEffect(() => {
+    const t = params.get('tab');
+    if (t === 'favorites' || t === 'salvas') {
+      setActiveTab('favorites');
+    } else if (t === 'all' || !t) {
+      setActiveTab('all');
+    }
+  }, [params]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setParams(prev => {
+      const p = new URLSearchParams(prev);
+      if (newTab === 'all') {
+        p.delete('tab');
+      } else {
+        p.set('tab', newTab);
+      }
+      return p;
+    });
+  };
+
+  useEffect(() => {
     if (selectedCity) {
       setFilterCity(selectedCity);
     }
@@ -118,7 +145,12 @@ export default function Vagas() {
     );
   };
 
-  const hasActiveFilters = query || (filterCity && filterCity !== 'Todas as Cidades') || filterType !== 'Todos' || filterModality !== 'Todas' || minMatch > 0 || selectedSkills.length > 0;
+  const savedJobsList = useMemo(() => {
+    if (!Array.isArray(favoriteJobs) || favoriteJobs.length === 0) return [];
+    return (allJobs || []).filter(j => isJobFavorited(j, favoriteJobs));
+  }, [allJobs, favoriteJobs]);
+
+  const hasActiveFilters = query || (filterCity && filterCity !== 'Todas as Cidades') || filterType !== 'Todos' || filterModality !== 'Todas' || minMatch > 0 || onlyFavorites || selectedSkills.length > 0;
 
   const resetFilters = () => {
     setQuery('');
@@ -126,6 +158,7 @@ export default function Vagas() {
     setFilterType('Todos');
     setFilterModality('Todas');
     setMinMatch(0);
+    setOnlyFavorites(false);
     setSelectedSkills([]);
     setSortBy('match');
   };
@@ -176,7 +209,10 @@ export default function Vagas() {
         ).toLowerCase();
         const matchText = !query || text.includes(query.toLowerCase());
 
-        return matchCityOk && matchType && matchModality && matchScoreOk && matchSkillsOk && matchText;
+        // Favoritas
+        const matchFavoriteOk = !onlyFavorites || isJobFavorited(j, favoriteJobs);
+
+        return matchCityOk && matchType && matchModality && matchScoreOk && matchSkillsOk && matchFavoriteOk && matchText;
       })
       .sort((a, b) => {
         if (sortBy === 'match' && canSeeMatch) {
@@ -189,7 +225,7 @@ export default function Vagas() {
         }
         return 0;
       });
-  }, [allJobs, filterCity, filterType, filterModality, minMatch, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser]);
+  }, [allJobs, filterCity, filterType, filterModality, minMatch, onlyFavorites, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser, favoriteJobs]);
 
   return (
     <>
@@ -204,10 +240,12 @@ export default function Vagas() {
                 <Sparkles size={14} /> Oportunidades no Vale do Ivaí
               </span>
               <h1 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-heading font-extrabold text-white mb-3 tracking-tight leading-tight">
-                Vagas de Emprego &amp; Estágio Regional
+                {activeTab === 'favorites' ? 'Minhas Vagas Salvas & Favoritas' : 'Vagas de Emprego & Estágio Regional'}
               </h1>
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-                Encontre vagas em Ivaiporã e cidades vizinhas com cálculo automático de match de habilidades e indicação direta de professores parceiros.
+                {activeTab === 'favorites'
+                  ? 'Vagas e oportunidades salvas por você para acompanhar requisitos, prazos e candidaturas no momento ideal.'
+                  : 'Encontre vagas em Ivaiporã e cidades vizinhas com cálculo automático de match de habilidades e indicação direta de professores parceiros.'}
               </p>
             </div>
 
@@ -219,6 +257,28 @@ export default function Vagas() {
                 <Plus size={18} /> Publicar Nova Vaga
               </button>
             )}
+          </div>
+
+          {/* Abas de Navegação (Igual em Banco de Talentos) */}
+          <div className="flex items-center gap-2 sm:gap-3 mt-6 sm:mt-8 border-b border-white/15 pt-2 overflow-x-auto scrollbar-none w-full max-w-full">
+            <button
+              onClick={() => handleTabChange('all')}
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab !== 'favorites' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
+              }`}
+            >
+              <Briefcase size={16} /> Todas as Vagas ({allJobs.length})
+            </button>
+
+            <button
+              onClick={() => handleTabChange('favorites')}
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === 'favorites' ? 'border-amber-400 text-amber-300' : 'border-transparent text-gray-300 hover:text-white'
+              }`}
+            >
+              <Bookmark size={16} className={savedJobsList.length > 0 ? 'fill-amber-400 text-amber-400' : ''} />
+              Vagas Salvas ({savedJobsList.length})
+            </button>
           </div>
         </div>
       </header>
@@ -282,6 +342,27 @@ export default function Vagas() {
               </button>
             </div>
 
+          </div>
+
+          {/* Botão de Atalho Rápido para Vagas Salvas */}
+          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setOnlyFavorites(prev => !prev)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                onlyFavorites
+                  ? 'bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                  : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-amber-300'
+              }`}
+            >
+              <Bookmark size={13} className={onlyFavorites ? 'fill-amber-500 text-amber-500' : 'text-gray-400'} />
+              <span>Apenas Salvas</span>
+              {savedJobsList.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100 font-extrabold">
+                  {savedJobsList.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Painel de Filtros Avançados */}
@@ -394,29 +475,100 @@ export default function Vagas() {
           </div>
         )}
 
-        {/* ── GRID DE VAGAS ── */}
-        {filtered.length === 0 ? (
-          <div className="py-20 text-center text-gray-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
-            <div className="flex justify-center mb-4">
-              <Search size={48} className="text-gray-300 dark:text-slate-600" />
+        {/* ── CONTEÚDO PRINCIPAL: VAGAS SALVAS vs MURAL GERAL ── */}
+        {activeTab === 'favorites' ? (
+          <div className="space-y-6 w-full animate-in fade-in duration-200">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                  <Bookmark className="text-amber-500 fill-amber-500" size={24} /> Vagas Salvas &amp; Favoritas ({savedJobsList.length})
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+                  Oportunidades favoritadas para acompanhar requisitos, prazos ou candidatar-se.
+                </p>
+              </div>
+
+              {savedJobsList.length > 0 && (
+                <button
+                  onClick={() => handleTabChange('all')}
+                  className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Search size={14} /> Explorar Todas as Vagas
+                </button>
+              )}
             </div>
-            <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga encontrada com os filtros selecionados.</p>
-            <p className="text-sm text-gray-400 mb-5">Tente remover alguns filtros ou buscar por outro termo.</p>
-            <button onClick={resetFilters} className="btn btn-outline btn-sm">
-              <RotateCcw size={14} /> Restaurar Todos os Filtros
-            </button>
+
+            {savedJobsList.length === 0 ? (
+              <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3 max-w-xl mx-auto my-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+                  <Bookmark size={32} className="fill-amber-500" />
+                </div>
+                <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white">
+                  Nenhuma vaga favoritada ainda
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+                  Ao navegar pelo mural de vagas, clique no ícone de marcador (bookmark) em qualquer oportunidade para salvá-la aqui e acessá-la rapidamente.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => handleTabChange('all')}
+                    className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Search size={14} /> Explorar Vagas no Vale do Ivaí
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid-3">
+                {savedJobsList.map(j => {
+                  const reqSkills = safeSkillsArray(j.requiredSkills);
+                  const score = canSeeMatch
+                    ? calculateMatchScore(userSkills, reqSkills, {
+                        userCity: currentUser?.city,
+                        jobCity: j.city,
+                        isVerifiedStudent: currentUser?.isVerifiedStudent,
+                        endorsementsCount: (currentUser?.endorsements?.length || currentUser?.endorsementCount || 0)
+                      })
+                    : null;
+                  return (
+                    <JobCard
+                      key={j.id || j.firestoreId}
+                      job={{ ...j, requiredSkills: reqSkills, calculatedScore: score }}
+                      matchScore={score}
+                      onSelect={(jobObj) => setSelectedJob(jobObj)}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
-          <div className="grid-3">
-            {filtered.map(j => (
-              <JobCard
-                key={j.id}
-                job={j}
-                matchScore={j.calculatedScore}
-                onSelect={(jobObj) => setSelectedJob(jobObj)}
-              />
-            ))}
-          </div>
+          <>
+            {/* ── GRID DE VAGAS ── */}
+            {filtered.length === 0 ? (
+              <div className="py-20 text-center text-gray-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
+                <div className="flex justify-center mb-4">
+                  <Search size={48} className="text-gray-300 dark:text-slate-600" />
+                </div>
+                <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma vaga encontrada com os filtros selecionados.</p>
+                <p className="text-sm text-gray-400 mb-5">Tente remover alguns filtros ou buscar por outro termo.</p>
+                <button onClick={resetFilters} className="btn btn-outline btn-sm">
+                  <RotateCcw size={14} /> Restaurar Todos os Filtros
+                </button>
+              </div>
+            ) : (
+              <div className="grid-3">
+                {filtered.map(j => (
+                  <JobCard
+                    key={j.id}
+                    job={j}
+                    matchScore={j.calculatedScore}
+                    onSelect={(jobObj) => setSelectedJob(jobObj)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
 

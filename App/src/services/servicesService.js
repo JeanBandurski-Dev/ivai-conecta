@@ -14,8 +14,6 @@ import {
   hasProfanity,
   validateProfessionalText,
   validatePhoneNumber,
-  GENERAL_TROLL_WORDS,
-  STANDARD_JOB_TITLES,
   isTrollWord
 } from './jobTaxonomy.js';
 import { matchCity } from '../utils/searchUtils.js';
@@ -670,13 +668,7 @@ export async function createServiceOrder(orderData) {
     clientEmail,
     providerEmail,
     id: orderId,
-    firestoreId: orderId,
-    clientId,
-    clientUid: clientId,
-    providerId,
-    providerUid: providerId,
-    clientEmail,
-    providerEmail
+    firestoreId: orderId
   };
 
   const participants = Array.from(new Set([

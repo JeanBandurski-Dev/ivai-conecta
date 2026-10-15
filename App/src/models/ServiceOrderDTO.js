@@ -4,7 +4,6 @@
  * Contrato de dados e validação para Pedidos / Ordens de Serviço (Contratação de Freelancers).
  */
 
-import { ServiceOrderStatus } from './enums.js';
 import { validationResult, validateString, validateEmail } from './schemaValidator.js';
 
 /**

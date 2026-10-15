@@ -168,6 +168,80 @@ export function isSameUser(userA, userB) {
   return false;
 }
 
+/**
+ * Extrai o timestamp numérico exato de uma mensagem, com múltiplos fallbacks defensivos
+ * (Firestore Timestamp, objeto serializado, número millis, ISO string, timestamp formatado ou ID com timestamp).
+ * NUNCA retorna NaN.
+ */
+export function getMessageTime(m) {
+  if (!m) return 0;
+  if (typeof m.createdAt === 'number' && !isNaN(m.createdAt) && m.createdAt > 0) {
+    return m.createdAt;
+  }
+  if (m.createdAt && typeof m.createdAt.toMillis === 'function') {
+    return m.createdAt.toMillis();
+  }
+  if (m.createdAt && typeof m.createdAt.seconds === 'number') {
+    return m.createdAt.seconds * 1000 + Math.round((m.createdAt.nanoseconds || 0) / 1000000);
+  }
+  if (typeof m.createdAt === 'string') {
+    const parsed = Date.parse(m.createdAt);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  if (m.timestamp && typeof m.timestamp === 'string') {
+    const parts = m.timestamp.split(' - ');
+    if (parts.length === 2) {
+      const dateParts = parts[0].split('/');
+      const timeParts = parts[1].split(':');
+      if (dateParts.length === 3 && timeParts.length >= 2) {
+        const d = parseInt(dateParts[0], 10);
+        const mo = parseInt(dateParts[1], 10) - 1;
+        const y = parseInt(dateParts[2], 10);
+        const h = parseInt(timeParts[0], 10);
+        const mi = parseInt(timeParts[1], 10);
+        const dt = new Date(y, mo, d, h, mi);
+        if (!isNaN(dt.getTime())) return dt.getTime();
+      }
+    }
+  }
+  if (typeof m.id === 'string' && m.id.startsWith('m_')) {
+    const segs = m.id.split('_');
+    const ts = parseInt(segs[1], 10);
+    if (!isNaN(ts) && ts > 0) return ts;
+  }
+  if (typeof m.clientMsgId === 'string' && m.clientMsgId.startsWith('m_')) {
+    const segs = m.clientMsgId.split('_');
+    const ts = parseInt(segs[1], 10);
+    if (!isNaN(ts) && ts > 0) return ts;
+  }
+  return 0;
+}
+
+/**
+ * Identifica se duas instâncias representam a mesma mensagem lógica (id local vs id Firestore vs mesmo texto/remetente/horário)
+ */
+export function isSameChatMessage(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (a.clientMsgId && b.clientMsgId && a.clientMsgId === b.clientMsgId) return true;
+  if (a.clientMsgId && b.id && a.clientMsgId === b.id) return true;
+  if (a.id && b.clientMsgId && a.id === b.clientMsgId) return true;
+
+  const sameSender =
+    (a.senderEmail && b.senderEmail && a.senderEmail.toLowerCase().trim() === b.senderEmail.toLowerCase().trim()) ||
+    (a.senderId && b.senderId && a.senderId === b.senderId);
+  const sameText = String(a.text || '').trim() === String(b.text || '').trim();
+
+  if (sameSender && sameText) {
+    if (a.timestamp && b.timestamp && a.timestamp === b.timestamp) return true;
+    const timeA = getMessageTime(a);
+    const timeB = getMessageTime(b);
+    if (timeA > 0 && timeB > 0 && Math.abs(timeA - timeB) < 60000) return true;
+  }
+
+  return false;
+}
+
 // ─── VALIDAÇÃO RIGOROSA DE MENSAGENS (ANTI-PROFANIDADE E REGRAS) ─────────
 
 /**
@@ -257,7 +331,7 @@ export function getThreadUnreadCount(thread, userEmail) {
   let unread = 0;
   for (const m of messages) {
     const isFromOther = m.senderEmail && !matchesUserEmail(m.senderEmail, cleanEmail);
-    const msgTime = m.createdAt || 0;
+    const msgTime = getMessageTime(m);
     if (isFromOther && msgTime > lastRead) {
       unread++;
     }
@@ -364,17 +438,17 @@ async function syncWithLocalServer() {
           merged.push(st);
           hasChanges = true;
         } else {
-          const localMsgs = merged[idx].messages || [];
-          const remoteMsgs = st.messages || [];
+          const localMsgs = (merged[idx].messages || []).map(m => ({ ...m, createdAt: getMessageTime(m) }));
+          const remoteMsgs = (st.messages || []).map(m => ({ ...m, createdAt: getMessageTime(m) }));
           let addedNew = false;
           remoteMsgs.forEach(rm => {
-            if (!localMsgs.some(lm => lm.id === rm.id || (lm.text === rm.text && lm.timestamp === rm.timestamp))) {
+            if (!localMsgs.some(lm => isSameChatMessage(lm, rm))) {
               localMsgs.push(rm);
               addedNew = true;
             }
           });
           if (addedNew) {
-            localMsgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+            localMsgs.sort((a, b) => getMessageTime(a) - getMessageTime(b));
             merged[idx].messages = localMsgs;
             merged[idx].lastMessage = st.lastMessage || localMsgs[localMsgs.length - 1]?.text;
             merged[idx].lastMessageAt = st.lastMessageAt || localMsgs[localMsgs.length - 1]?.timestamp;
@@ -554,7 +628,12 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
       return;
     }
 
-    callback(thread?.messages || []);
+    const msgs = (thread.messages || []).map(m => ({
+      ...m,
+      createdAt: getMessageTime(m)
+    }));
+    msgs.sort((a, b) => getMessageTime(a) - getMessageTime(b));
+    callback(msgs);
   };
 
   emitLocal();
@@ -580,65 +659,57 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
     );
 
     unsubscribeFirestoreMsgs = onSnapshot(msgsQuery, (snapshot) => {
-      if (!snapshot.empty) {
-        const firestoreMsgs = snapshot.docs.map(docSnap => {
-          const d = docSnap.data();
-          return {
-            id: docSnap.id,
-            ...d,
-            createdAt: d.createdAt?.toMillis ? d.createdAt.toMillis() : (d.createdAt || Date.now())
-          };
-        });
+      const firestoreMsgs = snapshot.docs.map(docSnap => {
+        const d = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...d,
+          clientMsgId: d.clientMsgId || d.id || docSnap.id,
+          createdAt: getMessageTime(d) || Date.now()
+        };
+      });
 
-        const allThreads = getChatThreads();
-        const threadIndex = allThreads.findIndex(t => t.id === chatId);
+      const allThreads = getChatThreads();
+      let threadIndex = allThreads.findIndex(t => t.id === chatId);
 
-        // Se a conversa ainda não foi salva localmente neste dispositivo/navegador,
-        // criamos a entrada no estado para que as mensagens fiquem visíveis imediatamente!
-        if (threadIndex === -1) {
-          const lastMsg = firestoreMsgs[firestoreMsgs.length - 1];
-          const newThread = {
-            id: chatId,
-            participants: [cleanEmail].filter(Boolean),
-            lastMessage: lastMsg?.text || 'Nova mensagem',
-            lastMessageAt: lastMsg?.timestamp || 'Agora',
-            updatedAt: Date.now(),
-            messages: firestoreMsgs
-          };
-          allThreads.unshift(newThread);
-          saveChatThreads(allThreads);
-          callback(firestoreMsgs);
-          return;
-        }
-
-        const thread = allThreads[threadIndex];
-        if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
-          return;
-        }
-
-        const existingMsgs = thread.messages || [];
-        const merged = [...existingMsgs];
-        let added = false;
-
-        firestoreMsgs.forEach(fm => {
-          if (!merged.some(m => m.id === fm.id || (m.text === fm.text && m.timestamp === fm.timestamp))) {
-            merged.push(fm);
-            added = true;
-          }
-        });
-
-        if (added) {
-          merged.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-          allThreads[threadIndex].messages = merged;
-          allThreads[threadIndex].lastMessage = merged[merged.length - 1]?.text || allThreads[threadIndex].lastMessage;
-          allThreads[threadIndex].lastMessageAt = merged[merged.length - 1]?.timestamp || allThreads[threadIndex].lastMessageAt;
-          allThreads[threadIndex].updatedAt = Date.now();
-          saveChatThreads(allThreads);
-          callback(merged);
-        } else {
-          callback(existingMsgs);
-        }
+      let currentThread = threadIndex !== -1 ? allThreads[threadIndex] : null;
+      if (!currentThread) {
+        currentThread = {
+          id: chatId,
+          participants: [cleanEmail].filter(Boolean),
+          lastMessage: firestoreMsgs[firestoreMsgs.length - 1]?.text || 'Nova mensagem',
+          lastMessageAt: firestoreMsgs[firestoreMsgs.length - 1]?.timestamp || 'Agora',
+          updatedAt: Date.now(),
+          messages: []
+        };
+        allThreads.unshift(currentThread);
+        threadIndex = 0;
       }
+
+      if (cleanEmail && currentThread.participants && !currentThread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+        return;
+      }
+
+      // Preserva mensagens locais que ainda estão sendo enviadas (não chegaram ao Firestore ainda)
+      const existingMsgs = (currentThread.messages || []).map(m => ({ ...m, createdAt: getMessageTime(m) }));
+      const pendingLocal = existingMsgs.filter(lm => !firestoreMsgs.some(fm => isSameChatMessage(lm, fm)));
+
+      // Combina Firestore (fonte da verdade) com pendentes locais e ordena rigorosamente
+      const unified = [...firestoreMsgs, ...pendingLocal];
+      unified.sort((a, b) => getMessageTime(a) - getMessageTime(b));
+
+      // Atualiza thread no storage local
+      allThreads[threadIndex].messages = unified;
+      if (unified.length > 0) {
+        const last = unified[unified.length - 1];
+        allThreads[threadIndex].lastMessage = last.text || allThreads[threadIndex].lastMessage;
+        allThreads[threadIndex].lastMessageAt = last.timestamp || allThreads[threadIndex].lastMessageAt;
+      }
+      allThreads[threadIndex].updatedAt = Date.now();
+      saveChatThreads(allThreads);
+
+      // Emite lista perfeitamente ordenada e sincronizada para o componente
+      callback(unified);
     }, (err) => {
       console.warn('[Chat] Erro no listener do Firestore para mensagens:', err);
     });
@@ -681,8 +752,10 @@ export async function sendChatMessage(chatId, senderUser, text) {
   const senderRole = resolveUserRole(senderUser);
   const senderUid = senderUser.uid || senderUser.id || 'user';
 
+  const msgId = `m_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   const messageData = {
-    id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    id: msgId,
+    clientMsgId: msgId,
     senderId: senderUid,
     sender: senderName,
     senderName,
@@ -738,11 +811,11 @@ export async function sendChatMessage(chatId, senderUser, text) {
 
   // 4. Sincroniza no Firestore em tempo real
   try {
-    const threadRef = doc(db, 'chats', chatId);
     const messagesCol = collection(db, 'chats', chatId, 'messages');
 
     addDoc(messagesCol, {
       ...messageData,
+      clientMsgId: msgId,
       createdAt: serverTimestamp()
     }).catch(err => {
       console.warn('[Chat] Falha na persistência da mensagem no Firestore:', err);
