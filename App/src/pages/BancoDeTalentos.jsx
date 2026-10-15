@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, X, Sparkles, RotateCcw,
-  ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap
+  ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap, Bookmark
 } from 'lucide-react';
 import {
-  getTeacherEndorsedStudents, CITIES, matchCity, useTalents
+  getTeacherEndorsedStudents, CITIES, matchCity, useTalents, isTalentFavorited
 } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
@@ -23,16 +23,40 @@ const AREAS = [
 
 export default function BancoDeTalentos() {
   const navigate = useNavigate();
-  const { currentUser, selectedCity } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { currentUser, selectedCity, favoriteTalents = [] } = useAppStore();
 
-  const [activeTab,       setActiveTab]       = useState('talents'); // 'talents' | 'teachers'
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'favorites' || tabParam === 'salvos' ? 'favorites' : (tabParam === 'teachers' ? 'teachers' : 'talents');
+  const [activeTab,       setActiveTab]       = useState(initialTab); // 'talents' | 'teachers' | 'favorites'
   const [query,          setQuery]          = useState('');
   const [city,           setCity]           = useState(selectedCity || 'Todas as Cidades');
   const [area,           setArea]           = useState('Todas');
   const [institution,    setInstitution]    = useState('Todas as Instituições');
   const [onlyEndorsed,   setOnlyEndorsed]   = useState(false);
+  const [onlyFavorites,  setOnlyFavorites]  = useState(false);
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [sortBy,         setSortBy]         = useState('endorsements');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'favorites' || tab === 'salvos') {
+      setActiveTab('favorites');
+    } else if (tab === 'teachers') {
+      setActiveTab('teachers');
+    } else if (tab === 'talents') {
+      setActiveTab('talents');
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', newTab);
+      return p;
+    });
+  };
 
   useEffect(() => {
     if (selectedCity) setCity(selectedCity);
@@ -47,7 +71,12 @@ export default function BancoDeTalentos() {
     return all.filter(t => t.isVerifiedStudent && t.endorsements && t.endorsements.length >= 1).slice(0, 4);
   }, [all]);
 
-  const hasActiveFilters = query || city !== 'Todas as Cidades' || area !== 'Todas' || institution !== 'Todas as Instituições' || onlyEndorsed || selectedSkills.length > 0;
+  const savedTalents = useMemo(() => {
+    if (!Array.isArray(favoriteTalents) || favoriteTalents.length === 0) return [];
+    return all.filter(t => isTalentFavorited(t, favoriteTalents));
+  }, [all, favoriteTalents]);
+
+  const hasActiveFilters = query || city !== 'Todas as Cidades' || area !== 'Todas' || institution !== 'Todas as Instituições' || onlyEndorsed || onlyFavorites || selectedSkills.length > 0;
 
   const resetFilters = () => {
     setQuery('');
@@ -55,6 +84,7 @@ export default function BancoDeTalentos() {
     setArea('Todas');
     setInstitution('Todas as Instituições');
     setOnlyEndorsed(false);
+    setOnlyFavorites(false);
     setSelectedSkills([]);
     setSortBy('endorsements');
   };
@@ -66,6 +96,7 @@ export default function BancoDeTalentos() {
         const mArea = area === 'Todas' || (t.course && t.course.toLowerCase().includes(area.toLowerCase()));
         const mInst = institution === 'Todas as Instituições' || (t.institution && t.institution.toLowerCase().includes(institution.toLowerCase())) || (institution.includes('Autônomo') && t.institution && t.institution.includes('Autônomo'));
         const mEndorsed = !onlyEndorsed || (t.endorsements && t.endorsements.length > 0);
+        const mFav = !onlyFavorites || isTalentFavorited(t, favoriteTalents);
         const mSkills = selectedSkills.length === 0 || selectedSkills.some(sk => t.skills?.some(s => s && s.toLowerCase().includes(sk.toLowerCase())));
 
         const q = query.toLowerCase().trim();
@@ -76,7 +107,7 @@ export default function BancoDeTalentos() {
           (t.institution && t.institution.toLowerCase().includes(q)) ||
           t.skills?.some(s => s && s.toLowerCase().includes(q));
 
-        return mCity && mArea && mInst && mEndorsed && mSkills && mQ;
+        return mCity && mArea && mInst && mEndorsed && mFav && mSkills && mQ;
       })
       .sort((a, b) => {
         if (sortBy === 'endorsements') return (b.endorsements?.length || 0) - (a.endorsements?.length || 0);
@@ -84,7 +115,7 @@ export default function BancoDeTalentos() {
         if (sortBy === 'city') return (a.city || '').localeCompare(b.city || '');
         return 0;
       });
-  }, [all, city, area, institution, onlyEndorsed, selectedSkills, query, sortBy]);
+  }, [all, city, area, institution, onlyEndorsed, onlyFavorites, selectedSkills, query, sortBy, favoriteTalents]);
 
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
@@ -170,7 +201,7 @@ export default function BancoDeTalentos() {
           {/* Abas de Navegação */}
           <div className="flex items-center gap-2 sm:gap-3 mt-6 sm:mt-8 border-b border-white/15 pt-2 overflow-x-auto scrollbar-none w-full max-w-full">
             <button
-              onClick={() => setActiveTab('talents')}
+              onClick={() => handleTabChange('talents')}
               className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === 'talents' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
@@ -179,12 +210,22 @@ export default function BancoDeTalentos() {
             </button>
 
             <button
-              onClick={() => setActiveTab('teachers')}
+              onClick={() => handleTabChange('teachers')}
               className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === 'teachers' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
               <Award size={16} /> Professores Verificados ({teachers.length})
+            </button>
+
+            <button
+              onClick={() => handleTabChange('favorites')}
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === 'favorites' ? 'border-amber-400 text-amber-300' : 'border-transparent text-gray-300 hover:text-white'
+              }`}
+            >
+              <Bookmark size={16} className={savedTalents.length > 0 ? 'fill-amber-400 text-amber-400' : ''} />
+              Talentos Salvos ({savedTalents.length})
             </button>
           </div>
 
@@ -192,6 +233,57 @@ export default function BancoDeTalentos() {
       </header>
 
       <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8 w-full max-w-full">
+
+        {/* ── ABA TALENTOS SALVOS / FAVORITOS ── */}
+        {activeTab === 'favorites' && (
+          <div className="space-y-6 w-full animate-in fade-in duration-200">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
+                  <Bookmark className="text-amber-500 fill-amber-500" size={24} /> Talentos Salvos &amp; Favoritos ({savedTalents.length})
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+                  Estudantes e profissionais salvos pela sua empresa para acompanhar formação ou contatar em vagas futuras.
+                </p>
+              </div>
+
+              {savedTalents.length > 0 && (
+                <button
+                  onClick={() => handleTabChange('talents')}
+                  className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Search size={14} /> Explorar Mais Talentos
+                </button>
+              )}
+            </div>
+
+            {savedTalents.length === 0 ? (
+              <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3 max-w-xl mx-auto my-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+                  <Bookmark size={32} className="fill-amber-500" />
+                </div>
+                <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white">
+                  Nenhum talento salvo ainda
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+                  Ao explorar o Banco de Talentos, clique no ícone de marcador (bookmark) no card de qualquer estudante ou profissional para salvá-lo aqui e montar seu banco de pré-seleção.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => handleTabChange('talents')}
+                    className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Search size={14} /> Explorar Alunos &amp; Profissionais
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full max-w-full">
+                {savedTalents.map(t => <TalentCard key={t.id || t.uid || t.firestoreId} talent={t} />)}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── ABA PROFESSORES VERIFICADOS ── */}
         {activeTab === 'teachers' && (
@@ -371,6 +463,35 @@ export default function BancoDeTalentos() {
                     <option value="city" className="dark:bg-slate-800 dark:text-white">Cidade</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Botões rápidos de filtro */}
+              <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setOnlyEndorsed(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    onlyEndorsed
+                      ? 'bg-blue-50 dark:bg-blue-950/70 text-primary-blue dark:text-blue-300 border-primary-blue/30 dark:border-blue-700'
+                      : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-gray-300'
+                  }`}
+                >
+                  <ShieldCheck size={13} className={onlyEndorsed ? 'text-primary-blue dark:text-blue-300' : 'text-gray-400'} />
+                  <span>Apenas com Parecer Docente</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOnlyFavorites(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    onlyFavorites
+                      ? 'bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                      : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-amber-300'
+                  }`}
+                >
+                  <Bookmark size={13} className={onlyFavorites ? 'fill-amber-500 text-amber-500' : 'text-gray-400'} />
+                  <span>Apenas Meus Favoritos ({savedTalents.length})</span>
+                </button>
               </div>
             </div>
 
