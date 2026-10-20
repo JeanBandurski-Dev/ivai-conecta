@@ -8,6 +8,7 @@
     "build": "vite build",
     "check:mocks": "node ../scripts/check-no-mocks.cjs",
     "test:cbo": "node ../scripts/test-cbo.mjs",
+    "clean:cbo": "node ./scripts/clean-invalid-cbo-jobs.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -175,7 +175,7 @@ function applyJobOverrides(job) {
  * Mescla com jobs em memória para nunca perder vagas recém-criadas.
  * Limita a 150 vagas mais recentes para evitar quota exceeded.
  */
-function persistJobs(jobs) {
+function persistJobs(jobs, replaceAll = false) {
   if (!Array.isArray(jobs)) return;
 
   const map = new Map();
@@ -186,8 +186,8 @@ function persistJobs(jobs) {
     }
   });
 
-  // 2. Preserva jobs em memória que possam não estar ainda no snapshot recebido
-  if (Array.isArray(_memJobsCache)) {
+  // 2. Preserva jobs em memória apenas quando não for sincronização direta do Firestore
+  if (!replaceAll && Array.isArray(_memJobsCache)) {
     _memJobsCache.forEach(j => {
       if (j && (j.id || j.firestoreId)) {
         const key = String(j.id || j.firestoreId);
@@ -232,7 +232,7 @@ export function subscribeToJobs(city = 'Todas as Cidades', callback) {
   try {
     unsubFirestore = jobRepository.subscribeToJobs((remoteJobs) => {
       const processedJobs = remoteJobs.map(applyJobOverrides).filter(Boolean);
-      persistJobs(processedJobs);
+      persistJobs(processedJobs, true);
       const filtered = processedJobs.filter(j => matchCity(j.city, city));
       callback(filtered);
     }, (error) => {
@@ -548,7 +548,7 @@ export async function getJobsAsync(city = 'Todas as Cidades') {
   try {
     const rawJobs = await jobRepository.findJobs({ city });
     const remoteJobs = rawJobs.map(applyJobOverrides).filter(Boolean);
-    persistJobs(remoteJobs);
+    persistJobs(remoteJobs, true);
     return remoteJobs;
   } catch (error) {
     console.warn('[Firestore] Erro ao buscar vagas do Firestore:', error.message);
