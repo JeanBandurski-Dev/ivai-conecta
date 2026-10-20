@@ -3,73 +3,14 @@
  * Ivaí Conecta - Vale do Ivaí
  */
 
-// 1. CARGOS E TÍTULOS PROFISSIONAIS PADRONIZADOS (CBO / MERCADO)
-export const STANDARD_JOB_TITLES = [
-  // Tecnologia & TI
-  'Desenvolvedor Front-end',
-  'Desenvolvedor Back-end',
-  'Desenvolvedor Full Stack',
-  'Desenvolvedor Mobile',
-  'Estagiário de TI / Software',
-  'Analista de Suporte Técnico',
-  'Analista de Dados & BI',
-  'UI/UX Designer',
-  'Técnico em Informática',
-  'Administrador de Redes',
+import {
+  CBO_OCCUPATIONS,
+  isRecognizedCboOccupation,
+  isIsolatedIncompleteRole
+} from './cboDatabase.js';
 
-  // Gestão, Administrativo & Financeiro
-  'Auxiliar Administrativo',
-  'Assistente Administrativo',
-  'Analista Administrativo',
-  'Assistente Financeiro',
-  'Analista Financeiro',
-  'Auxiliar Contábil',
-  'Assistente Contábil',
-  'Assistente de Recursos Humanos (RH)',
-  'Analista de Recursos Humanos (RH)',
-  'Recepcionista / Atendente',
-  'Secretário(a) Executivo(a)',
-  'Gerente de Loja / Unidade',
-
-  // Comercial & Vendas
-  'Vendedor(a) Comercial',
-  'Atendente de Loja',
-  'Consultor(a) de Vendas',
-  'Representante Comercial',
-  'Operador(a) de Caixa',
-  'Assistente Comercial',
-  'Executivo(a) de Contas (B2B)',
-
-  // Marketing & Comunicação
-  'Social Media & Marketing Digital',
-  'Designer Gráfico',
-  'Analista de Marketing',
-  'Assistente de Marketing',
-  'Criador de Conteúdo / Copywriter',
-
-  // Agro, Indústria & Logística
-  'Eletricista Industrial',
-  'Eletricista Predial',
-  'Mecânico de Manutenção',
-  'Técnico Agrícola',
-  'Engenheiro(a) Agrônomo(a)',
-  'Operador(a) de Produção',
-  'Auxiliar de Logística / Estoque',
-  'Estoquista / Almoxarife',
-  'Motorista / Entregador',
-  'Técnico em Segurança do Trabalho',
-
-  // Saúde, Educação & Serviços
-  'Farmacêutico(a)',
-  'Enfermeiro(a)',
-  'Técnico(a) em Enfermagem',
-  'Professor(a) / Docente',
-  'Instrutor(a) de Treinamento',
-  'Nutricionista',
-  'Fisioterapeuta',
-  'Cozinheiro(a) / Auxiliar de Cozinha',
-  'Zelador(a) / Serviços Gerais'
-];
+// 1. CARGOS E TÍTULOS PROFISSIONAIS PADRONIZADOS (CBO / MERCADO OFICIAL)
+export const STANDARD_JOB_TITLES = CBO_OCCUPATIONS;
 
 // 2. BANCO DE HABILIDADES PROFISSIONAIS HOMOLOGADAS
 export const STANDARD_SKILLS = [
@@ -567,7 +508,9 @@ export function escapeRegex(string) {
 
 /**
  * Validação de Título Profissional de Vaga (CBO / Mercado de Trabalho)
- * Exige que o título contenha um cargo, função ou profissão de trabalho real.
+ * Valida o cargo contra a base oficial da Classificação Brasileira de Ocupações (CBO),
+ * permitindo cargos legítimos (inclusive os que não possuem palavras-chave específicas)
+ * e rejeitando termos incompletos, áreas soltas ou palavras-chave isoladas (ex.: apenas "chefe", "ti", "auxiliar").
  */
 export function validateJobTitle(title) {
   try {
@@ -578,7 +521,7 @@ export function validateJobTitle(title) {
     const clean = title.trim();
 
     // Validação básica profissional (palavrões, tamanho, repetição)
-    const basicVal = validateProfessionalText(clean, 'Título do Cargo', 3, 75);
+    const basicVal = validateProfessionalText(clean, 'Título do Cargo', 3, 80);
     if (!basicVal.valid) {
       return basicVal;
     }
@@ -594,38 +537,35 @@ export function validateJobTitle(title) {
       if (GENERAL_TROLL_WORDS.has(w)) {
         return {
           valid: false,
-          error: `O termo "${w}" não é apropriado para um cargo ou profissão de trabalho. Especifique uma ocupação legítima.`
+          error: `O termo "${w}" não é apropriado para um cargo ou ocupação profissional (CBO). Especifique uma ocupação legítima.`
         };
       }
     }
 
-    // 1. Verifica se corresponde ou contém algum título padronizado oficial
-    const isExactStandard = STANDARD_JOB_TITLES.some(st => {
-      const normSt = st.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return norm === normSt || norm.includes(normSt) || normSt.includes(norm);
-    });
-    if (isExactStandard) {
-      return { valid: true };
+    // Bloqueio de sufixos numéricos aleatórios ou cargos puramente numéricos (ex: "vendedor123")
+    if (/\d{2,}$/.test(clean)) {
+      return {
+        valid: false,
+        error: 'O cargo não deve conter números aleatórios ao final.'
+      };
     }
 
-    // 2. Verifica se contém ao menos uma palavra-chave ocupacional/CBO de trabalho
-    const hasOccupationalRole = OCCUPATIONAL_ROLE_KEYWORDS.some(kw => {
-      try {
-        const normKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const regex = new RegExp(`(^|\\s|\\W)${escapeRegex(normKw)}($|\\s|\\W)`, 'i');
-        return regex.test(norm) || norm.includes(normKw);
-      } catch {
-        return false;
-      }
-    });
+    // Bloqueio de termos isolados/incompletos (ex.: apenas "chefe", "gerente", "auxiliar", "ti", "dev", "marketing", "dados")
+    if (isIsolatedIncompleteRole(words, norm)) {
+      return {
+        valid: false,
+        error: 'Cargo incompleto ou genérico. Especifique a ocupação completa com função e área (ex.: "Auxiliar Administrativo", "Gerente Comercial", "Estagiário de TI", "Desenvolvedor de Software").'
+      };
+    }
 
-    if (hasOccupationalRole) {
+    // Validação robusta contra a base oficial CBO (correspondência direta, ocupação + senioridade, ocupação + especialidade, função + domínio)
+    if (isRecognizedCboOccupation(norm, clean)) {
       return { valid: true };
     }
 
     return {
       valid: false,
-      error: 'O título da vaga deve especificar um cargo ou profissão de trabalho legítima (ex.: "Vendedor(a)", "Desenvolvedor(a)", "Auxiliar Administrativo", "Técnico(a)", "Eletricista"). Selecione uma opção na lista de cargos recomendados ou informe uma função profissional.'
+      error: 'O cargo informado não foi reconhecido na Classificação Brasileira de Ocupações (CBO). Informe uma ocupação profissional legítima (ex.: "Biólogo", "Topógrafo", "Vendedor(a)", "Auxiliar Administrativo", "Engenheiro(a)") ou selecione uma opção sugerida na lista.'
     };
   } catch (err) {
     console.error('Erro defensivo em validateJobTitle:', err);

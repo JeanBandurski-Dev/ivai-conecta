@@ -31,9 +31,9 @@ export default function JobTitleCombobox({
 
   const queryNorm = normalize(value);
 
-  // Filtra títulos do CBO
+  // Filtra títulos do CBO (limita a 25 resultados para máxima fluidez)
   const filteredTitles = queryNorm.trim()
-    ? STANDARD_JOB_TITLES.filter(t => normalize(t).includes(queryNorm))
+    ? STANDARD_JOB_TITLES.filter(t => normalize(t).includes(queryNorm)).slice(0, 25)
     : STANDARD_JOB_TITLES.slice(0, 15); // Exibe os 15 mais comuns se o campo estiver limpo
 
   // Fechar ao clicar fora
