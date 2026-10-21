@@ -1,12 +1,63 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- FUNÇÕES AUXILIARES DE AUTORIZAÇÃO ---
+
+    // ===============================================================
+    // Assumed Data Model & Architecture: Ivaí Conecta
+    // ===============================================================
+    //
+    // Collection: users/{userId}
+    //   - id, uid: string (identificador igual a auth.uid)
+    //   - name: string (2 a 120 caracteres)
+    //   - email: string
+    //   - role: string (aluno, empresa, professor, freelancer, admin, candidato)
+    //   - isVerifiedStudent: bool (apenas confirmado se email_verified via Firebase Auth)
+    //   - isVerifiedCompany: bool
+    //   - status, blocked: string / bool (controlados exclusivamente pelo Admin)
+    //
+    // Collection: jobs/{jobId}
+    //   - title: string (min 3 chars)
+    //   - company: string (min 2 chars)
+    //   - createdBy: string (igual a auth.uid)
+    //   - applicantsCount: number (inicia em 0; incrementos/decrementos atômicos protegidos)
+    //   - status: string (Ativa, Pendente, Encerrada, Rejeitada)
+    //
+    // Collection: applications/{applicationId}
+    //   - candidateUid: string (igual a auth.uid do candidato)
+    //   - recruiterUid: string (recrutador dono da vaga)
+    //   - jobId: string
+    //   - status, stage: controlados pelo recrutador (candidato não pode se auto-aprovar)
+    //
+    // Collection: services/{serviceId}
+    //   - title: string (min 3 chars)
+    //   - createdBy / providerUid: string (igual a auth.uid do prestador)
+    //   - rating: number (0 a 5; prestador não pode alterar diretamente a própria nota)
+    //   - reviewsCount: number (inicia em 0)
+    //
+    // Collection: endorsement_requests/{requestId}
+    //   - studentId: string (aluno solicitante)
+    //   - profEmail: string (docente avaliador)
+    //   - status: string (Pendente, Aprovado, Recusado; aluno não pode se auto-recomendar)
+    //
+    // Collection: service_orders/{orderId}
+    //   - clientUid: string (cliente solicitante)
+    //   - providerUid: string (prestador do serviço)
+    //   - status: string
+    //
+    // Collection: favorites/{favoriteId}
+    //   - userUid: string (proprietário do favorito)
+    //
+    // Collection: chats/{chatId} & subcollection messages/{messageId}
+    //   - participants / participantUids: array (apenas membros autorizados)
+    //
+    // ===============================================================
+
+    // --- FUNÇÕES AUXILIARES DE AUTORIZAÇÃO E INTEGRIDADE ---
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -20,46 +71,82 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------
-    // 1. Coleção USERS
-    // Leitura pública de perfis (para visualização de talentos/profissionais/empresas).
-    // Criação: Usuário autenticado para o próprio id, sem auto-promoção para 'admin'.
-    // Atualização: Admin pode alterar qualquer usuário (inclusive role/status/bloqueio).
-    // Usuário comum só atualiza seu próprio perfil SE não tentar alterar 'role', 'status' ou 'blocked'.
-    // Deleção: Permitida ao próprio usuário ou ao admin.
+    // 1. Coleção USERS (Perfis de Usuários)
+    // Leitura: Pública para visualização de perfis e diretórios.
+    // Criação: Próprio usuário logado (isOwner).
+    //   - Proibida auto-promoção a 'admin'.
+    //   - Proibido criar perfil pré-bloqueado.
+    //   - Proibido forjar selo 'isVerifiedStudent' sem e-mail verificado no Firebase Auth.
+    // Atualização:
+    //   - Admin pode atualizar qualquer campo.
+    //   - Usuário dono: NÃO pode alterar 'role', 'status', 'blocked' ou 'blockedReason'.
+    //   - Aluno só pode ativar 'isVerifiedStudent' se o token de e-mail estiver verificado.
+    // Deleção: Usuário dono ou Admin.
     // -------------------------------------------------------------
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin());
+
+      allow create: if isOwner(userId) &&
+        (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin()) &&
+        (!('blocked' in request.resource.data) || request.resource.data.blocked == false) &&
+        (!('status' in request.resource.data) || request.resource.data.status != 'blocked') &&
+        (!('isVerifiedStudent' in request.resource.data) || request.resource.data.isVerifiedStudent == false || request.auth.token.email_verified == true || isAdmin());
+
       allow update: if isAdmin() || (
-        isOwner(userId) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'blocked'])
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'blocked', 'blockedReason']) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerifiedStudent']) ||
+          request.resource.data.isVerifiedStudent == resource.data.isVerifiedStudent ||
+          request.auth.token.email_verified == true
+        )
       );
+
       allow delete: if isAdmin() || isOwner(userId);
     }
 
     // -------------------------------------------------------------
     // 2. Coleção JOBS (Vagas de Emprego)
-    // Leitura pública (qualquer um pode visualizar as vagas no mural).
-    // Criação: Empresa/recrutador autenticado ou Admin.
-    // Edição: Empresa dona da vaga, Admin, OU candidato atualizando applicantsCount.
-    // Exclusão: Empresa dona da vaga ou Admin.
+    // Leitura: Pública.
+    // Criação: Empresa, recrutador autenticado ou Admin.
+    //   - createdBy deve bater com request.auth.uid.
+    //   - Título e empresa com tamanho mínimo exigido.
+    //   - applicantsCount inicial não pode ser forjado (inicia em 0 ou ausente).
+    // Atualização:
+    //   - Admin pode atualizar tudo.
+    //   - Recrutador/Criador pode atualizar detalhes da vaga (createdBy é imutável).
+    //   - Candidato aplicando/desistindo só pode alterar applicantsCount de forma atômica (+1 ou -1).
+    // Exclusão: Recrutador criador ou Admin.
     // -------------------------------------------------------------
     match /jobs/{jobId} {
       allow read: if true;
-      
+
       allow create: if isAuthenticated() && (
         isAdmin() ||
-        request.resource.data.createdBy == request.auth.uid ||
-        request.resource.data.recruiterEmail == request.auth.token.email
+        (
+          request.resource.data.createdBy == request.auth.uid &&
+          (!('recruiterEmail' in request.resource.data) || request.resource.data.recruiterEmail == request.auth.token.email) &&
+          request.resource.data.title is string && request.resource.data.title.size() >= 3 &&
+          request.resource.data.company is string && request.resource.data.company.size() >= 2 &&
+          (!('applicantsCount' in request.resource.data) || request.resource.data.applicantsCount == 0)
+        )
       );
-      
+
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.createdBy == request.auth.uid ||
-        resource.data.recruiterEmail == request.auth.token.email ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount'])
+        (
+          (resource.data.createdBy == request.auth.uid || resource.data.recruiterEmail == request.auth.token.email) &&
+          request.resource.data.createdBy == resource.data.createdBy
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount', 'updatedAt']) &&
+          (
+            request.resource.data.applicantsCount == resource.data.applicantsCount + 1 ||
+            (resource.data.applicantsCount > 0 && request.resource.data.applicantsCount == resource.data.applicantsCount - 1)
+          )
+        )
       );
-      
+
       allow delete: if isAuthenticated() && (
         isAdmin() ||
         resource.data.createdBy == request.auth.uid ||
@@ -68,10 +155,14 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------
-    // 3. Coleção APPLICATIONS (Candidaturas)
-    // Leitura: Próprio candidato, recrutador da vaga OU Admin para auditoria.
-    // Criação: Candidato para si mesmo.
-    // Atualização: Candidato, Recrutador ou Admin.
+    // 3. Coleção APPLICATIONS (Candidaturas e Processo Seletivo)
+    // Leitura: Candidato proprietário, Recrutador da vaga ou Admin.
+    // Criação: Próprio candidato.
+    //   - Proibido criar já com status 'Aprovado' ou 'Admitido'.
+    // Atualização:
+    //   - Admin: total.
+    //   - Recrutador: pode gerenciar etapas (stage), status e pareceres (candidateUid e jobId imutáveis).
+    //   - Candidato: NÃO PODE alterar etapas ou se auto-aprovar. Só pode desistir/cancelar ou atualizar notas.
     // Exclusão: Candidato, Recrutador ou Admin.
     // -------------------------------------------------------------
     match /applications/{applicationId} {
@@ -84,16 +175,29 @@ service cloud.firestore {
       );
 
       allow create: if isAuthenticated() && (
-        request.resource.data.candidateUid == request.auth.uid ||
-        request.resource.data.candidateEmail == request.auth.token.email
+        isAdmin() ||
+        (
+          (request.resource.data.candidateUid == request.auth.uid || request.resource.data.candidateEmail == request.auth.token.email) &&
+          request.resource.data.candidateUid == request.auth.uid &&
+          (!('status' in request.resource.data) || request.resource.data.status in ['Pendente', 'Enviada', 'Candidatura Enviada', 'Em Análise', 'Triagem de Currículo'])
+        )
       );
 
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.candidateUid == request.auth.uid ||
-        resource.data.candidateEmail == request.auth.token.email ||
-        resource.data.recruiterUid == request.auth.uid ||
-        resource.data.recruiterEmail == request.auth.token.email
+        (
+          (resource.data.recruiterUid == request.auth.uid || resource.data.recruiterEmail == request.auth.token.email) &&
+          request.resource.data.candidateUid == resource.data.candidateUid &&
+          request.resource.data.jobId == resource.data.jobId
+        ) ||
+        (
+          (resource.data.candidateUid == request.auth.uid || resource.data.candidateEmail == request.auth.token.email) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'withdrawnAt', 'updatedAt', 'notes', 'coverLetter']) &&
+          (
+            request.resource.data.status == resource.data.status ||
+            request.resource.data.status in ['Cancelada', 'Desistente', 'Pendente']
+          )
+        )
       );
 
       allow delete: if isAuthenticated() && (
@@ -106,26 +210,47 @@ service cloud.firestore {
 
     // -------------------------------------------------------------
     // 4. Coleção SERVICES (Marketplace de Serviços Autônomos)
-    // Leitura pública.
+    // Leitura: Pública.
     // Criação: Prestador autenticado ou Admin.
-    // Edição: Prestador proprietário, Admin, OU qualquer usuário atualizando analytics.
-    // Exclusão: Prestador proprietário ou Admin.
+    //   - Proibido criar serviço com avaliação forjada (rating inicial deve ser 0/nulo).
+    // Atualização:
+    //   - Admin: total.
+    //   - Prestador: pode editar dados do serviço, mas NÃO PODE alterar a própria nota (rating) nem reviewsCount.
+    //   - Clientes/Visitantes: podem registrar avaliações, fórum e métricas de visualização (rating limitado entre 0 e 5).
+    // Exclusão: Prestador criador ou Admin.
     // -------------------------------------------------------------
     match /services/{serviceId} {
       allow read: if true;
 
       allow create: if isAuthenticated() && (
         isAdmin() ||
-        request.resource.data.createdBy == request.auth.uid ||
-        request.resource.data.providerEmail == request.auth.token.email
+        (
+          (request.resource.data.createdBy == request.auth.uid ||
+           request.resource.data.providerUid == request.auth.uid ||
+           request.resource.data.providerEmail == request.auth.token.email) &&
+          request.resource.data.title is string && request.resource.data.title.size() >= 3 &&
+          (!('rating' in request.resource.data) || request.resource.data.rating == 0 || request.resource.data.rating == null) &&
+          (!('reviewsCount' in request.resource.data) || request.resource.data.reviewsCount == 0 || request.resource.data.reviewsCount == null)
+        )
       );
 
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.createdBy == request.auth.uid ||
-        resource.data.providerUid == request.auth.uid ||
-        resource.data.providerEmail == request.auth.token.email ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics', 'rating', 'reviewsCount', 'reviewCount', 'reviews', 'updatedAt'])
+        (
+          (resource.data.createdBy == request.auth.uid ||
+           resource.data.providerUid == request.auth.uid ||
+           resource.data.providerEmail == request.auth.token.email) &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'reviewsCount', 'reviewCount'])
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics', 'rating', 'reviewsCount', 'reviewCount', 'reviews', 'forumTopics', 'updatedAt']) &&
+          (!('rating' in request.resource.data) || (
+            (request.resource.data.rating is int || request.resource.data.rating is float || request.resource.data.rating is number) &&
+            request.resource.data.rating >= 0 &&
+            request.resource.data.rating <= 5
+          ))
+        )
       );
 
       allow delete: if isAuthenticated() && (
@@ -137,20 +262,46 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------
-    // 5. Coleção ENDORSEMENT_REQUESTS (Pareceres e Recomendações)
-    // Alunos solicitam pareceres e professores avaliam.
+    // 5. Coleção ENDORSEMENT_REQUESTS (Recomendações e Pareceres Docentes)
+    // Leitura: Aluno solicitante, Professor avaliador ou Admin.
+    // Criação: Aluno logado (status deve ser 'Pendente'; não pode se auto-recomendar).
+    // Atualização:
+    //   - Admin: total.
+    //   - Professor: pode redigir parecer (quote), aprovar ou recusar.
+    //   - Aluno: NÃO PODE aprovar o próprio parecer. Pode apenas cancelar enquanto pendente.
+    // Exclusão: Aluno, Professor ou Admin.
     // -------------------------------------------------------------
     match /endorsement_requests/{requestId} {
       allow read: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.studentId == request.auth.uid ||
         resource.data.profEmail == request.auth.token.email
       );
       
       allow create: if isAuthenticated() && (
-        request.resource.data.studentId == request.auth.uid
+        isAdmin() ||
+        (
+          request.resource.data.studentId == request.auth.uid &&
+          (!('status' in request.resource.data) || request.resource.data.status == 'Pendente')
+        )
       );
       
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          resource.data.profEmail == request.auth.token.email &&
+          request.resource.data.studentId == resource.data.studentId
+        ) ||
+        (
+          resource.data.studentId == request.auth.uid &&
+          resource.data.status == 'Pendente' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'notes']) &&
+          request.resource.data.status != 'Aprovado'
+        )
+      );
+
+      allow delete: if isAuthenticated() && (
+        isAdmin() ||
         resource.data.studentId == request.auth.uid ||
         resource.data.profEmail == request.auth.token.email
       );
@@ -169,6 +320,7 @@ service cloud.firestore {
     // -------------------------------------------------------------
     // 7. Coleção CHATS & Subcoleção MESSAGES
     // Apenas os participantes da conversa (por e-mail ou UID) têm acesso à thread e às mensagens.
+    // Remetente de mensagens é estritamente validado com o usuário autenticado.
     // -------------------------------------------------------------
     match /chats/{chatId} {
       allow get: if isAuthenticated() && (
@@ -228,18 +380,10 @@ service cloud.firestore {
       }
     }
 
-    // Compatibilidade legada para coleções talents e teachers
-    match /talents/{talentId} {
-      allow read: if true;
-      allow write: if isAuthenticated() && request.auth.uid == talentId;
-    }
-
-    match /teachers/{teacherId} {
-      allow read: if true;
-      allow write: if isAuthenticated() && request.auth.uid == teacherId;
-    }
-
-    // Service Orders Collection (Pedidos e Demandas de Serviços)
+    // -------------------------------------------------------------
+    // 8. Coleção SERVICE_ORDERS (Pedidos e Demandas de Serviços)
+    // Apenas cliente, prestador ou Admin podem acessar e gerenciar.
+    // -------------------------------------------------------------
     match /service_orders/{orderId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||
@@ -259,12 +403,12 @@ service cloud.firestore {
 
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        resource.data.clientUid == request.auth.uid ||
-        resource.data.clientId == request.auth.uid ||
-        resource.data.clientEmail == request.auth.token.email ||
-        resource.data.providerUid == request.auth.uid ||
-        resource.data.providerId == request.auth.uid ||
-        resource.data.providerEmail == request.auth.token.email
+        (
+          (resource.data.clientUid == request.auth.uid || resource.data.clientId == request.auth.uid || resource.data.clientEmail == request.auth.token.email ||
+           resource.data.providerUid == request.auth.uid || resource.data.providerId == request.auth.uid || resource.data.providerEmail == request.auth.token.email) &&
+          (!('clientUid' in resource.data) || request.resource.data.clientUid == resource.data.clientUid) &&
+          (!('providerUid' in resource.data) || request.resource.data.providerUid == resource.data.providerUid)
+        )
       );
 
       allow delete: if isAuthenticated() && (
@@ -272,6 +416,19 @@ service cloud.firestore {
         resource.data.clientUid == request.auth.uid ||
         resource.data.clientId == request.auth.uid
       );
+    }
+
+    // -------------------------------------------------------------
+    // 9. Compatibilidade Legada (Coleções talents e teachers)
+    // -------------------------------------------------------------
+    match /talents/{talentId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == talentId;
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == teacherId;
     }
   }
 }

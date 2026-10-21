@@ -113,7 +113,7 @@ async function run() {
             await deleteDoc(doc(db, 'applications', appDoc.id));
             console.log(`      ↪ Candidatura órfã removida: ${appDoc.id}`);
           }
-        } catch {}
+        } catch { }
 
         deletedCount++;
       } catch (delErr) {
