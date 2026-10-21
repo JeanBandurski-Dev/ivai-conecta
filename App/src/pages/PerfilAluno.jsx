@@ -1407,7 +1407,15 @@ export default function PerfilAluno() {
 
       {/* Modal: Pré-visualização e Impressão de CV em PDF */}
       {pdfModalOpen && (
-        <ResumePDFModal talent={talent} onClose={() => setPdfModalOpen(false)} />
+        <ResumePDFModal
+          talent={{
+            ...talent,
+            endorsements: uniqueEndorsements && uniqueEndorsements.length > 0 ? uniqueEndorsements : talent?.endorsements,
+            email: talent?.email || (isOwner ? currentUser?.email : ''),
+            phone: talent?.phone || (isOwner ? currentUser?.phone : '')
+          }}
+          onClose={() => setPdfModalOpen(false)}
+        />
       )}
 
       {/* Modal: Edição Completa de Perfil & Currículo Estilo Gupy */}

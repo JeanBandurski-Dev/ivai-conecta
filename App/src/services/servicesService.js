@@ -14,7 +14,8 @@ import {
   hasProfanity,
   validateProfessionalText,
   validatePhoneNumber,
-  isTrollWord
+  isTrollWord,
+  STANDARD_JOB_TITLES
 } from './jobTaxonomy.js';
 import { matchCity } from '../utils/searchUtils.js';
 
@@ -334,7 +335,7 @@ export async function incrementServiceContact(id) {
   if (docId) {
     try {
       await updateDoc(doc(db, 'services', String(docId)), { analytics: updatedAnalytics });
-    } catch {}
+    } catch { }
   }
 
   const updated = services.map(s => (s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id ? { ...s, analytics: updatedAnalytics } : s));
@@ -435,7 +436,7 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
       if (typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(enriched));
-        } catch {}
+        } catch { }
       }
 
       const filtered = enriched.filter(s => matchCity(s.city, city));
@@ -480,7 +481,7 @@ export function getServices(city = 'Todas as Cidades') {
           services = parsed;
           _memServicesCache = parsed;
         }
-      } catch {}
+      } catch { }
     }
   }
 
@@ -626,7 +627,7 @@ export function saveServiceOrders(orders) {
   if (typeof localStorage === 'undefined' || !Array.isArray(orders)) return;
   try {
     localStorage.setItem(STORAGE_KEY_SERVICE_ORDERS, JSON.stringify(orders));
-  } catch {}
+  } catch { }
 }
 
 function notifyOrdersUpdated(orders) {
@@ -636,7 +637,7 @@ function notifyOrdersUpdated(orders) {
   if (ordersBroadcast) {
     try {
       ordersBroadcast.postMessage({ type: 'ORDERS_UPDATED', orders });
-    } catch {}
+    } catch { }
   }
 }
 
@@ -699,7 +700,7 @@ export async function createServiceOrder(orderData) {
   // 2. Tenta também registrar na coleção direta 'service_orders'
   try {
     await setDoc(doc(db, 'service_orders', orderId), newOrder, { merge: true });
-  } catch {}
+  } catch { }
 
   // 3. Atualiza cache local e notifica componentes
   const all = getServiceOrders();
@@ -763,7 +764,7 @@ export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
   // 2. Tenta atualizar 'service_orders'
   try {
     await setDoc(doc(db, 'service_orders', docId), patch, { merge: true });
-  } catch {}
+  } catch { }
 
   // 3. Atualiza cache local e notifica
   const updatedList = orders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, ...patch } : o));
@@ -800,7 +801,7 @@ export async function submitServiceReview(orderId, {
 
   // 1. Atualiza ordem de serviço para 'avaliado'
   await updateServiceOrderStatus(orderId, 'avaliado', `Cliente avaliou o atendimento com ${rating} estrelas.`);
-  
+
   const docId = String(orderId);
   try {
     await updateDoc(doc(db, 'chats', docId), {
@@ -815,7 +816,7 @@ export async function submitServiceReview(orderId, {
         serviceOrder: { review: reviewData, rating: reviewData.rating, status: 'avaliado' },
         updatedAt: new Date().toISOString()
       }, { merge: true });
-    } catch {}
+    } catch { }
   }
 
   // Atualiza cache local com review e prepara patch com identificadores para Firestore
@@ -873,7 +874,7 @@ export async function submitServiceReview(orderId, {
     if (!targetService && targetServiceId) {
       try {
         targetService = await serviceRepository.findById(String(targetServiceId));
-      } catch {}
+      } catch { }
     }
 
     if (targetService) {
@@ -965,8 +966,8 @@ export function subscribeToServiceOrders(user, callback) {
   const userUid = String(user.uid || user.id || '').trim();
   const queryField = userEmail || userUid;
 
-  let unsubChats = () => {};
-  let unsubDirect = () => {};
+  let unsubChats = () => { };
+  let unsubDirect = () => { };
 
   const mergeAndNotify = (newOrders) => {
     const local = getServiceOrders();
