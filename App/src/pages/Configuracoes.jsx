@@ -5,7 +5,7 @@ import {
   FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
   Building2, Camera,
   Search, Loader2, AlertCircle, RefreshCw, Check,
-  Wrench, Briefcase, GraduationCap
+  Wrench, Briefcase, GraduationCap, Save
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -42,6 +42,7 @@ export default function Configuracoes() {
     isGenericPlaceholderAvatar(currentUser?.avatar) ? '' : (currentUser?.avatar || '')
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [submittingAccount, setSubmittingAccount] = useState(false);
   const [selectedRole, setSelectedRole] = useState(currentUser?.role || 'candidato');
   const [switchingRole, setSwitchingRole] = useState(false);
 
@@ -221,6 +222,7 @@ export default function Configuracoes() {
 
   const handleSaveAccount = async (e) => {
     e.preventDefault();
+    if (submittingAccount) return;
     if (!name || !name.trim()) {
       showToast('Por favor, informe seu nome ou razão social.', 'error');
       return;
@@ -239,23 +241,30 @@ export default function Configuracoes() {
     const targetRole = selectedRole || currentUser?.role || 'candidato';
     const targetBadge = roleBadges[targetRole] || currentUser?.badge;
 
-    const updated = await updateAuthUser({
-      name,
-      email,
-      linkedin,
-      github,
-      avatar,
-      ...(currentUser?.role === 'aluno' ? { raNumber } : {}),
-      role: targetRole,
-      activeRole: targetRole,
-      selectedRole: targetRole,
-      profileType: targetRole,
-      badge: targetBadge
-    }, currentUser);
+    setSubmittingAccount(true);
+    try {
+      const updated = await updateAuthUser({
+        name,
+        email,
+        linkedin,
+        github,
+        avatar,
+        ...(currentUser?.role === 'aluno' ? { raNumber } : {}),
+        role: targetRole,
+        activeRole: targetRole,
+        selectedRole: targetRole,
+        profileType: targetRole,
+        badge: targetBadge
+      }, currentUser);
 
-    if (updated) {
-      setCurrentUser(updated);
-      showToast('Dados da conta e perfil atualizados com sucesso!', 'success');
+      if (updated) {
+        setCurrentUser(updated);
+        showToast('Dados da conta e perfil atualizados com sucesso!', 'success');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao salvar alterações da conta.', 'error');
+    } finally {
+      setSubmittingAccount(false);
     }
   };
 
@@ -495,10 +504,10 @@ export default function Configuracoes() {
         <div className="max-w-4xl mx-auto space-y-6">
 
           {/* Nav Tabs */}
-          <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 overflow-x-auto pb-1">
+          <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 overflow-x-auto pb-1 scrollbar-none w-full max-w-full">
             <button
               onClick={() => setActiveTab('account')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'account' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
               }`}
             >
@@ -508,7 +517,7 @@ export default function Configuracoes() {
             {currentUser.role === 'aluno' && (
               <button
                 onClick={() => setActiveTab('verification')}
-                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'verification' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
                 }`}
               >
@@ -520,7 +529,7 @@ export default function Configuracoes() {
             {currentUser.role === 'empresa' && (
               <button
                 onClick={() => setActiveTab('company')}
-                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'company' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
                 }`}
               >
@@ -531,7 +540,7 @@ export default function Configuracoes() {
 
             <button
               onClick={() => setActiveTab('security')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'security' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
               }`}
             >
@@ -540,7 +549,7 @@ export default function Configuracoes() {
 
             <button
               onClick={() => setActiveTab('privacy')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'privacy' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
               }`}
             >
@@ -784,8 +793,22 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end pt-3">
-                  <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">
-                    Salvar Alterações
+                  <button
+                    type="submit"
+                    disabled={submittingAccount}
+                    className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {submittingAccount ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Salvando alterações...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={15} />
+                        <span>Salvar Alterações</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
