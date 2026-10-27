@@ -1392,7 +1392,7 @@ export default function GerenciamentoVagasEmpresa() {
 
       {/* ── HEADER MINIMALISTA ── */}
       <header className="bg-white dark:bg-slate-900 py-6 lg:py-8 border-b border-gray-200 dark:border-slate-800">
-        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container-wide">
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-slate-400 mb-4">
             <button
               onClick={() => navigate(-1)}
@@ -1626,7 +1626,7 @@ export default function GerenciamentoVagasEmpresa() {
         );
       })()}
 
-      <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="container-wide py-6">
 
         {/* ═════════════════════════════════════════════════════════════════
             TAB 1: FUNIL DE RECRUTAMENTO & PIPELINE (KANBAN ATS REVAMP)

@@ -376,7 +376,7 @@ export default function MinhasVagas() {
       <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 lg:py-16 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(34,197,94,0.15),transparent_50%)] pointer-events-none" />
 
-        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="container relative z-10">
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
@@ -426,7 +426,7 @@ export default function MinhasVagas() {
         </div>
       </header>
 
-      <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <main className="container section py-8 sm:py-10">
 
         {/* ── VISÃO DO PROFESSOR / DOCENTE ── */}
         {isProfessor ? (

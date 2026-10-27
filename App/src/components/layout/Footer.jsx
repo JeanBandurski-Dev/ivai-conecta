@@ -1,11 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Logo from '../ui/Logo';
 import useAppStore from '../../store/useAppStore';
 
 export default function Footer() {
   const { currentUser } = useAppStore();
+  const location = useLocation();
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+  const isWidePage = location.pathname.startsWith('/gerenciamento-vagas') || location.pathname.startsWith('/painel-empresa');
 
   const platformLinks = [
     { label: 'Dashboard', to: '/' },
@@ -16,7 +18,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-primary-dark dark:bg-slate-950 dark:border-t dark:border-slate-800 text-white mt-auto transition-colors duration-300">
-      <div className="container py-8 sm:py-10">
+      <div className={`${isWidePage ? 'container-wide' : 'container'} py-8 sm:py-10`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
           {/* Brand */}
