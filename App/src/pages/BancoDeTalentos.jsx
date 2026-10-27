@@ -381,33 +381,7 @@ export default function BancoDeTalentos() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
                   {highlightedTalents.map(t => (
-                    <div key={t.id} className="card p-5 space-y-3 border-amber-200/60 dark:border-amber-900/60 bg-gradient-to-b from-amber-50/20 dark:from-amber-950/30 to-white dark:to-slate-800 hover:border-amber-400 transition-all flex flex-col justify-between min-w-0 overflow-hidden">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2 min-w-0">
-                          <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 shadow-xs shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-gray-800 dark:text-white text-sm leading-tight truncate">{t.name}</div>
-                            <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold truncate max-w-full">{t.course}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 font-bold bg-green-50 dark:bg-green-950/40 border border-green-200/70 dark:border-green-800/60 px-2.5 py-1 rounded-lg w-fit mb-2">
-                          <ShieldCheck size={13} /> {t.endorsements.length} Parecer{t.endorsements.length > 1 ? 'es' : ''} Docente{t.endorsements.length > 1 ? 's' : ''}
-                        </div>
-
-                        <div className="flex flex-wrap gap-1">
-                          {t.skills.slice(0, 3).map(s => (
-                            <span key={s} className="tag text-[10px] truncate max-w-[120px]">{s}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between gap-2">
-                        <button onClick={() => navigate(`/perfil/${t.id}`)} className="text-xs font-bold text-primary-blue dark:text-blue-400 hover:underline cursor-pointer">
-                          Ver Perfil
-                        </button>
-                      </div>
-                    </div>
+                    <TalentCard key={`highlighted-${t.id || t.uid || t.firestoreId}`} talent={t} isHighlighted />
                   ))}
                 </div>
               </div>
