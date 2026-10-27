@@ -1,4 +1,5 @@
-import { MapPin, Phone, DollarSign, Calendar, Star, Check, Play, CheckCircle2, Clock, XCircle, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { MapPin, Phone, DollarSign, Calendar, Star, Check, Play, CheckCircle2, Clock, XCircle, MessageSquare, Loader2 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { generateWhatsAppLink } from '../services/servicesService';
 
@@ -12,6 +13,17 @@ const LIFECYCLE_STEPS = [
 
 export default function ServiceOrderCard({ order, isProvider, onTransition, onEvaluate }) {
   const { currentUser, startChatWith, showToast } = useAppStore();
+  const [transitioning, setTransitioning] = useState(false);
+
+  const handleTransition = async (status, note) => {
+    if (transitioning) return;
+    setTransitioning(true);
+    try {
+      await onTransition?.(order.firestoreId || order.id, status, note);
+    } finally {
+      setTransitioning(false);
+    }
+  };
 
   const isActuallyProvider = isProvider || Boolean(
     currentUser && (
@@ -224,34 +236,38 @@ export default function ServiceOrderCard({ order, isProvider, onTransition, onEv
               <>
                 <button
                   type="button"
-                  onClick={() => onTransition(order.firestoreId || order.id, 'recusado', 'Prestador recusou a demanda.')}
-                  className="btn btn-outline text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/40 btn-sm text-xs font-bold"
+                  disabled={transitioning}
+                  onClick={() => handleTransition('recusado', 'Prestador recusou a demanda.')}
+                  className="btn btn-outline text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/40 btn-sm text-xs font-bold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   Recusar
                 </button>
                 <button
                   type="button"
-                  onClick={() => onTransition(order.firestoreId || order.id, 'aceito', 'Prestador aceitou a demanda de serviço.')}
-                  className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+                  disabled={transitioning}
+                  onClick={() => handleTransition('aceito', 'Prestador aceitou a demanda de serviço.')}
+                  className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  <Check size={14} /> Aceitar Demanda
+                  {transitioning ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Aceitar Demanda
                 </button>
               </>
             ) : order.status === 'aceito' ? (
               <button
                 type="button"
-                onClick={() => onTransition(order.firestoreId || order.id, 'em_andamento', 'Prestador iniciou a execução do serviço.')}
-                className="btn btn-teal btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+                disabled={transitioning}
+                onClick={() => handleTransition('em_andamento', 'Prestador iniciou a execução do serviço.')}
+                className="btn btn-teal btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
               >
-                <Play size={13} /> Iniciar Atendimento
+                {transitioning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} Iniciar Atendimento
               </button>
             ) : order.status === 'em_andamento' ? (
               <button
                 type="button"
-                onClick={() => onTransition(order.firestoreId || order.id, 'concluido', 'Serviço finalizado pelo prestador.')}
-                className="btn bg-green-600 hover:bg-green-700 text-white btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+                disabled={transitioning}
+                onClick={() => handleTransition('concluido', 'Serviço finalizado pelo prestador.')}
+                className="btn bg-green-600 hover:bg-green-700 text-white btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
               >
-                <CheckCircle2 size={13} /> Concluir Atendimento
+                {transitioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Concluir Atendimento
               </button>
             ) : order.status === 'concluido' ? (
               <span className="text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 px-3 py-1.5 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-1.5">

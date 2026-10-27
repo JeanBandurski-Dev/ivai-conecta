@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox
+  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox, Loader2
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -198,6 +198,7 @@ export default function Servicos() {
     phone: currentService?.phone || currentUser?.phone || '',
     description: currentService?.description || ''
   });
+  const [updatingService, setUpdatingService] = useState(false);
 
   useEffect(() => {
     if (currentService) {
@@ -322,10 +323,17 @@ export default function Servicos() {
 
   const handleUpdateService = async (e) => {
     e.preventDefault();
-    if (!currentService) return;
-    await updateService(currentService.firestoreId || currentService.id, serviceData);
-    setEditModal(false);
-    showToast('Serviço e localização atualizados com sucesso!');
+    if (!currentService || updatingService) return;
+    setUpdatingService(true);
+    try {
+      await updateService(currentService.firestoreId || currentService.id, serviceData);
+      setEditModal(false);
+      showToast('Serviço e localização atualizados com sucesso!');
+    } catch {
+      showToast('Erro ao atualizar dados do serviço.');
+    } finally {
+      setUpdatingService(false);
+    }
   };
 
   return (
@@ -925,8 +933,28 @@ export default function Servicos() {
               </div>
 
               <div className="flex gap-3 justify-end pt-3">
-                <button type="button" onClick={() => setEditModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-primary btn-sm font-bold shadow-md">Salvar Alterações</button>
+                <button
+                  type="button"
+                  disabled={updatingService}
+                  onClick={() => setEditModal(false)}
+                  className="btn btn-outline btn-sm font-semibold cursor-pointer disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingService}
+                  className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {updatingService ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <span>Salvar Alterações</span>
+                  )}
+                </button>
               </div>
             </form>
           </div>
