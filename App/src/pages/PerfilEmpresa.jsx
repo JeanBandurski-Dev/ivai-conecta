@@ -27,6 +27,7 @@ export default function PerfilEmpresa() {
   const navigate = useNavigate();
 
   const [editModal, setEditModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -334,57 +335,65 @@ export default function PerfilEmpresa() {
 
   const handleSaveCompany = async (e) => {
     if (e) e.preventDefault();
-    setEditModal(false);
+    setIsSaving(true);
 
-    const payload = {
-      name: editCompanyData.name,
-      razaoSocial: editCompanyData.name,
-      nomeFantasia: editCompanyData.tradingName,
-      cnpj: editCompanyData.cnpj,
-      city: editCompanyData.city,
-      sector: editCompanyData.industry,
-      size: editCompanyData.size,
-      foundedYear: editCompanyData.foundedYear,
-      about: editCompanyData.description,
-      history: editCompanyData.culture,
-      culture: editCompanyData.culture,
-      perks: editCompanyData.benefits,
-      avatar: editCompanyData.avatar,
-      banner: editCompanyData.coverImage,
-      website: editCompanyData.website,
-      email: editCompanyData.email,
-      phone: editCompanyData.phone,
-      linkedin: editCompanyData.linkedin,
-      instagram: editCompanyData.instagram,
-    };
+    try {
+      const payload = {
+        name: editCompanyData.name,
+        razaoSocial: editCompanyData.name,
+        nomeFantasia: editCompanyData.tradingName,
+        cnpj: editCompanyData.cnpj,
+        city: editCompanyData.city,
+        sector: editCompanyData.industry,
+        size: editCompanyData.size,
+        foundedYear: editCompanyData.foundedYear,
+        about: editCompanyData.description,
+        history: editCompanyData.culture,
+        culture: editCompanyData.culture,
+        perks: editCompanyData.benefits,
+        avatar: editCompanyData.avatar,
+        banner: editCompanyData.coverImage,
+        website: editCompanyData.website,
+        email: editCompanyData.email,
+        phone: editCompanyData.phone,
+        linkedin: editCompanyData.linkedin,
+        instagram: editCompanyData.instagram,
+      };
 
-    setCompany(prev => ({
-      ...prev,
-      name: editCompanyData.name,
-      tradingName: editCompanyData.tradingName,
-      cnpj: editCompanyData.cnpj,
-      city: editCompanyData.city,
-      sector: editCompanyData.industry,
-      size: editCompanyData.size,
-      about: editCompanyData.description,
-      history: editCompanyData.culture,
-      culture: editCompanyData.culture,
-      perks: editCompanyData.benefits,
-      logo: editCompanyData.avatar,
-      banner: editCompanyData.coverImage,
-      website: editCompanyData.website,
-      phone: editCompanyData.phone,
-      email: editCompanyData.email,
-    }));
+      setCompany(prev => ({
+        ...prev,
+        name: editCompanyData.name,
+        tradingName: editCompanyData.tradingName,
+        cnpj: editCompanyData.cnpj,
+        city: editCompanyData.city,
+        sector: editCompanyData.industry,
+        size: editCompanyData.size,
+        about: editCompanyData.description,
+        history: editCompanyData.culture,
+        culture: editCompanyData.culture,
+        perks: editCompanyData.benefits,
+        logo: editCompanyData.avatar,
+        banner: editCompanyData.coverImage,
+        website: editCompanyData.website,
+        phone: editCompanyData.phone,
+        email: editCompanyData.email,
+      }));
 
-    await updateAuthUser(payload);
-    if (currentUser) {
-      setCurrentUser({
-        ...currentUser,
-        ...payload
-      });
+      await updateAuthUser(payload);
+      if (currentUser) {
+        setCurrentUser({
+          ...currentUser,
+          ...payload
+        });
+      }
+      showToast('Dados da empresa atualizados com sucesso!');
+      setEditModal(false);
+    } catch (err) {
+      console.error('Erro ao atualizar empresa:', err);
+      showToast('Erro ao atualizar dados da empresa', 'error');
+    } finally {
+      setIsSaving(false);
     }
-    showToast('Dados da empresa atualizados com sucesso!');
   };
 
   return (
@@ -760,7 +769,7 @@ export default function PerfilEmpresa() {
       {/* Modal Padronizado: Editar Perfil da Empresa */}
       <EditCompanyProfileModal
         isOpen={editModal}
-        onClose={() => setEditModal(false)}
+        onClose={() => !isSaving && setEditModal(false)}
         editData={editCompanyData}
         setEditData={setEditCompanyData}
         handleSaveProfile={handleSaveCompany}
@@ -768,6 +777,7 @@ export default function PerfilEmpresa() {
         handleBannerUpload={handleBannerUpload}
         uploadingLogo={uploadingLogo}
         uploadingBanner={uploadingBanner}
+        isSaving={isSaving}
       />
       {/* Modal: Publicar Nova Vaga */}
       <PublishJobModal

@@ -58,7 +58,8 @@ export default function EditCompanyProfileModal({
   handleLogoUpload,
   handleBannerUpload,
   uploadingLogo = false,
-  uploadingBanner = false
+  uploadingBanner = false,
+  isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('branding');
   const [newBenefitInput, setNewBenefitInput] = useState('');
@@ -142,8 +143,9 @@ export default function EditCompanyProfileModal({
 
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10 hover:scale-105 active:scale-95"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Fechar Janela"
             >
               <X size={18} />
@@ -674,16 +676,27 @@ export default function EditCompanyProfileModal({
           <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900/90 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
-              className="btn btn-outline btn-sm text-xs font-bold"
+              className="btn btn-outline btn-sm text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
+              disabled={isSaving}
+              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save size={14} /> Salvar Perfil da Empresa
+              {isSaving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={14} /> Salvar Perfil da Empresa
+                </>
+              )}
             </button>
           </div>
 
