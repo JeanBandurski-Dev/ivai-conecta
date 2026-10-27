@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
@@ -26,6 +26,15 @@ import {
   isGoogleOnlyAuthUser
 } from '../lib/ivaiConecta';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import {
+  validateAccountName,
+  validateAccountEmail,
+  validateAccountLinkedIn,
+  validateAccountGitHubOrPortfolio,
+  validateStudentRA,
+  validatePasswordChange,
+  validateAccountSettingsForm
+} from '../utils/formValidation';
 
 export default function Configuracoes() {
   const { currentUser, setCurrentUser, logout, showToast, showConfirm } = useAppStore();
@@ -34,7 +43,11 @@ export default function Configuracoes() {
   const [activeTab, setActiveTab] = useState('account'); // 'account', 'verification', 'company', 'security', 'privacy'
 
   // Account form
-  const [name, setName] = useState(currentUser?.name || '');
+  const [name, setName] = useState(
+    (currentUser?.role === 'empresa'
+      ? (currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name)
+      : currentUser?.name) || ''
+  );
   const [email, setEmail] = useState(currentUser?.email || '');
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
   const [github, setGithub] = useState(currentUser?.github || '');
@@ -45,6 +58,20 @@ export default function Configuracoes() {
   const [submittingAccount, setSubmittingAccount] = useState(false);
   const [selectedRole, setSelectedRole] = useState(currentUser?.role || 'candidato');
   const [switchingRole, setSwitchingRole] = useState(false);
+
+  // Estados de Validação dos Formulários
+  const [accountErrors, setAccountErrors] = useState({});
+  const [accountSubmitAttempted, setAccountSubmitAttempted] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
+
+  const accountErrorCount = useMemo(() => {
+    return Object.values(accountErrors).filter(Boolean).length;
+  }, [accountErrors]);
+
+  const passwordErrorCount = useMemo(() => {
+    return Object.values(passwordErrors).filter(Boolean).length;
+  }, [passwordErrors]);
 
   useEffect(() => {
     if (currentUser?.avatar) {
@@ -75,7 +102,10 @@ export default function Configuracoes() {
   // Sincroniza estados do formulário sempre que o currentUser é carregado ou atualizado
   useEffect(() => {
     if (!currentUser) return;
-    if (currentUser.name) setName(currentUser.name);
+    const currentDisplayName = currentUser.role === 'empresa'
+      ? (currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || '')
+      : (currentUser.name || '');
+    if (currentDisplayName) setName(currentDisplayName);
     if (currentUser.email) setEmail(currentUser.email);
     if (currentUser.linkedin) setLinkedin(currentUser.linkedin);
     if (currentUser.github) setGithub(currentUser.github);
@@ -102,7 +132,10 @@ export default function Configuracoes() {
     getDoc(userDocRef).then((snap) => {
       if (!isMounted || !snap.exists()) return;
       const data = snap.data();
-      if (data.name) setName(data.name);
+      const currentDisplayName = (data.role || currentUser?.role) === 'empresa'
+        ? (data.razaoSocial || data.nomeFantasia || data.name || '')
+        : (data.name || '');
+      if (currentDisplayName) setName(currentDisplayName);
       if (data.email) setEmail(data.email);
       if (data.linkedin) setLinkedin(data.linkedin);
       if (data.github) setGithub(data.github);
@@ -119,7 +152,7 @@ export default function Configuracoes() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.uid, currentUser?.id]);
+  }, [currentUser?.uid, currentUser?.id, currentUser?.role]);
 
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
@@ -220,17 +253,111 @@ export default function Configuracoes() {
     }
   };
 
+  // Handlers com validação em tempo real para os campos de Conta & Perfil
+  const handleNameChange = (val) => {
+    setName(val);
+    const res = validateAccountName(val, currentUser?.role || 'candidato');
+    setAccountErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
+  };
+
+  const handleNameBlur = () => {
+    const res = validateAccountName(name, currentUser?.role || 'candidato');
+    setAccountErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
+  };
+
+  const handleEmailChange = (val) => {
+    setEmail(val);
+    const res = validateAccountEmail(val, { required: true });
+    setAccountErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
+  };
+
+  const handleEmailBlur = () => {
+    const res = validateAccountEmail(email, { required: true });
+    setAccountErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
+  };
+
+  const handleLinkedinChange = (val) => {
+    setLinkedin(val);
+    if (val?.trim()) {
+      const res = validateAccountLinkedIn(val, { required: false });
+      setAccountErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, linkedin: undefined }));
+    }
+  };
+
+  const handleLinkedinBlur = () => {
+    if (linkedin?.trim()) {
+      const res = validateAccountLinkedIn(linkedin, { required: false });
+      setAccountErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, linkedin: undefined }));
+    }
+  };
+
+  const handleGithubChange = (val) => {
+    setGithub(val);
+    if (val?.trim()) {
+      const res = validateAccountGitHubOrPortfolio(val, { required: false });
+      setAccountErrors(prev => ({ ...prev, github: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, github: undefined }));
+    }
+  };
+
+  const handleGithubBlur = () => {
+    if (github?.trim()) {
+      const res = validateAccountGitHubOrPortfolio(github, { required: false });
+      setAccountErrors(prev => ({ ...prev, github: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, github: undefined }));
+    }
+  };
+
+  const handleRaChange = (val) => {
+    setRaNumber(val);
+    if (val?.trim()) {
+      const res = validateStudentRA(val);
+      setAccountErrors(prev => ({ ...prev, raNumber: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, raNumber: undefined }));
+    }
+  };
+
+  const handleRaBlur = () => {
+    if (raNumber?.trim()) {
+      const res = validateStudentRA(raNumber);
+      setAccountErrors(prev => ({ ...prev, raNumber: res.valid ? undefined : res.error }));
+    } else {
+      setAccountErrors(prev => ({ ...prev, raNumber: undefined }));
+    }
+  };
+
   const handleSaveAccount = async (e) => {
     e.preventDefault();
     if (submittingAccount) return;
-    if (!name || !name.trim()) {
-      showToast('Por favor, informe seu nome ou razão social.', 'error');
+
+    setAccountSubmitAttempted(true);
+
+    const targetRole = selectedRole || currentUser?.role || 'candidato';
+
+    const check = validateAccountSettingsForm({
+      name,
+      email,
+      linkedin,
+      github,
+      raNumber,
+      role: targetRole
+    });
+
+    if (!check.isValid) {
+      setAccountErrors(check.errors);
+      const firstMsg = check.errors[check.firstErrorKey] || 'Verifique as informações preenchidas.';
+      showToast(firstMsg, 'error');
       return;
     }
-    if (name.trim().length > 70) {
-      showToast('O nome deve ter no máximo 70 caracteres.', 'error');
-      return;
-    }
+
+    setAccountErrors({});
     const roleBadges = {
       candidato: 'Candidato / Profissional',
       freelancer: 'Prestador de Serviço Autônomo',
@@ -238,24 +365,38 @@ export default function Configuracoes() {
       empresa: 'Empresa / Recrutador',
       professor: 'Docente (IFPR/UENP/Univale)'
     };
-    const targetRole = selectedRole || currentUser?.role || 'candidato';
     const targetBadge = roleBadges[targetRole] || currentUser?.badge;
+
+    const trimmedName = name.trim();
+    const isEmpresa = targetRole === 'empresa';
+
+    const companyFields = isEmpresa ? {
+      name: trimmedName,
+      razaoSocial: trimmedName,
+      nomeFantasia: (!currentUser?.nomeFantasia || currentUser?.nomeFantasia === currentUser?.name || currentUser?.nomeFantasia === currentUser?.razaoSocial)
+        ? trimmedName
+        : currentUser.nomeFantasia
+    } : {
+      name: trimmedName
+    };
+
+    const updatePayload = {
+      ...companyFields,
+      email: email.trim(),
+      linkedin: linkedin.trim(),
+      github: github.trim(),
+      avatar,
+      ...(currentUser?.role === 'aluno' ? { raNumber: raNumber.trim() } : {}),
+      role: targetRole,
+      activeRole: targetRole,
+      selectedRole: targetRole,
+      profileType: targetRole,
+      badge: targetBadge
+    };
 
     setSubmittingAccount(true);
     try {
-      const updated = await updateAuthUser({
-        name,
-        email,
-        linkedin,
-        github,
-        avatar,
-        ...(currentUser?.role === 'aluno' ? { raNumber } : {}),
-        role: targetRole,
-        activeRole: targetRole,
-        selectedRole: targetRole,
-        profileType: targetRole,
-        badge: targetBadge
-      }, currentUser);
+      const updated = await updateAuthUser(updatePayload, currentUser);
 
       if (updated) {
         setCurrentUser(updated);
@@ -434,36 +575,41 @@ export default function Configuracoes() {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      showToast('A nova senha deve ter no mínimo 6 caracteres.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('As senhas digitadas não coincidem.');
-      return;
-    }
-    if (currentPassword && currentPassword === newPassword) {
-      showToast('A nova senha deve ser diferente da senha atual.');
+    setPasswordSubmitAttempted(true);
+
+    const check = validatePasswordChange({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      isGoogleOnly: isGoogleOnlyAuthUser()
+    });
+
+    if (!check.isValid) {
+      setPasswordErrors(check.errors);
+      const firstMsg = check.errors[check.firstErrorKey] || 'Verifique os dados da nova senha.';
+      showToast(firstMsg, 'error');
       return;
     }
 
+    setPasswordErrors({});
     setSubmittingPassword(true);
     try {
       const res = await updateUserPassword(currentPassword, newPassword);
       if (res.success) {
-        showToast(res.message || 'Senha alterada com sucesso!');
+        showToast(res.message || 'Senha alterada com sucesso!', 'success');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setPasswordReauthRequired(false);
+        setPasswordSubmitAttempted(false);
       } else {
         if (res.requiresReauth) {
           setPasswordReauthRequired(true);
         }
-        showToast(res.error || 'Erro ao atualizar a senha.');
+        showToast(res.error || 'Não foi possível alterar a senha.', 'error');
       }
     } catch (err) {
-      showToast(`Erro inesperado: ${err.message || err}`);
+      showToast('Erro ao atualizar senha: ' + (err.message || 'Tente novamente.'), 'error');
     } finally {
       setSubmittingPassword(false);
     }
@@ -512,6 +658,11 @@ export default function Configuracoes() {
               }`}
             >
               <User size={16} /> Conta &amp; Redes Sociais
+              {accountErrorCount > 0 && (
+                <span className="text-[10px] bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 px-1.5 py-0.2 rounded-full font-extrabold flex items-center gap-1">
+                  <AlertCircle size={10} /> {accountErrorCount}
+                </span>
+              )}
             </button>
 
             {currentUser.role === 'aluno' && (
@@ -545,6 +696,11 @@ export default function Configuracoes() {
               }`}
             >
               <Lock size={16} /> Segurança &amp; Senha
+              {passwordErrorCount > 0 && (
+                <span className="text-[10px] bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 px-1.5 py-0.2 rounded-full font-extrabold flex items-center gap-1">
+                  <AlertCircle size={10} /> {passwordErrorCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -570,7 +726,16 @@ export default function Configuracoes() {
                 </span>
               </div>
 
-              <form onSubmit={handleSaveAccount} className="space-y-4">
+              <form onSubmit={handleSaveAccount} className="space-y-4" noValidate>
+                {accountSubmitAttempted && accountErrorCount > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-in fade-in duration-200">
+                    <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Atenção:</span> Existem campos com informações inválidas ou pendentes ({accountErrorCount} erro{accountErrorCount > 1 ? 's' : ''}). Por favor, corrija antes de salvar.
+                    </div>
+                  </div>
+                )}
+
                 {/* Foto de Perfil / Avatar com Firebase Storage */}
                 <div className="bg-gray-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700/80 flex flex-wrap items-center gap-5">
                   <div className="relative shrink-0">
@@ -609,29 +774,54 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Nome Completo / Razão Social</label>
+                  <label className="form-label flex items-center justify-between">
+                    <span>{currentUser?.role === 'empresa' ? 'Razão Social / Nome Oficial' : 'Nome Completo'} *</span>
+                    <span className="text-[11px] font-normal text-gray-400">
+                      {currentUser?.role === 'empresa' ? 'Nome oficial da organização' : 'Nome e sobrenome'}
+                    </span>
+                  </label>
                   <input
                     type="text"
                     value={name}
-                    onChange={e => setName(e.target.value)}
-                    className="form-control"
-                    maxLength={70}
+                    onChange={e => handleNameChange(e.target.value)}
+                    onBlur={handleNameBlur}
+                    className={`form-control ${
+                      accountErrors.name ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                    }`}
+                    maxLength={100}
+                    placeholder={currentUser?.role === 'empresa' ? 'Ex: Ivaí Tech Soluções Ltda' : 'Ex: João da Silva'}
                     required
                   />
+                  {accountErrors.name && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{accountErrors.name}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">E-mail de Acesso</label>
+                  <label className="form-label">E-mail de Acesso *</label>
                   <div className="relative">
                     <input
                       type="email"
                       value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      className="form-control pr-10"
+                      onChange={e => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
+                      className={`form-control pr-10 ${
+                        accountErrors.email ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
+                      placeholder="exemplo@email.com"
                       required
                     />
                     <Mail size={16} className="absolute right-3 top-3.5 text-gray-400 dark:text-slate-500" />
                   </div>
+                  {accountErrors.email && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{accountErrors.email}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Redes Sociais Opcionais */}
@@ -639,23 +829,41 @@ export default function Configuracoes() {
                   <div className="form-group">
                     <label className="form-label">Perfil do LinkedIn (Opcional)</label>
                     <input
-                      type="url"
+                      type="text"
                       value={linkedin}
-                      onChange={e => setLinkedin(e.target.value)}
-                      className="form-control"
-                      placeholder="https://linkedin.com/in/seu-perfil"
+                      onChange={e => handleLinkedinChange(e.target.value)}
+                      onBlur={handleLinkedinBlur}
+                      className={`form-control ${
+                        accountErrors.linkedin ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
+                      placeholder="https://linkedin.com/in/seu-nome"
                     />
+                    {accountErrors.linkedin && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{accountErrors.linkedin}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Perfil do GitHub / Portfólio (Opcional)</label>
                     <input
-                      type="url"
+                      type="text"
                       value={github}
-                      onChange={e => setGithub(e.target.value)}
-                      className="form-control"
-                      placeholder="https://github.com/seu-usuario"
+                      onChange={e => handleGithubChange(e.target.value)}
+                      onBlur={handleGithubBlur}
+                      className={`form-control ${
+                        accountErrors.github ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
+                      placeholder="https://github.com/seu-usuario ou portfólio"
                     />
+                    {accountErrors.github && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{accountErrors.github}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -665,13 +873,23 @@ export default function Configuracoes() {
                     <input
                       type="text"
                       value={raNumber}
-                      onChange={e => setRaNumber(e.target.value)}
-                      className="form-control"
+                      onChange={e => handleRaChange(e.target.value)}
+                      onBlur={handleRaBlur}
+                      className={`form-control ${
+                        accountErrors.raNumber ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
                       placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
                     />
-                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
-                      Identificador acadêmico opcional exibido no seu currículo e para recrutadores.
-                    </p>
+                    {accountErrors.raNumber ? (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{accountErrors.raNumber}</span>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
+                        Identificador acadêmico opcional exibido no seu currículo e para recrutadores.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1182,7 +1400,16 @@ export default function Configuracoes() {
                 </div>
               )}
 
-              <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md">
+              <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md" noValidate>
+                {passwordSubmitAttempted && passwordErrorCount > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-in fade-in duration-200">
+                    <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Atenção:</span> Existem campos com informações inválidas na senha.
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <div className="flex items-center justify-between mb-1">
                     <label className="form-label mb-0">Senha Atual</label>
@@ -1198,12 +1425,15 @@ export default function Configuracoes() {
                       value={currentPassword}
                       onChange={e => {
                         setCurrentPassword(e.target.value);
+                        if (passwordErrors.currentPassword) {
+                          setPasswordErrors(prev => ({ ...prev, currentPassword: undefined }));
+                        }
                         if (passwordReauthRequired && e.target.value.length > 0) {
                           setPasswordReauthRequired(false);
                         }
                       }}
                       className={`form-control pl-10 pr-10 ${
-                        passwordReauthRequired ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : ''
+                        passwordErrors.currentPassword || passwordReauthRequired ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 bg-rose-50/10' : ''
                       }`}
                       placeholder="••••••••"
                       autoComplete="current-password"
@@ -1218,9 +1448,16 @@ export default function Configuracoes() {
                       {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
-                    Necessária para confirmar a sua identidade caso sua sessão não seja recente.
-                  </p>
+                  {passwordErrors.currentPassword ? (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{passwordErrors.currentPassword}</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
+                      Necessária para confirmar a sua identidade caso sua sessão não seja recente.
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -1229,8 +1466,15 @@ export default function Configuracoes() {
                     <input
                       type={showNewPass ? 'text' : 'password'}
                       value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      className="form-control pl-10 pr-10"
+                      onChange={e => {
+                        setNewPassword(e.target.value);
+                        if (passwordErrors.newPassword) {
+                          setPasswordErrors(prev => ({ ...prev, newPassword: undefined }));
+                        }
+                      }}
+                      className={`form-control pl-10 pr-10 ${
+                        passwordErrors.newPassword ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
                       placeholder="Mínimo de 6 caracteres"
                       required
                       autoComplete="new-password"
@@ -1245,6 +1489,12 @@ export default function Configuracoes() {
                       {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {passwordErrors.newPassword && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{passwordErrors.newPassword}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -1253,8 +1503,15 @@ export default function Configuracoes() {
                     <input
                       type={showConfirmPass ? 'text' : 'password'}
                       value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      className="form-control pl-10 pr-10"
+                      onChange={e => {
+                        setConfirmPassword(e.target.value);
+                        if (passwordErrors.confirmPassword) {
+                          setPasswordErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                        }
+                      }}
+                      className={`form-control pl-10 pr-10 ${
+                        passwordErrors.confirmPassword ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
+                      }`}
                       placeholder="Repita a nova senha"
                       required
                       autoComplete="new-password"
@@ -1269,6 +1526,12 @@ export default function Configuracoes() {
                       {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {passwordErrors.confirmPassword && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{passwordErrors.confirmPassword}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-start pt-2">

@@ -2,9 +2,25 @@ import { useState, useMemo } from 'react';
 import {
   X, Camera, Upload, Plus, Building2,
   Globe, Sparkles, Save, HeartHandshake, MapPin, Mail,
-  Phone, ShieldCheck, Loader2, Image as ImageIcon
+  Phone, ShieldCheck, Loader2, Image as ImageIcon,
+  AlertCircle
 } from 'lucide-react';
 import { CITIES } from '../lib/ivaiConecta';
+import {
+  maskCNPJ,
+  maskPhone,
+  validateCompanyProfileForm,
+  validateCompanyText,
+  validateCompanyCNPJField,
+  validateFoundedYear,
+  validateCompanyInstitutionalText,
+  validateCompanyUrl,
+  validateCompanyEmail,
+  validateCompanyLinkedIn,
+  validateCompanyInstagram,
+  validateCompanyBenefitItem
+} from '../utils/formValidation';
+import { validatePhoneNumber } from '../services/jobTaxonomy';
 
 const COMPANY_LOGO_PRESETS = [
   'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&q=80&w=250',
@@ -63,6 +79,9 @@ export default function EditCompanyProfileModal({
 }) {
   const [activeTab, setActiveTab] = useState('branding');
   const [newBenefitInput, setNewBenefitInput] = useState('');
+  const [benefitError, setBenefitError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [formSubmitAttempted, setFormSubmitAttempted] = useState(false);
 
   // Calcula a taxa de completude da marca empregadora em tempo real
   const completionPercentage = useMemo(() => {
@@ -80,31 +99,331 @@ export default function EditCompanyProfileModal({
     return Math.min(100, score);
   }, [editData]);
 
+  // Contagem de erros agrupados por aba
+  const tabErrors = useMemo(() => {
+    const counts = { branding: 0, info: 0, culture: 0, contact: 0 };
+    if (!errors || Object.keys(errors).length === 0) return counts;
+
+    const infoFields = ['name', 'tradingName', 'cnpj', 'city', 'industry', 'foundedYear'];
+    const cultureFields = ['description', 'culture', 'benefits'];
+    const contactFields = ['website', 'email', 'linkedin', 'instagram', 'phone'];
+    const brandingFields = ['coverImage', 'avatar'];
+
+    Object.keys(errors).forEach(field => {
+      if (errors[field]) {
+        if (infoFields.includes(field)) counts.info++;
+        else if (cultureFields.includes(field)) counts.culture++;
+        else if (contactFields.includes(field)) counts.contact++;
+        else if (brandingFields.includes(field)) counts.branding++;
+      }
+    });
+    return counts;
+  }, [errors]);
+
   if (!isOpen) return null;
 
+  // Submissão do formulário com validação completa em todos os campos
   const handleFormSubmit = (e) => {
     if (e) e.preventDefault();
+    setFormSubmitAttempted(true);
+
+    const validation = validateCompanyProfileForm(editData || {});
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      if (validation.firstErrorTab) {
+        setActiveTab(validation.firstErrorTab);
+      }
+      return;
+    }
+
+    setErrors({});
     handleSaveProfile(e);
   };
 
+  // Handlers para cada campo com validação e máscara em tempo real IMEDIATA
+  const handleNameChange = (val) => {
+    setEditData(d => ({ ...d, name: val }));
+    const res = validateCompanyText(val, { fieldName: 'Razão Social', min: 3, max: 100, required: true });
+    setErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
+  };
+
+  const handleNameBlur = () => {
+    const res = validateCompanyText(editData.name, { fieldName: 'Razão Social', min: 3, max: 100, required: true });
+    setErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
+  };
+
+  const handleTradingNameChange = (val) => {
+    setEditData(d => ({ ...d, tradingName: val }));
+    const res = validateCompanyText(val, { fieldName: 'Nome Fantasia', min: 2, max: 70, required: true });
+    setErrors(prev => ({ ...prev, tradingName: res.valid ? undefined : res.error }));
+  };
+
+  const handleTradingNameBlur = () => {
+    const res = validateCompanyText(editData.tradingName, { fieldName: 'Nome Fantasia', min: 2, max: 70, required: true });
+    setErrors(prev => ({ ...prev, tradingName: res.valid ? undefined : res.error }));
+  };
+
+  const handleCnpjChange = (val) => {
+    const masked = maskCNPJ(val);
+    setEditData(d => ({ ...d, cnpj: masked }));
+    const res = validateCompanyCNPJField(masked, true);
+    setErrors(prev => ({ ...prev, cnpj: res.valid ? undefined : res.error }));
+  };
+
+  const handleCnpjBlur = () => {
+    const res = validateCompanyCNPJField(editData.cnpj, true);
+    setErrors(prev => ({ ...prev, cnpj: res.valid ? undefined : res.error }));
+  };
+
+  const handleFoundedYearChange = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    setEditData(d => ({ ...d, foundedYear: digits }));
+    if (digits) {
+      const res = validateFoundedYear(digits, false);
+      setErrors(prev => ({ ...prev, foundedYear: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, foundedYear: undefined }));
+    }
+  };
+
+  const handleFoundedYearBlur = () => {
+    if (editData.foundedYear) {
+      const res = validateFoundedYear(editData.foundedYear, false);
+      setErrors(prev => ({ ...prev, foundedYear: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, foundedYear: undefined }));
+    }
+  };
+
+  const handleDescriptionChange = (val) => {
+    setEditData(d => ({ ...d, description: val }));
+    if (val?.trim()) {
+      const res = validateCompanyInstitutionalText(val, { fieldName: 'Sobre a Organização', min: 30, max: 3000, required: false });
+      setErrors(prev => ({ ...prev, description: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, description: undefined }));
+    }
+  };
+
+  const handleDescriptionBlur = () => {
+    if (editData.description?.trim()) {
+      const res = validateCompanyInstitutionalText(editData.description, { fieldName: 'Sobre a Organização', min: 30, max: 3000, required: false });
+      setErrors(prev => ({ ...prev, description: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, description: undefined }));
+    }
+  };
+
+  const handleCultureChange = (val) => {
+    setEditData(d => ({ ...d, culture: val }));
+    if (val?.trim()) {
+      const res = validateCompanyInstitutionalText(val, { fieldName: 'Missão, Visão e Cultura', min: 20, max: 2000, required: false });
+      setErrors(prev => ({ ...prev, culture: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, culture: undefined }));
+    }
+  };
+
+  const handleCultureBlur = () => {
+    if (editData.culture?.trim()) {
+      const res = validateCompanyInstitutionalText(editData.culture, { fieldName: 'Missão, Visão e Cultura', min: 20, max: 2000, required: false });
+      setErrors(prev => ({ ...prev, culture: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, culture: undefined }));
+    }
+  };
+
+  const handleWebsiteChange = (val) => {
+    setEditData(d => ({ ...d, website: val }));
+    if (val?.trim()) {
+      const res = validateCompanyUrl(val, { fieldName: 'Website Oficial', required: false });
+      setErrors(prev => ({ ...prev, website: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, website: undefined }));
+    }
+  };
+
+  const handleWebsiteBlur = () => {
+    if (editData.website?.trim()) {
+      const res = validateCompanyUrl(editData.website, { fieldName: 'Website Oficial', required: false });
+      setErrors(prev => ({ ...prev, website: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, website: undefined }));
+    }
+  };
+
+  const handleEmailChange = (val) => {
+    setEditData(d => ({ ...d, email: val }));
+    if (val?.trim()) {
+      const res = validateCompanyEmail(val, { required: false });
+      setErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, email: undefined }));
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (editData.email?.trim()) {
+      const res = validateCompanyEmail(editData.email, { required: false });
+      setErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, email: undefined }));
+    }
+  };
+
+  const handleLinkedInChange = (val) => {
+    setEditData(d => ({ ...d, linkedin: val }));
+    if (val?.trim()) {
+      const res = validateCompanyLinkedIn(val, { required: false });
+      setErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, linkedin: undefined }));
+    }
+  };
+
+  const handleLinkedInBlur = () => {
+    if (editData.linkedin?.trim()) {
+      const res = validateCompanyLinkedIn(editData.linkedin, { required: false });
+      setErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, linkedin: undefined }));
+    }
+  };
+
+  const handleInstagramChange = (val) => {
+    setEditData(d => ({ ...d, instagram: val }));
+    if (val?.trim()) {
+      const res = validateCompanyInstagram(val, { required: false });
+      setErrors(prev => ({ ...prev, instagram: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, instagram: undefined }));
+    }
+  };
+
+  const handleInstagramBlur = () => {
+    if (editData.instagram?.trim()) {
+      const res = validateCompanyInstagram(editData.instagram, { required: false });
+      setErrors(prev => ({ ...prev, instagram: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, instagram: undefined }));
+    }
+  };
+
+  const handlePhoneChange = (val) => {
+    const masked = maskPhone(val);
+    setEditData(d => ({ ...d, phone: masked }));
+    if (masked?.trim()) {
+      const res = validatePhoneNumber(masked, false);
+      setErrors(prev => ({ ...prev, phone: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, phone: undefined }));
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    if (editData.phone?.trim()) {
+      const res = validatePhoneNumber(editData.phone, false);
+      setErrors(prev => ({ ...prev, phone: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, phone: undefined }));
+    }
+  };
+
+  const handleCoverUrlChange = (val) => {
+    setEditData(d => ({ ...d, coverImage: val }));
+    if (val?.trim()) {
+      const res = validateCompanyUrl(val, { fieldName: 'Imagem de Capa', required: false });
+      setErrors(prev => ({ ...prev, coverImage: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, coverImage: undefined }));
+    }
+  };
+
+  const handleCoverUrlBlur = () => {
+    if (editData.coverImage?.trim()) {
+      const res = validateCompanyUrl(editData.coverImage, { fieldName: 'Imagem de Capa', required: false });
+      setErrors(prev => ({ ...prev, coverImage: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, coverImage: undefined }));
+    }
+  };
+
+  const handleAvatarUrlChange = (val) => {
+    setEditData(d => ({ ...d, avatar: val }));
+    if (val?.trim()) {
+      const res = validateCompanyUrl(val, { fieldName: 'Logotipo', required: false });
+      setErrors(prev => ({ ...prev, avatar: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, avatar: undefined }));
+    }
+  };
+
+  const handleAvatarUrlBlur = () => {
+    if (editData.avatar?.trim()) {
+      const res = validateCompanyUrl(editData.avatar, { fieldName: 'Logotipo', required: false });
+      setErrors(prev => ({ ...prev, avatar: res.valid ? undefined : res.error }));
+    } else {
+      setErrors(prev => ({ ...prev, avatar: undefined }));
+    }
+  };
+
+
   const addBenefitItem = (itemToAdd) => {
     const val = (typeof itemToAdd === 'string' ? itemToAdd : newBenefitInput).trim();
-    if (!val) return;
-    const current = Array.isArray(editData.benefits) ? editData.benefits : [];
-    if (!current.includes(val)) {
-      setEditData(prev => ({
-        ...prev,
-        benefits: [...current, val]
-      }));
+    if (!val) {
+      setBenefitError('Digite o nome do benefício para adicionar.');
+      return;
     }
+    const current = Array.isArray(editData.benefits) ? editData.benefits : [];
+    const check = validateCompanyBenefitItem(val, current);
+    if (!check.valid) {
+      setBenefitError(check.error);
+      return;
+    }
+
+    setBenefitError('');
+    setEditData(prev => ({
+      ...prev,
+      benefits: [...current, check.benefit]
+    }));
     setNewBenefitInput('');
+    if (errors.benefits) {
+      setErrors(prev => ({ ...prev, benefits: undefined }));
+    }
   };
 
   const removeBenefitItem = (itemToRemove) => {
+    const updated = (editData.benefits || []).filter(b => b !== itemToRemove);
     setEditData(prev => ({
       ...prev,
-      benefits: (prev.benefits || []).filter(b => b !== itemToRemove)
+      benefits: updated
     }));
+    if (errors.benefits) {
+      const hasInvalid = updated.some(b => !validateCompanyBenefitItem(b).valid);
+      if (!hasInvalid) {
+        setErrors(prev => ({ ...prev, benefits: undefined }));
+      }
+    }
+  };
+
+  // Helper para renderizar mensagem de erro abaixo do campo
+  const renderFieldError = (fieldKey) => {
+    if (!errors[fieldKey]) return null;
+    return (
+      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-[11px] font-semibold animate-in fade-in duration-150">
+        <AlertCircle size={13} className="shrink-0" />
+        <span>{errors[fieldKey]}</span>
+      </div>
+    );
+  };
+
+  // Helper de classe CSS para input com erro
+  const getInputClass = (fieldKey, base = 'form-control text-xs') => {
+    return `${base} ${
+      errors[fieldKey]
+        ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10'
+        : ''
+    }`;
   };
 
   const TABS = [
@@ -170,11 +489,13 @@ export default function EditCompanyProfileModal({
           </div>
         </div>
 
-        {/* Barra de Navegação por Abas (Tabs) */}
+        {/* Barra de Navegação por Abas (Tabs) com Indicadores de Erros */}
         <div className="flex items-center gap-1 p-2 bg-slate-100 dark:bg-slate-800/80 border-b border-gray-200 dark:border-slate-800 overflow-x-auto scrollbar-none shrink-0">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const errorCount = tabErrors[tab.id];
+
             return (
               <button
                 key={tab.id}
@@ -188,7 +509,14 @@ export default function EditCompanyProfileModal({
               >
                 <Icon size={14} className={isActive ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
                 <span>{tab.label}</span>
-                {tab.badge !== null && tab.badge > 0 && (
+
+                {/* Badge de Erros na Aba */}
+                {errorCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle size={10} />
+                    {errorCount}
+                  </span>
+                ) : tab.badge !== null && tab.badge > 0 ? (
                   <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                     isActive
                       ? 'bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-400'
@@ -196,14 +524,24 @@ export default function EditCompanyProfileModal({
                   }`}>
                     {tab.badge}
                   </span>
-                )}
+                ) : null}
               </button>
             );
           })}
         </div>
 
+        {/* Banner de Alerta Geral caso haja erros ao tentar salvar */}
+        {formSubmitAttempted && Object.keys(errors).length > 0 && (
+          <div className="mx-5 sm:mx-6 mt-4 p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-in fade-in duration-200">
+            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Atenção:</span> Existem campos com informações inválidas ou pendentes ({Object.keys(errors).length} erro{Object.keys(errors).length > 1 ? 's' : ''}). Verifique as abas destacadas em vermelho antes de salvar o perfil.
+            </div>
+          </div>
+        )}
+
         {/* Corpo do Formulário com Scroll e Navegação Suave */}
-        <form onSubmit={handleFormSubmit} className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6 text-left">
+        <form onSubmit={handleFormSubmit} className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6 text-left" noValidate>
           
           {/* ═════════════════════════════════════════════════════════════
               ABA 1: IDENTIDADE VISUAL, LOGO & CAPA
@@ -228,6 +566,9 @@ export default function EditCompanyProfileModal({
                       src={editData.coverImage || COMPANY_COVER_PRESETS[0]}
                       alt="Capa da Empresa"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = COMPANY_COVER_PRESETS[0];
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                       <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-md">
@@ -238,20 +579,24 @@ export default function EditCompanyProfileModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shrink-0 shadow-xs">
-                      {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                      <span>{uploadingBanner ? 'Enviando Capa...' : 'Upload de Capa do PC'}</span>
-                      <input type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" disabled={uploadingBanner} />
-                    </label>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shrink-0 shadow-xs">
+                        {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                        <span>{uploadingBanner ? 'Enviando Capa...' : 'Upload de Capa do PC'}</span>
+                        <input type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" disabled={uploadingBanner} />
+                      </label>
 
-                    <input
-                      type="url"
-                      value={editData.coverImage || ''}
-                      onChange={e => setEditData(d => ({ ...d, coverImage: e.target.value }))}
-                      placeholder="Ou cole a URL direta de uma imagem de capa..."
-                      className="form-control text-xs flex-1"
-                    />
+                      <input
+                        type="url"
+                        value={editData.coverImage || ''}
+                        onChange={e => handleCoverUrlChange(e.target.value)}
+                        onBlur={handleCoverUrlBlur}
+                        placeholder="Ou cole a URL direta de uma imagem de capa (https://...)"
+                        className={getInputClass('coverImage', 'form-control text-xs flex-1')}
+                      />
+                    </div>
+                    {renderFieldError('coverImage')}
                   </div>
 
                   {/* Presets de Capa */}
@@ -264,7 +609,10 @@ export default function EditCompanyProfileModal({
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setEditData(d => ({ ...d, coverImage: preset }))}
+                          onClick={() => {
+                            setEditData(d => ({ ...d, coverImage: preset }));
+                            setErrors(prev => ({ ...prev, coverImage: undefined }));
+                          }}
                           className={`h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer relative group ${
                             editData.coverImage === preset
                               ? 'border-primary-blue ring-2 ring-blue-400/50 scale-[1.02]'
@@ -296,6 +644,9 @@ export default function EditCompanyProfileModal({
                       src={editData.avatar || COMPANY_LOGO_PRESETS[0]}
                       alt="Logo da Empresa"
                       className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800 p-1"
+                      onError={(e) => {
+                        e.target.src = COMPANY_LOGO_PRESETS[0];
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none">
                       <Camera size={18} />
@@ -311,13 +662,17 @@ export default function EditCompanyProfileModal({
                       </label>
                     </div>
 
-                    <input
-                      type="url"
-                      value={editData.avatar || ''}
-                      onChange={e => setEditData(d => ({ ...d, avatar: e.target.value }))}
-                      placeholder="Ou cole a URL direta do logotipo..."
-                      className="form-control text-xs"
-                    />
+                    <div>
+                      <input
+                        type="url"
+                        value={editData.avatar || ''}
+                        onChange={e => handleAvatarUrlChange(e.target.value)}
+                        onBlur={handleAvatarUrlBlur}
+                        placeholder="Ou cole a URL direta do logotipo (https://...)"
+                        className={getInputClass('avatar', 'form-control text-xs')}
+                      />
+                      {renderFieldError('avatar')}
+                    </div>
                   </div>
                 </div>
 
@@ -331,7 +686,10 @@ export default function EditCompanyProfileModal({
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setEditData(d => ({ ...d, avatar: url }))}
+                        onClick={() => {
+                          setEditData(d => ({ ...d, avatar: url }));
+                          setErrors(prev => ({ ...prev, avatar: undefined }));
+                        }}
                         className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition-all cursor-pointer bg-white p-0.5 ${
                           editData.avatar === url
                             ? 'border-primary-blue scale-110 shadow-md ring-2 ring-blue-400/50'
@@ -361,12 +719,14 @@ export default function EditCompanyProfileModal({
                   <input
                     type="text"
                     value={editData.name || ''}
-                    onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
+                    onChange={e => handleNameChange(e.target.value)}
+                    onBlur={handleNameBlur}
                     placeholder="Ex: Ivaí Tech Soluções em TI Ltda"
-                    className="form-control text-xs font-semibold"
-                    maxLength={70}
+                    className={getInputClass('name', 'form-control text-xs font-semibold')}
+                    maxLength={100}
                     required
                   />
+                  {renderFieldError('name')}
                 </div>
 
                 <div className="form-group">
@@ -376,12 +736,14 @@ export default function EditCompanyProfileModal({
                   <input
                     type="text"
                     value={editData.tradingName || ''}
-                    onChange={e => setEditData(d => ({ ...d, tradingName: e.target.value }))}
+                    onChange={e => handleTradingNameChange(e.target.value)}
+                    onBlur={handleTradingNameBlur}
                     placeholder="Ex: Ivaí Tech"
-                    className="form-control text-xs font-semibold"
+                    className={getInputClass('tradingName', 'form-control text-xs font-semibold')}
                     maxLength={70}
                     required
                   />
+                  {renderFieldError('tradingName')}
                 </div>
               </div>
 
@@ -393,11 +755,14 @@ export default function EditCompanyProfileModal({
                   <input
                     type="text"
                     value={editData.cnpj || ''}
-                    onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))}
+                    onChange={e => handleCnpjChange(e.target.value)}
+                    onBlur={handleCnpjBlur}
                     placeholder="00.000.000/0001-00"
-                    className="form-control text-xs font-mono"
+                    className={getInputClass('cnpj', 'form-control text-xs font-mono')}
+                    maxLength={18}
                     required
                   />
+                  {renderFieldError('cnpj')}
                 </div>
 
                 <div className="form-group">
@@ -406,13 +771,17 @@ export default function EditCompanyProfileModal({
                   </label>
                   <select
                     value={editData.city || 'Ivaiporã'}
-                    onChange={e => setEditData(d => ({ ...d, city: e.target.value }))}
-                    className="form-control text-xs font-semibold"
+                    onChange={e => {
+                      setEditData(d => ({ ...d, city: e.target.value }));
+                      setErrors(prev => ({ ...prev, city: undefined }));
+                    }}
+                    className={getInputClass('city', 'form-control text-xs font-semibold')}
                   >
                     {CITIES.filter(c => c !== 'Todas as Cidades').map(city => (
                       <option key={city} value={city}>{city}</option>
                     ))}
                   </select>
+                  {renderFieldError('city')}
                 </div>
               </div>
 
@@ -421,19 +790,23 @@ export default function EditCompanyProfileModal({
                   <label className="form-label text-xs font-bold">Setor de Atuação Principal *</label>
                   <select
                     value={editData.industry || 'Tecnologia & Inovação'}
-                    onChange={e => setEditData(d => ({ ...d, industry: e.target.value }))}
-                    className="form-control text-xs"
+                    onChange={e => {
+                      setEditData(d => ({ ...d, industry: e.target.value }));
+                      setErrors(prev => ({ ...prev, industry: undefined }));
+                    }}
+                    className={getInputClass('industry', 'form-control text-xs')}
                   >
                     {INDUSTRY_OPTIONS.map(ind => (
                       <option key={ind} value={ind}>{ind}</option>
                     ))}
                   </select>
+                  {renderFieldError('industry')}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label text-xs font-bold">Porte da Empresa</label>
                   <select
-                    value={editData.size || '11-50 colaboradores'}
+                    value={editData.size || '1-10 colaboradores'}
                     onChange={e => setEditData(d => ({ ...d, size: e.target.value }))}
                     className="form-control text-xs"
                   >
@@ -450,10 +823,13 @@ export default function EditCompanyProfileModal({
                 <input
                   type="text"
                   value={editData.foundedYear || ''}
-                  onChange={e => setEditData(d => ({ ...d, foundedYear: e.target.value }))}
+                  onChange={e => handleFoundedYearChange(e.target.value)}
+                  onBlur={handleFoundedYearBlur}
                   placeholder="Ex: 2018"
-                  className="form-control text-xs"
+                  maxLength={4}
+                  className={getInputClass('foundedYear', 'form-control text-xs')}
                 />
+                {renderFieldError('foundedYear')}
               </div>
             </div>
           )}
@@ -473,11 +849,14 @@ export default function EditCompanyProfileModal({
                   </p>
                   <textarea
                     value={editData.description || ''}
-                    onChange={e => setEditData(d => ({ ...d, description: e.target.value }))}
-                    className="form-control text-xs leading-relaxed"
+                    onChange={e => handleDescriptionChange(e.target.value)}
+                    onBlur={handleDescriptionBlur}
+                    className={getInputClass('description', 'form-control text-xs leading-relaxed')}
                     rows={4}
+                    maxLength={3000}
                     placeholder="Conte sobre o início da empresa, as soluções desenvolvidas e o impacto no Vale do Ivaí..."
                   />
+                  {renderFieldError('description')}
                 </div>
 
                 <div className="form-group">
@@ -486,11 +865,14 @@ export default function EditCompanyProfileModal({
                   </label>
                   <textarea
                     value={editData.culture || ''}
-                    onChange={e => setEditData(d => ({ ...d, culture: e.target.value }))}
-                    className="form-control text-xs leading-relaxed"
+                    onChange={e => handleCultureChange(e.target.value)}
+                    onBlur={handleCultureBlur}
+                    className={getInputClass('culture', 'form-control text-xs leading-relaxed')}
                     rows={3}
+                    maxLength={2000}
                     placeholder="Nosso ambiente valoriza inovação contínua, colaboração aberta e bem-estar dos profissionais..."
                   />
+                  {renderFieldError('culture')}
                 </div>
               </div>
 
@@ -510,27 +892,39 @@ export default function EditCompanyProfileModal({
                   </span>
                 </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newBenefitInput}
-                    onChange={e => setNewBenefitInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addBenefitItem();
-                      }
-                    }}
-                    placeholder="Digite um benefício e aperte Enter..."
-                    className="form-control text-xs flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addBenefitItem()}
-                    className="btn btn-teal btn-sm text-xs font-bold shrink-0 flex items-center gap-1 cursor-pointer shadow-xs"
-                  >
-                    <Plus size={14} /> Adicionar
-                  </button>
+                <div className="space-y-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newBenefitInput}
+                      onChange={e => {
+                        setNewBenefitInput(e.target.value);
+                        if (benefitError) setBenefitError('');
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addBenefitItem();
+                        }
+                      }}
+                      placeholder="Digite um benefício e aperte Enter..."
+                      className={`form-control text-xs flex-1 ${benefitError ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
+                      maxLength={50}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addBenefitItem()}
+                      className="btn btn-teal btn-sm text-xs font-bold shrink-0 flex items-center gap-1 cursor-pointer shadow-xs"
+                    >
+                      <Plus size={14} /> Adicionar
+                    </button>
+                  </div>
+                  {benefitError && (
+                    <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400 text-[11px] font-semibold animate-in fade-in duration-150">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{benefitError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sugestões Rápidas */}
@@ -563,25 +957,43 @@ export default function EditCompanyProfileModal({
                       Nenhum benefício cadastrado. Adicione acima para atrair mais candidatos.
                     </p>
                   ) : (
-                    editData.benefits.map((b, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-2 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 px-3 py-1.5 rounded-xl shadow-2xs"
-                      >
-                        <Sparkles size={12} className="text-emerald-600" />
-                        <span>{b}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeBenefitItem(b)}
-                          className="p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-900 rounded-md transition-colors text-emerald-600 hover:text-red-600 cursor-pointer ml-1"
-                          title="Remover benefício"
+                    editData.benefits.map((b, idx) => {
+                      const bCheck = validateCompanyBenefitItem(b);
+                      const isInvalid = !bCheck.valid;
+                      return (
+                        <span
+                          key={idx}
+                          className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-2xs border ${
+                            isInvalid
+                              ? 'bg-red-50 dark:bg-red-950/70 text-red-800 dark:text-red-300 border-red-300 dark:border-red-800 ring-2 ring-red-400/30'
+                              : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80'
+                          }`}
+                          title={isInvalid ? bCheck.error : undefined}
                         >
-                          <X size={13} />
-                        </button>
-                      </span>
-                    ))
+                          {isInvalid ? (
+                            <AlertCircle size={12} className="text-red-600 dark:text-red-400 shrink-0" />
+                          ) : (
+                            <Sparkles size={12} className="text-emerald-600 shrink-0" />
+                          )}
+                          <span>{b}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeBenefitItem(b)}
+                            className={`p-0.5 rounded-md transition-colors cursor-pointer ml-1 ${
+                              isInvalid
+                                ? 'hover:bg-red-200 dark:hover:bg-red-900 text-red-600'
+                                : 'hover:bg-emerald-200 dark:hover:bg-emerald-900 text-emerald-600 hover:text-red-600'
+                            }`}
+                            title="Remover benefício"
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      );
+                    })
                   )}
                 </div>
+                {renderFieldError('benefits')}
               </div>
             </div>
           )}
@@ -604,10 +1016,12 @@ export default function EditCompanyProfileModal({
                     <input
                       type="url"
                       value={editData.website || ''}
-                      onChange={e => setEditData(d => ({ ...d, website: e.target.value }))}
+                      onChange={e => handleWebsiteChange(e.target.value)}
+                      onBlur={handleWebsiteBlur}
                       placeholder="https://suaempresa.com.br"
-                      className="form-control text-xs"
+                      className={getInputClass('website', 'form-control text-xs')}
                     />
+                    {renderFieldError('website')}
                   </div>
 
                   <div className="form-group">
@@ -617,10 +1031,12 @@ export default function EditCompanyProfileModal({
                     <input
                       type="email"
                       value={editData.email || ''}
-                      onChange={e => setEditData(d => ({ ...d, email: e.target.value }))}
+                      onChange={e => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
                       placeholder="rh@suaempresa.com.br"
-                      className="form-control text-xs"
+                      className={getInputClass('email', 'form-control text-xs')}
                     />
+                    {renderFieldError('email')}
                   </div>
                 </div>
 
@@ -631,12 +1047,14 @@ export default function EditCompanyProfileModal({
                       LinkedIn da Empresa
                     </label>
                     <input
-                      type="url"
+                      type="text"
                       value={editData.linkedin || ''}
-                      onChange={e => setEditData(d => ({ ...d, linkedin: e.target.value }))}
+                      onChange={e => handleLinkedInChange(e.target.value)}
+                      onBlur={handleLinkedInBlur}
                       placeholder="https://linkedin.com/company/sua-empresa"
-                      className="form-control text-xs"
+                      className={getInputClass('linkedin', 'form-control text-xs')}
                     />
+                    {renderFieldError('linkedin')}
                   </div>
 
                   <div className="form-group">
@@ -647,10 +1065,12 @@ export default function EditCompanyProfileModal({
                     <input
                       type="text"
                       value={editData.instagram || ''}
-                      onChange={e => setEditData(d => ({ ...d, instagram: e.target.value }))}
+                      onChange={e => handleInstagramChange(e.target.value)}
+                      onBlur={handleInstagramBlur}
                       placeholder="@suaempresa"
-                      className="form-control text-xs"
+                      className={getInputClass('instagram', 'form-control text-xs')}
                     />
+                    {renderFieldError('instagram')}
                   </div>
                 </div>
 
@@ -661,10 +1081,12 @@ export default function EditCompanyProfileModal({
                   <input
                     type="text"
                     value={editData.phone || ''}
-                    onChange={e => setEditData(d => ({ ...d, phone: e.target.value }))}
+                    onChange={e => handlePhoneChange(e.target.value)}
+                    onBlur={handlePhoneBlur}
                     placeholder="(43) 99999-9999"
-                    className="form-control text-xs"
+                    className={getInputClass('phone', 'form-control text-xs')}
                   />
+                  {renderFieldError('phone')}
                 </div>
               </div>
             </div>
@@ -685,7 +1107,7 @@ export default function EditCompanyProfileModal({
             <button
               type="submit"
               disabled={isSaving}
-              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isSaving ? (
                 <>
