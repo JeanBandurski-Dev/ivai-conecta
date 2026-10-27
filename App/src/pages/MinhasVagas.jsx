@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle, Clock, ArrowRight,
   ArrowLeft, Plus, Users, Eye, XCircle, RotateCcw, Phone, ShieldCheck, CheckCircle2,
-  Award, Send, X, FileText, Trash2, MessageSquare, Layers, Sparkles, ExternalLink, Bookmark
+  Award, Send, X, FileText, Trash2, MessageSquare, Layers, Sparkles, ExternalLink, Bookmark, Loader2
 } from 'lucide-react';
 import {
   getUserApplications, getJobs,
@@ -195,6 +195,9 @@ export default function MinhasVagas() {
   }, [teacherRequests, currentUser]);
 
   const [customQuote, setCustomQuote] = useState({});
+  const [processingRequestId, setProcessingRequestId] = useState(null);
+  const [processingActionType, setProcessingActionType] = useState(null);
+  const [reopeningJobId, setReopeningJobId] = useState(null);
 
   // Selected job to view applicants (for company view)
   const [selectedJobApplicants, setSelectedJobApplicants] = useState(null);
@@ -257,6 +260,8 @@ export default function MinhasVagas() {
   }
 
   const handleJobAction = async (jobId, action) => {
+    if (reopeningJobId) return;
+    setReopeningJobId(jobId);
     try {
       const updated = await updateJobStatus(jobId, action);
       if (Array.isArray(updated)) setLiveJobs(updated);
@@ -265,6 +270,8 @@ export default function MinhasVagas() {
     } catch (err) {
       console.error('Erro ao atualizar status da vaga:', err);
       showToast('Erro ao atualizar status da vaga.');
+    } finally {
+      setReopeningJobId(null);
     }
   };
 
@@ -322,23 +329,45 @@ export default function MinhasVagas() {
   };
 
   const handleApproveTeacherRequest = async (reqId) => {
-    const quoteText = customQuote[reqId] || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio lógico em disciplinas práticas.';
-    const res = await approveEndorsementRequest(reqId, quoteText, currentUser);
-    if (res.success) {
-      showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!');
-      forceUpdate(n => n + 1);
-    } else if (res.alreadyEndorsed) {
-      showToast('Você já recomendou este aluno. A solicitação foi concluída sem duplicar pareceres.');
-      forceUpdate(n => n + 1);
-    } else {
-      showToast(res.error || 'Erro ao conceder parecer.');
+    if (processingRequestId) return;
+    setProcessingRequestId(reqId);
+    setProcessingActionType('approve');
+    try {
+      const quoteText = customQuote[reqId] || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio lógico em disciplinas práticas.';
+      const res = await approveEndorsementRequest(reqId, quoteText, currentUser);
+      if (res.success) {
+        showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!');
+        forceUpdate(n => n + 1);
+      } else if (res.alreadyEndorsed) {
+        showToast('Você já recomendou este aluno. A solicitação foi concluída sem duplicar pareceres.');
+        forceUpdate(n => n + 1);
+      } else {
+        showToast(res.error || 'Erro ao conceder parecer.');
+      }
+    } catch (err) {
+      console.error('Erro ao aprovar solicitação:', err);
+      showToast('Erro ao conceder parecer.');
+    } finally {
+      setProcessingRequestId(null);
+      setProcessingActionType(null);
     }
   };
 
   const handleRejectTeacherRequest = async (reqId) => {
-    await rejectEndorsementRequest(reqId, currentUser);
-    showToast('Solicitação recusada.');
-    forceUpdate(n => n + 1);
+    if (processingRequestId) return;
+    setProcessingRequestId(reqId);
+    setProcessingActionType('reject');
+    try {
+      await rejectEndorsementRequest(reqId, currentUser);
+      showToast('Solicitação recusada.');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao recusar solicitação:', err);
+      showToast('Erro ao recusar solicitação.');
+    } finally {
+      setProcessingRequestId(null);
+      setProcessingActionType(null);
+    }
   };
 
   return (
@@ -462,9 +491,10 @@ export default function MinhasVagas() {
                       <div className="space-y-2">
                         <label className="form-label text-xs">Escreva seu Parecer / Avaliação Pedagógica:</label>
                         <textarea
+                          disabled={Boolean(processingRequestId)}
                           value={customQuote[req.id] || ''}
                           onChange={e => setCustomQuote({ ...customQuote, [req.id]: e.target.value })}
-                          className="form-control text-xs"
+                          className="form-control text-xs disabled:opacity-60"
                           rows={2}
                           placeholder="Ex: Estudante com excelente raciocínio prático, boa assiduidade e ótimo trabalho em equipe."
                         />
@@ -472,16 +502,40 @@ export default function MinhasVagas() {
 
                       <div className="flex items-center justify-end gap-3 pt-2">
                         <button
+                          type="button"
+                          disabled={Boolean(processingRequestId)}
                           onClick={() => handleRejectTeacherRequest(req.id)}
-                          className="btn btn-outline border-red-200 text-red-600 dark:text-red-400 hover:bg-red-50 btn-sm text-xs font-bold"
+                          className="btn btn-outline border-red-200 text-red-600 dark:text-red-400 hover:bg-red-50 btn-sm text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
                         >
-                          <X size={14} /> Recusar
+                          {processingRequestId === req.id && processingActionType === 'reject' ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>Recusando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <X size={14} />
+                              <span>Recusar</span>
+                            </>
+                          )}
                         </button>
                         <button
+                          type="button"
+                          disabled={Boolean(processingRequestId)}
                           onClick={() => handleApproveTeacherRequest(req.id)}
-                          className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
+                          className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
-                          <ShieldCheck size={15} /> Aprovar & Conceder Selo Verificado
+                          {processingRequestId === req.id && processingActionType === 'approve' ? (
+                            <>
+                              <Loader2 size={15} className="animate-spin" />
+                              <span>Concedendo Selo...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck size={15} />
+                              <span>Aprovar &amp; Conceder Selo Verificado</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -551,11 +605,11 @@ export default function MinhasVagas() {
           <div className="space-y-6 max-w-5xl mx-auto">
 
             {/* Seletor de Abas da Empresa */}
-            <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit shadow-2xs">
+            <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit max-w-full overflow-x-auto scrollbar-none shadow-2xs">
               <button
                 type="button"
                 onClick={() => handleTabChange('applications')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${candidateTab !== 'favorites'
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${candidateTab !== 'favorites'
                     ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
                     : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
@@ -573,7 +627,7 @@ export default function MinhasVagas() {
               <button
                 type="button"
                 onClick={() => handleTabChange('favorites')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${candidateTab === 'favorites'
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${candidateTab === 'favorites'
                     ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
                     : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
@@ -736,11 +790,17 @@ export default function MinhasVagas() {
 
                         {job.status === 'Encerrada' ? (
                           <button
+                            type="button"
+                            disabled={reopeningJobId === job.id}
                             onClick={() => handleJobAction(job.id, 'reopen')}
-                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            className="btn btn-outline border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/30 btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
                             title="Reabrir Vaga"
                           >
-                            <RotateCcw size={13} />
+                            {reopeningJobId === job.id ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <RotateCcw size={13} />
+                            )}
                           </button>
                         ) : (
                           <button
@@ -774,11 +834,11 @@ export default function MinhasVagas() {
           <div className="space-y-6 w-full">
 
             {/* Seletor de Abas do Candidato */}
-            <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit shadow-2xs">
+            <div className="flex items-center justify-center sm:justify-start gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700 w-fit max-w-full overflow-x-auto scrollbar-none shadow-2xs">
               <button
                 type="button"
                 onClick={() => setCandidateTab('applications')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${candidateTab === 'applications'
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${candidateTab === 'applications'
                     ? 'bg-white dark:bg-slate-900 text-primary-blue dark:text-blue-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
                     : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
@@ -796,7 +856,7 @@ export default function MinhasVagas() {
               <button
                 type="button"
                 onClick={() => handleTabChange('favorites')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   candidateTab === 'favorites'
                     ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-gray-200/80 dark:border-slate-700'
                     : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
