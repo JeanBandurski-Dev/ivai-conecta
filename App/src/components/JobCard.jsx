@@ -92,7 +92,7 @@ export default function JobCard({ job, matchScore, onSelect }) {
   const companyLinkTarget = `/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`;
 
   return (
-    <div className="card p-5 sm:p-5.5 gap-3.5 hover:border-primary-blue/40 transition-all group flex flex-col justify-between h-full relative rounded-2xl sm:rounded-3xl">
+    <div className="card p-5 sm:p-5.5 gap-3.5 hover:border-primary-blue/40 transition-all group flex flex-col justify-between h-full relative rounded-2xl sm:rounded-3xl min-w-0 overflow-hidden">
       <div className="space-y-3">
         {/* Top row */}
         <div className="flex items-start justify-between gap-2.5">
@@ -178,26 +178,27 @@ export default function JobCard({ job, matchScore, onSelect }) {
 
         {/* Benefits Badges */}
         {benefits.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 min-w-0">
             {benefits.slice(0, 2).map((b, i) => (
-              <span key={i} className="text-[11px] font-semibold bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-                <Check size={11} strokeWidth={3} /> {b}
+              <span key={i} className="text-[11px] font-semibold bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border border-green-200/70 dark:border-green-800/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 max-w-[150px] truncate">
+                <Check size={11} strokeWidth={3} className="shrink-0" />
+                <span className="truncate">{b}</span>
               </span>
             ))}
             {benefits.length > 2 && (
-              <span className="text-[11px] text-gray-400 dark:text-slate-400 self-center font-bold">+{benefits.length - 2}</span>
+              <span className="text-[11px] text-gray-400 dark:text-slate-400 self-center font-bold shrink-0">+{benefits.length - 2}</span>
             )}
           </div>
         )}
 
         {/* Skills */}
         {requiredSkills.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
+          <div className="flex flex-wrap gap-1.5 pt-0.5 min-w-0">
             {requiredSkills.slice(0, 3).map(skill => (
-              <span key={skill} className="tag text-[11px] px-2 py-0.5">{skill}</span>
+              <span key={skill} className="tag text-[11px] px-2 py-0.5 truncate max-w-[140px]">{skill}</span>
             ))}
             {requiredSkills.length > 3 && (
-              <span className="text-[11px] text-gray-400 dark:text-slate-400 self-center font-bold">+{requiredSkills.length - 3}</span>
+              <span className="text-[11px] text-gray-400 dark:text-slate-400 self-center font-bold shrink-0">+{requiredSkills.length - 3}</span>
             )}
           </div>
         )}

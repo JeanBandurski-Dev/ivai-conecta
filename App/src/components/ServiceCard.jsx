@@ -89,7 +89,7 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
         : (typeof rating === 'number' ? rating.toFixed(1) : (rating || '5.0')));
 
   return (
-    <div className="card gap-3 hover:border-primary-blue/30 transition-all flex flex-col h-full">
+    <div className="card gap-3 hover:border-primary-blue/30 transition-all flex flex-col h-full min-w-0 overflow-hidden">
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <span className="badge-endorsement">{category}</span>
@@ -109,8 +109,8 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
       </div>
 
       <div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{serviceTitle}</h3>
-        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 break-words">{serviceTitle}</h3>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 truncate">
           Por{' '}
           {providerProfileId ? (
             <Link
@@ -159,7 +159,7 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
         </div>
       )}
 
-      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed flex-1">{description}</p>
+      <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed flex-1 line-clamp-3 break-words">{description}</p>
 
       {/* Actions */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
