@@ -41,13 +41,18 @@ export function useServices(city = 'Todas as Cidades') {
     setError(null);
 
     const initial = getServices(city);
-    if (isMounted && Array.isArray(initial)) {
+    if (isMounted && Array.isArray(initial) && initial.length > 0) {
       setServices(initial);
       setIsLoading(false);
     }
 
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 6000);
+
     const unsubscribe = subscribeToServices(city, (updatedServices) => {
       if (!isMounted) return;
+      clearTimeout(timer);
       if (Array.isArray(updatedServices)) {
         setServices(updatedServices);
       }
@@ -56,6 +61,7 @@ export function useServices(city = 'Todas as Cidades') {
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }

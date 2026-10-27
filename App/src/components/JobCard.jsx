@@ -1,4 +1,4 @@
-import { MapPin, Eye, ShieldCheck, Bookmark, Check } from 'lucide-react';
+import { MapPin, Eye, ShieldCheck, Bookmark, Check, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { calculateMatchScore, safeSkillsArray, isJobFavorited, UserRole } from '../lib/ivaiConecta';

@@ -13,6 +13,16 @@ export default function Navbar() {
   const { currentUser, theme, toggleTheme, logout, showToast, openChat, favoriteJobs = [], favoriteTalents = [] } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  useEffect(() => {
+    if (!showLogoutModal) return;
+    const handleLogoutKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowLogoutModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleLogoutKeyDown);
+    return () => window.removeEventListener('keydown', handleLogoutKeyDown);
+  }, [showLogoutModal]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -123,7 +133,7 @@ export default function Navbar() {
               {currentUser && (
                 <button
                   onClick={() => openChat()}
-                  className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative"
+                  className="w-11 h-11 flex items-center justify-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:border-primary-blue dark:hover:border-blue-400 transition-all duration-200 shadow-xs cursor-pointer relative shrink-0"
                   title={unreadCount > 0 ? `${unreadCount} ${unreadCount === 1 ? 'mensagem não lida' : 'mensagens não lidas'}` : 'Mensagens & Chat'}
                   aria-label="Abrir chat"
                 >
@@ -139,7 +149,7 @@ export default function Navbar() {
               {/* Theme Switcher Button */}
               <button
                 onClick={toggleTheme}
-                className="p-2.5 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-amber-400 hover:border-primary-blue dark:hover:border-amber-400 transition-all duration-200 shadow-xs cursor-pointer"
+                className="w-11 h-11 flex items-center justify-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-600 dark:text-amber-400 hover:border-primary-blue dark:hover:border-amber-400 transition-all duration-200 shadow-xs cursor-pointer shrink-0"
                 title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
                 aria-label="Alternar tema"
               >
@@ -151,7 +161,9 @@ export default function Navbar() {
                   <button
                     onClick={() => setDropdownOpen(o => !o)}
                     className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 hover:border-primary-blue dark:hover:border-blue-400 transition-colors duration-200 bg-white dark:bg-slate-800 shadow-xs cursor-pointer"
-                    aria-label="Menu do usuário"
+                    aria-expanded={dropdownOpen}
+                    aria-haspopup="menu"
+                    aria-label="Menu da conta de usuário"
                   >
                     <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
                       {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
@@ -169,7 +181,9 @@ export default function Navbar() {
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div role="menu"
+                      aria-label="Opções do usuário"
+                      className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
                           {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
@@ -292,7 +306,7 @@ export default function Navbar() {
             <div className="flex md:hidden items-center gap-2">
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-amber-400 bg-white dark:bg-slate-800"
+                className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-amber-400 bg-white dark:bg-slate-800 cursor-pointer"
                 aria-label="Alternar tema"
               >
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -305,8 +319,10 @@ export default function Navbar() {
               )}
               <button
                 onClick={() => setMobileOpen(o => !o)}
-                className="p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:text-primary-blue hover:border-primary-blue transition-colors"
-                aria-label="Abrir menu"
+                className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:text-primary-blue hover:border-primary-blue transition-colors cursor-pointer"
+                aria-expanded={mobileOpen}
+                aria-controls="mobile-nav-drawer"
+                aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
               >
                 {mobileOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
@@ -317,7 +333,10 @@ export default function Navbar() {
 
         {/* ── MOBILE DRAWER ── */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
+          <div id="mobile-nav-drawer"
+            role="region"
+            aria-label="Navegação móvel"
+            className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
             <div className={`${isWidePage ? 'container-wide' : 'container'} py-4 space-y-1`}>
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Início</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
@@ -449,16 +468,38 @@ export default function Navbar() {
 
       {/* Logout modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowLogoutModal(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-brand-xl w-full max-w-sm p-7 border border-gray-100 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white mb-2">Deseja realmente sair?</h3>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-modal-title"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowLogoutModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-3xl shadow-brand-xl w-full max-w-sm p-7 border border-gray-100 dark:border-slate-700 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="logout-modal-title" className="font-heading text-xl font-bold text-primary-dark dark:text-white mb-2">
+              Deseja realmente sair?
+            </h3>
             <p className="text-sm text-gray-600 dark:text-slate-300 mb-6 leading-relaxed">
               Sua sessão no <strong className="text-primary-dark dark:text-white">Ivaí Conecta</strong> será encerrada. Você precisará entrar novamente para acessar seu perfil.
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowLogoutModal(false)} className="btn btn-outline btn-sm">Cancelar</button>
-              <button onClick={handleLogout} className="btn btn-danger btn-sm">Sair da Conta</button>
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="btn btn-outline btn-sm cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="btn btn-danger btn-sm cursor-pointer"
+              >
+                Sair da Conta
+              </button>
             </div>
           </div>
         </div>

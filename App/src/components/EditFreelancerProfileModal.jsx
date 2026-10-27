@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Camera, Upload, Plus, Trash2,
@@ -64,6 +64,15 @@ export default function EditFreelancerProfileModal({
     if (editData?.projects && editData.projects.length > 0) score += 10;
     return Math.min(100, score);
   }, [editData]);
+
+    useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSaving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, isSaving]);
 
   if (!isOpen) return null;
 

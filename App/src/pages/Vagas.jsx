@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench, Bookmark, Briefcase } from 'lucide-react';
+import { Search, Plus, X, Sparkles, SlidersHorizontal, RotateCcw, Check, Wrench, Bookmark, Briefcase, AlertCircle } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   calculateMatchScore, CITIES, getJobById, safeSkillsArray, matchCity,
   useJobs, UserRole, WorkplaceType, isJobFavorited
 } from '../lib/ivaiConecta';
 import JobCard from '../components/JobCard';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import JobDetailModal from '../components/JobDetailModal';
 import PublishJobModal from '../components/PublishJobModal';
 import CustomSelect from '../components/ui/CustomSelect';
@@ -68,7 +69,7 @@ export default function Vagas() {
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [selectedJob,   setSelectedJob]   = useState(null);
 
-  const { jobs: allJobs, refresh: refreshJobs } = useJobs('Todas as Cidades');
+  const { jobs: allJobs, isLoading, error, refresh: refreshJobs } = useJobs('Todas as Cidades');
 
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
   const isCompany = Boolean(
@@ -509,7 +510,13 @@ export default function Vagas() {
               )}
             </div>
 
-            {savedJobsList.length === 0 ? (
+            {isLoading && allJobs.length === 0 ? (
+              <div className="grid-3" aria-busy="true" aria-label="Carregando vagas salvas">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <SkeletonCard key={i} type="job" />
+                ))}
+              </div>
+            ) : savedJobsList.length === 0 ? (
               <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3 max-w-xl mx-auto my-6">
                 <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
                   <Bookmark size={32} className="fill-amber-500" />
@@ -556,7 +563,28 @@ export default function Vagas() {
         ) : (
           <>
             {/* ── GRID DE VAGAS ── */}
-            {filtered.length === 0 ? (
+            {isLoading && allJobs.length === 0 ? (
+              <div className="grid-3" aria-busy="true" aria-label="Carregando oportunidades de vagas">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} type="job" />
+                ))}
+              </div>
+            ) : error && allJobs.length === 0 ? (
+              <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/50 p-8 shadow-xs max-w-lg mx-auto">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle size={24} />
+                </div>
+                <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white mb-1">
+                  Falha ao carregar as vagas
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                  {error || 'Não foi possível carregar as vagas no momento. Verifique sua conexão com o servidor.'}
+                </p>
+                <button onClick={refreshJobs} className="btn btn-primary btn-sm text-xs font-bold cursor-pointer">
+                  <RotateCcw size={14} /> Tentar Novamente
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="py-20 text-center text-gray-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
                 <div className="flex justify-center mb-4">
                   <Search size={48} className="text-gray-300 dark:text-slate-600" />

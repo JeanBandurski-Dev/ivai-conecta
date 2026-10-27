@@ -151,6 +151,17 @@ export default function ChatModal({ onClose }) {
   const [isSending, setIsSending] = useState(false);
 
   const messagesEndRef = useRef(null);
+
+  // Fechar no Escape
+  useEffect(() => {
+    const handleEscapeKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEscapeKeyDown);
+    return () => window.removeEventListener('keydown', handleEscapeKeyDown);
+  }, [onClose]);
   const textareaRef = useRef(null);
 
   // Carrega lista de usuários reais do Firestore para novos contatos

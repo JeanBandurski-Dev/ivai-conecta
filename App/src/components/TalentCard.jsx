@@ -167,7 +167,7 @@ export default function TalentCard({ talent, isHighlighted = false }) {
                 avatar: (avatar && !isGenericPlaceholderAvatar(avatar)) ? avatar : ''
               }, `Contato com Talento: ${name}`);
             }}
-            className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-400 hover:bg-primary-blue hover:text-white transition-colors shrink-0 flex items-center justify-center shadow-xs cursor-pointer"
             title={`Iniciar Chat com ${name}`}
             aria-label="Abrir chat com talento"
           >

@@ -12,6 +12,7 @@ import {
   useServices, UserRole
 } from '../lib/ivaiConecta';
 import ServiceCard from '../components/ServiceCard';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import ServiceOrderCard from '../components/ServiceOrderCard';
 import AvaliarServicoModal from '../components/AvaliarServicoModal';
 import PublishServiceModal from '../components/PublishServiceModal';
@@ -84,7 +85,7 @@ export default function Servicos() {
     if (selectedCity) setCity(selectedCity);
   }, [selectedCity]);
 
-  const { services: all, refresh: refreshServices } = useServices('Todas as Cidades');
+  const { services: all, isLoading, error, refresh: refreshServices } = useServices('Todas as Cidades');
 
   // ── Service Orders Lifecycle State ──
   const [liveOrders, setLiveOrders] = useState(() => getServiceOrders());
@@ -835,7 +836,28 @@ export default function Servicos() {
             </div>
 
             {/* ── GRID DE SERVIÇOS ── */}
-            {filtered.length === 0 ? (
+            {isLoading && all.length === 0 ? (
+              <div className="grid-3" aria-busy="true" aria-label="Carregando serviços disponíveis">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} type="service" />
+                ))}
+              </div>
+            ) : error && all.length === 0 ? (
+              <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/50 p-8 shadow-xs max-w-lg mx-auto">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle size={24} />
+                </div>
+                <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white mb-1">
+                  Falha ao carregar os serviços
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                  {error || 'Não foi possível carregar os serviços no momento. Verifique sua conexão com o servidor.'}
+                </p>
+                <button onClick={refreshServices} className="btn btn-primary btn-sm text-xs font-bold cursor-pointer">
+                  <RotateCcw size={14} /> Tentar Novamente
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
                 <div className="flex justify-center mb-4">
                   <Search size={48} className="text-gray-300 dark:text-slate-600" />

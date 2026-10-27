@@ -31,15 +31,20 @@ export function useJobs(city = 'Todas as Cidades') {
     setIsLoading(true);
     setError(null);
 
-    // Emissão imediata do cache síncrono
+    // Emissão imediata do cache síncrono somente se houver registros
     const cached = getJobs(city);
-    if (isMounted && Array.isArray(cached)) {
+    if (isMounted && Array.isArray(cached) && cached.length > 0) {
       setJobs(cached);
       setIsLoading(false);
     }
 
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 6000);
+
     const unsubscribe = subscribeToJobs(city, (updatedJobs) => {
       if (!isMounted) return;
+      clearTimeout(timer);
       if (Array.isArray(updatedJobs)) {
         setJobs(updatedJobs);
       }
@@ -48,6 +53,7 @@ export function useJobs(city = 'Todas as Cidades') {
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }

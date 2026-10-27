@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Briefcase, DollarSign, FileText, X, Check, ChevronLeft, ChevronRight,
   MapPin, Phone, Sparkles, Building2, RefreshCw, Globe, ShieldCheck,
@@ -87,6 +87,17 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     description: '',
     responsibilities: []
   });
+
+    useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isPublishing) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isPublishing]);
 
   if (!isOpen) return null;
 

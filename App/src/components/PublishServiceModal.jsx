@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Wrench, Sparkles, AlertCircle, CheckCircle2,
@@ -55,6 +55,16 @@ export default function PublishServiceModal({ onClose, onSuccess }) {
 
   // Validação em tempo real do Telefone
   const phoneValidation = phone ? validatePhoneNumber(phone, true) : null;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, isSubmitting]);
 
   const handleUseTemplate = () => {
     const template = `Ofereço serviços profissionais de ${category} em ${city} e municípios do Vale do Ivaí.

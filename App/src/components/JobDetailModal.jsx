@@ -21,6 +21,17 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job?.status || 'Ativa');
 
+  // Fechamento no pressionamento da tecla Escape (Lei de Jakob)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!job || typeof job !== 'object') return null;
 
   const jobId = job.id || job.firestoreId || '';
@@ -251,7 +262,10 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
-      onClick={onClose}>
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="job-detail-title">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-2xl overflow-hidden my-8 border border-gray-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}>
         

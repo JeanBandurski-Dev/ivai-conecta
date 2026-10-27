@@ -38,17 +38,26 @@ export function useTalents(city = 'Todas as Cidades') {
     setIsLoading(true);
     setError(null);
 
-    // Carregamento síncrono inicial
+    // Carregamento síncrono inicial apenas se houver registros
     const initialTalents = getTalents(city);
     const initialTeachers = getVerifiedTeachers();
     if (isMounted) {
-      if (Array.isArray(initialTalents)) setTalents(initialTalents);
-      if (Array.isArray(initialTeachers)) setTeachers(initialTeachers);
-      setIsLoading(false);
+      if (Array.isArray(initialTalents) && initialTalents.length > 0) {
+        setTalents(initialTalents);
+        setIsLoading(false);
+      }
+      if (Array.isArray(initialTeachers) && initialTeachers.length > 0) {
+        setTeachers(initialTeachers);
+      }
     }
+
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 6000);
 
     const unsubTalents = subscribeToTalents(city, (updatedTalents) => {
       if (!isMounted) return;
+      clearTimeout(timer);
       if (Array.isArray(updatedTalents)) setTalents(updatedTalents);
       setIsLoading(false);
     });
@@ -60,6 +69,7 @@ export function useTalents(city = 'Todas as Cidades') {
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
       if (typeof unsubTalents === 'function') unsubTalents();
       if (typeof unsubTeachers === 'function') unsubTeachers();
     };

@@ -420,6 +420,24 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Quick Add Candidate Modal
   const [showAddCandidateModal, setShowAddCandidateModal] = useState(false);
+  // Listener global da tecla Escape para gaveta lateral e modais (Lei de Jakob)
+  useEffect(() => {
+    const handleEscGlobal = (e) => {
+      if (e.key === 'Escape') {
+        if (selectedCandidate) {
+          setSelectedCandidate(null);
+        } else if (showAddCandidateModal) {
+          setShowAddCandidateModal(false);
+        } else if (editingJob) {
+          setEditingJob(null);
+        } else if (showNewJobModal) {
+          setShowNewJobModal(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEscGlobal);
+    return () => window.removeEventListener('keydown', handleEscGlobal);
+  }, [selectedCandidate, showAddCandidateModal, editingJob, showNewJobModal]);
   const [addCandidateTargetStage, setAddCandidateTargetStage] = useState('triagem');
   const [newCandidateForm, setNewCandidateForm] = useState({
     name: '',
@@ -4831,7 +4849,7 @@ export default function GerenciamentoVagasEmpresa() {
           MODAL: ADICIONAR CANDIDATO MANUALMENTE NO QUADRO
       ═════════════════════════════════════════════════════════════════ */}
         {showAddCandidateModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby="add-cand-modal-title" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl w-full max-w-lg my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -4966,7 +4984,7 @@ export default function GerenciamentoVagasEmpresa() {
           MODAL: EDITAR VAGA EXISTENTE
       ═════════════════════════════════════════════════════════════════ */}
         {editingJob && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-job-modal-title" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl w-full max-w-xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="font-heading text-lg font-bold text-gray-900 dark:text-white">Editar Dados da Vaga</h3>

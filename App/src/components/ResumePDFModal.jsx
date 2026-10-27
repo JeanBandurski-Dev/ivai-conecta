@@ -310,6 +310,9 @@ export default function ResumePDFModal({ talent, onClose }) {
 
       <div
         id="resume-modal-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resume-modal-title"
         className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto"
         onClick={onClose}
       >

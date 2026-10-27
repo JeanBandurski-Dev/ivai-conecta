@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   X, Camera, Upload, Plus, Building2,
   Globe, Sparkles, Save, HeartHandshake, MapPin, Mail,
@@ -119,6 +119,15 @@ export default function EditCompanyProfileModal({
     });
     return counts;
   }, [errors]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSaving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, isSaving]);
 
   if (!isOpen) return null;
 
@@ -434,7 +443,10 @@ export default function EditCompanyProfileModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+    <div role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-company-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-200">
         
         {/* Cabeçalho Premium com Indicador de Completude */}

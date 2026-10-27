@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   GraduationCap, UserCheck, Wrench, Briefcase, Building2, Lock, ShieldCheck,
   CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Mail, Sparkles,
-  ArrowRight, MapPin
+  ArrowRight, MapPin, X
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail, isInstitutionalEmail, inferInstitutionFromEmail } from '../lib/ivaiConecta';
@@ -420,12 +420,25 @@ export default function Login() {
 
             {/* Alerta de Erro Amigável */}
             {alert && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl space-y-1.5 animate-in fade-in duration-300">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl space-y-1.5 animate-in fade-in duration-300"
+              >
                 <div className="flex items-start gap-2.5">
                   <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-red-800 dark:text-red-200 leading-snug" dangerouslySetInnerHTML={{ __html: alert }} />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setAlert('')}
+                    className="p-1 -mr-1 -mt-1 rounded-lg text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-100/50 dark:hover:bg-red-900/40 transition-colors cursor-pointer"
+                    title="Fechar alerta de erro"
+                    aria-label="Fechar alerta de erro"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
             )}

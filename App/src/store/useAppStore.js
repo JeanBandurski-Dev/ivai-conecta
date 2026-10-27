@@ -281,6 +281,10 @@ const useAppStore = create((set, get) => ({
     }, dur);
   },
 
+  removeToast: (id) => {
+    set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
+  },
+
   // ─── Modal Dialog State (Alert & Confirm) ─────────────────
   confirmDialog: null,
 

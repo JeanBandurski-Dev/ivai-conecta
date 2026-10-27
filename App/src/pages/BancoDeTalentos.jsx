@@ -2,12 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search, X, Sparkles, RotateCcw,
-  ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap, Bookmark
+  ArrowLeft, ShieldCheck, Award, Eye, UserCheck, GraduationCap, Bookmark, AlertCircle
 } from 'lucide-react';
 import {
   getTeacherEndorsedStudents, CITIES, matchCity, useTalents, isTalentFavorited
 } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
 
@@ -65,7 +66,7 @@ export default function BancoDeTalentos() {
   // Modal to view students endorsed by a specific teacher
   const [selectedTeacherForEndorsements, setSelectedTeacherForEndorsements] = useState(null);
 
-  const { talents: all, teachers } = useTalents('Todas as Cidades');
+  const { talents: all, teachers, isLoading, error, refresh: refreshTalents } = useTalents('Todas as Cidades');
 
   const highlightedTalents = useMemo(() => {
     return all.filter(t => t.isVerifiedStudent && t.endorsements && t.endorsements.length >= 1).slice(0, 4);
@@ -470,7 +471,28 @@ export default function BancoDeTalentos() {
             </div>
 
             {/* ── GRID DE TALENTOS ── */}
-            {filtered.length === 0 ? (
+            {isLoading && all.length === 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full max-w-full" aria-busy="true" aria-label="Carregando banco de talentos">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} type="talent" />
+                ))}
+              </div>
+            ) : error && all.length === 0 ? (
+              <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/50 p-8 shadow-xs max-w-lg mx-auto">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle size={24} />
+                </div>
+                <h3 className="font-heading font-bold text-base text-gray-900 dark:text-white mb-1">
+                  Falha ao carregar banco de talentos
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                  {error || 'Não foi possível carregar os perfis de talentos no momento. Verifique sua conexão.'}
+                </p>
+                <button onClick={refreshTalents} className="btn btn-primary btn-sm text-xs font-bold cursor-pointer">
+                  <RotateCcw size={14} /> Tentar Novamente
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="py-16 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs w-full">
                 <div className="flex justify-center mb-4">
                   <Search size={48} className="text-gray-300 dark:text-slate-600" />
