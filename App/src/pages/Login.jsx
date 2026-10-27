@@ -26,6 +26,7 @@ export default function Login() {
   const [selectedRole, setRole] = useState('aluno');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [alert, setAlert] = useState('');
 
   // Password visibility
   const [showLoginPass, setShowLoginPass] = useState(false);
