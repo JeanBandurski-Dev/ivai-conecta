@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
   Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users, Bookmark,
-  Wrench, GraduationCap, ShieldAlert, AlertCircle, ExternalLink
+  Wrench, GraduationCap, ShieldAlert, AlertCircle, ExternalLink, Loader2
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -18,6 +18,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith, favoriteJobs = [], toggleFavoriteJob } = useAppStore();
   const [applied, setApplied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job?.status || 'Ativa');
 
   if (!job || typeof job !== 'object') return null;
@@ -138,11 +139,20 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   }, [job, jobId, currentUser, isCandidate, isFreelancer]);
 
   const handleToggleJobStatus = async () => {
-    const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
-    await updateJobStatus(jobId, action);
-    const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
-    setCurrentStatus(newStatus);
-    showToast(action === 'close' ? 'Vaga encerrada com sucesso!' : 'Vaga reaberta com sucesso!');
+    if (isTogglingStatus) return;
+    setIsTogglingStatus(true);
+    try {
+      const action = currentStatus === 'Ativa' ? 'close' : 'reopen';
+      await updateJobStatus(jobId, action);
+      const newStatus = action === 'close' ? 'Encerrada' : 'Ativa';
+      setCurrentStatus(newStatus);
+      showToast(action === 'close' ? 'Vaga encerrada com sucesso!' : 'Vaga reaberta com sucesso!');
+    } catch (err) {
+      console.error('Erro ao alterar status da vaga:', err);
+      showToast('Erro ao alterar status da vaga.');
+    } finally {
+      setIsTogglingStatus(false);
+    }
   };
 
   const handleApply = async () => {
@@ -496,17 +506,9 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
         {/* Modal Footer */}
         <div className="p-5 sm:p-6 bg-gray-50 dark:bg-slate-800/80 border-t border-gray-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <button onClick={onClose} className="btn btn-outline btn-sm font-semibold text-gray-600 dark:text-slate-300">
+            <button onClick={onClose} className="btn btn-outline btn-sm font-semibold text-gray-600 dark:text-slate-300 cursor-pointer">
               Fechar
             </button>
-            <Link
-              to={`/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`}
-              onClick={onClose}
-              className="btn btn-outline btn-sm text-xs font-bold text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600 hover:border-primary-blue hover:text-primary-blue dark:hover:text-blue-400 transition-all flex items-center gap-1.5 cursor-pointer"
-              title={`Ver perfil da empresa ${company}`}
-            >
-              <Building2 size={14} /> Ver Empresa
-            </Link>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -549,14 +551,20 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  disabled={isTogglingStatus}
                   onClick={handleToggleJobStatus}
-                  className={`btn btn-sm text-xs font-bold flex items-center gap-1.5 border transition-all ${
+                  className={`btn btn-sm text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                     currentStatus === 'Encerrada'
                       ? 'border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/40 hover:bg-green-100'
                       : 'border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
                   }`}
                 >
-                  {currentStatus === 'Encerrada' ? (
+                  {isTogglingStatus ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>{currentStatus === 'Encerrada' ? 'Reabrindo...' : 'Encerrando...'}</span>
+                    </>
+                  ) : currentStatus === 'Encerrada' ? (
                     <><RotateCcw size={14} /> Reabrir Vaga</>
                   ) : (
                     <><XCircle size={14} /> Encerrar Vaga</>
@@ -565,7 +573,7 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 <Link
                   to="/minhas-vagas"
                   onClick={onClose}
-                  className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md"
+                  className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer"
                 >
                   <Building2 size={14} /> Gerenciar Candidatos
                 </Link>
