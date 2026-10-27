@@ -4,7 +4,7 @@ import {
   X, Camera, Upload, Plus, Trash2,
   Globe, Sparkles, Save, User,
   ExternalLink, MapPin, Phone, Wrench,
-  CheckCircle2, FileText, Wand2
+  CheckCircle2, FileText, Wand2, Loader2
 } from 'lucide-react';
 import { CITIES, maskPhone, maskCNPJ } from '../lib/ivaiConecta';
 import { validatePhoneNumber } from '../services/jobTaxonomy';
@@ -46,7 +46,8 @@ export default function EditFreelancerProfileModal({
   setEditData,
   handleSaveProfile,
   handleAvatarFileChange,
-  handleBannerFileChange
+  handleBannerFileChange,
+  isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const [newSkill, setNewSkill] = useState('');
@@ -113,15 +114,17 @@ export default function EditFreelancerProfileModal({
 
   const modalContent = (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
-      onClick={onClose}>
+      onClick={() => !isSaving && onClose()}>
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden my-6 border border-gray-100 dark:border-slate-800 flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}>
         
         {/* Header Modal */}
         <div className="p-6 bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white relative shrink-0">
           <button
+            type="button"
+            disabled={isSaving}
             onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Fechar"
           >
             <X size={18} />
@@ -656,16 +659,27 @@ export default function EditFreelancerProfileModal({
           <div className="pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
-              className="btn btn-outline btn-sm text-xs font-semibold"
+              className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5"
+              disabled={isSaving}
+              className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save size={14} /> Salvar Perfil Freelancer
+              {isSaving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={14} /> Salvar Perfil Freelancer
+                </>
+              )}
             </button>
           </div>
         </form>

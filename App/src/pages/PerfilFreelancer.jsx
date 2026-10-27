@@ -39,6 +39,7 @@ export default function PerfilFreelancer() {
     }
   }, [searchParams]);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
 
@@ -188,6 +189,7 @@ export default function PerfilFreelancer() {
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
+    setIsSaving(true);
     try {
       const payload = {
         name: editData.name,
@@ -215,6 +217,8 @@ export default function PerfilFreelancer() {
       setEditModalOpen(false);
     } catch {
       showToast('Erro ao atualizar perfil.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -779,12 +783,13 @@ export default function PerfilFreelancer() {
       {editModalOpen && (
         <EditFreelancerProfileModal
           isOpen={editModalOpen}
-          onClose={() => setEditModalOpen(false)}
+          onClose={() => !isSaving && setEditModalOpen(false)}
           editData={editData}
           setEditData={setEditData}
           handleSaveProfile={handleSaveProfile}
           handleAvatarFileChange={handleAvatarFileChange}
           handleBannerFileChange={handleBannerFileChange}
+          isSaving={isSaving}
         />
       )}
 

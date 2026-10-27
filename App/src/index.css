@@ -103,6 +103,28 @@
       padding-right: 1.5rem !important;
     }
   }
+
+  /* ── Container Amplo / Telas de Gestão Avançada (Kanban) ── */
+  .container-wide {
+    width: 100% !important;
+    max-width: 1720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  @media (min-width: 640px) {
+    .container-wide {
+      padding-left: 1.5rem !important;
+      padding-right: 1.5rem !important;
+    }
+  }
+  @media (min-width: 1024px) {
+    .container-wide {
+      padding-left: 2rem !important;
+      padding-right: 2rem !important;
+    }
+  }
   .section {
     padding-top: 3.5rem;
     padding-bottom: 3.5rem;

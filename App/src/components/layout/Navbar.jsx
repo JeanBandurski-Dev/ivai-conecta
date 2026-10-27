@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, ChevronDown, Settings, LogOut, Briefcase, Star,
   Building2, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert, FileText
@@ -16,7 +16,10 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const isWidePage = location.pathname.startsWith('/gerenciamento-vagas') || location.pathname.startsWith('/painel-empresa');
 
   // Escuta contagem real de mensagens não lidas
   useEffect(() => {
@@ -82,7 +85,7 @@ export default function Navbar() {
   return (
     <>
       <nav className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 dark:border-slate-800 shadow-xs transition-colors duration-300">
-        <div className="container mx-auto">
+        <div className={isWidePage ? 'container-wide' : 'container mx-auto'}>
           <div className="flex items-center justify-between h-[74px] gap-3 lg:gap-6 w-full max-w-full">
 
             {/* Logo */}
@@ -326,7 +329,7 @@ export default function Navbar() {
         {/* ── MOBILE DRAWER ── */}
         {mobileOpen && (
           <div className="md:hidden border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg">
-            <div className="container py-4 space-y-1">
+            <div className={`${isWidePage ? 'container-wide' : 'container'} py-4 space-y-1`}>
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Início</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>

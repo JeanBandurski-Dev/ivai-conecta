@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
   Send, Edit3, ArrowLeft, X, BookOpen, Briefcase, FolderKanban,
-  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, CheckCircle2, Clock, ChevronDown, User, Mail
+  Printer, ExternalLink, Camera, MessageSquare, Lock, Sparkles, Check, CheckCircle, CheckCircle2, Clock, ChevronDown, User, Mail, Loader2
 } from 'lucide-react';
 import {
   getTalentById, requestTeacherEndorsement, updateTalentProfile,
@@ -74,6 +74,8 @@ export default function PerfilAluno() {
   const [proactiveEndorseModal, setProactiveEndorseModal] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [isSubmittingProactive, setIsSubmittingProactive] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [successBanner, setSuccessBanner] = useState(null);
 
   // 4. Formulários de endosso
@@ -390,6 +392,7 @@ export default function PerfilAluno() {
       setError('Você já possui uma solicitação pendente enviada para este professor(a). Aguarde a avaliação.');
       return;
     }
+    if (isSubmittingRequest) return;
     setError('');
     setIsSubmittingRequest(true);
 
@@ -414,8 +417,6 @@ export default function PerfilAluno() {
         selectedTeacher
       );
 
-      setIsSubmittingRequest(false);
-
       if (res.success) {
         // Sai da tela imediatamente
         setRequestModal(false);
@@ -431,9 +432,10 @@ export default function PerfilAluno() {
         showToast(res.message || 'Erro ao enviar solicitação.', 'error');
       }
     } catch (err) {
-      setIsSubmittingRequest(false);
       setError(err.message || 'Erro ao enviar solicitação.');
       showToast(err.message || 'Erro ao processar solicitação.', 'error');
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -444,13 +446,21 @@ export default function PerfilAluno() {
       setProactiveEndorseModal(false);
       return;
     }
-    const res = await proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
-    if (res.success) {
-      showToast(`Recomendação concedida com sucesso para ${talent.name}!`);
-      setProactiveEndorseModal(false);
-      setProactiveQuote('');
-    } else {
-      showToast(res.error || 'Não foi possível conceder recomendação.');
+    if (isSubmittingProactive) return;
+    setIsSubmittingProactive(true);
+    try {
+      const res = await proactiveEndorseStudent(talent.id, currentUser, proactiveQuote, proactiveDiscipline);
+      if (res.success) {
+        showToast(`Recomendação concedida com sucesso para ${talent.name}!`);
+        setProactiveEndorseModal(false);
+        setProactiveQuote('');
+      } else {
+        showToast(res.error || 'Não foi possível conceder recomendação.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro ao processar recomendação.', 'error');
+    } finally {
+      setIsSubmittingProactive(false);
     }
   };
 
@@ -470,34 +480,42 @@ export default function PerfilAluno() {
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
-    const targetId = talent?.id || currentUser?.uid || currentUser?.id;
-    if (targetId) {
-      updateTalentProfile(targetId, editData);
-      try {
-        await setDoc(doc(db, 'users', String(targetId)), {
-          ...editData,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn('[PerfilAluno] Erro ao sincronizar edição no Firestore:', dbErr);
+    if (isSavingProfile) return;
+    setIsSavingProfile(true);
+    try {
+      const targetId = talent?.id || currentUser?.uid || currentUser?.id;
+      if (targetId) {
+        updateTalentProfile(targetId, editData);
+        try {
+          await setDoc(doc(db, 'users', String(targetId)), {
+            ...editData,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (dbErr) {
+          console.warn('[PerfilAluno] Erro ao sincronizar edição no Firestore:', dbErr);
+        }
       }
-    }
 
-    // Se o usuário logado for o proprietário, atualiza a store global
-    if (isOwner && currentUser) {
-      setCurrentUser({
-        ...currentUser,
+      // Se o usuário logado for o proprietário, atualiza a store global
+      if (isOwner && currentUser) {
+        setCurrentUser({
+          ...currentUser,
+          ...editData
+        });
+      }
+
+      setTalent(prev => ({
+        ...prev,
         ...editData
-      });
+      }));
+
+      showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
+      handleCloseEditModal();
+    } catch (err) {
+      showToast('Erro ao salvar perfil.', 'error');
+    } finally {
+      setIsSavingProfile(false);
     }
-
-    setTalent(prev => ({
-      ...prev,
-      ...editData
-    }));
-
-    showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
-    handleCloseEditModal();
   };
 
 
@@ -789,10 +807,10 @@ export default function PerfilAluno() {
           </div>
 
           {/* Abas Principais */}
-          <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 overflow-x-auto">
+          <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 overflow-x-auto scrollbar-none w-full max-w-full">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'overview' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -800,7 +818,7 @@ export default function PerfilAluno() {
             </button>
             <button
               onClick={() => setActiveTab('experience')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'experience' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -808,7 +826,7 @@ export default function PerfilAluno() {
             </button>
             <button
               onClick={() => setActiveTab('endorsements')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'endorsements' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -1037,13 +1055,20 @@ export default function PerfilAluno() {
       {/* Modal: Recomendação Proativa pelo Professor */}
       {proactiveEndorseModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setProactiveEndorseModal(false)}>
+          onClick={() => !isSubmittingProactive && setProactiveEndorseModal(false)}>
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
               <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                 <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name || 'Estudante'}
               </h3>
-              <button onClick={() => setProactiveEndorseModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" /></button>
+              <button
+                type="button"
+                disabled={isSubmittingProactive}
+                onClick={() => setProactiveEndorseModal(false)}
+                className="cursor-pointer disabled:opacity-50"
+              >
+                <X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" />
+              </button>
             </div>
 
             <p className="text-xs text-gray-500 dark:text-slate-400 mb-4 leading-relaxed">
@@ -1060,6 +1085,7 @@ export default function PerfilAluno() {
                   className="form-control"
                   placeholder="Ex: Programação de Computadores"
                   required
+                  disabled={isSubmittingProactive}
                 />
               </div>
 
@@ -1072,13 +1098,35 @@ export default function PerfilAluno() {
                   rows={3}
                   placeholder="Escreva sobre a assiduidade, qualidade dos trabalhos e competências técnicas do aluno..."
                   required
+                  disabled={isSubmittingProactive}
                 />
               </div>
 
               <div className="flex gap-3 justify-end pt-3">
-                <button type="button" onClick={() => setProactiveEndorseModal(false)} className="btn btn-outline btn-sm font-semibold">Cancelar</button>
-                <button type="submit" className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5">
-                  <ShieldCheck size={16} /> Conceder Parecer Verificado
+                <button
+                  type="button"
+                  disabled={isSubmittingProactive}
+                  onClick={() => setProactiveEndorseModal(false)}
+                  className="btn btn-outline btn-sm font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingProactive}
+                  className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingProactive ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin shrink-0" />
+                      <span>Concedendo Parecer...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={16} className="shrink-0" />
+                      <span>Conceder Parecer Verificado</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1086,16 +1134,16 @@ export default function PerfilAluno() {
         </div>
       )}
 
-      {/* Banner Verde Claro de Sucesso Após Envio de Solicitação - Canto Esquerdo */}
+      {/* Banner Verde Claro de Sucesso Após Envio de Solicitação - Responsivo sem overflow */}
       {successBanner && (
-        <div className="fixed bottom-6 left-6 z-[300] max-w-sm w-full bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl border border-emerald-400 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-5 duration-300">
-          <div className="flex items-center gap-3">
+        <div className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-auto sm:max-w-sm z-[300] bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl border border-emerald-400 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               <CheckCircle2 size={20} className="text-white" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="font-bold text-xs sm:text-sm leading-tight">Solicitação Enviada!</div>
-              <div className="text-[11px] sm:text-xs text-emerald-100 mt-0.5 leading-snug">{successBanner}</div>
+              <div className="text-[11px] sm:text-xs text-emerald-100 mt-0.5 leading-snug break-words">{successBanner}</div>
             </div>
           </div>
           <button
@@ -1111,7 +1159,7 @@ export default function PerfilAluno() {
       {/* Modal: Pedir Recomendação a Professor (Para Alunos) */}
       {requestModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => { setRequestModal(false); setNameInputFocused(false); }}>
+          onClick={() => { if (!isSubmittingRequest) { setRequestModal(false); setNameInputFocused(false); } }}>
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-6 sm:p-7 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5 border-b border-gray-100 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1128,8 +1176,10 @@ export default function PerfilAluno() {
                 </div>
               </div>
               <button
+                type="button"
+                disabled={isSubmittingRequest}
                 onClick={() => { setRequestModal(false); setNameInputFocused(false); }}
-                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <X size={20} />
               </button>
@@ -1378,8 +1428,9 @@ export default function PerfilAluno() {
               <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isSubmittingRequest}
                   onClick={() => { setRequestModal(false); setNameInputFocused(false); }}
-                  className="px-5 py-2.5 rounded-xl font-bold text-xs text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-gray-200 dark:border-slate-700"
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-gray-200 dark:border-slate-700 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -1390,12 +1441,13 @@ export default function PerfilAluno() {
                 >
                   {isSubmittingRequest ? (
                     <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Enviando...
+                      <Loader2 size={15} className="animate-spin shrink-0" />
+                      <span>Enviando solicitação...</span>
                     </>
                   ) : (
                     <>
-                      <Send size={14} /> Enviar Solicitação
+                      <Send size={14} className="shrink-0" />
+                      <span>Enviar Solicitação</span>
                     </>
                   )}
                 </button>
@@ -1421,7 +1473,7 @@ export default function PerfilAluno() {
       {/* Modal: Edição Completa de Perfil & Currículo Estilo Gupy */}
       <EditProfileModal
         isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+        onClose={() => !isSavingProfile && setEditModalOpen(false)}
         editData={editData}
         setEditData={setEditData}
         role={currentUser?.role || talent?.role || 'aluno'}
@@ -1435,6 +1487,7 @@ export default function PerfilAluno() {
         setNewExp={setNewExp}
         newProj={newProj}
         setNewProj={setNewProj}
+        isSaving={isSavingProfile}
       />
     </>
   );

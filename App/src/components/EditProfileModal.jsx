@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   X, Camera, Upload, Edit3, Plus, Trash2, Briefcase, GraduationCap,
   Globe, Sparkles, Save, FolderGit2,
-  User, ExternalLink, AlertCircle
+  User, ExternalLink, AlertCircle, Loader2
 } from 'lucide-react';
 import { validateSkill } from '../lib/ivaiConecta';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
@@ -38,7 +38,8 @@ export default function EditProfileModal({
   newExp = { role: '', company: '', period: '', description: '' },
   setNewExp,
   newProj = { title: '', tech: '', link: '', description: '' },
-  setNewProj
+  setNewProj,
+  isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const [skillInputError, setSkillInputError] = useState('');
@@ -48,11 +49,11 @@ export default function EditProfileModal({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !isSaving) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isSaving]);
 
   // Calcula a taxa de completude do perfil em tempo real
   const completionPercentage = useMemo(() => {
@@ -78,10 +79,10 @@ export default function EditProfileModal({
 
   if (!isOpen) return null;
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     if (e) e.preventDefault();
-    handleSaveProfile(e);
-    onClose();
+    if (isSaving) return;
+    await handleSaveProfile(e);
   };
 
   const handleAddSkillLocal = (skillToAdd) => {
@@ -146,8 +147,9 @@ export default function EditProfileModal({
 
             <button
               type="button"
+              disabled={isSaving}
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10 hover:scale-105 active:scale-95"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Fechar Janela"
             >
               <X size={18} />
@@ -830,16 +832,27 @@ export default function EditProfileModal({
             <div className="flex items-center gap-2.5 ml-auto">
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={onClose}
-                className="btn btn-outline btn-sm font-bold text-xs px-4 py-2 cursor-pointer"
+                className="btn btn-outline btn-sm font-bold text-xs px-4 py-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="btn btn-primary btn-sm font-extrabold text-xs px-6 py-2.5 flex items-center gap-2 shadow-brand-sm hover:shadow-brand-md cursor-pointer hover:scale-[1.02] active:scale-95"
+                disabled={isSaving}
+                className="btn btn-primary btn-sm font-extrabold text-xs px-6 py-2.5 flex items-center gap-2 shadow-brand-sm hover:shadow-brand-md cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Save size={15} /> Salvar Perfil Completo
+                {isSaving ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={15} /> Salvar Perfil Completo
+                  </>
+                )}
               </button>
             </div>
           </div>

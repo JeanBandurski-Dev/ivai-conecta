@@ -1392,7 +1392,7 @@ export default function GerenciamentoVagasEmpresa() {
 
       {/* ── HEADER MINIMALISTA ── */}
       <header className="bg-white dark:bg-slate-900 py-6 lg:py-8 border-b border-gray-200 dark:border-slate-800">
-        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container-wide">
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-slate-400 mb-4">
             <button
               onClick={() => navigate(-1)}
@@ -1516,7 +1516,7 @@ export default function GerenciamentoVagasEmpresa() {
         };
 
         return (
-          <div className={`fixed bottom-6 right-6 z-50 w-[360px] rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] bg-gradient-to-br ${bannerStyles[activeCand.interviewStatus]} overflow-hidden animate-in slide-in-from-bottom-8 fade-in duration-500 transition-colors`}>
+          <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 left-4 sm:left-auto sm:w-[360px] max-w-[calc(100vw-2rem)] z-50 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] bg-gradient-to-br ${bannerStyles[activeCand.interviewStatus]} overflow-hidden animate-in slide-in-from-bottom-8 fade-in duration-500 transition-colors`}>
             {/* Animated Background Elements */}
             <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 rounded-full bg-white opacity-10 blur-2xl animate-pulse"></div>
             <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-32 h-32 rounded-full bg-white opacity-10 blur-2xl animate-pulse delay-700"></div>
@@ -1626,7 +1626,7 @@ export default function GerenciamentoVagasEmpresa() {
         );
       })()}
 
-      <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="container-wide py-6">
 
         {/* ═════════════════════════════════════════════════════════════════
             TAB 1: FUNIL DE RECRUTAMENTO & PIPELINE (KANBAN ATS REVAMP)
@@ -2043,7 +2043,7 @@ export default function GerenciamentoVagasEmpresa() {
                             const stageCandidates = filteredCandidates.filter(c => c.stage === stage.id);
                             const style = getStageStyle(stage.id, stage.color);
                             const isDragOver = dragOverStageId === stage.id;
-                            const _isSingleColumn = selectedStageFilter !== 'todos';
+                            const isSingleColumn = selectedStageFilter !== 'todos';
 
                             return (
                               <div
@@ -2051,7 +2051,11 @@ export default function GerenciamentoVagasEmpresa() {
                                 onDragOver={e => handleDragOver(e, stage.id)}
                                 onDragLeave={e => handleDragLeave(e, stage.id)}
                                 onDrop={e => handleDrop(e, stage.id)}
-                                className={`w-[330px] min-w-[330px] max-w-[330px] shrink-0 flex flex-col rounded-3xl p-3.5 transition-all duration-200 border shadow-sm ${isDragOver
+                                className={`${
+                                  isSingleColumn
+                                    ? 'w-full max-w-2xl mx-auto'
+                                    : 'w-[calc(100vw-2.5rem)] sm:w-[330px] sm:min-w-[330px] sm:max-w-[330px] shrink-0'
+                                } flex flex-col rounded-3xl p-3.5 transition-all duration-200 border shadow-sm ${isDragOver
                                     ? `${style.dropHighlight} ring-2 ring-primary-blue/60 scale-[1.01]`
                                     : 'bg-slate-100/70 dark:bg-slate-900/60 border-slate-200/90 dark:border-slate-800/90'
                                   }`}
@@ -2285,39 +2289,39 @@ export default function GerenciamentoVagasEmpresa() {
                                               </div>
 
                                               {/* Actions Group */}
-                                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                              <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
 
                                                 {/* Quick Shift Left */}
                                                 <button
                                                   onClick={() => handleShiftStage(cand, 'prev')}
                                                   disabled={customStages.findIndex(s => s.id === cand.stage) === 0}
-                                                  className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
                                                   title="Mover para etapa anterior"
                                                 >
-                                                  <ChevronLeft size={13} />
+                                                  <ChevronLeft size={14} />
                                                 </button>
 
                                                 {/* Quick Shift Right */}
                                                 <button
                                                   onClick={() => handleShiftStage(cand, 'next')}
                                                   disabled={customStages.findIndex(s => s.id === cand.stage) === customStages.length - 1}
-                                                  className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
                                                   title="Avançar para próxima etapa"
                                                 >
-                                                  <ChevronRight size={13} />
+                                                  <ChevronRight size={14} />
                                                 </button>
 
                                                 {/* Interview Button */}
                                                 <button
                                                   onClick={() => handleOpenCandidateModal(cand, 'interview')}
-                                                  className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer border ${
+                                                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer border ${
                                                     cand.interview
                                                       ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                                                       : 'text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-700 border-transparent'
                                                   }`}
                                                   title={cand.interview ? 'Ver / Reagendar entrevista' : 'Agendar entrevista'}
                                                 >
-                                                  <Calendar size={11} />
+                                                  <Calendar size={13} />
                                                 </button>
 
                                                 {/* Chat Button */}
@@ -2333,10 +2337,10 @@ export default function GerenciamentoVagasEmpresa() {
                                                       avatar: cand.avatar
                                                     }, `Processo Seletivo: ${currentJob?.title || 'Vaga'}`);
                                                   }}
-                                                  className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-primary-blue dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-primary-blue dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
                                                   title="Abrir chat no Ivaí Conecta"
                                                 >
-                                                  <MessageSquare size={11} />
+                                                  <MessageSquare size={13} />
                                                 </button>
                                               </div>
                                             </div>

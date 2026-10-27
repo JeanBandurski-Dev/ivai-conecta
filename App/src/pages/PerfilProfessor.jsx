@@ -149,6 +149,7 @@ export default function PerfilProfessor() {
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Edit form state
   const [editData, setEditData] = useState({
@@ -184,16 +185,24 @@ export default function PerfilProfessor() {
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
     if (!teacher) return;
-    const targetId = teacher.firestoreId || teacher.id;
-    await updateTeacherProfile(targetId, editData);
-    if (isOwner && currentUser && typeof setCurrentUser === 'function') {
-      setCurrentUser({
-        ...currentUser,
-        ...editData
-      });
+    setIsSaving(true);
+    try {
+      const targetId = teacher.firestoreId || teacher.id;
+      await updateTeacherProfile(targetId, editData);
+      if (isOwner && currentUser && typeof setCurrentUser === 'function') {
+        setCurrentUser({
+          ...currentUser,
+          ...editData
+        });
+      }
+      showToast('🎉 Perfil acadêmico e matérias atualizados com sucesso!');
+      setEditModal(false);
+    } catch (err) {
+      console.error('Erro ao atualizar perfil docente:', err);
+      showToast('Erro ao atualizar perfil docente.', 'error');
+    } finally {
+      setIsSaving(false);
     }
-    showToast('🎉 Perfil acadêmico e matérias atualizados com sucesso!');
-    setEditModal(false);
   };
 
   const handleAvatarFileChange = async (e) => {
@@ -531,11 +540,12 @@ export default function PerfilProfessor() {
       {/* Modal Padronizado: Editar Perfil do Professor */}
       <EditTeacherProfileModal
         isOpen={editModal}
-        onClose={() => setEditModal(false)}
+        onClose={() => !isSaving && setEditModal(false)}
         editData={editData}
         setEditData={setEditData}
         handleSaveProfile={handleSaveProfile}
         handleAvatarFileChange={handleAvatarFileChange}
+        isSaving={isSaving}
       />
     </>
   );
