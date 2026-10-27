@@ -326,10 +326,10 @@ export default function PerfilProfessor() {
           )}
 
           {/* Abas */}
-          <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2">
+          <div className="flex items-center gap-2 mt-8 border-b border-white/15 pt-2 overflow-x-auto scrollbar-none w-full max-w-full">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'overview' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -338,7 +338,7 @@ export default function PerfilProfessor() {
 
             <button
               onClick={() => setActiveTab('students')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'students' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
@@ -420,9 +420,9 @@ export default function PerfilProfessor() {
                     {teacher.education.map((edu, idx) => (
                       <div key={idx} className="border-l-3 border-primary-blue pl-4 py-1.5 space-y-1 bg-gray-50/50 dark:bg-slate-800/40 p-3 rounded-r-2xl border-y border-r border-gray-100 dark:border-slate-800">
                         <div className="font-extrabold text-gray-900 dark:text-white text-base">{edu.degree}</div>
-                        <div className="text-xs font-bold text-primary-blue dark:text-blue-400 flex items-center justify-between">
-                          <span className="flex items-center gap-1"><Building2 size={12} /> {edu.institution}</span>
-                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                        <div className="text-xs font-bold text-primary-blue dark:text-blue-400 flex items-center justify-between flex-wrap gap-2">
+                          <span className="flex items-center gap-1 min-w-0 break-words"><Building2 size={12} className="shrink-0" /> {edu.institution}</span>
+                          <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shrink-0">
                             <Calendar size={11} /> {edu.period || edu.year || 'Período Vigente'}
                           </span>
                         </div>

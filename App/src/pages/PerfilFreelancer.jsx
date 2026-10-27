@@ -493,10 +493,10 @@ export default function PerfilFreelancer() {
 
         {/* ── TABS NAVEGAÇÃO INTERNA ── */}
         <div className="container space-y-6">
-          <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 pb-2">
+          <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 pb-2 overflow-x-auto scrollbar-none w-full max-w-full">
             <button
               onClick={() => setActiveTab('services')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'services'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800'
@@ -506,7 +506,7 @@ export default function PerfilFreelancer() {
             </button>
             <button
               onClick={() => setActiveTab('about')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'about'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800'
@@ -516,7 +516,7 @@ export default function PerfilFreelancer() {
             </button>
             <button
               onClick={() => setActiveTab('reviews')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'reviews'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800'
