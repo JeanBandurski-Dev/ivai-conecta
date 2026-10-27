@@ -183,8 +183,8 @@ export default function Dashboard() {
               </p>
 
               {/* Hero Search Box Multi-Setorial */}
-              <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl shadow-2xl flex flex-wrap sm:flex-nowrap items-center gap-3 max-w-xl border border-white/20 dark:border-slate-700">
-                <div className="flex-1 min-w-[200px] flex items-center gap-2.5 px-4 py-3 bg-gray-50/90 dark:bg-slate-800/90 rounded-xl border border-gray-200/50 dark:border-slate-700/60 focus-within:border-primary-blue transition-colors">
+              <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl shadow-2xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 max-w-xl border border-white/20 dark:border-slate-700">
+                <div className="flex-1 min-w-0 flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-gray-50/90 dark:bg-slate-800/90 rounded-xl border border-gray-200/50 dark:border-slate-700/60 focus-within:border-primary-blue transition-colors">
                   <Search size={18} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
@@ -209,7 +209,7 @@ export default function Dashboard() {
                         setSearchQuery('');
                         setActiveSearch('');
                       }}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 cursor-pointer"
                       title="Limpar busca"
                     >
                       <X size={15} />
@@ -217,23 +217,25 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <div className="border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 shrink-0 flex items-center gap-1.5">
-                  <MapPin size={15} className="text-primary-blue dark:text-sky-400 shrink-0" />
-                  <select
-                    value={selectedCity}
-                    onChange={e => setCity(e.target.value)}
-                    className="bg-transparent text-primary-blue dark:text-blue-400 font-bold text-xs sm:text-sm outline-none cursor-pointer"
-                  >
-                    {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
-                  </select>
-                </div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 sm:py-2 bg-white dark:bg-slate-800 shrink-0 flex items-center gap-1.5 flex-1 sm:flex-initial">
+                    <MapPin size={15} className="text-primary-blue dark:text-sky-400 shrink-0" />
+                    <select
+                      value={selectedCity}
+                      onChange={e => setCity(e.target.value)}
+                      className="bg-transparent text-primary-blue dark:text-blue-400 font-bold text-xs sm:text-sm outline-none cursor-pointer w-full sm:w-auto"
+                    >
+                      {cities.map(c => <option key={c} value={c} className="dark:bg-slate-800 dark:text-white">{c}</option>)}
+                    </select>
+                  </div>
 
-                <button
-                  onClick={() => handleExecuteSearch()}
-                  className="btn btn-primary px-6 py-3 font-bold rounded-xl text-sm sm:text-base shadow-md shrink-0 cursor-pointer flex items-center gap-2"
-                >
-                  <Search size={16} /> Buscar
-                </button>
+                  <button
+                    onClick={() => handleExecuteSearch()}
+                    className="btn btn-primary px-5 sm:px-6 py-2.5 sm:py-3 font-bold rounded-xl text-sm sm:text-base shadow-md shrink-0 cursor-pointer flex items-center justify-center gap-2 active:scale-95 transition-all flex-1 sm:flex-initial"
+                  >
+                    <Search size={16} /> <span>Buscar</span>
+                  </button>
+                </div>
               </div>
 
               {/* Sugestões Rápidas de Pesquisa */}
