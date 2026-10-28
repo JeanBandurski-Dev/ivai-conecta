@@ -262,17 +262,6 @@ export default function Navbar() {
                                 </span>
                               )}
                             </Link>
-                            <Link to="/vagas?tab=favorites" onClick={() => setDropdownOpen(false)}
-                              className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                              <span className="flex items-center gap-3">
-                                <Bookmark size={15} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas
-                              </span>
-                              {favoriteJobs.length > 0 && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                                  {favoriteJobs.length}
-                                </span>
-                              )}
-                            </Link>
                           </>
                         )}
                       </div>
@@ -434,18 +423,6 @@ export default function Navbar() {
                           {favoriteTalents.length > 0 && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
                               {favoriteTalents.length}
-                            </span>
-                          )}
-                        </span>
-                      </NavLink>
-                      <NavLink to="/vagas?tab=favorites" className={mobileNavLinkClass} onClick={closeMobile}>
-                        <span className="flex items-center justify-between w-full">
-                          <span className="flex items-center gap-2.5">
-                            <Bookmark size={16} className={favoriteJobs.length > 0 ? 'text-amber-500 fill-amber-500' : ''} /> Vagas Salvas
-                          </span>
-                          {favoriteJobs.length > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                              {favoriteJobs.length}
                             </span>
                           )}
                         </span>
