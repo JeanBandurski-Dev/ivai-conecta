@@ -33,10 +33,20 @@ const MATCH_RANGES = [
   { label: '90%+ Match (Alta Afinidade)', value: 90 },
 ];
 
-const POPULAR_SKILLS = [
-  'React', 'JavaScript', 'Python', 'SQL', 'Excel Avançado',
-  'Figma', 'Git', 'NR-10', 'Power BI', 'ERP', 'Marketing Digital'
+// Áreas de atuação para filtro rápido. As palavras-chave (sem acento, minúsculas) são comparadas
+// com o título e as habilidades exigidas da vaga (alinhadas à taxonomia em services/jobTaxonomy.js).
+const JOB_AREAS = [
+  { label: 'Tecnologia', keywords: ['javascript', 'typescript', 'react', 'node', 'python', 'php', 'java', 'c#', 'c++', 'sql', 'git', 'docker', 'aws', 'azure', 'linux', 'html', 'figma', 'ui/ux', 'power bi', 'tableau', 'programa', 'desenvolvedor', 'software', 'informatica', 'suporte tecnico', 'dados'] },
+  { label: 'Agronegócio', keywords: ['agro', 'agric', 'pastage', 'trator', 'zootecn', 'rural', 'plantio', 'colheita', 'pecuar', 'veterin'] },
+  { label: 'Indústria & Logística', keywords: ['nr-', 'empilhadeira', 'solda', 'manutencao', 'usinagem', 'cnc', 'logistica', 'estoque', 'almoxarifado', 'expedicao', 'maquinas', 'producao', 'autocad', 'cnh'] },
+  { label: 'Comércio & Vendas', keywords: ['vendas', 'vendedor', 'atendimento', 'negociacao', 'pos-venda', 'prospeccao', 'marketing', 'redes sociais', 'trafego', 'google ads', 'meta ads', 'copywriting', 'seo', 'crm'] },
+  { label: 'Administrativo & Financeiro', keywords: ['administrativ', 'financeir', 'contab', 'fiscal', 'contas a pagar', 'fluxo de caixa', 'departamento pessoal', 'recrutamento', 'excel', 'pacote office', 'erp', 'sap', 'totvs'] },
+  { label: 'Saúde', keywords: ['enfermagem', 'socorros', 'farmac', 'saude', 'cuidador', 'hospitalar', 'clinic'] },
+  { label: 'Educação', keywords: ['didatica', 'ensino', 'pedagog', 'professor', 'educa'] },
 ];
+
+const normalizeText = (value) =>
+  String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export default function Vagas() {
   const { selectedCity, currentUser, showToast, favoriteJobs = [] } = useAppStore();
@@ -52,7 +62,7 @@ export default function Vagas() {
   const [filterModality,setFilterModality]= useState('Todas');
   const [minMatch,      setMinMatch]      = useState(0);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [selectedSkills,setSelectedSkills]= useState([]);
+  const [selectedAreas, setSelectedAreas] = useState([]);
   const [sortBy,        setSortBy]        = useState('match');
   const [showNewModal,  setShowModal]     = useState(params.get('action') === 'new');
   const [showAdvanced,  setShowAdvanced]  = useState(false);
@@ -139,9 +149,9 @@ export default function Vagas() {
     setParams({});
   };
 
-  const toggleSkill = (skill) => {
-    setSelectedSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+  const toggleArea = (area) => {
+    setSelectedAreas(prev =>
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
     );
   };
 
@@ -150,7 +160,7 @@ export default function Vagas() {
     return (allJobs || []).filter(j => isJobFavorited(j, favoriteJobs));
   }, [allJobs, favoriteJobs]);
 
-  const hasActiveFilters = query || (filterCity && filterCity !== 'Todas as Cidades') || filterType !== 'Todos' || filterModality !== 'Todas' || minMatch > 0 || onlyFavorites || selectedSkills.length > 0;
+  const hasActiveFilters = query || (filterCity && filterCity !== 'Todas as Cidades') || filterType !== 'Todos' || filterModality !== 'Todas' || minMatch > 0 || onlyFavorites || selectedAreas.length > 0;
 
   const resetFilters = () => {
     setQuery('');
@@ -159,7 +169,7 @@ export default function Vagas() {
     setFilterModality('Todas');
     setMinMatch(0);
     setOnlyFavorites(false);
-    setSelectedSkills([]);
+    setSelectedAreas([]);
     setSortBy('match');
   };
 
@@ -195,10 +205,11 @@ export default function Vagas() {
         // Match Mínimo
         const matchScoreOk = !canSeeMatch || minMatch === 0 || (typeof j.calculatedScore === 'number' && j.calculatedScore >= minMatch);
 
-        // Habilidades
-        const matchSkillsOk = selectedSkills.every(sk => 
-          (j.requiredSkills || []).some(r => r && String(r).toLowerCase().includes(String(sk).toLowerCase()))
-        );
+        // Áreas de atuação
+        const areaText = normalizeText([j.title, ...(j.requiredSkills || [])].join(' '));
+        const matchSkillsOk = selectedAreas.length === 0 || JOB_AREAS
+          .filter(a => selectedAreas.includes(a.label))
+          .some(a => a.keywords.some(k => areaText.includes(k)));
 
         // Busca Textual
         const text = (
@@ -225,7 +236,7 @@ export default function Vagas() {
         }
         return 0;
       });
-  }, [allJobs, filterCity, filterType, filterModality, minMatch, onlyFavorites, selectedSkills, query, sortBy, canSeeMatch, userSkills, currentUser, favoriteJobs]);
+  }, [allJobs, filterCity, filterType, filterModality, minMatch, onlyFavorites, selectedAreas, query, sortBy, canSeeMatch, userSkills, currentUser, favoriteJobs]);
 
   return (
     <>
@@ -297,7 +308,7 @@ export default function Vagas() {
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Cargo, empresa ou tecnologia..."
+                placeholder="Cargo, empresa ou habilidade..."
                 className="text-sm text-gray-800 dark:text-white placeholder-gray-400 outline-none bg-transparent w-full"
               />
               {query && (
@@ -411,23 +422,23 @@ export default function Vagas() {
 
               </div>
 
-              {/* Habilidades Populares */}
+              {/* Áreas de Atuação */}
               <div>
-                <label className="form-label text-xs mb-2 block">Filtrar por Tecnologias &amp; Habilidades:</label>
+                <label className="form-label text-xs mb-2 block">Filtrar por Área de Atuação:</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_SKILLS.map(skill => {
-                    const isSelected = selectedSkills.includes(skill);
+                  {JOB_AREAS.map(({ label }) => {
+                    const isSelected = selectedAreas.includes(label);
                     return (
                       <button
-                        key={skill}
-                        onClick={() => toggleSkill(skill)}
+                        key={label}
+                        onClick={() => toggleArea(label)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1 ${
                           isSelected
                             ? 'bg-primary-blue text-white border-primary-blue shadow-xs'
                             : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-primary-blue'
                         }`}
                       >
-                        <span>{skill}</span>
+                        <span>{label}</span>
                         {isSelected && <Check size={12} strokeWidth={3} />}
                       </button>
                     );

@@ -11,6 +11,7 @@ import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
 import EditCompanyProfileModal from '../components/EditCompanyProfileModal';
+import { validateCompanyProfileForm } from '../utils/formValidation';
 
 const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600';
 
@@ -126,8 +127,12 @@ export default function PerfilEmpresa() {
     );
 
     if (isOwnerByAuthOrId && currentUser) {
-      setCompany({
-        name:     currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada',
+      const companyDisplayName = currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada';
+      const companyTradingName = currentUser.nomeFantasia || companyDisplayName;
+      setCompany(prev => ({
+        ...prev,
+        name:     companyDisplayName,
+        tradingName: companyTradingName,
         city:     currentUser.city || 'Ivaiporã',
         sector:   currentUser.sector || 'Comércio & Serviços',
         size:     currentUser.size || '1-10 funcionários',
@@ -143,7 +148,24 @@ export default function PerfilEmpresa() {
         perks:    currentUser.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento'],
         blocked:  currentUser.blocked || currentUser.status === 'blocked',
         blockedReason: currentUser.blockedReason || null,
-      });
+      }));
+
+      setEditCompanyData(prev => ({
+        ...prev,
+        name: companyDisplayName,
+        tradingName: companyTradingName,
+        cnpj: currentUser.cnpj || prev.cnpj || '',
+        city: currentUser.city || prev.city || 'Ivaiporã',
+        industry: currentUser.sector || prev.industry || 'Comércio & Serviços',
+        size: currentUser.size || prev.size || '1-10 funcionários',
+        avatar: currentUser.avatar || prev.avatar || '',
+        coverImage: currentUser.banner || prev.coverImage || DEFAULT_BANNER,
+        website: currentUser.website || prev.website || '',
+        email: currentUser.email || prev.email || '',
+        phone: currentUser.phone || currentUser.whatsapp || prev.phone || '',
+        linkedin: currentUser.linkedin || prev.linkedin || '',
+        instagram: currentUser.instagram || prev.instagram || ''
+      }));
     } else if (id) {
       const decodedId = decodeURIComponent(id).toLowerCase().trim();
       // Busca dados atualizados do perfil no Firestore
@@ -335,6 +357,12 @@ export default function PerfilEmpresa() {
 
   const handleSaveCompany = async (e) => {
     if (e) e.preventDefault();
+    const validation = validateCompanyProfileForm(editCompanyData || {});
+    if (!validation.isValid) {
+      showToast('⚠️ Corrija os erros apontados no perfil da empresa antes de salvar.');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
