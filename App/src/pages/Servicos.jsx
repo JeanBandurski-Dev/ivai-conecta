@@ -61,8 +61,9 @@ export default function Servicos() {
   const [badgeFilter,  setBadgeFilter]  = useState('todos');
   const [minRating,    setMinRating]    = useState(0);
   const [sortBy,       setSortBy]       = useState('rating');
-  const [showModal,    setModal]        = useState(params.get('action') === 'new');
-  const [editModal,    setEditModal]    = useState(false);
+  const [showModal,        setModal]        = useState(params.get('action') === 'new');
+  const [editingService,  setEditingService] = useState(null);
+  const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
   const [orderSubTab,  setOrderSubTab]  = useState('received'); // 'received' | 'sent'
 
@@ -187,33 +188,15 @@ export default function Servicos() {
       (currentUser?.id && (s.createdBy === currentUser.id || s.providerUid === currentUser.id))
     );
   }, [enrichedServices, currentUser]);
-  const currentService = myServices[0] || null;
 
-  // Service Edit Form State
-  const [serviceData, setServiceData] = useState({
-    title: currentService?.title || currentService?.name || '',
-    providerName: currentService?.providerName || currentUser?.name || '',
-    category: currentService?.category || 'Construção & Manutenção',
-    city: currentService?.city || currentUser?.city || 'Ivaiporã',
-    address: currentService?.address || '',
-    phone: currentService?.phone || currentUser?.phone || '',
-    description: currentService?.description || ''
-  });
-  const [updatingService, setUpdatingService] = useState(false);
-
-  useEffect(() => {
-    if (currentService) {
-      setServiceData({
-        title: currentService.title || currentService.name || '',
-        providerName: currentService.providerName || currentUser?.name || '',
-        category: currentService.category || 'Construção & Manutenção',
-        city: currentService.city || 'Ivaiporã',
-        address: currentService.address || '',
-        phone: currentService.phone || currentUser?.phone || '',
-        description: currentService.description || ''
-      });
+  const currentService = useMemo(() => {
+    if (!myServices.length) return null;
+    if (selectedServiceId) {
+      const found = myServices.find(s => String(s.id) === String(selectedServiceId) || String(s.firestoreId) === String(selectedServiceId));
+      if (found) return found;
     }
-  }, [currentService, currentUser]);
+    return myServices[0];
+  }, [myServices, selectedServiceId]);
 
 
   const receivedOrders = useMemo(() => {
@@ -322,20 +305,7 @@ export default function Servicos() {
       });
   }, [enrichedServices, city, category, badgeFilter, minRating, query, sortBy]);
 
-  const handleUpdateService = async (e) => {
-    e.preventDefault();
-    if (!currentService || updatingService) return;
-    setUpdatingService(true);
-    try {
-      await updateService(currentService.firestoreId || currentService.id, serviceData);
-      setEditModal(false);
-      showToast('Serviço e localização atualizados com sucesso!');
-    } catch {
-      showToast('Erro ao atualizar dados do serviço.');
-    } finally {
-      setUpdatingService(false);
-    }
-  };
+  
 
   return (
     <>
@@ -569,6 +539,35 @@ export default function Servicos() {
               </div>
             ) : (
               <>
+                {/* Seletor quando houver múltiplos serviços cadastrados */}
+                {myServices.length > 1 && (
+                  <div className="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 flex items-center gap-3 overflow-x-auto">
+                    <span className="text-xs font-bold text-gray-500 dark:text-slate-400 shrink-0">
+                      Seus Serviços ({myServices.length}):
+                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {myServices.map(srv => {
+                        const srvId = srv.firestoreId || srv.id;
+                        const isSelected = String(srvId) === String(currentService?.firestoreId || currentService?.id);
+                        return (
+                          <button
+                            key={srvId}
+                            type="button"
+                            onClick={() => setSelectedServiceId(srvId)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                              isSelected
+                                ? 'bg-primary-blue text-white shadow-xs'
+                                : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {srv.title || srv.name || srv.category}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Header do Serviço Cadastrado */}
                 <div className="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
                   <div>
@@ -597,7 +596,7 @@ export default function Servicos() {
                     </div>
                   </div>
 
-                  <button onClick={() => setEditModal(true)} className="btn btn-primary btn-sm font-bold shadow-md">
+                  <button onClick={() => setEditingService(currentService)} className="btn btn-primary btn-sm font-bold shadow-md cursor-pointer">
                     <Edit3 size={15} /> Editar Dados &amp; Localização
                   </button>
                 </div>
@@ -874,6 +873,7 @@ export default function Servicos() {
                   <ServiceCard
                     key={s.id || s.firestoreId}
                     service={s}
+                    onEdit={(srv) => setEditingService(srv)}
                     onRequestService={setSelectedServiceToOrder}
                   />
                 ))}
@@ -884,103 +884,16 @@ export default function Servicos() {
 
       </main>
 
-      {/* Modal: Editar Dados do Serviço Freelancer */}
-      {editModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setEditModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-brand-xl w-full max-w-lg p-7 border border-gray-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white">Editar Dados &amp; Localização do Negócio</h3>
-              <button onClick={() => setEditModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200" /></button>
-            </div>
-
-            <form onSubmit={handleUpdateService} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Título / Nome do Serviço</label>
-                <input
-                  type="text"
-                  value={serviceData.title}
-                  onChange={e => setServiceData(d => ({ ...d, title: e.target.value }))}
-                  className="form-control"
-                  placeholder="Ex: Manutenção Elétrica Residencial e Predial"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Nome do Prestador / Empresa</label>
-                <input
-                  type="text"
-                  value={serviceData.providerName}
-                  onChange={e => setServiceData(d => ({ ...d, providerName: e.target.value }))}
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Endereço Completo do Estabelecimento</label>
-                <input
-                  type="text"
-                  value={serviceData.address}
-                  onChange={e => setServiceData(d => ({ ...d, address: e.target.value }))}
-                  className="form-control"
-                  placeholder="Ex: Rua Paraná, 450 - Centro, Ivaiporã - PR"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Telefone de Contato</label>
-                <input
-                  type="tel"
-                  value={serviceData.phone}
-                  onChange={e => setServiceData(d => ({ ...d, phone: maskPhone(e.target.value) }))}
-                  maxLength={15}
-                  placeholder="(43) 99999-9999"
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Descrição das Atividades &amp; Especialidades</label>
-                <textarea
-                  value={serviceData.description}
-                  onChange={e => setServiceData(d => ({ ...d, description: e.target.value }))}
-                  className="form-control"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-3">
-                <button
-                  type="button"
-                  disabled={updatingService}
-                  onClick={() => setEditModal(false)}
-                  className="btn btn-outline btn-sm font-semibold cursor-pointer disabled:opacity-60"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingService}
-                  className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {updatingService ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <span>Salvar Alterações</span>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Modal: Editar Serviço Freelancer */}
+      {editingService && (
+        <PublishServiceModal
+          serviceToEdit={editingService}
+          onClose={() => setEditingService(null)}
+          onSuccess={() => {
+            setEditingService(null);
+            refreshServices?.();
+          }}
+        />
       )}
 
       {/* New Service Modal com Validação Rigorosa & Anti-Profanidade */}

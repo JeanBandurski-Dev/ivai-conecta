@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, MessageSquare, Trash2, FileText } from 'lucide-react';
+import { Star, MessageSquare, Trash2, FileText, Edit3 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { deleteService } from '../lib/ivaiConecta';
 import { isGenericPlaceholderAvatar } from '../services/chatService';
 import SolicitarServicoModal from './SolicitarServicoModal';
 
-export default function ServiceCard({ service, onDelete, onRequestService }) {
+export default function ServiceCard({ service, onDelete, onEdit, onRequestService }) {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const {
     id, title, name, providerName, category, city, rating,
@@ -96,14 +96,32 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-xs font-bold text-gray-600 dark:text-slate-400">{city}</span>
           {isOwner && (
-            <button
-              onClick={handleDelete}
-              className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-              title="Excluir este serviço"
-              aria-label="Excluir serviço"
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onEdit(service);
+                  }}
+                  className="p-1 rounded-lg text-gray-400 hover:text-primary-blue hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+                  title="Editar este serviço"
+                  aria-label="Editar serviço"
+                >
+                  <Edit3 size={14} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                title="Excluir este serviço"
+                aria-label="Excluir serviço"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -164,8 +182,32 @@ export default function ServiceCard({ service, onDelete, onRequestService }) {
       {/* Actions */}
       <div className="mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
         {isOwner ? (
-          <div className="text-xs text-center py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5">
-            <span>✨ Seu anúncio de serviço</span>
+          <div className="flex items-center gap-2">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEdit(service);
+                }}
+                className="btn btn-outline btn-sm flex-1 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 border-blue-200 dark:border-blue-800 text-primary-blue dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+              >
+                <Edit3 size={13} /> Editar Serviço
+              </button>
+            ) : (
+              <div className="flex-1 text-xs text-center py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-primary-blue dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5">
+                <span>✨ Seu anúncio de serviço</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="btn btn-outline btn-sm text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 border-gray-200 dark:border-slate-700 hover:border-red-400 hover:text-red-500 text-gray-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+              title="Excluir serviço"
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">

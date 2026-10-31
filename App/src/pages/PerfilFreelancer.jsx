@@ -42,6 +42,7 @@ export default function PerfilFreelancer() {
   const [isSaving, setIsSaving] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
+  const [editingService, setEditingService] = useState(null);
 
   // Escuta dados em tempo real do documento do usuário no Firestore
   useEffect(() => {
@@ -564,6 +565,8 @@ export default function PerfilFreelancer() {
                     <ServiceCard
                       key={service.id || service.firestoreId}
                       service={service}
+                      onEdit={isOwner ? (s) => setEditingService(s) : null}
+                      onDelete={(id) => setAllServices(prev => prev.filter(s => s.id !== id && s.firestoreId !== id))}
                       onRequestService={setSelectedServiceToOrder}
                     />
                   ))}
@@ -813,6 +816,18 @@ export default function PerfilFreelancer() {
             setAllServices(prev => [created, ...prev.filter(s => s.id !== created.id && s.firestoreId !== created.id)]);
             setActiveTab('services');
             setPublishModalOpen(false);
+          }}
+        />
+      )}
+
+      {/* Modal: Editar Serviço Existente */}
+      {editingService && (
+        <PublishServiceModal
+          serviceToEdit={editingService}
+          onClose={() => setEditingService(null)}
+          onSuccess={(updated) => {
+            setAllServices(prev => prev.map(s => (s.id === updated.id || s.firestoreId === updated.id || s.id === updated.firestoreId ? { ...s, ...updated } : s)));
+            setEditingService(null);
           }}
         />
       )}

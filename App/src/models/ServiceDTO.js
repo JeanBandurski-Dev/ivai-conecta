@@ -55,6 +55,8 @@ export function normalizeServiceDTO(raw, fallbackId = '') {
     price: data.price !== undefined && data.price !== null ? data.price : 'A Combinar',
     pricingType: String(data.pricingType || data.priceType || 'fixo').trim(),
     priceType: String(data.priceType || data.pricingType || 'fixo').trim(),
+    budgetType: String(data.budgetType || data.pricingType || data.priceType || 'combinar').trim(),
+    deliveryMode: String(data.deliveryMode || 'presencial').trim(),
     description: String(data.description || '').trim(),
     rating,
     reviewCount: reviewsCount,

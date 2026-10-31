@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Wrench, Sparkles, AlertCircle, CheckCircle2,
-  MapPin, Phone, DollarSign, FileText, Check, Wand2, ShieldCheck, Tag
+  MapPin, Phone, DollarSign, FileText, Check, Wand2, ShieldCheck, Tag, Edit3
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
   addService,
+  updateService,
   validateServiceTitle,
   validateServiceDescription,
   validateServicePayload,
@@ -31,17 +32,29 @@ const DELIVERY_MODES = [
   { id: 'hibrido', label: 'Híbrido', desc: 'Presencial ou online conforme a demanda' }
 ];
 
-export default function PublishServiceModal({ onClose, onSuccess }) {
+export default function PublishServiceModal({ serviceToEdit = null, onClose, onSuccess }) {
   const { currentUser, showToast } = useAppStore();
+  const isEditMode = Boolean(serviceToEdit);
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState(SERVICE_CATEGORIES[0] || 'Construção & Manutenção');
-  const [city, setCity] = useState(currentUser?.city || 'Ivaiporã');
-  const [phone, setPhone] = useState(currentUser?.phone ? maskPhone(currentUser.phone) : '');
-  const [budgetType, setBudgetType] = useState('combinar');
-  const [price, setPrice] = useState('');
-  const [deliveryMode, setDeliveryMode] = useState('presencial');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(serviceToEdit?.title || serviceToEdit?.name || '');
+  const [category, setCategory] = useState(serviceToEdit?.category || SERVICE_CATEGORIES[0] || 'Construção & Manutenção');
+  const [city, setCity] = useState(serviceToEdit?.city || currentUser?.city || 'Ivaiporã');
+  const [phone, setPhone] = useState(
+    serviceToEdit?.phone
+      ? maskPhone(serviceToEdit.phone)
+      : (currentUser?.phone ? maskPhone(currentUser.phone) : '')
+  );
+  const [budgetType, setBudgetType] = useState(
+    serviceToEdit?.budgetType ||
+    (serviceToEdit?.price && serviceToEdit.price !== 'A combinar' && serviceToEdit.price !== 'A Combinar' ? 'fixo' : 'combinar')
+  );
+  const [price, setPrice] = useState(
+    serviceToEdit?.price && serviceToEdit.price !== 'A combinar' && serviceToEdit.price !== 'A Combinar'
+      ? String(serviceToEdit.price).replace(/^R\$\s*/, '')
+      : ''
+  );
+  const [deliveryMode, setDeliveryMode] = useState(serviceToEdit?.deliveryMode || 'presencial');
+  const [description, setDescription] = useState(serviceToEdit?.description || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -78,6 +91,56 @@ export default function PublishServiceModal({ onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const formattedPrice = budgetType === 'combinar' ? 'A combinar' : price.trim() || 'A combinar';
+
+    if (isEditMode) {
+      const updatePayload = {
+        title: title.trim(),
+        name: title.trim(),
+        category,
+        city,
+        phone: phone.trim(),
+        budgetType,
+        price: formattedPrice,
+        deliveryMode,
+        description: description.trim(),
+        providerName: currentUser?.name || serviceToEdit.providerName || 'Profissional Autônomo',
+        avatar: currentUser?.avatar || serviceToEdit.avatar || '',
+        providerEmail: currentUser?.email || serviceToEdit.providerEmail || '',
+        providerUid: currentUser?.uid || currentUser?.id || serviceToEdit.providerUid || '',
+        badge: currentUser?.badge || serviceToEdit.badge || (currentUser?.cnpj ? 'Prestador PJ Verificado' : 'Prestador Regional')
+      };
+
+      const validation = validateServicePayload(updatePayload);
+      if (!validation.valid) {
+        setFieldErrors(validation.errors);
+        const firstError = Object.values(validation.errors)[0];
+        showToast(`⚠️ ${firstError}`);
+        return;
+      }
+
+      setIsSubmitting(true);
+      setFieldErrors({});
+
+      try {
+        const targetId = serviceToEdit.firestoreId || serviceToEdit.id;
+        await updateService(targetId, updatePayload);
+        const updatedService = { ...serviceToEdit, ...updatePayload };
+        showToast(`🎉 Serviço "${updatedService.title}" atualizado com sucesso!`);
+        if (onSuccess) {
+          onSuccess(updatedService);
+        }
+        onClose();
+      } catch (err) {
+        console.error('[PublishServiceModal] Erro ao atualizar serviço:', err);
+        showToast(`❌ ${err.message || 'Erro ao atualizar serviço.'}`);
+        setFieldErrors({ submit: err.message });
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     const payload = {
       title: title.trim(),
       name: title.trim(),
@@ -85,7 +148,7 @@ export default function PublishServiceModal({ onClose, onSuccess }) {
       city,
       phone: phone.trim(),
       budgetType,
-      price: budgetType === 'combinar' ? 'A combinar' : price.trim() || 'A combinar',
+      price: formattedPrice,
       deliveryMode,
       description: description.trim(),
       providerName: currentUser?.name || 'Profissional Autônomo',
@@ -150,10 +213,13 @@ export default function PublishServiceModal({ onClose, onSuccess }) {
           </div>
 
           <h2 className="font-heading text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-            <Wrench size={22} className="text-white" /> Cadastrar Novo Serviço
+            {isEditMode ? <Edit3 size={22} className="text-white" /> : <Wrench size={22} className="text-white" />}
+            {isEditMode ? 'Editar Anúncio de Serviço' : 'Cadastrar Novo Serviço'}
           </h2>
           <p className="text-xs sm:text-sm text-sky-100 mt-1 max-w-lg leading-relaxed">
-            Divulgue suas especialidades com avaliações reais de clientes e receba solicitações de orçamento pelo Vale do Ivaí.
+            {isEditMode
+              ? 'Atualize os dados, valores e condições do seu serviço no marketplace regional.'
+              : 'Divulgue suas especialidades com avaliações reais de clientes e receba solicitações de orçamento pelo Vale do Ivaí.'}
           </p>
         </div>
 
@@ -499,11 +565,11 @@ export default function PublishServiceModal({ onClose, onSuccess }) {
               {isSubmitting ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Publicando no Firestore...
+                  {isEditMode ? 'Salvando alterações...' : 'Publicando no Firestore...'}
                 </>
               ) : (
                 <>
-                  <Check size={15} strokeWidth={2.5} /> Publicar Serviço no Marketplace
+                  <Check size={15} strokeWidth={2.5} /> {isEditMode ? 'Salvar Alterações' : 'Publicar Serviço no Marketplace'}
                 </>
               )}
             </button>
