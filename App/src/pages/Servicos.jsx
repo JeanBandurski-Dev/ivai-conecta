@@ -3,11 +3,11 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, X, Plus, Star, RotateCcw,
   ArrowLeft, MapPin, TrendingUp, Users, MessageSquare, Edit3, Phone,
-  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox, Loader2
+  BarChart3, CheckCircle2, AlertCircle, FileText, Inbox
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  updateService, CITIES, maskPhone, matchCity,
+  updateService, CITIES, matchCity,
   subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders,
   useServices, UserRole
 } from '../lib/ivaiConecta';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Briefcase, DollarSign, FileText, X, Check, ChevronLeft, ChevronRight,
   MapPin, Phone, Sparkles, Building2, RefreshCw, Globe, ShieldCheck,
@@ -88,7 +88,15 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     responsibilities: []
   });
 
-    useEffect(() => {
+  const handleClose = useCallback(() => {
+    if (isPublishing) return;
+    setStep(1);
+    setFieldErrors({});
+    setShowMobilePreview(false);
+    onClose();
+  }, [isPublishing, onClose]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && !isPublishing) {
@@ -97,7 +105,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isPublishing]);
+  }, [isOpen, isPublishing, handleClose]);
 
   if (!isOpen) return null;
 
@@ -108,14 +116,6 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
     if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
     if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
-  };
-
-  const handleClose = () => {
-    if (isPublishing) return;
-    setStep(1);
-    setFieldErrors({});
-    setShowMobilePreview(false);
-    onClose();
   };
 
   // Limpar erro de um campo específico ao digitar

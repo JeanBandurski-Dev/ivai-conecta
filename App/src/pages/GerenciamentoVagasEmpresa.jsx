@@ -420,24 +420,6 @@ export default function GerenciamentoVagasEmpresa() {
 
   // Quick Add Candidate Modal
   const [showAddCandidateModal, setShowAddCandidateModal] = useState(false);
-  // Listener global da tecla Escape para gaveta lateral e modais (Lei de Jakob)
-  useEffect(() => {
-    const handleEscGlobal = (e) => {
-      if (e.key === 'Escape') {
-        if (selectedCandidate) {
-          setSelectedCandidate(null);
-        } else if (showAddCandidateModal) {
-          setShowAddCandidateModal(false);
-        } else if (editingJob) {
-          setEditingJob(null);
-        } else if (showNewJobModal) {
-          setShowNewJobModal(false);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleEscGlobal);
-    return () => window.removeEventListener('keydown', handleEscGlobal);
-  }, [selectedCandidate, showAddCandidateModal, editingJob, showNewJobModal]);
   const [addCandidateTargetStage, setAddCandidateTargetStage] = useState('triagem');
   const [newCandidateForm, setNewCandidateForm] = useState({
     name: '',
@@ -499,6 +481,25 @@ export default function GerenciamentoVagasEmpresa() {
   // Edit / New Job Modal State
   const [showNewJobModal, setShowNewJobModal] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+
+  // Listener global da tecla Escape para gaveta lateral e modais (Lei de Jakob)
+  useEffect(() => {
+    const handleEscGlobal = (e) => {
+      if (e.key === 'Escape') {
+        if (selectedCandidate) {
+          setSelectedCandidate(null);
+        } else if (showAddCandidateModal) {
+          setShowAddCandidateModal(false);
+        } else if (editingJob) {
+          setEditingJob(null);
+        } else if (showNewJobModal) {
+          setShowNewJobModal(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEscGlobal);
+    return () => window.removeEventListener('keydown', handleEscGlobal);
+  }, [selectedCandidate, showAddCandidateModal, editingJob, showNewJobModal]);
 
   // Candidates for selected job
   const jobCandidates = useMemo(() => {

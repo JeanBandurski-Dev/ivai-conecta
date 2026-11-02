@@ -458,6 +458,7 @@ export default function PerfilAluno() {
         showToast(res.error || 'Não foi possível conceder recomendação.', 'error');
       }
     } catch (err) {
+      console.error('[PerfilAluno] Erro ao processar recomendação:', err);
       showToast('Erro ao processar recomendação.', 'error');
     } finally {
       setIsSubmittingProactive(false);
@@ -512,6 +513,7 @@ export default function PerfilAluno() {
       showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
       handleCloseEditModal();
     } catch (err) {
+      console.error('[PerfilAluno] Erro ao salvar perfil:', err);
       showToast('Erro ao salvar perfil.', 'error');
     } finally {
       setIsSavingProfile(false);
