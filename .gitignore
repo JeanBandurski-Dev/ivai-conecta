@@ -224,3 +224,7 @@ node_modules/
 .env.*.local
 dist/
 
+
+# Office temporary/lock files
+.~lock.*#
+~$*
