@@ -1,16 +1,28 @@
-# React + Vite
+# Ivaí Conecta - Front-end (App)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Esta pasta contém o código-fonte da aplicação web construída em **React 19**, **Vite 8** e **Tailwind CSS v4**, integrada aos serviços do **Firebase** (Firestore, Authentication e Storage).
 
-Currently, two official plugins are available:
+Para instruções completas de instalação, variáveis de ambiente, execução local e regras de arquitetura, consulte o documento principal na raiz do repositório:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+👉 **[README principal do repositório](../README.md)**
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Comandos Rápidos dentro de `App/`
 
-## Expanding the Oxlint configuration
+```bash
+# Instalação das dependências do front-end
+npm install
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+# Iniciar servidor de desenvolvimento (Vite HMR)
+npm run dev
+
+# Análise estática com Oxlint
+npm run lint
+
+# Build otimizado para produção
+npm run build
+
+# Pré-visualizar build localmente
+npm run preview
+```
