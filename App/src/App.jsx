@@ -10,6 +10,7 @@ import GuestRoute from './components/auth/GuestRoute';
 import ChatModal from './components/ChatModal';
 import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
+import { normalizeUserRole } from './services/authService';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
 
@@ -40,7 +41,8 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 
 function MinhasVagasRoute() {
   const { currentUser } = useAppStore();
-  if (currentUser?.role === 'empresa') {
+  const userRole = normalizeUserRole(currentUser?.role);
+  if (userRole === 'empresa') {
     return <GerenciamentoVagasEmpresa />;
   }
   return <MinhasVagas />;
@@ -72,7 +74,7 @@ function AppContent() {
               <Route path="/talentos" element={<BancoDeTalentos />} />
               <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
               <Route path="/perfil/:id"       element={<PerfilAluno />} />
-              <Route path="/empresa"          element={<ProtectedRoute><PerfilEmpresa /></ProtectedRoute>} />
+              <Route path="/empresa"          element={<ProtectedRoute allowedRoles={['empresa']}><PerfilEmpresa /></ProtectedRoute>} />
               <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
               <Route path="/professor"        element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
               <Route path="/professor/:id"    element={<PerfilProfessor />} />
@@ -97,7 +99,7 @@ function AppContent() {
               <Route
                 path="/gerenciamento-vagas"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['empresa']}>
                     <GerenciamentoVagasEmpresa />
                   </ProtectedRoute>
                 }
@@ -105,7 +107,7 @@ function AppContent() {
               <Route
                 path="/painel-empresa"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['empresa']}>
                     <GerenciamentoVagasEmpresa />
                   </ProtectedRoute>
                 }
