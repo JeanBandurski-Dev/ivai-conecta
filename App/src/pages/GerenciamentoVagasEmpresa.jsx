@@ -1,4 +1,4 @@
-mitimport { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle2, Clock,

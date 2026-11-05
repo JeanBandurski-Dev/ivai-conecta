@@ -1045,6 +1045,15 @@ export async function completeUserProfile(uid, additionalData) {
 }
 
 export async function logout() {
+  const currentUid = auth.currentUser?.uid;
+  if (currentUid) {
+    try {
+      await setDoc(doc(db, 'users', currentUid), {
+        isOnline: false,
+        lastActiveAt: new Date().toISOString()
+      }, { merge: true });
+    } catch { }
+  }
   try {
     await signOut(auth);
   } catch { }

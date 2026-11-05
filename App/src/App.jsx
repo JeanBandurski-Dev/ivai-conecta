@@ -11,6 +11,7 @@ import ChatModal from './components/ChatModal';
 import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 import { normalizeUserRole } from './services/authService';
+import { useUserPresence } from './services/presenceService';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
 
@@ -51,7 +52,10 @@ function MinhasVagasRoute() {
 function AppContent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
-  const { isChatOpen, closeChat } = useAppStore();
+  const { isChatOpen, closeChat, currentUser } = useAppStore();
+
+  // Gerenciamento global de presença real (Online / Visto por último / Offline)
+  useUserPresence(currentUser);
 
   return (
     <div className="flex flex-col min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">

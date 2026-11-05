@@ -39,6 +39,7 @@ import { getUsersDB } from '../lib/ivaiConecta';
 import { getUserProfile } from '../services/authService';
 import { db } from '../lib/firebase';
 import { collection, query, limit, onSnapshot } from 'firebase/firestore';
+import { isUserOnline, formatPresenceStatus, findContactInUsers } from '../services/presenceService';
 
 function getRoleBadge(role) {
   const r = (role || '').toLowerCase();
@@ -77,7 +78,7 @@ function getRoleBadge(role) {
   };
 }
 
-function UserAvatar({ src, name, className = 'w-9 h-9' }) {
+function UserAvatar({ src, name, className = 'w-9 h-9', isOnline = undefined }) {
   const [imgError, setImgError] = useState(false);
   const initials = (name || 'U')
     .split(' ')
@@ -89,22 +90,30 @@ function UserAvatar({ src, name, className = 'w-9 h-9' }) {
   const isInvalidOrPlaceholder = !src || isGenericPlaceholderAvatar(src) || imgError;
   const gradientClass = getAvatarGradient(name);
 
-  if (!isInvalidOrPlaceholder) {
-    return (
-      <img
-        src={src}
-        alt={name || 'Usuário'}
-        onError={() => setImgError(true)}
-        className={`${className} rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800`}
-      />
-    );
-  }
-
   return (
-    <div
-      className={`${className} rounded-full bg-gradient-to-tr ${gradientClass} text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
-    >
-      {initials || 'U'}
+    <div className="relative inline-block shrink-0">
+      {!isInvalidOrPlaceholder ? (
+        <img
+          src={src}
+          alt={name || 'Usuário'}
+          onError={() => setImgError(true)}
+          className={`${className} rounded-full object-cover border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800`}
+        />
+      ) : (
+        <div
+          className={`${className} rounded-full bg-gradient-to-tr ${gradientClass} text-white font-bold text-xs flex items-center justify-center border border-white/20 shadow-xs`}
+        >
+          {initials || 'U'}
+        </div>
+      )}
+      {typeof isOnline === 'boolean' && (
+        <span
+          className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-slate-900 ${
+            isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400 dark:bg-slate-500'
+          }`}
+          title={isOnline ? 'Online agora' : 'Offline'}
+        />
+      )}
     </div>
   );
 }
@@ -368,23 +377,11 @@ export default function ChatModal({ onClose }) {
   const currentRoleBadge = otherPerson ? getRoleBadge(otherPerson.role) : null;
   const currentUserName = resolveDisplayName(currentUser);
 
-  // Encontra os dados completos do outro usuário no banco para navegação ao perfil
+  // Encontra os dados completos do outro usuário no banco para navegação ao perfil e presença
   const otherUserData = useMemo(() => {
     if (!otherPerson) return null;
     const all = remoteUsers.length > 0 ? remoteUsers : (getUsersDB() || []);
-    const targetEmail = (otherPerson.email || '').toLowerCase().trim();
-    const targetUid = String(otherPerson.uid || '').trim();
-    const targetName = (otherPerson.name || '').toLowerCase().trim();
-
-    return all.find(u => {
-      const uUid = String(u.uid || u.id || '').trim();
-      const uEmail = String(u.email || u.studentEmail || '').toLowerCase().trim();
-      const uName = String(u.name || u.displayName || u.company || u.nomeFantasia || '').toLowerCase().trim();
-      if (targetUid && uUid === targetUid) return true;
-      if (targetEmail && uEmail === targetEmail) return true;
-      if (targetName && uName === targetName) return true;
-      return false;
-    }) || null;
+    return findContactInUsers(all, otherPerson);
   }, [otherPerson, remoteUsers]);
 
   const [asyncOtherUser, setAsyncOtherUser] = useState(null);
@@ -410,6 +407,13 @@ export default function ChatModal({ onClose }) {
 
     return () => { isMounted = false; };
   }, [otherPerson, otherUserData]);
+
+  // Status de presença real do interlocutor (calculado a partir de heartbeat e Firestore)
+  const otherPersonPresence = useMemo(() => {
+    if (!otherPerson) return { isOnline: false, label: 'Offline', color: 'gray' };
+    const resolvedUser = asyncOtherUser || otherUserData || otherPerson;
+    return formatPresenceStatus(resolvedUser);
+  }, [otherPerson, otherUserData, asyncOtherUser]);
 
   const handleOpenUserProfile = () => {
     if (!otherPerson) return;
@@ -534,6 +538,8 @@ export default function ChatModal({ onClose }) {
                       const cAvatar = resolveAvatar(c);
                       const cRole = resolveUserRole(c);
                       const badge = getRoleBadge(cRole);
+                      const isContactOnline = isUserOnline(c);
+                      const contactPresence = formatPresenceStatus(c);
 
                       return (
                         <button
@@ -545,11 +551,16 @@ export default function ChatModal({ onClose }) {
                           }}
                           className="w-full text-left p-2 rounded-xl hover:bg-primary-blue/10 dark:hover:bg-slate-700/80 flex items-center gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-primary-blue/20"
                         >
-                          <UserAvatar src={cAvatar} name={cName} className="w-8 h-8 text-[11px]" />
+                          <UserAvatar src={cAvatar} name={cName} className="w-8 h-8 text-[11px]" isOnline={isContactOnline} />
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{cName}</div>
-                            <div className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1 truncate">
+                            <div className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
                               <span>{badge.icon} {badge.label}</span>
+                              <span>·</span>
+                              <span className={`flex items-center gap-1 ${isContactOnline ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-gray-400 dark:text-slate-500'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-slate-500'}`}></span>
+                                {contactPresence.label}
+                              </span>
                             </div>
                           </div>
                         </button>
@@ -582,6 +593,8 @@ export default function ChatModal({ onClose }) {
                   const isSelected = t.id === activeThreadId;
                   const threadUnread = getThreadUnreadCount(t, currentUser?.email);
                   const badge = getRoleBadge(other.role);
+                  const otherContact = findContactInUsers(remoteUsers, other);
+                  const isOtherOnline = isUserOnline(otherContact);
 
                   return (
                     <div
@@ -596,7 +609,7 @@ export default function ChatModal({ onClose }) {
                           : 'hover:bg-gray-100 dark:hover:bg-slate-800/60 border border-transparent'
                       }`}
                     >
-                      <UserAvatar src={other.avatar} name={other.name} className="w-10 h-10" />
+                      <UserAvatar src={other.avatar} name={other.name} className="w-10 h-10" isOnline={isOtherOnline} />
 
                       <div className="min-w-0 flex-1 pr-5">
                         <div className="flex items-center justify-between gap-1">
@@ -658,7 +671,12 @@ export default function ChatModal({ onClose }) {
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleOpenUserProfile(); }}
                   >
-                    <UserAvatar src={otherPerson.avatar} name={otherPerson.name} className="w-10 h-10 group-hover:scale-105 group-hover:ring-2 group-hover:ring-primary-blue/30 transition-all shadow-2xs" />
+                    <UserAvatar
+                      src={otherPerson.avatar}
+                      name={otherPerson.name}
+                      className="w-10 h-10 group-hover:scale-105 group-hover:ring-2 group-hover:ring-primary-blue/30 transition-all shadow-2xs"
+                      isOnline={otherPersonPresence.isOnline}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2 truncate">
@@ -671,8 +689,15 @@ export default function ChatModal({ onClose }) {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+                        <span className={`flex items-center gap-1.5 font-medium text-[11px] ${
+                          otherPersonPresence.isOnline
+                            ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                            : 'text-gray-500 dark:text-slate-400'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            otherPersonPresence.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400 dark:bg-slate-500'
+                          }`}></span>
+                          <span>{otherPersonPresence.label}</span>
                         </span>
                         <span>·</span>
                         <span className="truncate text-primary-blue dark:text-blue-400 font-medium">
@@ -850,6 +875,8 @@ export default function ChatModal({ onClose }) {
                     const cAvatar = resolveAvatar(contact);
                     const cRole = resolveUserRole(contact);
                     const badge = getRoleBadge(cRole);
+                    const isContactOnline = isUserOnline(contact);
+                    const contactPresence = formatPresenceStatus(contact);
 
                     return (
                       <button
@@ -860,13 +887,17 @@ export default function ChatModal({ onClose }) {
                         }}
                         className="p-3 bg-gray-50 dark:bg-slate-800/80 hover:bg-primary-blue/5 dark:hover:bg-primary-blue/10 border border-gray-200 dark:border-slate-700 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group"
                       >
-                        <UserAvatar src={cAvatar} name={cName} className="w-9 h-9" />
+                        <UserAvatar src={cAvatar} name={cName} className="w-9 h-9" isOnline={isContactOnline} />
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-xs text-gray-900 dark:text-white truncate group-hover:text-primary-blue transition-colors">
                             {cName}
                           </div>
-                          <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                          <div className="text-[10px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
                             <span>{badge.icon} {badge.label}</span>
+                            <span>·</span>
+                            <span className={isContactOnline ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-gray-400 dark:text-slate-500'}>
+                              {contactPresence.label}
+                            </span>
                           </div>
                         </div>
                       </button>
