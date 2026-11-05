@@ -6,7 +6,7 @@ import {
   BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Loader2, ShieldAlert
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
-import { getUserProfile } from '../services/authService';
+import { getUserProfile, normalizeUserRole } from '../services/authService';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
@@ -56,12 +56,24 @@ export default function PerfilEmpresa() {
   const [, setRefreshKey] = useState(0);
 
   const [company, setCompany] = useState(() => {
+    const roleNormalized = normalizeUserRole(currentUser?.role);
+    const isCompanyUser = Boolean(
+      currentUser && (
+        roleNormalized === 'empresa' ||
+        currentUser.role === 'empresa' ||
+        currentUser.role === 'company' ||
+        currentUser.role === 'recrutador'
+      )
+    );
+    const decId = id && String(id) !== 'empresa' ? decodeURIComponent(id).toLowerCase().trim() : '';
+    const compName = String(currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || '').toLowerCase().trim();
     const isOwner = Boolean(
-      currentUser && currentUser.role === 'empresa' && (
+      isCompanyUser && (
         !id ||
         String(id) === 'empresa' ||
         String(id) === String(currentUser.uid) ||
-        String(id) === String(currentUser.id)
+        String(id) === String(currentUser.id) ||
+        (decId && compName && decId === compName)
       )
     );
     if (isOwner && currentUser) {
@@ -105,24 +117,37 @@ export default function PerfilEmpresa() {
     };
   });
 
+  const userRole = normalizeUserRole(currentUser?.role);
+  const isCompany = Boolean(
+    currentUser && (
+      userRole === 'empresa' ||
+      currentUser.role === 'empresa' ||
+      currentUser.role === 'company' ||
+      currentUser.role === 'recrutador'
+    )
+  );
+
+  const decodedId = id && String(id) !== 'empresa' ? decodeURIComponent(id).toLowerCase().trim() : '';
+  const currentCompanyName = String(currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || '').toLowerCase().trim();
+
   const isCompanyOwner = Boolean(
-    currentUser && currentUser.role === 'empresa' && (
+    isCompany && (
       !id ||
       String(id) === 'empresa' ||
-      String(id) === String(currentUser.uid) ||
-      String(id) === String(currentUser.id) ||
-      (company?.uid && currentUser.uid && String(company.uid) === String(currentUser.uid)) ||
-      (company?.id && currentUser.id && String(company.id) === String(currentUser.id))
+      (currentUser?.uid && (String(id) === String(currentUser.uid) || String(company?.uid) === String(currentUser.uid))) ||
+      (currentUser?.id && (String(id) === String(currentUser.id) || String(company?.id) === String(currentUser.id))) ||
+      (decodedId && currentCompanyName && decodedId === currentCompanyName)
     )
   );
 
   useEffect(() => {
     const isOwnerByAuthOrId = Boolean(
-      currentUser && currentUser.role === 'empresa' && (
+      isCompany && (
         !id ||
         String(id) === 'empresa' ||
         String(id) === String(currentUser.uid) ||
-        String(id) === String(currentUser.id)
+        String(id) === String(currentUser.id) ||
+        (decodedId && currentCompanyName && decodedId === currentCompanyName)
       )
     );
 
@@ -623,7 +648,7 @@ export default function PerfilEmpresa() {
                 </Link>
               </div>
             ) : (
-              currentUser?.role !== 'empresa' && (
+              !isCompany && (
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={() => {
@@ -771,18 +796,28 @@ export default function PerfilEmpresa() {
                 <p className="text-sm text-gray-500 dark:text-slate-400">Vagas abertas ativas publicadas por {company.name}.</p>
               </div>
 
-              <button
-                onClick={() => setShowPublishModal(true)}
-                className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus size={16} /> Publicar Nova Vaga
-              </button>
+              {isCompanyOwner && !company.blocked && company.status !== 'blocked' && !currentUser?.blocked && currentUser?.status !== 'blocked' && (
+                <button
+                  onClick={() => setShowPublishModal(true)}
+                  className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={16} /> Publicar Nova Vaga
+                </button>
+              )}
             </div>
 
             {jobs.length === 0 ? (
               <div className="card text-center py-12 text-gray-400 dark:text-slate-500">
                 <Briefcase size={40} className="mx-auto mb-2 text-gray-300 dark:text-slate-600" />
                 <p className="font-bold text-gray-600 dark:text-slate-300">Nenhuma vaga em aberto no momento.</p>
+                {isCompanyOwner && !company.blocked && company.status !== 'blocked' && !currentUser?.blocked && currentUser?.status !== 'blocked' && (
+                  <button
+                    onClick={() => setShowPublishModal(true)}
+                    className="btn btn-teal btn-sm font-bold shadow-md flex items-center gap-1.5 cursor-pointer mx-auto mt-4"
+                  >
+                    <Plus size={16} /> Publicar Primeira Vaga
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4">
@@ -795,24 +830,28 @@ export default function PerfilEmpresa() {
       </main>
 
       {/* Modal Padronizado: Editar Perfil da Empresa */}
-      <EditCompanyProfileModal
-        isOpen={editModal}
-        onClose={() => !isSaving && setEditModal(false)}
-        editData={editCompanyData}
-        setEditData={setEditCompanyData}
-        handleSaveProfile={handleSaveCompany}
-        handleLogoUpload={handleLogoUpload}
-        handleBannerUpload={handleBannerUpload}
-        uploadingLogo={uploadingLogo}
-        uploadingBanner={uploadingBanner}
-        isSaving={isSaving}
-      />
+      {isCompanyOwner && (
+        <EditCompanyProfileModal
+          isOpen={editModal}
+          onClose={() => !isSaving && setEditModal(false)}
+          editData={editCompanyData}
+          setEditData={setEditCompanyData}
+          handleSaveProfile={handleSaveCompany}
+          handleLogoUpload={handleLogoUpload}
+          handleBannerUpload={handleBannerUpload}
+          uploadingLogo={uploadingLogo}
+          uploadingBanner={uploadingBanner}
+          isSaving={isSaving}
+        />
+      )}
       {/* Modal: Publicar Nova Vaga */}
-      <PublishJobModal
-        isOpen={showPublishModal}
-        onClose={() => setShowPublishModal(false)}
-        onJobCreated={() => setRefreshKey(k => k + 1)}
-      />
+      {isCompanyOwner && (
+        <PublishJobModal
+          isOpen={showPublishModal}
+          onClose={() => setShowPublishModal(false)}
+          onJobCreated={() => setRefreshKey(k => k + 1)}
+        />
+      )}
     </>
   );
 }

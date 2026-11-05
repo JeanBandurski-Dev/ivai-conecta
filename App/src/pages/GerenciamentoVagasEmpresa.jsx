@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+mitimport { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Briefcase, Building2, MapPin, CheckCircle2, Clock,
@@ -312,8 +312,7 @@ export default function GerenciamentoVagasEmpresa() {
     });
 
     if (userCompanyMatch.length > 0) return userCompanyMatch;
-    if (currentUser.role === 'empresa') return [];
-    return jobs;
+    return [];
   }, [liveJobs, currentUser]);
 
   // Selected Job for Pipeline (com persistência em localStorage / query param)
