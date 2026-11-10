@@ -430,5 +430,17 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAuthenticated() && request.auth.uid == teacherId;
     }
+
+    // -------------------------------------------------------------
+    // 10. Fila de E-mails / Notificações (Trigger Email Extension / Cloud Functions)
+    // -------------------------------------------------------------
+    match /mail/{mailId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.to == request.auth.token.email ||
+        resource.data.to == request.auth.token.email.lower()
+      );
+    }
   }
 }

@@ -28,6 +28,10 @@ import {
 import { calculateMatchScore, safeSkillsArray } from './matchService.js';
 import { isGenericPlaceholderAvatar } from './chatService.js';
 import { matchCity } from '../utils/searchUtils.js';
+import {
+  sendApplicationStatusNotification,
+  sendInterviewScheduledNotification
+} from './notificationService.js';
 
 export const STORAGE_KEY_DELETED_JOBS = 'ivai_conecta_deleted_job_ids';
 export const STORAGE_KEY_JOB_STATUSES = 'ivai_conecta_job_statuses';
@@ -1502,6 +1506,25 @@ export function updateCandidateStage(jobId, candidateId, newStage) {
         } catch {}
       }
 
+      // Dispara notificação por e-mail em background respeitando estritamente preferências do candidato
+      const candEmail = cand.candidateEmail || cand.email;
+      if (candEmail) {
+        try {
+          const currentJob = getJobById(jobId);
+          sendApplicationStatusNotification({
+            candidateEmail: candEmail,
+            candidateUid: cand.candidateUid || cand.candidateId || cand.uid || cand.id,
+            candidateName: cand.name || cand.candidateName || 'Candidato(a)',
+            jobTitle: currentJob?.title || cand.jobTitle || 'Oportunidade',
+            companyName: currentJob?.company || cand.company || 'Empresa contratante',
+            newStage: normalizedStage,
+            newStageName: stageNameMap[normalizedStage] || normalizedStage
+          }).catch(notifErr => console.warn('[jobsService] Notificação de etapa:', notifErr.message));
+        } catch (e) {
+          console.warn('[jobsService] Erro ao disparar notificação:', e.message);
+        }
+      }
+
       // Sincroniza no cache de candidaturas para atualizar visões locais
       try {
         const allApps = getUserApplications();
@@ -1638,6 +1661,24 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
           localStorage.setItem(STORAGE_KEY_APPLICATIONS, JSON.stringify(updatedApps));
         }
       } catch {}
+
+      // Dispara e-mail oficial com o convite da entrevista
+      const candEmail = cand.candidateEmail || cand.email;
+      if (candEmail) {
+        try {
+          const currentJob = getJobById(jobId);
+          sendInterviewScheduledNotification({
+            candidateEmail: candEmail,
+            candidateUid: cand.candidateUid || cand.candidateId || cand.uid || cand.id,
+            candidateName: cand.name || cand.candidateName || 'Candidato(a)',
+            jobTitle: currentJob?.title || cand.jobTitle || 'Oportunidade',
+            companyName: currentJob?.company || cand.company || 'Empresa parceira',
+            interviewData
+          }).catch(notifErr => console.warn('[jobsService] Notificação de entrevista:', notifErr.message));
+        } catch (e) {
+          console.warn('[jobsService] Erro ao disparar notificação de entrevista:', e.message);
+        }
+      }
 
       return {
         ...cand,

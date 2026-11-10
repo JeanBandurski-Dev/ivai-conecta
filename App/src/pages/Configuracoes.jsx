@@ -1,12 +1,29 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
-  FileCheck, CheckCircle2, User, Mail, ShieldCheck, Upload,
-  Building2, Camera,
-  Search, Loader2, AlertCircle, RefreshCw, Check,
-  Wrench, Briefcase, GraduationCap, Save
+  FileCheck, CheckCircle2, Mail, ShieldCheck, Upload,
+  Building2, Search, Loader2, AlertCircle, RefreshCw, Check,
+  Briefcase, GraduationCap, Save, ExternalLink, Globe,
+  Share2, AlertTriangle, Trash2, Power, Download,
+  Copy
 } from 'lucide-react';
+
+function LinkedInIcon({ className = 'w-4 h-4 fill-current' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.78a1.62 1.62 0 1 0 0 3.24 1.62 1.62 0 0 0 0-3.24z" />
+    </svg>
+  );
+}
+
+function GitHubIcon({ className = 'w-4 h-4 fill-current' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z" />
+    </svg>
+  );
+}
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import useAppStore from '../store/useAppStore';
@@ -16,81 +33,94 @@ import {
   sendStudentVerificationEmail,
   checkStudentVerification,
   validateStudentEmail,
-  uploadUserProfilePicture,
   uploadUserDocument,
   maskCNPJ,
   cleanCNPJ,
   validateCNPJ,
   fetchCNPJData,
   updateUserPassword,
-  isGoogleOnlyAuthUser
+  updateUserEmail,
+  deactivateUserAccount,
+  deleteUserAccount,
+  isGoogleOnlyAuthUser,
+  getUserNotificationPreferences,
+  saveUserNotificationPreferences,
+  getUserPrivacySettings,
+  saveUserPrivacySettings,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  DEFAULT_PRIVACY_SETTINGS,
+  exportUserDataAsJSON
 } from '../lib/ivaiConecta';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import {
-  validateAccountName,
   validateAccountEmail,
   validateAccountLinkedIn,
   validateAccountGitHubOrPortfolio,
   validateStudentRA,
-  validatePasswordChange,
-  validateAccountSettingsForm
+  validatePasswordChange
 } from '../utils/formValidation';
 
 export default function Configuracoes() {
-  const { currentUser, setCurrentUser, logout, showToast, showConfirm } = useAppStore();
+  const { currentUser, setCurrentUser, logout, showToast } = useAppStore();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('account'); // 'account', 'verification', 'company', 'security', 'privacy'
+  // Abas disponíveis de acordo com o papel do usuário
+  const userRole = currentUser?.role || 'candidato';
+  const isAdmin = userRole === 'admin';
+  const isEmpresa = userRole === 'empresa';
+  const isAluno = userRole === 'aluno';
 
-  // Account form
-  const [name, setName] = useState(
-    (currentUser?.role === 'empresa'
-      ? (currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name)
-      : currentUser?.name) || ''
-  );
-  const [email, setEmail] = useState(currentUser?.email || '');
+  // Define a aba inicial padrão
+  const defaultTab = isAdmin ? 'account' : 'links';
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // ─── ESTADO: INFORMAÇÕES E REDES SOCIAIS (LINKS PROFISSIONAIS) ──────
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
   const [github, setGithub] = useState(currentUser?.github || '');
-  const [avatar, setAvatar] = useState(
-    isGenericPlaceholderAvatar(currentUser?.avatar) ? '' : (currentUser?.avatar || '')
-  );
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [submittingAccount, setSubmittingAccount] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(currentUser?.role || 'candidato');
-  const [switchingRole, setSwitchingRole] = useState(false);
-
-  // Estados de Validação dos Formulários
-  const [accountErrors, setAccountErrors] = useState({});
-  const [accountSubmitAttempted, setAccountSubmitAttempted] = useState(false);
-  const [passwordErrors, setPasswordErrors] = useState({});
-  const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
-
-  const accountErrorCount = useMemo(() => {
-    return Object.values(accountErrors).filter(Boolean).length;
-  }, [accountErrors]);
-
-  const passwordErrorCount = useMemo(() => {
-    return Object.values(passwordErrors).filter(Boolean).length;
-  }, [passwordErrors]);
-
-  useEffect(() => {
-    if (currentUser?.avatar) {
-      if (!isGenericPlaceholderAvatar(currentUser.avatar)) {
-        setAvatar(currentUser.avatar);
-      } else {
-        setAvatar('');
-      }
-    }
-  }, [currentUser?.avatar]);
-
-  useEffect(() => {
-    if (currentUser?.role) {
-      setSelectedRole(currentUser.role);
-    }
-  }, [currentUser?.role]);
-
-  // Verification form (Student)
+  const [portfolio, setPortfolio] = useState(currentUser?.portfolio || currentUser?.website || '');
+  const [additionalLink, setAdditionalLink] = useState(currentUser?.additionalLink || '');
   const [raNumber, setRaNumber] = useState(currentUser?.raNumber || '');
+  const [linksErrors, setLinksErrors] = useState({});
+  const [submittingLinks, setSubmittingLinks] = useState(false);
+
+  // ─── ESTADO: CONFIGURAÇÕES DA CONTA ─────────────────────────────────
+  const [currentEmailDisplay, setCurrentEmailDisplay] = useState(currentUser?.email || '');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPasswordConfirm, setEmailPasswordConfirm] = useState('');
+  const [showEmailPassConfirm, setShowEmailPassConfirm] = useState(false);
+  const [submittingEmailChange, setSubmittingEmailChange] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [pendingEmailNotice, setPendingEmailNotice] = useState(currentUser?.pendingEmail || null);
+
+  // Alteração de Senha
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [submittingPassword, setSubmittingPassword] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState({});
+
+  // Desativação e Exclusão
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [deactivationReason, setDeactivationReason] = useState('');
+  const [submittingDeactivation, setSubmittingDeactivation] = useState(false);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [submittingDeletion, setSubmittingDeletion] = useState(false);
+
+  // ─── ESTADO: NOTIFICAÇÕES & PREFERÊNCIAS DE E-MAIL ─────────────────
+  const [notifPrefs, setNotifPrefs] = useState({ ...DEFAULT_NOTIFICATION_PREFERENCES });
+  const [savingNotifPrefs, setSavingNotifPrefs] = useState(false);
+
+  // ─── ESTADO: PRIVACIDADE & LGPD ─────────────────────────────────────
+  const [privacySettings, setPrivacySettings] = useState({ ...DEFAULT_PRIVACY_SETTINGS });
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+
+  // ─── ESTADO: VERIFICAÇÃO ESTUDANTIL (ALUNO) ─────────────────────────
   const [verificationSubmitted, setVerificationSubmitted] = useState(currentUser?.isVerifiedStudent || false);
   const [studentInstEmail, setStudentInstEmail] = useState(
     currentUser?.studentEmail || (currentUser?.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu')) ? currentUser.email : '')
@@ -99,61 +129,298 @@ export default function Configuracoes() {
   const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
 
-  // Sincroniza estados do formulário sempre que o currentUser é carregado ou atualizado
-  useEffect(() => {
-    if (!currentUser) return;
-    const currentDisplayName = currentUser.role === 'empresa'
-      ? (currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || '')
-      : (currentUser.name || '');
-    if (currentDisplayName) setName(currentDisplayName);
-    if (currentUser.email) setEmail(currentUser.email);
-    if (currentUser.linkedin) setLinkedin(currentUser.linkedin);
-    if (currentUser.github) setGithub(currentUser.github);
-    if (currentUser.avatar) setAvatar(currentUser.avatar);
-    if (currentUser.raNumber) setRaNumber(currentUser.raNumber);
-    if (currentUser.isVerifiedStudent != null) setVerificationSubmitted(Boolean(currentUser.isVerifiedStudent || currentUser.emailVerified));
-    if (currentUser.studentEmail) {
-      setStudentInstEmail(currentUser.studentEmail);
-    } else if (currentUser.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu'))) {
-      setStudentInstEmail(currentUser.email);
-    }
-    if (currentUser.studentEmailVerificationSentAt) {
-      setVerificationEmailSent(true);
-    }
-  }, [currentUser]);
+  // ─── ESTADO: VERIFICAÇÃO DE CNPJ (EMPRESA) ──────────────────────────
+  const [cnpj, setCnpj] = useState(currentUser?.cnpj || '');
+  const [companyFile, setCompanyFile] = useState(null);
+  const [companyVerified, setCompanyVerified] = useState(currentUser?.isVerifiedCompany || false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjData, setCnpjData] = useState(null);
+  const [cnpjError, setCnpjError] = useState('');
+  const [isEditingCnpj, setIsEditingCnpj] = useState(false);
+  const [submittingCompany, setSubmittingCompany] = useState(false);
+  const companyFileInputRef = useRef(null);
 
-  // Consulta direta ao Firestore para garantir consistência em navegadores novos ou abas anônimas
+  // Sincroniza dados com o Firestore ao montar ou trocar de usuário
   useEffect(() => {
     const uid = currentUser?.uid || currentUser?.id;
     if (!uid) return;
 
     let isMounted = true;
+
+    // 1. Busca dados do documento do usuário
     const userDocRef = doc(db, 'users', String(uid));
     getDoc(userDocRef).then((snap) => {
       if (!isMounted || !snap.exists()) return;
       const data = snap.data();
-      const currentDisplayName = (data.role || currentUser?.role) === 'empresa'
-        ? (data.razaoSocial || data.nomeFantasia || data.name || '')
-        : (data.name || '');
-      if (currentDisplayName) setName(currentDisplayName);
-      if (data.email) setEmail(data.email);
-      if (data.linkedin) setLinkedin(data.linkedin);
-      if (data.github) setGithub(data.github);
-      if (data.avatar) setAvatar(data.avatar);
-      if (data.raNumber) setRaNumber(data.raNumber);
+
+      if (data.email) setCurrentEmailDisplay(data.email);
+      if (data.pendingEmail) setPendingEmailNotice(data.pendingEmail);
+      if (data.linkedin !== undefined) setLinkedin(data.linkedin || '');
+      if (data.github !== undefined) setGithub(data.github || '');
+      if (data.portfolio !== undefined) setPortfolio(data.portfolio || '');
+      else if (data.website) setPortfolio(data.website);
+      if (data.additionalLink !== undefined) setAdditionalLink(data.additionalLink || '');
+      if (data.raNumber !== undefined) setRaNumber(data.raNumber || '');
+      if (data.cnpj) setCnpj(data.cnpj);
+      if (data.isVerifiedCompany != null) setCompanyVerified(Boolean(data.isVerifiedCompany));
       if (data.isVerifiedStudent != null) setVerificationSubmitted(Boolean(data.isVerifiedStudent || data.emailVerified));
-      if (data.studentEmail) {
-        setStudentInstEmail(data.studentEmail);
-      } else if (data.email && (validateStudentEmail(data.email)?.isValid || data.email.includes('estudante'))) {
-        setStudentInstEmail(data.email);
+      if (data.studentEmail) setStudentInstEmail(data.studentEmail);
+
+      if (data.notificationPreferences) {
+        setNotifPrefs({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...data.notificationPreferences });
       }
-    }).catch((err) => console.warn('[Configuracoes] Erro ao sincronizar dados com Firestore:', err));
+      if (data.privacySettings) {
+        setPrivacySettings({ ...DEFAULT_PRIVACY_SETTINGS, ...data.privacySettings });
+      }
+    }).catch(err => console.warn('[Configuracoes] Erro ao sincronizar dados com Firestore:', err));
+
+    // 2. Carrega preferências de notificação
+    getUserNotificationPreferences(uid).then(prefs => {
+      if (isMounted && prefs) setNotifPrefs(prefs);
+    });
+
+    // 3. Carrega preferências de privacidade
+    getUserPrivacySettings(uid).then(priv => {
+      if (isMounted && priv) setPrivacySettings(priv);
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.uid, currentUser?.id, currentUser?.role]);
+  }, [currentUser?.uid, currentUser?.id]);
 
+  if (!currentUser) {
+    return (
+      <main className="container section text-center py-24">
+        <Settings size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
+        <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Acesso restrito</h2>
+        <p className="text-gray-500 dark:text-slate-300 mb-6">Você precisa estar logado para acessar as configurações da sua conta.</p>
+        <Link to="/login" className="btn btn-primary px-6 py-2.5 font-bold">Entrar na Conta</Link>
+      </main>
+    );
+  }
+
+  // ─── HANDLERS: INFORMAÇÕES E REDES SOCIAIS ──────────────────────────
+  const handleSaveLinks = async (e) => {
+    e.preventDefault();
+    if (submittingLinks) return;
+
+    const errors = {};
+    if (linkedin?.trim()) {
+      const v = validateAccountLinkedIn(linkedin.trim());
+      if (!v.valid) errors.linkedin = v.error;
+    }
+    if (github?.trim()) {
+      const v = validateAccountGitHubOrPortfolio(github.trim());
+      if (!v.valid) errors.github = v.error;
+    }
+    if (portfolio?.trim()) {
+      const v = validateAccountGitHubOrPortfolio(portfolio.trim());
+      if (!v.valid) errors.portfolio = v.error;
+    }
+    if (raNumber?.trim() && isAluno) {
+      const v = validateStudentRA(raNumber.trim());
+      if (!v.valid) errors.raNumber = v.error;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setLinksErrors(errors);
+      showToast('Por favor, verifique os links informados.', 'error');
+      return;
+    }
+    setLinksErrors({});
+
+    setSubmittingLinks(true);
+    try {
+      const patch = {
+        linkedin: linkedin.trim(),
+        github: github.trim(),
+        portfolio: portfolio.trim(),
+        website: portfolio.trim(),
+        additionalLink: additionalLink.trim(),
+        ...(isAluno ? { raNumber: raNumber.trim() } : {})
+      };
+
+      const updated = await updateAuthUser(patch, currentUser);
+      if (updated) {
+        setCurrentUser(updated);
+        showToast('Links profissionais atualizados com sucesso!', 'success');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao salvar links profissionais.', 'error');
+    } finally {
+      setSubmittingLinks(false);
+    }
+  };
+
+  // ─── HANDLERS: ALTERAÇÃO DE E-MAIL ──────────────────────────────────
+  const handleSaveEmail = async (e) => {
+    e.preventDefault();
+    if (submittingEmailChange) return;
+
+    setEmailError('');
+    const v = validateAccountEmail(newEmail);
+    if (!v.valid) {
+      setEmailError(v.error);
+      return;
+    }
+
+    setSubmittingEmailChange(true);
+    try {
+      const res = await updateUserEmail(newEmail, emailPasswordConfirm);
+      if (res.success) {
+        showToast(res.message, 'success', 6000);
+        setPendingEmailNotice(newEmail.toLowerCase().trim());
+        setNewEmail('');
+        setEmailPasswordConfirm('');
+      } else {
+        setEmailError(res.error || 'Não foi possível solicitar a alteração de e-mail.');
+        showToast(res.error || 'Erro ao alterar e-mail.', 'error');
+      }
+    } catch (err) {
+      setEmailError(err?.message || 'Erro inesperado.');
+      showToast('Erro ao atualizar e-mail: ' + (err?.message || 'Tente novamente.'), 'error');
+    } finally {
+      setSubmittingEmailChange(false);
+    }
+  };
+
+  // ─── HANDLERS: ALTERAÇÃO DE SENHA ───────────────────────────────────
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+
+    const check = validatePasswordChange({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      isGoogleOnly: isGoogleOnlyAuthUser()
+    });
+
+    if (!check.isValid) {
+      setPasswordErrors(check.errors);
+      const firstMsg = check.errors[check.firstErrorKey] || 'Verifique os dados da nova senha.';
+      showToast(firstMsg, 'error');
+      return;
+    }
+
+    setPasswordErrors({});
+    setSubmittingPassword(true);
+    try {
+      const res = await updateUserPassword(currentPassword, newPassword);
+      if (res.success) {
+        showToast(res.message || 'Senha alterada com sucesso!', 'success');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        showToast(res.error || 'Não foi possível alterar a senha.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro ao atualizar senha: ' + (err?.message || 'Tente novamente.'), 'error');
+    } finally {
+      setSubmittingPassword(false);
+    }
+  };
+
+  // ─── HANDLERS: DESATIVAÇÃO DE CONTA ─────────────────────────────────
+  const handleConfirmDeactivate = async () => {
+    setSubmittingDeactivation(true);
+    try {
+      const res = await deactivateUserAccount(deactivationReason);
+      if (res.success) {
+        setIsDeactivateModalOpen(false);
+        showToast(res.message, 'info', 6000);
+        navigate('/');
+      } else {
+        showToast(res.error || 'Não foi possível desativar a conta.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro na desativação: ' + (err?.message || 'Tente novamente.'), 'error');
+    } finally {
+      setSubmittingDeactivation(false);
+    }
+  };
+
+  // ─── HANDLERS: EXCLUSÃO DE CONTA ────────────────────────────────────
+  const handleConfirmDelete = async () => {
+    const isGoogle = isGoogleOnlyAuthUser();
+    if (!isGoogle && !deletePassword.trim()) {
+      showToast('Por favor, informe sua senha atual para confirmar a exclusão.', 'error');
+      return;
+    }
+    if (isGoogle && deleteConfirmationInput.trim().toUpperCase() !== 'EXCLUIR') {
+      showToast('Digite a palavra EXCLUIR para confirmar a ação irreversível.', 'error');
+      return;
+    }
+
+    setSubmittingDeletion(true);
+    try {
+      const res = await deleteUserAccount(deletePassword);
+      if (res.success) {
+        setIsDeleteModalOpen(false);
+        showToast('Sua conta foi excluída com sucesso. Sentiremos sua falta!', 'info', 6000);
+        navigate('/');
+      } else {
+        showToast(res.error || 'Não foi possível excluir a conta.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro ao excluir conta: ' + (err?.message || 'Tente novamente.'), 'error');
+    } finally {
+      setSubmittingDeletion(false);
+    }
+  };
+
+  // ─── HANDLERS: NOTIFICAÇÕES ─────────────────────────────────────────
+  const handleSaveNotifications = async (e) => {
+    if (e) e.preventDefault();
+    const uid = currentUser?.uid || currentUser?.id;
+    if (!uid) return;
+
+    setSavingNotifPrefs(true);
+    try {
+      const res = await saveUserNotificationPreferences(uid, notifPrefs);
+      if (res.success) {
+        showToast('Preferências de notificação salvas com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao salvar preferências.', 'error');
+      }
+    } finally {
+      setSavingNotifPrefs(false);
+    }
+  };
+
+  // ─── HANDLERS: PRIVACIDADE ──────────────────────────────────────────
+  const handleSavePrivacy = async (e) => {
+    if (e) e.preventDefault();
+    const uid = currentUser?.uid || currentUser?.id;
+    if (!uid) return;
+
+    setSavingPrivacy(true);
+    try {
+      const res = await saveUserPrivacySettings(uid, privacySettings);
+      if (res.success) {
+        showToast('Configurações de privacidade salvas com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao salvar privacidade.', 'error');
+      }
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExportingData(true);
+    try {
+      await exportUserDataAsJSON(currentUser);
+      showToast('Download do arquivo de dados pessoais (LGPD) iniciado com sucesso!', 'success');
+    } catch (err) {
+      showToast('Erro ao exportar dados: ' + (err?.message || 'Tente novamente.'), 'error');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  // ─── HANDLERS: VERIFICAÇÃO ESTUDANTIL (ALUNO) ───────────────────────
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
     const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
@@ -201,281 +468,7 @@ export default function Configuracoes() {
     }
   };
 
-  // Company verification form (Empresa)
-  const [cnpj, setCnpj] = useState(currentUser?.cnpj || '');
-  const [companyFile, setCompanyFile] = useState(null);
-  const [companyVerified, setCompanyVerified] = useState(currentUser?.isVerifiedCompany || false);
-  const [cnpjLoading, setCnpjLoading] = useState(false);
-  const [cnpjData, setCnpjData] = useState(null);
-  const [cnpjError, setCnpjError] = useState('');
-  const [isEditingCnpj, setIsEditingCnpj] = useState(false);
-  const companyFileInputRef = useRef(null);
-
-  // Password form
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPass, setShowCurrentPass] = useState(false);
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [submittingPassword, setSubmittingPassword] = useState(false);
-  const [passwordReauthRequired, setPasswordReauthRequired] = useState(false);
-
-  const [submittingCompany, setSubmittingCompany] = useState(false);
-
-  if (!currentUser) {
-    return (
-      <main className="container section text-center py-24">
-        <Settings size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
-        <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Acesso restrito</h2>
-        <p className="text-gray-500 dark:text-slate-300 mb-6">Você precisa estar logado para acessar as configurações da sua conta.</p>
-        <Link to="/login" className="btn btn-primary px-6 py-2.5 font-bold">Entrar na Conta</Link>
-      </main>
-    );
-  }
-
-  const handleAvatarFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingAvatar(true);
-    showToast('Processando foto de perfil...');
-    try {
-      const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
-      if (res.success) {
-        setAvatar(res.url);
-        setCurrentUser({ ...currentUser, avatar: res.url });
-        showToast('Foto de perfil salva com sucesso!');
-      } else {
-        showToast(res.error || 'Erro ao enviar imagem.');
-      }
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  // Handlers com validação em tempo real para os campos de Conta & Perfil
-  const handleNameChange = (val) => {
-    setName(val);
-    const res = validateAccountName(val, currentUser?.role || 'candidato');
-    setAccountErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
-  };
-
-  const handleNameBlur = () => {
-    const res = validateAccountName(name, currentUser?.role || 'candidato');
-    setAccountErrors(prev => ({ ...prev, name: res.valid ? undefined : res.error }));
-  };
-
-  const handleEmailChange = (val) => {
-    setEmail(val);
-    const res = validateAccountEmail(val, { required: true });
-    setAccountErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
-  };
-
-  const handleEmailBlur = () => {
-    const res = validateAccountEmail(email, { required: true });
-    setAccountErrors(prev => ({ ...prev, email: res.valid ? undefined : res.error }));
-  };
-
-  const handleLinkedinChange = (val) => {
-    setLinkedin(val);
-    if (val?.trim()) {
-      const res = validateAccountLinkedIn(val, { required: false });
-      setAccountErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, linkedin: undefined }));
-    }
-  };
-
-  const handleLinkedinBlur = () => {
-    if (linkedin?.trim()) {
-      const res = validateAccountLinkedIn(linkedin, { required: false });
-      setAccountErrors(prev => ({ ...prev, linkedin: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, linkedin: undefined }));
-    }
-  };
-
-  const handleGithubChange = (val) => {
-    setGithub(val);
-    if (val?.trim()) {
-      const res = validateAccountGitHubOrPortfolio(val, { required: false });
-      setAccountErrors(prev => ({ ...prev, github: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, github: undefined }));
-    }
-  };
-
-  const handleGithubBlur = () => {
-    if (github?.trim()) {
-      const res = validateAccountGitHubOrPortfolio(github, { required: false });
-      setAccountErrors(prev => ({ ...prev, github: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, github: undefined }));
-    }
-  };
-
-  const handleRaChange = (val) => {
-    setRaNumber(val);
-    if (val?.trim()) {
-      const res = validateStudentRA(val);
-      setAccountErrors(prev => ({ ...prev, raNumber: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, raNumber: undefined }));
-    }
-  };
-
-  const handleRaBlur = () => {
-    if (raNumber?.trim()) {
-      const res = validateStudentRA(raNumber);
-      setAccountErrors(prev => ({ ...prev, raNumber: res.valid ? undefined : res.error }));
-    } else {
-      setAccountErrors(prev => ({ ...prev, raNumber: undefined }));
-    }
-  };
-
-  const handleSaveAccount = async (e) => {
-    e.preventDefault();
-    if (submittingAccount) return;
-
-    setAccountSubmitAttempted(true);
-
-    const targetRole = selectedRole || currentUser?.role || 'candidato';
-
-    const check = validateAccountSettingsForm({
-      name,
-      email,
-      linkedin,
-      github,
-      raNumber,
-      role: targetRole
-    });
-
-    if (!check.isValid) {
-      setAccountErrors(check.errors);
-      const firstMsg = check.errors[check.firstErrorKey] || 'Verifique as informações preenchidas.';
-      showToast(firstMsg, 'error');
-      return;
-    }
-
-    setAccountErrors({});
-    const roleBadges = {
-      candidato: 'Candidato / Profissional',
-      freelancer: 'Prestador de Serviço Autônomo',
-      aluno: 'Estudante (IFPR/UENP/Univale)',
-      empresa: 'Empresa / Recrutador',
-      professor: 'Docente (IFPR/UENP/Univale)'
-    };
-    const targetBadge = roleBadges[targetRole] || currentUser?.badge;
-
-    const trimmedName = name.trim();
-    const isEmpresa = targetRole === 'empresa';
-
-    const companyFields = isEmpresa ? {
-      name: trimmedName,
-      razaoSocial: trimmedName,
-      nomeFantasia: (!currentUser?.nomeFantasia || currentUser?.nomeFantasia === currentUser?.name || currentUser?.nomeFantasia === currentUser?.razaoSocial)
-        ? trimmedName
-        : currentUser.nomeFantasia
-    } : {
-      name: trimmedName
-    };
-
-    const updatePayload = {
-      ...companyFields,
-      email: email.trim(),
-      linkedin: linkedin.trim(),
-      github: github.trim(),
-      avatar,
-      ...(currentUser?.role === 'aluno' ? { raNumber: raNumber.trim() } : {}),
-      role: targetRole,
-      activeRole: targetRole,
-      selectedRole: targetRole,
-      profileType: targetRole,
-      badge: targetBadge
-    };
-
-    setSubmittingAccount(true);
-    try {
-      const updated = await updateAuthUser(updatePayload, currentUser);
-
-      if (updated) {
-        setCurrentUser(updated);
-        showToast('Dados da conta e perfil atualizados com sucesso!', 'success');
-      }
-    } catch (err) {
-      showToast(err?.message || 'Erro ao salvar alterações da conta.', 'error');
-    } finally {
-      setSubmittingAccount(false);
-    }
-  };
-
-  const handleSwitchRole = async (newRole) => {
-    const roleBadges = {
-      candidato: 'Candidato / Profissional',
-      freelancer: 'Prestador de Serviço Autônomo',
-      aluno: 'Estudante (IFPR/UENP/Univale)'
-    };
-    if (!roleBadges[newRole]) return;
-
-    const roleDetails = {
-      candidato: {
-        title: 'Mudar perfil para Candidato',
-        message: 'Deseja alterar seu perfil para Candidato?\nVocê passará a concorrer a vagas de emprego formal (CLT / Meio Período).',
-        confirmText: 'Alterar para Candidato'
-      },
-      freelancer: {
-        title: 'Mudar perfil para Freelancer',
-        message: 'Deseja alterar seu perfil para Freelancer?\nVocê passará a concorrer a demandas e vagas PJ no Marketplace de Serviços.',
-        confirmText: 'Alterar para Freelancer'
-      },
-      aluno: {
-        title: 'Mudar perfil para Estudante',
-        message: 'Deseja alterar seu perfil para Estudante?\nVocê terá acesso prioritário a programas de estágio e capacitação regional.',
-        confirmText: 'Alterar para Estudante'
-      }
-    };
-
-    const targetConfig = roleDetails[newRole] || {
-      title: 'Alterar Perfil',
-      message: 'Deseja alterar seu tipo de perfil?',
-      confirmText: 'Confirmar'
-    };
-
-    const confirmed = await showConfirm({
-      title: targetConfig.title,
-      message: targetConfig.message,
-      confirmText: targetConfig.confirmText,
-      cancelText: 'Cancelar',
-      variant: 'primary',
-      badge: 'Transição de Perfil'
-    });
-    if (!confirmed) return;
-
-    setSwitchingRole(true);
-    try {
-      const updated = await updateAuthUser({
-        role: newRole,
-        activeRole: newRole,
-        selectedRole: newRole,
-        profileType: newRole,
-        badge: roleBadges[newRole]
-      }, currentUser);
-
-      if (updated) {
-        setCurrentUser(updated);
-        setSelectedRole(newRole);
-        showToast(`Perfil alterado com sucesso para ${roleBadges[newRole]}!`, 'success');
-      } else {
-        showToast('Não foi possível atualizar o perfil no momento.', 'error');
-      }
-    } catch (err) {
-      console.error('Erro ao alternar perfil:', err);
-      showToast('Erro ao atualizar tipo de perfil.', 'error');
-    } finally {
-      setSwitchingRole(false);
-    }
-  };
-
+  // ─── HANDLERS: VERIFICAÇÃO DE CNPJ (EMPRESA) ────────────────────────
   const handleCnpjChange = (e) => {
     const raw = e.target.value;
     const masked = maskCNPJ(raw);
@@ -516,7 +509,6 @@ export default function Configuracoes() {
     }
   };
 
-  // Company CNPJ Submission
   const handleCompanyVerificationSubmit = async (e) => {
     e.preventDefault();
     const cleanDigits = cleanCNPJ(cnpj);
@@ -573,74 +565,40 @@ export default function Configuracoes() {
     }
   };
 
-  const handleUpdatePassword = async (e) => {
-    e.preventDefault();
-    setPasswordSubmitAttempted(true);
-
-    const check = validatePasswordChange({
-      currentPassword,
-      newPassword,
-      confirmPassword,
-      isGoogleOnly: isGoogleOnlyAuthUser()
-    });
-
-    if (!check.isValid) {
-      setPasswordErrors(check.errors);
-      const firstMsg = check.errors[check.firstErrorKey] || 'Verifique os dados da nova senha.';
-      showToast(firstMsg, 'error');
-      return;
-    }
-
-    setPasswordErrors({});
-    setSubmittingPassword(true);
-    try {
-      const res = await updateUserPassword(currentPassword, newPassword);
-      if (res.success) {
-        showToast(res.message || 'Senha alterada com sucesso!', 'success');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setPasswordReauthRequired(false);
-        setPasswordSubmitAttempted(false);
-      } else {
-        if (res.requiresReauth) {
-          setPasswordReauthRequired(true);
-        }
-        showToast(res.error || 'Não foi possível alterar a senha.', 'error');
-      }
-    } catch (err) {
-      showToast('Erro ao atualizar senha: ' + (err.message || 'Tente novamente.'), 'error');
-    } finally {
-      setSubmittingPassword(false);
-    }
-  };
-
   const handleLogout = () => {
     logout();
     showToast('Sessão encerrada com sucesso.');
     navigate('/');
   };
 
+  const copyUidToClipboard = () => {
+    const uid = currentUser?.uid || currentUser?.id || '';
+    if (uid && navigator.clipboard) {
+      navigator.clipboard.writeText(uid);
+      showToast('ID da conta copiado para a área de transferência!');
+    }
+  };
+
   return (
     <>
-      {/* HEADER */}
+      {/* ── HEADER SUPERIOR ELEGANTE ── */}
       <header className="relative bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-12 lg:py-16 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(34,197,94,0.15),transparent_50%)] pointer-events-none" />
 
         <div className="container relative z-10">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-4 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
           >
             <ArrowLeft size={14} /> Voltar para a tela anterior
           </button>
 
           <div className="max-w-2xl">
             <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-heading font-extrabold text-white mb-3 tracking-tight">
-              Configurações &amp; Autenticação
+              Configurações da Conta
             </h1>
             <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-              Gerencie seus dados pessoais, verificação de matrícula acadêmica, CNPJ e preferências de segurança.
+              Gerencie a segurança da sua conta, suas redes profissionais, preferências de notificação por e-mail e privacidade dos dados.
             </p>
           </div>
         </div>
@@ -649,399 +607,1008 @@ export default function Configuracoes() {
       <main className="container section">
         <div className="max-w-4xl mx-auto space-y-6">
 
-          {/* Nav Tabs */}
+          {/* ── NAVEGAÇÃO POR ABAS COESA E ADAPTÁVEL ── */}
           <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 overflow-x-auto pb-1 scrollbar-none w-full max-w-full">
-            <button
-              onClick={() => setActiveTab('account')}
-              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'account' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
-              }`}
-            >
-              <User size={16} /> Conta &amp; Redes Sociais
-              {accountErrorCount > 0 && (
-                <span className="text-[10px] bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 px-1.5 py-0.2 rounded-full font-extrabold flex items-center gap-1">
-                  <AlertCircle size={10} /> {accountErrorCount}
-                </span>
-              )}
-            </button>
-
-            {currentUser.role === 'aluno' && (
+            {!isAdmin && (
               <button
+                type="button"
+                onClick={() => setActiveTab('links')}
+                className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'links'
+                    ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+                }`}
+              >
+                {isEmpresa ? <Building2 size={16} /> : <Share2 size={16} />}
+                <span>{isEmpresa ? 'Canais & Redes' : 'Informações & Redes Sociais'}</span>
+              </button>
+            )}
+
+            {isAluno && (
+              <button
+                type="button"
                 onClick={() => setActiveTab('verification')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeTab === 'verification' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+                  activeTab === 'verification'
+                    ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
                 }`}
               >
-                <FileCheck size={16} /> Verificação de Estudante
-                {verificationSubmitted && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1"><Check size={10} /> Verificado</span>}
+                <FileCheck size={16} />
+                <span>Verificação de Estudante</span>
+                {verificationSubmitted && (
+                  <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <Check size={10} /> Verificado
+                  </span>
+                )}
               </button>
             )}
 
-            {currentUser.role === 'empresa' && (
+            {isEmpresa && (
               <button
+                type="button"
                 onClick={() => setActiveTab('company')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeTab === 'company' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+                  activeTab === 'company'
+                    ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
                 }`}
               >
-                <Building2 size={16} /> Verificação de CNPJ
-                {companyVerified && <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1"><Check size={10} /> CNPJ Ok</span>}
+                <ShieldCheck size={16} />
+                <span>Verificação de CNPJ</span>
+                {companyVerified && (
+                  <span className="text-[10px] bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <Check size={10} /> CNPJ Ok
+                  </span>
+                )}
               </button>
             )}
 
             <button
-              onClick={() => setActiveTab('security')}
+              type="button"
+              onClick={() => setActiveTab('account')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'security' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+                activeTab === 'account'
+                  ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
               }`}
             >
-              <Lock size={16} /> Segurança &amp; Senha
-              {passwordErrorCount > 0 && (
-                <span className="text-[10px] bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 px-1.5 py-0.2 rounded-full font-extrabold flex items-center gap-1">
-                  <AlertCircle size={10} /> {passwordErrorCount}
-                </span>
-              )}
+              <Lock size={16} />
+              <span>Configurações da Conta</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('privacy')}
+              type="button"
+              onClick={() => setActiveTab('notifications')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'privacy' ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+                activeTab === 'notifications'
+                  ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
               }`}
             >
-              <Bell size={16} /> Notificações &amp; Privacidade
+              <Bell size={16} />
+              <span>Notificações por E-mail</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('privacy')}
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
+                activeTab === 'privacy'
+                  ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white'
+              }`}
+            >
+              <Shield size={16} />
+              <span>Privacidade &amp; LGPD</span>
             </button>
           </div>
 
-          {/* ── ABA 1: CONTA & PERFIL ── */}
-          {activeTab === 'account' && (
-            <div className="card p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4">
-                <div>
-                  <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white">Informações Gerais &amp; Redes Sociais</h3>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Atualize seu nome de exibição, e-mail e perfis do LinkedIn / GitHub.</p>
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 1: INFORMAÇÕES E REDES SOCIAIS (LINKS PROFISSIONAIS) ─ */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'links' && !isAdmin && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Card Orientativo: Separação de Perfil Público vs Configurações */}
+              <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-primary-blue dark:text-blue-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <Briefcase size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                      Links Profissionais &amp; Presença Online
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                      Gerencie os canais de contato e portfólios que complementam seu perfil profissional.
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 size={13} /> E-mail Confirmado
-                </span>
+
+                <Link
+                  to={isEmpresa ? '/empresa' : isAluno ? '/perfil' : userRole === 'freelancer' ? '/freelancer' : '/perfil'}
+                  className="btn btn-outline btn-sm text-xs font-bold shrink-0 flex items-center gap-1.5 self-stretch sm:self-auto justify-center"
+                >
+                  <span>Editar Perfil Público</span>
+                  <ExternalLink size={13} />
+                </Link>
               </div>
 
-              <form onSubmit={handleSaveAccount} className="space-y-4" noValidate>
-                {accountSubmitAttempted && accountErrorCount > 0 && (
-                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-in fade-in duration-200">
-                    <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold">Atenção:</span> Existem campos com informações inválidas ou pendentes ({accountErrorCount} erro{accountErrorCount > 1 ? 's' : ''}). Por favor, corrija antes de salvar.
-                    </div>
-                  </div>
-                )}
+              {/* Formulário de Links Profissionais */}
+              <div className="card p-6 sm:p-8 space-y-6">
+                <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
+                  <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white">
+                    {isEmpresa ? 'Canais Oficiais da Empresa' : 'Redes Sociais & Portfólio Profissional'}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                    {isEmpresa
+                      ? 'Adicione os canais digitais onde candidatos e parceiros podem conhecer sua atuação.'
+                      : 'Mantenha seus links sempre atualizados para facilitar a avaliação de recrutadores e empresas parceiras.'}
+                  </p>
+                </div>
 
-                {/* Foto de Perfil / Avatar com Firebase Storage */}
-                <div className="bg-gray-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-gray-200/80 dark:border-slate-700/80 flex flex-wrap items-center gap-5">
-                  <div className="relative shrink-0">
-                    {avatar && !isGenericPlaceholderAvatar(avatar) ? (
-                      <img
-                        src={avatar}
-                        alt={name}
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-blue shadow-sm bg-white dark:bg-slate-800"
+                <form onSubmit={handleSaveLinks} className="space-y-4" noValidate>
+                  {/* LinkedIn */}
+                  <div className="form-group">
+                    <label className="form-label flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <LinkedInIcon className="w-4 h-4 text-[#0A66C2] fill-current" />
+                        {isEmpresa ? 'Página da Empresa no LinkedIn' : 'Perfil do LinkedIn'}
+                      </span>
+                      <span className="text-[11px] font-normal text-gray-400">Opcional</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={linkedin}
+                        onChange={e => {
+                          setLinkedin(e.target.value);
+                          if (linksErrors.linkedin) setLinksErrors(prev => ({ ...prev, linkedin: undefined }));
+                        }}
+                        className={`form-control ${linksErrors.linkedin ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                        placeholder="https://linkedin.com/in/seu-nome ou linkedin.com/company/sua-empresa"
                       />
-                    ) : (
-                      <div
-                        className={`w-16 h-16 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(name)} text-white font-extrabold text-xl flex items-center justify-center border-2 border-primary-blue shadow-sm`}
-                      >
-                        {(name || 'U').slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    {uploadingAvatar && (
-                      <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center text-white text-[10px] font-bold">
-                        Enviando...
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5 flex-1 min-w-[200px]">
-                    <div className="font-bold text-sm text-gray-900 dark:text-white">Foto do Perfil</div>
-                    <p className="text-xs text-gray-500 dark:text-slate-400">
-                      Envie uma imagem JPG, PNG ou WEBP (máx. 5MB).
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <label className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5">
-                        <Camera size={13} /> {uploadingAvatar ? 'Enviando foto...' : 'Escolher Arquivo do PC'}
-                        <input type="file" accept="image/*" onChange={handleAvatarFile} disabled={uploadingAvatar} className="hidden" />
-                      </label>
                     </div>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label flex items-center justify-between">
-                    <span>{currentUser?.role === 'empresa' ? 'Razão Social / Nome Oficial' : 'Nome Completo'} *</span>
-                    <span className="text-[11px] font-normal text-gray-400">
-                      {currentUser?.role === 'empresa' ? 'Nome oficial da organização' : 'Nome e sobrenome'}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => handleNameChange(e.target.value)}
-                    onBlur={handleNameBlur}
-                    className={`form-control ${
-                      accountErrors.name ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                    }`}
-                    maxLength={100}
-                    placeholder={currentUser?.role === 'empresa' ? 'Ex: Ivaí Tech Soluções Ltda' : 'Ex: João da Silva'}
-                    required
-                  />
-                  {accountErrors.name && (
-                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                      <AlertCircle size={13} className="shrink-0" />
-                      <span>{accountErrors.name}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">E-mail de Acesso *</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e => handleEmailChange(e.target.value)}
-                      onBlur={handleEmailBlur}
-                      className={`form-control pr-10 ${
-                        accountErrors.email ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="exemplo@email.com"
-                      required
-                    />
-                    <Mail size={16} className="absolute right-3 top-3.5 text-gray-400 dark:text-slate-500" />
-                  </div>
-                  {accountErrors.email && (
-                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                      <AlertCircle size={13} className="shrink-0" />
-                      <span>{accountErrors.email}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Redes Sociais Opcionais */}
-                <div className="grid sm:grid-cols-2 gap-4 pt-2">
-                  <div className="form-group">
-                    <label className="form-label">Perfil do LinkedIn (Opcional)</label>
-                    <input
-                      type="text"
-                      value={linkedin}
-                      onChange={e => handleLinkedinChange(e.target.value)}
-                      onBlur={handleLinkedinBlur}
-                      className={`form-control ${
-                        accountErrors.linkedin ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="https://linkedin.com/in/seu-nome"
-                    />
-                    {accountErrors.linkedin && (
+                    {linksErrors.linkedin ? (
                       <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
                         <AlertCircle size={13} className="shrink-0" />
-                        <span>{accountErrors.linkedin}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Perfil do GitHub / Portfólio (Opcional)</label>
-                    <input
-                      type="text"
-                      value={github}
-                      onChange={e => handleGithubChange(e.target.value)}
-                      onBlur={handleGithubBlur}
-                      className={`form-control ${
-                        accountErrors.github ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="https://github.com/seu-usuario ou portfólio"
-                    />
-                    {accountErrors.github && (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                        <AlertCircle size={13} className="shrink-0" />
-                        <span>{accountErrors.github}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {currentUser?.role === 'aluno' && (
-                  <div className="form-group">
-                    <label className="form-label">RA / Matrícula Acadêmica (Opcional)</label>
-                    <input
-                      type="text"
-                      value={raNumber}
-                      onChange={e => handleRaChange(e.target.value)}
-                      onBlur={handleRaBlur}
-                      className={`form-control ${
-                        accountErrors.raNumber ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
-                    />
-                    {accountErrors.raNumber ? (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                        <AlertCircle size={13} className="shrink-0" />
-                        <span>{accountErrors.raNumber}</span>
+                        <span>{linksErrors.linkedin}</span>
                       </div>
                     ) : (
-                      <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
-                        Identificador acadêmico opcional exibido no seu currículo e para recrutadores.
+                      <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
+                        Exemplo: https://linkedin.com/in/seu-usuario
                       </p>
                     )}
                   </div>
-                )}
 
-                <div className="form-group space-y-3">
-                  <div>
-                    <label className="form-label">Tipo de Conta &amp; Regras de Candidatura</label>
+                  {/* GitHub ou Website Corporativo */}
+                  <div className="form-group">
+                    <label className="form-label flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <GitHubIcon className="w-4 h-4 fill-current text-gray-800 dark:text-white" />
+                        {isEmpresa ? 'Repositório Oficial / GitHub Organizacional' : 'Perfil do GitHub'}
+                      </span>
+                      <span className="text-[11px] font-normal text-gray-400">Opcional</span>
+                    </label>
                     <input
                       type="text"
-                      value={currentUser.badge || currentUser.role}
-                      disabled
-                      className="form-control bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-bold border-gray-200 dark:border-slate-700 cursor-not-allowed"
+                      value={github}
+                      onChange={e => {
+                        setGithub(e.target.value);
+                        if (linksErrors.github) setLinksErrors(prev => ({ ...prev, github: undefined }));
+                      }}
+                      className={`form-control ${linksErrors.github ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                      placeholder="https://github.com/seu-usuario ou seu-usuario"
+                    />
+                    {linksErrors.github && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{linksErrors.github}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Portfólio Web / Website Oficial */}
+                  <div className="form-group">
+                    <label className="form-label flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <Globe size={16} className="text-primary-blue dark:text-blue-400" />
+                        {isEmpresa ? 'Website Oficial da Empresa' : 'Portfólio Pessoal ou Site Profissional'}
+                      </span>
+                      <span className="text-[11px] font-normal text-gray-400">Opcional</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={portfolio}
+                      onChange={e => {
+                        setPortfolio(e.target.value);
+                        if (linksErrors.portfolio) setLinksErrors(prev => ({ ...prev, portfolio: undefined }));
+                      }}
+                      className={`form-control ${linksErrors.portfolio ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                      placeholder={isEmpresa ? 'https://suaempresa.com.br' : 'https://seuportfoliopessoal.dev'}
+                    />
+                    {linksErrors.portfolio && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{linksErrors.portfolio}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Link Profissional Adicional */}
+                  <div className="form-group">
+                    <label className="form-label flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <Share2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+                        Outro Link Profissional (Lattes, Behance, Dribbble, Medium)
+                      </span>
+                      <span className="text-[11px] font-normal text-gray-400">Opcional</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalLink}
+                      onChange={e => setAdditionalLink(e.target.value)}
+                      className="form-control"
+                      placeholder="https://behance.net/seu-perfil ou currículo Lattes"
                     />
                   </div>
 
-                  {/* Cartão de Regras de Candidatura do Perfil */}
-                  <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 sm:p-4.5 space-y-3">
-                    <div className="flex items-start gap-2.5">
-                      {currentUser.role === 'freelancer' ? (
-                        <Wrench size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                      ) : currentUser.role === 'candidato' ? (
-                        <Briefcase size={18} className="text-primary-blue shrink-0 mt-0.5" />
-                      ) : currentUser.role === 'aluno' ? (
-                        <GraduationCap size={18} className="text-green-600 shrink-0 mt-0.5" />
-                      ) : (
-                        <Building2 size={18} className="text-sky-500 shrink-0 mt-0.5" />
+                  {/* Campo de Matrícula (Exclusivo para Aluno) */}
+                  {isAluno && (
+                    <div className="form-group pt-2 border-t border-gray-100 dark:border-slate-800">
+                      <label className="form-label flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-semibold">
+                          <GraduationCap size={16} className="text-green-600" />
+                          RA / Matrícula Acadêmica
+                        </span>
+                        <span className="text-[11px] font-normal text-gray-400">Opcional</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={raNumber}
+                        onChange={e => {
+                          setRaNumber(e.target.value);
+                          if (linksErrors.raNumber) setLinksErrors(prev => ({ ...prev, raNumber: undefined }));
+                        }}
+                        className={`form-control ${linksErrors.raNumber ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                        placeholder="Ex: IFPR-2024-8891 ou UNIVALE-2025-102"
+                      />
+                      {linksErrors.raNumber && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
+                          <AlertCircle size={13} className="shrink-0" />
+                          <span>{linksErrors.raNumber}</span>
+                        </div>
                       )}
-                      <div className="text-xs leading-relaxed space-y-1">
-                        <div className="font-bold text-gray-900 dark:text-white">
-                          Diretrizes de Candidatura para seu Perfil:
-                        </div>
-                        {currentUser.role === 'freelancer' && (
-                          <div className="text-gray-600 dark:text-slate-300">
-                            Perfis <strong>Freelancer / Autônomo</strong> concorrem a oportunidades no modelo <strong>Prestador de Serviço (PJ)</strong> e projetos técnicos sob demanda. Não realizam candidaturas diretas a vagas de emprego formal (CLT / Estágio). Se você deseja buscar emprego formal com carteira assinada, altere seu tipo de perfil abaixo.
-                          </div>
-                        )}
-                        {currentUser.role === 'candidato' && (
-                          <div className="text-gray-600 dark:text-slate-300">
-                            Perfis <strong>Candidato</strong> podem se candidatar a vagas de <strong>Emprego Formal CLT</strong> (Tempo Integral e Meio Período) e <strong>Prestador PJ</strong>. Vagas de <strong>Estágio</strong> são exclusivas para estudantes com matrícula acadêmica ativa.
-                          </div>
-                        )}
-                        {currentUser.role === 'aluno' && (
-                          <div className="text-gray-600 dark:text-slate-300">
-                            Perfis <strong>Aluno / Estudante</strong> podem se candidatar a vagas de <strong>Estágio</strong> (mediante envio de declaração de matrícula), além de oportunidades CLT, Meio Período e PJ.
-                          </div>
-                        )}
-                        {currentUser.role === 'empresa' && (
-                          <div className="text-gray-600 dark:text-slate-300">
-                            Perfis <strong>Empresa</strong> publicam oportunidades, realizam triagem de currículos e gerenciam processos seletivos. Não realizam candidaturas.
-                          </div>
-                        )}
-                        {currentUser.role === 'professor' && (
-                          <div className="text-gray-600 dark:text-slate-300">
-                            Perfis <strong>Docente / Professor</strong> acompanham oportunidades acadêmicas e emitem recomendações de parecer pedagógico para estudantes.
-                          </div>
-                        )}
-                      </div>
                     </div>
+                  )}
 
-                    {/* Ação de Alternância de Perfil (Aluno, Freelancer ou Candidato) */}
-                    {['aluno', 'candidato', 'freelancer'].includes(currentUser.role) && (
-                      <div className="pt-3 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-                          <span className="font-semibold text-gray-700 dark:text-slate-300">
-                            Alternar Tipo de Perfil:
-                          </span>
-                          <span className="text-[11px] text-gray-500 dark:text-slate-400">
-                            Escolha um perfil para testar as regras de candidatura
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSwitchRole('aluno')}
-                            disabled={currentUser.role === 'aluno' || switchingRole}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-                              currentUser.role === 'aluno'
-                                ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-300 dark:border-green-800 shadow-2xs cursor-default'
-                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-green-400'
-                            }`}
-                          >
-                            <GraduationCap size={15} className={currentUser.role === 'aluno' ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
-                            <span>Aluno / Estudante</span>
-                            {currentUser.role === 'aluno' && <Check size={13} className="text-green-600 dark:text-green-400" />}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSwitchRole('freelancer')}
-                            disabled={currentUser.role === 'freelancer' || switchingRole}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-                              currentUser.role === 'freelancer'
-                                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 shadow-2xs cursor-default'
-                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
-                            }`}
-                          >
-                            <Wrench size={15} className={currentUser.role === 'freelancer' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'} />
-                            <span>Freelancer (PJ)</span>
-                            {currentUser.role === 'freelancer' && <Check size={13} className="text-amber-600 dark:text-amber-400" />}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSwitchRole('candidato')}
-                            disabled={currentUser.role === 'candidato' || switchingRole}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-                              currentUser.role === 'candidato'
-                                ? 'bg-blue-50 dark:bg-blue-950/50 text-primary-blue dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-2xs cursor-default'
-                                : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
-                            }`}
-                          >
-                            <Briefcase size={15} className={currentUser.role === 'candidato' ? 'text-primary-blue dark:text-blue-400' : 'text-gray-400'} />
-                            <span>Candidato (CLT)</span>
-                            {currentUser.role === 'candidato' && <Check size={13} className="text-primary-blue dark:text-blue-400" />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                  <div className="flex justify-end pt-3">
+                    <button
+                      type="submit"
+                      disabled={submittingLinks}
+                      className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {submittingLinks ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Salvando links...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={15} />
+                          <span>Salvar Links Profissionais</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                </div>
-
-                <div className="flex justify-end pt-3">
-                  <button
-                    type="submit"
-                    disabled={submittingAccount}
-                    className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {submittingAccount ? (
-                      <>
-                        <Loader2 size={15} className="animate-spin" />
-                        <span>Salvando alterações...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save size={15} />
-                        <span>Salvar Alterações</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
           )}
 
-          {/* ── ABA 2: VERIFICAÇÃO DE ESTUDANTE (ALUNOS) ── */}
-          {activeTab === 'verification' && currentUser.role === 'aluno' && (
-            <div className="card p-6 sm:p-8 space-y-6">
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 2: CONFIGURAÇÕES DA CONTA (GERENCIAMENTO REAL) ─────── */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'account' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cartão de Resumo e Metadados da Conta */}
+              <div className="card p-6 sm:p-8 space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
+                      <Lock size={22} className="text-primary-blue dark:text-blue-400" />
+                      Informações da Conta
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+                      Dados cadastrais do seu acesso no Firebase Authentication.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Conta Ativa
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200/80 dark:border-slate-700/80">
+                    <span className="text-gray-500 dark:text-slate-400 block font-medium">E-mail Cadastrado</span>
+                    <span className="font-bold text-gray-900 dark:text-white text-sm break-all font-mono mt-0.5 block">
+                      {currentEmailDisplay || currentUser.email}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200/80 dark:border-slate-700/80">
+                    <span className="text-gray-500 dark:text-slate-400 block font-medium">Tipo de Conta</span>
+                    <span className="font-bold text-primary-blue dark:text-blue-400 text-sm mt-0.5 block">
+                      {currentUser.badge || currentUser.role}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200/80 dark:border-slate-700/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 dark:text-slate-400 font-medium">Identificador Único (UID)</span>
+                      <button
+                        type="button"
+                        onClick={copyUidToClipboard}
+                        className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                        title="Copiar ID"
+                      >
+                        <Copy size={13} />
+                      </button>
+                    </div>
+                    <span className="font-mono text-xs font-semibold text-gray-700 dark:text-slate-300 mt-1 block truncate">
+                      {currentUser.uid || currentUser.id}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Aviso se houver troca de e-mail pendente */}
+                {pendingEmailNotice && (
+                  <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 flex items-start gap-3">
+                    <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-900 dark:text-amber-200">
+                      <p className="font-bold">Confirmação de novo e-mail pendente!</p>
+                      <p className="mt-0.5 leading-relaxed">
+                        Uma solicitação para alterar seu login para <strong>{pendingEmailNotice}</strong> foi enviada. Abra a caixa de entrada desse novo endereço e clique no link de validação para efetivar a mudança.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── SEÇÃO: ALTERAR ENDEREÇO DE E-MAIL ── */}
+              <div className="card p-6 sm:p-8 space-y-4">
+                <div className="border-b border-gray-100 dark:border-slate-800 pb-3">
+                  <h4 className="font-heading font-bold text-lg text-primary-dark dark:text-white flex items-center gap-2">
+                    <Mail size={18} className="text-primary-blue dark:text-blue-400" />
+                    Alterar Endereço de E-mail
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                    A alteração é validada pelo Firebase Authentication via Prova de Propriedade (envio de link de confirmação para a nova caixa postal).
+                  </p>
+                </div>
+
+                <form onSubmit={handleSaveEmail} className="space-y-4 max-w-md" noValidate>
+                  <div className="form-group">
+                    <label className="form-label">Novo Endereço de E-mail *</label>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={e => {
+                        setNewEmail(e.target.value);
+                        if (emailError) setEmailError('');
+                      }}
+                      className={`form-control ${emailError ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                      placeholder="novo.email@exemplo.com"
+                      required
+                    />
+                    {emailError && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{emailError}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isGoogleOnlyAuthUser() && (
+                    <div className="form-group">
+                      <label className="form-label flex items-center justify-between">
+                        <span>Senha Atual (Reautenticação de Segurança)</span>
+                        <span className="text-[11px] font-normal text-gray-400">Obrigatória</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showEmailPassConfirm ? 'text' : 'password'}
+                          value={emailPasswordConfirm}
+                          onChange={e => setEmailPasswordConfirm(e.target.value)}
+                          className="form-control pr-10"
+                          placeholder="Digite sua senha atual"
+                          autoComplete="current-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEmailPassConfirm(!showEmailPassConfirm)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+                        >
+                          {showEmailPassConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submittingEmailChange || !newEmail.trim()}
+                    className="btn btn-outline btn-sm font-bold flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingEmailChange ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Enviando confirmação...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail size={14} />
+                        <span>Solicitar Alteração de E-mail</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* ── SEÇÃO: ALTERAR SENHA ── */}
+              <div className="card p-6 sm:p-8 space-y-4">
+                <div className="border-b border-gray-100 dark:border-slate-800 pb-3">
+                  <h4 className="font-heading font-bold text-lg text-primary-dark dark:text-white flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-primary-blue dark:text-blue-400" />
+                    Alteração de Senha
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    Atualize sua senha de acesso vinculada com segurança ao Firebase Authentication.
+                  </p>
+                </div>
+
+                {isGoogleOnlyAuthUser() && (
+                  <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-start gap-2.5 text-xs text-blue-900 dark:text-blue-200">
+                    <AlertCircle size={16} className="text-primary-blue dark:text-blue-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Conta vinculada via Google:</span> Você pode definir uma senha abaixo caso queira também acessar sua conta digitando e-mail e senha diretamente.
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md" noValidate>
+                  {!isGoogleOnlyAuthUser() && (
+                    <div className="form-group">
+                      <label className="form-label">Senha Atual</label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPass ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={e => {
+                            setCurrentPassword(e.target.value);
+                            if (passwordErrors.currentPassword) {
+                              setPasswordErrors(prev => ({ ...prev, currentPassword: undefined }));
+                            }
+                          }}
+                          className={`form-control pr-10 ${passwordErrors.currentPassword ? 'border-rose-500 focus:border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/10' : ''}`}
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPass(!showCurrentPass)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+                        >
+                          {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      {passwordErrors.currentPassword && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-red-500 text-xs font-semibold">
+                          <AlertCircle size={13} />
+                          <span>{passwordErrors.currentPassword}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label className="form-label">Nova Senha (Mínimo de 6 caracteres)</label>
+                    <div className="relative">
+                      <input
+                        type={showNewPass ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => {
+                          setNewPassword(e.target.value);
+                          if (passwordErrors.newPassword) {
+                            setPasswordErrors(prev => ({ ...prev, newPassword: undefined }));
+                          }
+                        }}
+                        className={`form-control pr-10 ${passwordErrors.newPassword ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+                      >
+                        {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {passwordErrors.newPassword && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 text-xs font-semibold">
+                        <AlertCircle size={13} />
+                        <span>{passwordErrors.newPassword}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Confirmar Nova Senha</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPass ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => {
+                          setConfirmPassword(e.target.value);
+                          if (passwordErrors.confirmPassword) {
+                            setPasswordErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                          }
+                        }}
+                        className={`form-control pr-10 ${passwordErrors.confirmPassword ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''}`}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPass(!showConfirmPass)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+                      >
+                        {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {passwordErrors.confirmPassword && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-red-500 text-xs font-semibold">
+                        <AlertCircle size={13} />
+                        <span>{passwordErrors.confirmPassword}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingPassword}
+                    className="btn btn-primary btn-sm font-bold flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {submittingPassword ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Atualizando senha...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={15} />
+                        <span>Atualizar Senha</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* ── SEÇÃO: DESATIVAÇÃO TEMPORÁRIA DA CONTA ── */}
+              <div className="card p-6 sm:p-8 space-y-4 border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/15">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <Power size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-heading font-bold text-lg text-amber-950 dark:text-amber-200">
+                      Desativação Temporária da Conta
+                    </h4>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                      Se você deseja pausar suas atividades temporariamente, desative seu perfil. Seus dados e histórico permanecem totalmente preservados para quando você decidir retornar.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs text-amber-900/80 dark:text-amber-300/80 pl-13">
+                  <p>• Seu perfil não aparecerá em buscas ou no Banco de Talentos durante a pausa;</p>
+                  <p>• Suas candidaturas em andamento ficarão suspensas;</p>
+                  <p>• Você poderá reativar seu acesso a qualquer momento ao fazer login novamente.</p>
+                </div>
+
+                <div className="pt-2 pl-13">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeactivateModalOpen(true)}
+                    className="btn btn-outline btn-sm text-xs font-bold border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 cursor-pointer"
+                  >
+                    Desativar Conta Temporariamente
+                  </button>
+                </div>
+              </div>
+
+              {/* ── SEÇÃO: EXCLUSÃO PERMANENTE (ZONA DE PERIGO / LGPD) ── */}
+              {!isAdmin && (
+                <div className="card p-6 sm:p-8 space-y-4 border-red-300 dark:border-red-900/80 bg-red-50/40 dark:bg-red-950/25">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-300 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-heading font-bold text-lg text-red-700 dark:text-red-300">
+                          Zona de Perigo: Exclusão Permanente da Conta
+                        </h4>
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-red-200 dark:bg-red-900/80 text-red-900 dark:text-red-200">
+                          LGPD · Ação Irreversível
+                        </span>
+                      </div>
+                      <p className="text-xs text-red-800 dark:text-red-300/90 mt-1 leading-relaxed">
+                        Excluir permanentemente sua conta removerá todos os seus dados pessoais do Ivaí Conecta, incluindo perfil, currículo, candidaturas ativas e credenciais de acesso. Esta operação é irreversível.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 pl-13">
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteModalOpen(true)}
+                      className="btn btn-danger btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 size={14} />
+                      <span>Excluir Minha Conta Definitivamente</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 3: NOTIFICAÇÕES & PREFERÊNCIAS DE E-MAIL ──────────── */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="card p-6 sm:p-8 space-y-6">
+                <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
+                  <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
+                    <Bell size={22} className="text-primary-blue dark:text-blue-400" />
+                    Preferências de Notificações por E-mail
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                    Escolha quando e como deseja ser avisado sobre o andamento de oportunidades, processos seletivos e mensagens.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSaveNotifications} className="space-y-6">
+                  {/* Chave Mestra: Habilitar/Desabilitar Geral */}
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">
+                        Notificações por E-mail (Geral)
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        Permitir que o sistema envie alertas transacionais para sua caixa de entrada ({currentEmailDisplay || currentUser.email}).
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={notifPrefs.emailNotifications}
+                        onChange={e => setNotifPrefs(prev => ({ ...prev, emailNotifications: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-blue"></div>
+                    </label>
+                  </div>
+
+                  {/* Categorias Granulares de Notificação */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                      Categorias de Alertas
+                    </h4>
+
+                    {/* Processo Seletivo (Candidato/Aluno/Freelancer) */}
+                    {!isEmpresa && (
+                      <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                            Atualizações de Processos Seletivos
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            Seja avisado sempre que uma empresa parceira alterar a etapa da sua candidatura (ex: Triagem, Em Análise, Aprovado).
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            disabled={!notifPrefs.emailNotifications}
+                            checked={notifPrefs.applicationUpdates && notifPrefs.emailNotifications}
+                            onChange={e => setNotifPrefs(prev => ({ ...prev, applicationUpdates: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Convites para Entrevistas */}
+                    <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                          Convites e Agendamentos de Entrevistas
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                          Receba avisos por e-mail com data, horário e link oficial de salas virtuais agendadas.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          disabled={!notifPrefs.emailNotifications}
+                          checked={notifPrefs.interviewInvites && notifPrefs.emailNotifications}
+                          onChange={e => setNotifPrefs(prev => ({ ...prev, interviewInvites: e.target.checked }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                      </label>
+                    </div>
+
+                    {/* Novas Candidaturas (Empresa) */}
+                    {isEmpresa && (
+                      <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                            Novas Inscrições em Vagas Abertas
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            Receba alertas quando novos estudantes ou profissionais se candidatarem às vagas da sua empresa.
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            disabled={!notifPrefs.emailNotifications}
+                            checked={notifPrefs.newApplicants && notifPrefs.emailNotifications}
+                            onChange={e => setNotifPrefs(prev => ({ ...prev, newApplicants: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Mensagens Diretas das Empresas */}
+                    <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                          Mensagens Diretas &amp; Comunicação
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                          Notificações quando {isEmpresa ? 'candidatos' : 'empresas ou recrutadores'} enviarem mensagens no chat.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          disabled={!notifPrefs.emailNotifications}
+                          checked={notifPrefs.companyMessages && notifPrefs.emailNotifications}
+                          onChange={e => setNotifPrefs(prev => ({ ...prev, companyMessages: e.target.checked }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                      </label>
+                    </div>
+
+                    {/* Comunicados da Plataforma */}
+                    <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                          Comunicados Importantes da Plataforma
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                          Avisos sobre eventos acadêmicos, programas regionais e oportunidades de capacitação do Ivaí Conecta.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          disabled={!notifPrefs.emailNotifications}
+                          checked={notifPrefs.platformAnnouncements && notifPrefs.emailNotifications}
+                          onChange={e => setNotifPrefs(prev => ({ ...prev, platformAnnouncements: e.target.checked }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Frequência de Envio */}
+                  <div className="form-group pt-2 border-t border-gray-100 dark:border-slate-800">
+                    <label className="form-label">Frequência de Notificações por E-mail</label>
+                    <select
+                      value={notifPrefs.frequency || 'instant'}
+                      onChange={e => setNotifPrefs(prev => ({ ...prev, frequency: e.target.value }))}
+                      disabled={!notifPrefs.emailNotifications}
+                      className="form-control text-xs sm:text-sm font-medium"
+                    >
+                      <option value="instant" className="dark:bg-slate-800">Envio em tempo real (Imediato a cada atualização)</option>
+                      <option value="daily" className="dark:bg-slate-800">Resumo consolidado diário</option>
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={savingNotifPrefs}
+                      className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {savingNotifPrefs ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Salvando preferências...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={15} />
+                          <span>Salvar Preferências de Notificação</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 4: PRIVACIDADE & DADOS PESSOAIS (LGPD) ─────────────── */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'privacy' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="card p-6 sm:p-8 space-y-6">
+                <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
+                  <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
+                    <Shield size={22} className="text-primary-blue dark:text-blue-400" />
+                    Privacidade &amp; Controle de Dados Pessoais
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                    Defina a visibilidade do seu perfil no Vale do Ivaí e exerça seus direitos garantidos pela LGPD (Lei Geral de Proteção de Dados).
+                  </p>
+                </div>
+
+                <form onSubmit={handleSavePrivacy} className="space-y-6">
+                  {/* Visibilidade no Banco de Talentos */}
+                  {!isEmpresa && (
+                    <div className="form-group">
+                      <label className="form-label">Visibilidade no Banco de Talentos Regional</label>
+                      <select
+                        value={privacySettings.talentDirectoryVisibility || 'public'}
+                        onChange={e => setPrivacySettings(prev => ({ ...prev, talentDirectoryVisibility: e.target.value }))}
+                        className="form-control text-xs sm:text-sm font-medium"
+                      >
+                        <option value="public" className="dark:bg-slate-800">
+                          Público: Visível para todas as empresas contratantes do ecossistema
+                        </option>
+                        <option value="verified_only" className="dark:bg-slate-800">
+                          Restrito: Apenas empresas com selo oficial de CNPJ Verificado
+                        </option>
+                        <option value="private" className="dark:bg-slate-800">
+                          Oculto / Privado: Visível exclusivamente quando você se candidatar a uma vaga
+                        </option>
+                      </select>
+                      <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
+                        Controla se recrutadores podem encontrar seu currículo por buscas ativas no Banco de Talentos.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Exibição de Contatos */}
+                  <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                        Exibição de Canais Profissionais para Recrutadores
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        Permitir que empresas parceiras visualizem seus links de LinkedIn e GitHub no seu currículo.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={privacySettings.showContactInfo}
+                        onChange={e => setPrivacySettings(prev => ({ ...prev, showContactInfo: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue"></div>
+                    </label>
+                  </div>
+
+                  {/* Mensagens Diretas */}
+                  <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                        Recebimento de Mensagens no Chat Interno
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        Permitir que empresas iniciem conversas sobre oportunidades diretamente no sistema.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={privacySettings.allowDirectMessages}
+                        onChange={e => setPrivacySettings(prev => ({ ...prev, allowDirectMessages: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={savingPrivacy}
+                      className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {savingPrivacy ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Salvando privacidade...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={15} />
+                          <span>Salvar Configurações de Privacidade</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                {/* ── SEÇÃO LGPD: PORTABILIDADE E EXPORTAÇÃO DE DADOS ── */}
+                <div className="pt-6 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                        <Download size={16} className="text-primary-blue" />
+                        Portabilidade de Dados Pessoais (LGPD - Art. 18, V)
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        Você tem o direito de baixar uma cópia completa dos seus dados cadastrais armazenados na plataforma em formato aberto (.JSON).
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleExportData}
+                      disabled={exportingData}
+                      className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {exportingData ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                      <span>Exportar Meus Dados (JSON)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 5: VERIFICAÇÃO DE ESTUDANTE (EXCLUSIVA ALUNOS) ────── */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'verification' && isAluno && (
+            <div className="card p-6 sm:p-8 space-y-6 animate-in fade-in duration-200">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
                 <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <GraduationCap size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação Oficial de Estudante
+                  <GraduationCap size={22} className="text-primary-blue dark:text-blue-400" />
+                  Autenticação Oficial de Estudante
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  Confirme seu e-mail institucional oficial (IFPR, Univale, UENP, UTFPR ou qualquer faculdade parceira com domínio <strong>.edu.br</strong>) para liberar candidaturas e ativar o <strong>Selo de Estudante Verificado</strong>.
+                  Confirme seu e-mail institucional oficial (IFPR, Univale, UENP, UTFPR ou faculdade com domínio <strong>.edu.br</strong>) para validar sua matrícula acadêmica e ativar o <strong>Selo de Estudante Verificado</strong>.
                 </p>
               </div>
 
@@ -1050,9 +1617,11 @@ export default function Configuracoes() {
                   <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center shadow-xs">
                     <ShieldCheck size={28} />
                   </div>
-                  <h4 className="font-heading font-bold text-lg text-emerald-900 dark:text-emerald-300">Estudante Autenticado com Sucesso!</h4>
+                  <h4 className="font-heading font-bold text-lg text-emerald-900 dark:text-emerald-300">
+                    Estudante Autenticado com Sucesso!
+                  </h4>
                   <p className="text-sm text-emerald-800 dark:text-emerald-200 max-w-md mx-auto leading-relaxed">
-                    Seu vínculo acadêmico foi confirmado oficialmente via Firebase Auth. Seu perfil está <strong>VISÍVEL</strong> para recrutadores e você pode se candidatar a todas as vagas do ecossistema.
+                    Seu vínculo acadêmico foi confirmado oficialmente via Firebase Auth. Seu perfil recebe destaque para vagas de estágio e oportunidades no Vale do Ivaí.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     {(currentUser.studentEmail || validateStudentEmail(currentUser.email)?.isValid) && (
@@ -1075,7 +1644,6 @@ export default function Configuracoes() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Autenticação Oficial por E-mail Estudantil (Prova de Propriedade) */}
                   <div className="p-5 sm:p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-800 space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1088,7 +1656,7 @@ export default function Configuracoes() {
                     </div>
 
                     <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                      Informe seu e-mail institucional acadêmico (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong>, <strong>@utfpr.edu.br</strong> ou qualquer domínio <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal institucional para validar sua titularidade instantaneamente.
+                      Informe seu e-mail institucional acadêmico (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer domínio <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal institucional para validar sua titularidade instantaneamente.
                     </p>
 
                     <form onSubmit={handleSendVerificationEmail} className="flex flex-col sm:flex-row gap-2">
@@ -1120,7 +1688,6 @@ export default function Configuracoes() {
                       </button>
                     </form>
 
-                    {/* Banner de Verificação Pendente & Botão de Checagem */}
                     {(verificationEmailSent || currentUser?.studentEmailVerificationSentAt) && (
                       <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-3">
                         <div className="flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
@@ -1171,20 +1738,23 @@ export default function Configuracoes() {
             </div>
           )}
 
-          {/* ── ABA 3: VERIFICAÇÃO EMPRESARIAL CNPJ (EMPRESAS) ── */}
-          {activeTab === 'company' && currentUser.role === 'empresa' && (
-            <div className="card p-6 sm:p-8 space-y-6">
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {/* ── ABA 6: VERIFICAÇÃO DE CNPJ (EXCLUSIVA EMPRESAS) ────────── */}
+          {/* ═════════════════════════════════════════════════════════════ */}
+          {activeTab === 'company' && isEmpresa && (
+            <div className="card p-6 sm:p-8 space-y-6 animate-in fade-in duration-200">
               <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                    <Building2 size={22} className="text-primary-blue dark:text-blue-400" /> Autenticação Oficial de CNPJ da Empresa
+                    <Building2 size={22} className="text-primary-blue dark:text-blue-400" />
+                    Autenticação Oficial de CNPJ da Empresa
                   </h3>
                   <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5">
                     <ShieldCheck size={14} /> Módulo 11 + BrasilAPI
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  Confirme o CNPJ da sua organização com validação oficial da Receita Federal para receber o selo **"Empresa Verificada"** e transmitir máxima segurança aos candidatos.
+                  Confirme o CNPJ da sua organização com validação oficial da Receita Federal para receber o selo <strong>"Empresa Verificada"</strong> e transmitir máxima segurança aos candidatos.
                 </p>
               </div>
 
@@ -1278,7 +1848,6 @@ export default function Configuracoes() {
                     )}
                   </div>
 
-                  {/* Informações retornadas pela BrasilAPI em Tempo Real */}
                   {cnpjData && (
                     <div className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800/80 border border-green-200 dark:border-green-800/80 space-y-3">
                       <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-200 dark:border-slate-700 pb-2.5">
@@ -1309,12 +1878,6 @@ export default function Configuracoes() {
                           <span className="text-gray-500 dark:text-slate-400 block font-medium">Município / Estado:</span>
                           <span className="font-semibold text-gray-800 dark:text-slate-200">{cnpjData.cidade} / {cnpjData.uf}</span>
                         </div>
-                        {cnpjData.cnae && (
-                          <div>
-                            <span className="text-gray-500 dark:text-slate-400 block font-medium">Atividade Principal:</span>
-                            <span className="font-semibold text-gray-800 dark:text-slate-200 line-clamp-1">{cnpjData.cnae}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1334,7 +1897,7 @@ export default function Configuracoes() {
                     >
                       <Upload size={32} className="mx-auto mb-2 text-primary-blue dark:text-blue-400" />
                       <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                        {companyFile ? `📄 ${companyFile.name} (${(companyFile.size / (1024 * 1024)).toFixed(2)} MB)` : 'Clique para selecionar o Cartão CNPJ da Receita Federal (PDF/Imagem)'}
+                        {companyFile ? `📄 ${companyFile.name} (${(companyFile.size / (1024 * 1024)).toFixed(2)} MB)` : 'Clique para anexar o Cartão CNPJ da Receita Federal (PDF/Imagem)'}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Formatos aceitos: PDF, PNG, JPG (Máx. 5MB)</p>
                     </div>
@@ -1345,7 +1908,7 @@ export default function Configuracoes() {
                       <button
                         type="button"
                         onClick={() => setIsEditingCnpj(false)}
-                        className="btn btn-outline btn-sm font-semibold"
+                        className="btn btn-outline btn-sm font-semibold cursor-pointer"
                       >
                         Cancelar
                       </button>
@@ -1353,9 +1916,10 @@ export default function Configuracoes() {
                     <button
                       type="submit"
                       disabled={submittingCompany}
-                      className="btn btn-primary btn-sm font-bold shadow-md ml-auto flex items-center gap-1.5"
+                      className="btn btn-primary btn-sm font-bold shadow-md ml-auto flex items-center gap-1.5 cursor-pointer"
                     >
-                      <ShieldCheck size={16} /> {submittingCompany ? 'Autenticando CNPJ...' : 'Autenticar & Obter Selo Verificado'}
+                      <ShieldCheck size={16} />
+                      <span>{submittingCompany ? 'Autenticando CNPJ...' : 'Autenticar & Obter Selo Verificado'}</span>
                     </button>
                   </div>
                 </form>
@@ -1363,253 +1927,176 @@ export default function Configuracoes() {
             </div>
           )}
 
-          {/* ── ABA 4: SEGURANÇA & SENHA ── */}
-          {activeTab === 'security' && (
-            <div className="card p-6 sm:p-8 space-y-6">
-              <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
-                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <ShieldCheck size={22} className="text-primary-blue dark:text-blue-400" />
-                  Alteração de Senha
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">
-                  Gerencie sua senha de acesso conectada diretamente ao Firebase Authentication.
-                </p>
-              </div>
-
-              {isGoogleOnlyAuthUser() && (
-                <div className="p-4 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-start gap-3">
-                  <AlertCircle size={18} className="text-primary-blue dark:text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-xs sm:text-sm text-blue-900 dark:text-blue-200">
-                    <p className="font-bold">Conta vinculada com Google</p>
-                    <p className="mt-0.5 opacity-90">
-                      Você pode criar uma senha abaixo caso queira também acessar sua conta digitando e-mail e senha diretamente.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {passwordReauthRequired && (
-                <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 flex items-start gap-3 animate-shake">
-                  <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200">
-                    <p className="font-bold">Reautenticação Necessária</p>
-                    <p className="mt-0.5">
-                      Por motivos de segurança do Firebase Auth, confirme sua <strong>Senha Atual</strong> no campo abaixo para autorizar a modificação.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md" noValidate>
-                {passwordSubmitAttempted && passwordErrorCount > 0 && (
-                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 animate-in fade-in duration-200">
-                    <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold">Atenção:</span> Existem campos com informações inválidas na senha.
-                    </div>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="form-label mb-0">Senha Atual</label>
-                    {passwordReauthRequired && (
-                      <span className="text-[11px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
-                        Obrigatória
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative group">
-                    <input
-                      type={showCurrentPass ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={e => {
-                        setCurrentPassword(e.target.value);
-                        if (passwordErrors.currentPassword) {
-                          setPasswordErrors(prev => ({ ...prev, currentPassword: undefined }));
-                        }
-                        if (passwordReauthRequired && e.target.value.length > 0) {
-                          setPasswordReauthRequired(false);
-                        }
-                      }}
-                      className={`form-control pl-10 pr-10 ${
-                        passwordErrors.currentPassword || passwordReauthRequired ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 bg-rose-50/10' : ''
-                      }`}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                    />
-                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPass(!showCurrentPass)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
-                      title={showCurrentPass ? 'Ocultar senha' : 'Ver senha'}
-                    >
-                      {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {passwordErrors.currentPassword ? (
-                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                      <AlertCircle size={13} className="shrink-0" />
-                      <span>{passwordErrors.currentPassword}</span>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
-                      Necessária para confirmar a sua identidade caso sua sessão não seja recente.
-                    </p>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Nova Senha</label>
-                  <div className="relative group">
-                    <input
-                      type={showNewPass ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={e => {
-                        setNewPassword(e.target.value);
-                        if (passwordErrors.newPassword) {
-                          setPasswordErrors(prev => ({ ...prev, newPassword: undefined }));
-                        }
-                      }}
-                      className={`form-control pl-10 pr-10 ${
-                        passwordErrors.newPassword ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="Mínimo de 6 caracteres"
-                      required
-                      autoComplete="new-password"
-                    />
-                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPass(!showNewPass)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
-                      title={showNewPass ? 'Ocultar senha' : 'Ver senha'}
-                    >
-                      {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {passwordErrors.newPassword && (
-                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                      <AlertCircle size={13} className="shrink-0" />
-                      <span>{passwordErrors.newPassword}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Confirmar Nova Senha</label>
-                  <div className="relative group">
-                    <input
-                      type={showConfirmPass ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={e => {
-                        setConfirmPassword(e.target.value);
-                        if (passwordErrors.confirmPassword) {
-                          setPasswordErrors(prev => ({ ...prev, confirmPassword: undefined }));
-                        }
-                      }}
-                      className={`form-control pl-10 pr-10 ${
-                        passwordErrors.confirmPassword ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20 bg-red-50/10' : ''
-                      }`}
-                      placeholder="Repita a nova senha"
-                      required
-                      autoComplete="new-password"
-                    />
-                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-blue transition-colors pointer-events-none" />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPass(!showConfirmPass)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors cursor-pointer"
-                      title={showConfirmPass ? 'Ocultar senha' : 'Ver senha'}
-                    >
-                      {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {passwordErrors.confirmPassword && (
-                    <div className="flex items-center gap-1.5 mt-1.5 text-red-500 dark:text-red-400 text-xs font-semibold animate-in fade-in duration-150">
-                      <AlertCircle size={13} className="shrink-0" />
-                      <span>{passwordErrors.confirmPassword}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-start pt-2">
-                  <button
-                    type="submit"
-                    disabled={submittingPassword}
-                    className="btn btn-primary btn-sm font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
-                  >
-                    {submittingPassword ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Atualizando no Firebase...
-                      </>
-                    ) : (
-                      <>
-                        <Lock size={16} />
-                        Atualizar Senha
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* ── ABA 5: NOTIFICAÇÕES & PRIVACIDADE ── */}
-          {activeTab === 'privacy' && (
-            <div className="space-y-6">
-              <div className="card p-6 sm:p-8 space-y-4">
-                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <Bell size={20} className="text-primary-blue dark:text-blue-400" /> Alertas por E-mail
-                </h3>
-                <div className="form-group">
-                  <label className="form-label">Frequência de Notificações</label>
-                  <select className="form-control font-medium">
-                    <option value="all" className="dark:bg-slate-800 dark:text-white">Receber alertas diários de vagas combinantes e mensagens</option>
-                    <option value="important" className="dark:bg-slate-800 dark:text-white">Apenas convites diretos para entrevistas</option>
-                    <option value="none" className="dark:bg-slate-800 dark:text-white">Desativar notificações por e-mail</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="card p-6 sm:p-8 space-y-4">
-                <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white flex items-center gap-2">
-                  <Eye size={20} className="text-primary-blue dark:text-blue-400" /> Visibilidade no Banco de Talentos
-                </h3>
-                <div className="form-group">
-                  <label className="form-label">Visibilidade do seu Perfil</label>
-                  <select className="form-control font-medium">
-                    <option value="public" className="dark:bg-slate-800 dark:text-white">Visível para todas as empresas contratantes do Vale do Ivaí (Requer Matrícula Verificada)</option>
-                    <option value="verified_only" className="dark:bg-slate-800 dark:text-white">Apenas empresas com selo de CNPJ verificado</option>
-                    <option value="private" className="dark:bg-slate-800 dark:text-white">Privado (Apenas quando você enviar candidatura)</option>
-                  </select>
-                </div>
-                <div className="flex justify-end pt-2">
-                  <button onClick={() => showToast('Preferências de privacidade salvas!')} className="btn btn-primary btn-sm font-bold">
-                    Salvar Preferências
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Zona de Encerramento */}
-          <div className="card p-6 border-red-200 dark:border-red-900/60 bg-red-50/30 dark:bg-red-950/20 flex flex-wrap items-center justify-between gap-4">
+          {/* ── CARD DE ENCERRAMENTO DE SESSÃO ── */}
+          <div className="card p-6 border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h4 className="font-heading font-bold text-base text-red-600 dark:text-red-400 flex items-center gap-2">
-                <Shield size={18} /> Encerrar Sessão no Dispositivo
+              <h4 className="font-heading font-bold text-base text-gray-800 dark:text-slate-200 flex items-center gap-2">
+                <Shield size={18} className="text-primary-blue" />
+                Sessão Conectada no Dispositivo
               </h4>
-              <p className="text-xs text-gray-600 dark:text-slate-400">Sua conta continuará segura. Você poderá acessar novamente a qualquer momento.</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Sua conta continuará segura. Você poderá acessar novamente a qualquer momento com suas credenciais.
+              </p>
             </div>
-            <button onClick={handleLogout} className="btn btn-danger btn-sm font-bold">
-              <LogOut size={15} /> Sair da Conta
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="btn btn-danger btn-sm font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogOut size={15} />
+              <span>Sair da Conta</span>
             </button>
           </div>
 
         </div>
       </main>
+
+      {/* ── MODAL: DESATIVAÇÃO TEMPORÁRIA DA CONTA ── */}
+      {isDeactivateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-amber-200 dark:border-amber-800/60 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                <Power size={24} />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-gray-900 dark:text-white">
+                  Desativar Conta Temporariamente?
+                </h3>
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  Seus dados continuam preservados
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-600 dark:text-slate-300 space-y-2 leading-relaxed">
+              <p>
+                Ao confirmar a desativação:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-gray-500 dark:text-slate-400">
+                <li>Seu perfil não aparecerá em pesquisas de vagas ou no banco de talentos;</li>
+                <li>Suas candidaturas ativas ficarão pausadas;</li>
+                <li>Sua sessão será encerrada agora neste dispositivo;</li>
+                <li>Você poderá reativar a sua conta a qualquer momento simplesmente realizando login.</li>
+              </ul>
+            </div>
+
+            <div className="form-group pt-1">
+              <label className="form-label text-xs">Motivo da desativação (Opcional):</label>
+              <input
+                type="text"
+                value={deactivationReason}
+                onChange={e => setDeactivationReason(e.target.value)}
+                placeholder="Ex: Emprego conquistado, pausa nos estudos..."
+                className="form-control text-xs"
+                maxLength={100}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDeactivateModalOpen(false)}
+                disabled={submittingDeactivation}
+                className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeactivate}
+                disabled={submittingDeactivation}
+                className="btn btn-sm text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                {submittingDeactivation ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                <span>Confirmar Desativação</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: EXCLUSÃO PERMANENTE DA CONTA (LGPD) ── */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-red-300 dark:border-red-900 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-300 flex items-center justify-center shrink-0">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-red-700 dark:text-red-300">
+                  Excluir Conta Permanentemente?
+                </h3>
+                <span className="text-xs font-extrabold uppercase text-red-600 dark:text-red-400">
+                  Ação Irreversível · LGPD
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-600 dark:text-slate-300 space-y-2 leading-relaxed">
+              <p>
+                Esta ação apagará em definitivo seus dados pessoais, credenciais, histórico de candidaturas e preferências de privacidade.
+              </p>
+              <p className="font-semibold text-red-600 dark:text-red-400">
+                Não será possível recuperar seu acesso após confirmar.
+              </p>
+            </div>
+
+            {isGoogleOnlyAuthUser() ? (
+              <div className="form-group pt-1">
+                <label className="form-label text-xs">
+                  Para confirmar, digite a palavra <strong>EXCLUIR</strong>:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmationInput}
+                  onChange={e => setDeleteConfirmationInput(e.target.value)}
+                  placeholder="EXCLUIR"
+                  className="form-control text-xs font-mono font-bold"
+                />
+              </div>
+            ) : (
+              <div className="form-group pt-1">
+                <label className="form-label text-xs">
+                  Confirme sua senha atual para autorizar a exclusão:
+                </label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  placeholder="Sua senha atual"
+                  className="form-control text-xs"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeletePassword('');
+                  setDeleteConfirmationInput('');
+                }}
+                disabled={submittingDeletion}
+                className="btn btn-outline btn-sm text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={submittingDeletion}
+                className="btn btn-danger btn-sm text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                {submittingDeletion ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>Excluir Definitivamente</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

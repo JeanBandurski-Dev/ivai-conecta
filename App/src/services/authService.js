@@ -11,8 +11,10 @@ import {
   EmailAuthProvider,
   reauthenticateWithPopup,
   sendEmailVerification,
+  verifyBeforeUpdateEmail,
+  deleteUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
 import {
@@ -659,6 +661,16 @@ export async function login(email, password) {
       };
     }
 
+    if (profileData?.isDeactivated === true) {
+      await signOut(auth);
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+      return {
+        success: false,
+        isDeactivated: true,
+        error: 'Esta conta está temporariamente desativada pelo usuário. Você pode reativá-la a qualquer momento ao confirmar seu acesso.'
+      };
+    }
+
     const rawRole = profileData.activeRole ||
       profileData.selectedRole ||
       profileData.profileType ||
@@ -886,6 +898,19 @@ export async function loginWithGoogle() {
         success: false,
         error: `Esta conta Google foi suspensa pela moderação.${profileRes.profile?.blockedReason ? ' Motivo: ' + profileRes.profile.blockedReason : ' Entre em contato com o suporte.'}`
       };
+    }
+
+    if (profileRes.profile?.isDeactivated === true) {
+      try {
+        await setDoc(doc(db, 'users', fbUser.uid), {
+          isDeactivated: false,
+          deactivatedAt: null,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        profileRes.profile.isDeactivated = false;
+      } catch (errRe) {
+        console.warn('[loginWithGoogle] Erro ao reativar conta desativada:', errRe.message);
+      }
     }
 
     const email = (fbUser.email || '').toLowerCase().trim();
@@ -1174,6 +1199,314 @@ export async function updateUserPassword(currentPassword, newPassword) {
     return {
       success: false,
       error: error.message || 'Erro ao alterar a senha no Firebase.',
+      errorCode: error.code
+    };
+  }
+}
+
+/**
+ * Altera o endereço de e-mail do usuário autenticado no Firebase Authentication.
+ * Utiliza o fluxo seguro verifyBeforeUpdateEmail e sincroniza a solicitação no Firestore.
+ * 
+ * @param {string} newEmail - Novo endereço de e-mail
+ * @param {string} [currentPassword] - Senha atual para reautenticação sensível
+ * @returns {Promise<{ success: boolean, message?: string, error?: string, requiresReauth?: boolean }>}
+ */
+export async function updateUserEmail(newEmail, currentPassword = '') {
+  const user = auth.currentUser;
+  if (!user) {
+    return {
+      success: false,
+      error: 'Nenhuma sessão ativa encontrada. Faça login novamente para prosseguir.'
+    };
+  }
+
+  const cleanEmail = String(newEmail || '').toLowerCase().trim();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return {
+      success: false,
+      error: 'Informe um endereço de e-mail válido.'
+    };
+  }
+
+  if (user.email && cleanEmail === user.email.toLowerCase().trim()) {
+    return {
+      success: false,
+      error: 'O novo endereço deve ser diferente do e-mail atualmente cadastrado.'
+    };
+  }
+
+  const isGoogleOnly = isGoogleOnlyAuthUser();
+
+  try {
+    if (currentPassword && user.email) {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    } else if (isGoogleOnly) {
+      await reauthenticateWithPopup(user, googleProvider);
+    }
+
+    // Utiliza verifyBeforeUpdateEmail do Firebase Auth oficial (Prova de Propriedade e Segurança)
+    await verifyBeforeUpdateEmail(user, cleanEmail);
+
+    // Registra no Firestore que há uma troca pendente para rastreabilidade
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        pendingEmail: cleanEmail,
+        emailChangeRequestedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (dbErr) {
+      console.warn('[authService] Aviso ao persistir pendingEmail no Firestore:', dbErr.message);
+    }
+
+    return {
+      success: true,
+      message: `Enviamos um link de confirmação para "${cleanEmail}". Por segurança, acesse a caixa de entrada do novo e-mail e clique no link de validação para efetivar a alteração.`
+    };
+  } catch (error) {
+    console.error('[authService] Erro ao alterar e-mail:', error.code, error.message);
+
+    if (error.code === 'auth/requires-recent-login') {
+      return {
+        success: false,
+        requiresReauth: true,
+        error: 'Esta é uma operação sensível e requer confirmação recente. Por favor, confirme sua senha atual para autorizar a alteração de e-mail.'
+      };
+    }
+    if (error.code === 'auth/email-already-in-use') {
+      return {
+        success: false,
+        error: 'Este endereço de e-mail já está cadastrado em outra conta do Ivaí Conecta.'
+      };
+    }
+    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      return {
+        success: false,
+        error: 'A senha atual informada está incorreta.'
+      };
+    }
+    if (error.code === 'auth/invalid-email') {
+      return {
+        success: false,
+        error: 'O formato do novo e-mail informado é inválido.'
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Erro ao atualizar e-mail no Firebase Authentication.',
+      errorCode: error.code
+    };
+  }
+}
+
+/**
+ * Desativa temporariamente a conta do usuário.
+ * Preserva os dados do usuário no Firestore, impede o acesso conforme as regras de autenticação,
+ * encerra a sessão ativa e permite reativação futura.
+ * 
+ * @param {string} [reason] - Motivo opcional da desativação
+ * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
+ */
+export async function deactivateUserAccount(reason = 'Solicitado pelo usuário') {
+  const user = auth.currentUser;
+  const current = getAuthUser();
+  const uid = user?.uid || current?.uid || current?.id;
+
+  if (!uid) {
+    return { success: false, error: 'Usuário não autenticado.' };
+  }
+
+  try {
+    // 1. Atualiza no Cloud Firestore
+    await setDoc(doc(db, 'users', String(uid)), {
+      isDeactivated: true,
+      deactivatedAt: new Date().toISOString(),
+      deactivationReason: reason,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // 2. Remove sessão local
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    }
+
+    // 3. Encerra sessão do Firebase
+    if (user) {
+      await signOut(auth);
+    }
+
+    return {
+      success: true,
+      message: 'Sua conta foi desativada temporariamente. Seus dados continuam preservados e você poderá reativá-la a qualquer momento ao fazer login.'
+    };
+  } catch (error) {
+    console.error('[authService] Erro ao desativar conta:', error);
+    return {
+      success: false,
+      error: error.message || 'Não foi possível desativar a conta no momento.'
+    };
+  }
+}
+
+/**
+ * Reativa uma conta previamente desativada mediante autenticação com e-mail e senha.
+ * 
+ * @param {string} email 
+ * @param {string} password 
+ * @returns {Promise<{ success: boolean, user?: object, error?: string }>}
+ */
+export async function reactivateUserAccount(email, password) {
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    const fbUser = userCredential.user;
+
+    // Atualiza status no Firestore
+    await setDoc(doc(db, 'users', fbUser.uid), {
+      isDeactivated: false,
+      deactivatedAt: null,
+      deactivationReason: null,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // Recarrega perfil completo
+    const profileRes = await getUserProfile(fbUser.uid);
+    const profileData = profileRes.profile || {};
+
+    const rawRole = profileData.activeRole || profileData.selectedRole || profileData.role || 'candidato';
+    const role = normalizeUserRole(rawRole);
+    const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
+
+    const sessionUser = {
+      ...profileData,
+      uid: fbUser.uid,
+      id: fbUser.uid,
+      email: fbUser.email,
+      name: profileData.name || fbUser.displayName || 'Usuário',
+      role,
+      badge: roleMeta.badge,
+      isDeactivated: false
+    };
+
+    localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatFirebaseAuthError(error, 'login').message
+    };
+  }
+}
+
+/**
+ * Exclui permanentemente a conta do usuário no Firebase Authentication e no Firestore.
+ * Trata dependências (candidaturas, favoritos, vagas) para integridade e conformidade LGPD.
+ * 
+ * @param {string} [currentPassword] - Senha atual para reautenticação sensível
+ * @returns {Promise<{ success: boolean, message?: string, error?: string, requiresReauth?: boolean }>}
+ */
+export async function deleteUserAccount(currentPassword = '') {
+  const user = auth.currentUser;
+  const current = getAuthUser();
+  const uid = user?.uid || current?.uid || current?.id;
+
+  if (!user || !uid) {
+    return {
+      success: false,
+      error: 'Nenhuma sessão ativa encontrada. Faça login para confirmar a exclusão da conta.'
+    };
+  }
+
+  const isGoogleOnly = isGoogleOnlyAuthUser();
+
+  try {
+    // 1. Reautenticação de segurança
+    if (currentPassword && user.email) {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    } else if (isGoogleOnly) {
+      await reauthenticateWithPopup(user, googleProvider);
+    }
+
+    // 2. Tratamento de integridade e dependências de banco de dados
+    // a) Candidaturas: atualiza status para Cancelada (LGPD Direito ao Esquecimento preservando métricas da vaga)
+    try {
+      const appsSnap = await getDocs(query(collection(db, 'applications'), where('candidateUid', '==', uid)));
+      for (const d of appsSnap.docs) {
+        await updateDoc(doc(db, 'applications', d.id), {
+          status: 'Cancelada',
+          candidateWithdrawn: true,
+          notes: 'Conta do titular excluída permanentemente sob solicitação LGPD.',
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (appErr) {
+      console.warn('[deleteUserAccount] Aviso ao tratar candidaturas:', appErr.message);
+    }
+
+    // b) Favoritos do usuário
+    try {
+      const favSnap = await getDocs(query(collection(db, 'favorites'), where('userUid', '==', uid)));
+      for (const d of favSnap.docs) {
+        await deleteDoc(doc(db, 'favorites', d.id));
+      }
+    } catch (favErr) {
+      console.warn('[deleteUserAccount] Aviso ao limpar favoritos:', favErr.message);
+    }
+
+    // c) Se for empresa com vagas abertas: encerra as vagas para não ficarem órfãs
+    try {
+      const jobsSnap = await getDocs(query(collection(db, 'jobs'), where('createdBy', '==', uid)));
+      for (const d of jobsSnap.docs) {
+        await updateDoc(doc(db, 'jobs', d.id), {
+          status: 'Encerrada',
+          closedReason: 'Conta da empresa encerrada pelo proprietário.',
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (jobErr) {
+      console.warn('[deleteUserAccount] Aviso ao fechar vagas:', jobErr.message);
+    }
+
+    // d) Documento principal em /users/{uid}
+    try {
+      await deleteDoc(doc(db, 'users', String(uid)));
+    } catch (userDocErr) {
+      console.warn('[deleteUserAccount] Aviso ao remover documento users:', userDocErr.message);
+    }
+
+    // 3. Exclui o registro no Firebase Authentication
+    await deleteUser(user);
+
+    // 4. Limpa sessão local
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+    }
+
+    return {
+      success: true,
+      message: 'Sua conta e seus dados foram excluídos com sucesso do Ivaí Conecta.'
+    };
+  } catch (error) {
+    console.error('[authService] Erro ao excluir conta:', error.code, error.message);
+
+    if (error.code === 'auth/requires-recent-login') {
+      return {
+        success: false,
+        requiresReauth: true,
+        error: 'Esta é uma operação irreversível e requer confirmação de segurança recente. Por favor, confirme sua senha atual.'
+      };
+    }
+    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      return {
+        success: false,
+        error: 'A senha atual informada está incorreta.'
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Erro ao excluir conta no Firebase Authentication.',
       errorCode: error.code
     };
   }
