@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MapPin, Phone, DollarSign, Calendar, Star, Check, Play, CheckCircle2, Clock, XCircle, MessageSquare, Loader2 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { generateWhatsAppLink } from '../services/servicesService';
+import { generateWhatsAppLink, getServiceById } from '../services/servicesService';
 
 const LIFECYCLE_STEPS = [
   { key: 'solicitado', label: 'Solicitado', desc: 'Demanda enviada' },
@@ -76,7 +76,11 @@ export default function ServiceOrderCard({ order, isProvider, onTransition, onEv
     );
   };
 
-  const targetPhone = isActuallyProvider ? order.clientPhone : (order.providerPhone || order.clientPhone);
+  const linkedService = order.serviceId ? getServiceById(order.serviceId) : null;
+  const providerPhone = order.providerPhone || linkedService?.providerPhone || linkedService?.phone || '';
+  const targetPhone = isActuallyProvider
+    ? order.clientPhone
+    : providerPhone;
   const whatsappUrl = targetPhone ? generateWhatsAppLink(
     targetPhone,
     `Olá! Sou ${isActuallyProvider ? order.providerName : order.clientName} do Ivaí Conecta, referente ao serviço "${order.serviceTitle || 'prestação de serviços'}".`

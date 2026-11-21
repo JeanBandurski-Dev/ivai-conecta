@@ -173,6 +173,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
         providerUid: providerId,
         providerName,
         providerEmail: service.providerEmail || '',
+        providerPhone: service.providerPhone || service.phone || '',
         clientId,
         clientUid: clientId,
         clientName,

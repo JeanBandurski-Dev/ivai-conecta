@@ -28,6 +28,7 @@ export function normalizeServiceOrderDTO(raw, fallbackId = '') {
     providerId: providerUid,
     providerEmail: String(data.providerEmail || '').toLowerCase().trim(),
     providerName: String(data.providerName || 'Prestador').trim(),
+    providerPhone: String(data.providerPhone || data.phone || '').trim(),
     clientUid,
     clientId: clientUid,
     clientEmail: String(data.clientEmail || data.buyerEmail || '').toLowerCase().trim(),
