@@ -16,7 +16,7 @@ import useAppStore from '../../store/useAppStore';
 import { auth, db } from '../../lib/firebase';
 import { sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { validateStudentEmail } from '../../services/studentVerificationService';
+import { validateStudentEmail, checkStudentVerification } from '../../services/studentVerificationService';
 import { normalizeUserRole } from '../../services/authService';
 
 /**
@@ -46,8 +46,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Estado local para controle imediato de verificação
   const [isVerified, setIsVerified] = useState(() => {
     if (currentUser && userRole !== 'aluno') return true;
-    if (currentUser?.isVerifiedStudent || currentUser?.emailVerified) return true;
-    if (auth.currentUser) return Boolean(auth.currentUser.emailVerified);
+    if (currentUser?.isVerifiedStudent === true) return true;
+    if (userRole === 'aluno') return false;
     return false;
   });
 
@@ -62,12 +62,12 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       setIsVerified(true);
       return;
     }
-    if (currentUser?.isVerifiedStudent || currentUser?.emailVerified) {
+    if (currentUser?.isVerifiedStudent === true) {
       setIsVerified(true);
       return;
     }
     if (auth.currentUser) {
-      setIsVerified(Boolean(auth.currentUser.emailVerified));
+      setIsVerified(currentUser?.isVerifiedStudent === true);
     }
   }, [currentUser, userRole]);
 
@@ -75,15 +75,17 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   useEffect(() => {
     let isMounted = true;
     async function checkSilently() {
-      if (userRole === 'aluno' && auth.currentUser && !auth.currentUser.emailVerified) {
+      if (userRole === 'aluno' && currentUser?.isVerifiedStudent !== true && auth.currentUser) {
         try {
           await auth.currentUser.reload();
-          if (auth.currentUser.emailVerified && isMounted) {
+          const result = await checkStudentVerification(auth.currentUser);
+          if (result.verified && isMounted) {
             setIsVerified(true);
             setCurrentUser(prev => ({
               ...prev,
-              emailVerified: true,
-              isVerifiedStudent: true
+              isVerifiedStudent: true,
+              institutionalValidationStatus: 'VALIDADO',
+              emailVerified: true
             }));
           }
         } catch {
@@ -95,7 +97,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return () => {
       isMounted = false;
     };
-  }, [userRole, setCurrentUser]);
+  }, [userRole, setCurrentUser, currentUser?.isVerifiedStudent]);
 
   // Timer regressivo para o botão de reenvio
   useEffect(() => {
@@ -193,44 +195,21 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
       if (user.emailVerified) {
         setStatusWarning('');
-        setIsVerified(true);
-
-        // Se for estudante institucional, já valida e promove o status estudantil
-        let isStudentVerified = currentUser?.isVerifiedStudent || false;
-        if (userRole === 'aluno') {
-          const studentCheck = validateStudentEmail(user.email);
-          if (studentCheck.isValid) {
-            isStudentVerified = true;
-          }
+        const result = await checkStudentVerification(user);
+        if (result.verified) {
+          const updatedUser = {
+            ...currentUser,
+            emailVerified: true,
+            isVerifiedStudent: true,
+            institutionalValidationStatus: 'VALIDADO'
+          };
+          setCurrentUser(updatedUser);
+          setIsVerified(true);
+          showToast('🎉 Validação estudantil confirmada! Acesso liberado.');
+        } else {
+          setStatusWarning('A confirmação de e-mail não substitui a validação institucional estudantil.');
+          showToast('Continue pela validação oficial de estudante.');
         }
-
-        // 1. Persistir no Cloud Firestore
-        try {
-          await setDoc(
-            doc(db, 'users', user.uid),
-            {
-              emailVerified: true,
-              ...(isStudentVerified ? {
-                isVerifiedStudent: true,
-                studentEmailVerifiedAt: new Date().toISOString()
-              } : {}),
-              updatedAt: new Date().toISOString()
-            },
-            { merge: true }
-          );
-        } catch (dbErr) {
-          console.warn('[ProtectedRoute] Falha ao persistir emailVerified no Firestore:', dbErr);
-        }
-
-        // 2. Atualizar estado global Zustand e localStorage
-        const updatedUser = {
-          ...currentUser,
-          emailVerified: true,
-          ...(isStudentVerified ? { isVerifiedStudent: true } : {})
-        };
-        setCurrentUser(updatedUser);
-
-        showToast('🎉 E-mail verificado com sucesso! Acesso liberado.');
       } else {
         setStatusWarning('O Firebase ainda não detectou o clique no link. Abra seu e-mail institucional/pessoal, clique no link de confirmação recebido e tente clicar em "Já verifiquei" novamente.');
         showToast('⚠️ Seu e-mail ainda não foi confirmado. Acesse sua caixa postal e clique no link recebido.');
@@ -259,6 +238,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         return;
       }
 
+      auth.languageCode = 'pt-BR';
       await sendEmailVerification(user);
       showToast('📩 E-mail de verificação reenviado! Verifique sua caixa de entrada.');
       setResendCooldown(60); // 60 segundos de cooldown anti-flood

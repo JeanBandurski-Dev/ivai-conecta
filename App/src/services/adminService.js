@@ -346,10 +346,17 @@ export async function deleteUserDocument(userId) {
     }
 
     await deleteDoc(doc(db, 'users', String(userId)));
-    return { success: true, message: 'Documento de usuário removido do Firestore com sucesso.' };
+    return {
+      success: true,
+      message: 'Perfil removido do Firestore. Para liberar o e-mail permanentemente no Firebase Authentication, exclua o usuário também em Authentication → Users.'
+    };
   } catch (error) {
     console.error('[adminService] Erro ao excluir usuário:', error);
-    return { success: false, error: error.message };
+    const code = error?.code ? ` (${error.code})` : '';
+    return {
+      success: false,
+      error: `${error?.message || 'Erro interno ao remover a conta.'}${code}`
+    };
   }
 }
 

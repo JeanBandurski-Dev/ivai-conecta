@@ -6,7 +6,7 @@ import {
   ArrowRight, MapPin, X
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail, isInstitutionalEmail, inferInstitutionFromEmail } from '../lib/ivaiConecta';
+import { CITIES, maskCNPJ, cleanCNPJ, validateCNPJ, fetchCNPJData, validateStudentEmail, isInstitutionalEmail, inferInstitutionFromEmail, reactivateUserAccount } from '../lib/ivaiConecta';
 
 const ROLES = [
   { id: 'aluno',      label: 'Aluno / Estudante',    shortLabel: 'Aluno',      desc: 'Estágios & 1º Emprego',    icon: GraduationCap, color: 'text-blue-500' },
@@ -180,7 +180,7 @@ export default function Login() {
     setLoading(false);
     if (res.success) {
       if (selectedRole === 'aluno') {
-        showToast('🎉 Conta criada! Enviamos um link de confirmação para o seu e-mail institucional. Acesse sua caixa postal e clique no link para ativar seu Selo de Estudante.');
+        showToast('Conta criada. Envie o código de validação na seção Autenticação Oficial de Estudante.');
       } else {
         showToast('🎉 Conta criada com sucesso! Enviamos um link de ativação para o seu e-mail.');
       }

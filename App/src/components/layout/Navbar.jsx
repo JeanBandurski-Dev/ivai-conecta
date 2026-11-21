@@ -94,6 +94,21 @@ export default function Navbar() {
 
   return (
     <>
+      {currentUser && userRole === 'aluno' && currentUser.isVerifiedStudent !== true && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
+          <div className="container mx-auto px-4 py-2 flex items-center justify-between gap-3">
+            <p className="text-xs sm:text-sm font-semibold text-amber-900 dark:text-amber-200">
+              Seu e-mail institucional ainda não foi validado. Conclua a autenticação oficial do seu vínculo acadêmico.
+            </p>
+            <Link
+              to="/configuracoes?tab=verification"
+              className="btn btn-sm shrink-0 bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+            >
+              Continuar validação
+            </Link>
+          </div>
+        </div>
+      )}
       <nav className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 dark:border-slate-800 shadow-xs transition-colors duration-300">
         <div className={isWidePage ? 'container-wide' : 'container mx-auto'}>
           <div className="flex items-center justify-between h-[74px] gap-3 lg:gap-6 w-full max-w-full">

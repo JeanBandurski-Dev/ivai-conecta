@@ -5,8 +5,72 @@
  */
 import { auth, db } from '../lib/firebase.js';
 import { sendEmailVerification, verifyBeforeUpdateEmail } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { STORAGE_KEY_AUTH_USER } from '../data/seedData';
+
+export async function syncGoogleStudentVerification(customUser = null) {
+  const user = customUser || auth.currentUser;
+  if (!user) return { data: { success: false, validated: false } };
+
+  const googleProvider = (user.providerData || []).some(p => p.providerId === 'google.com');
+  if (!googleProvider || !user.emailVerified) {
+    return { data: { success: true, validated: false } };
+  }
+
+  const check = validateStudentEmail(user.email);
+  if (!check.isValid) {
+    return { data: { success: true, validated: false } };
+  }
+
+  try {
+    const profileSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!profileSnap.exists() || String(profileSnap.data().role || '').toLowerCase().trim() !== 'aluno') {
+      return { data: { success: true, validated: false } };
+    }
+  } catch {
+    return { data: { success: false, validated: false } };
+  }
+
+  const payload = {
+    isVerifiedStudent: true,
+    institutionalValidationStatus: 'VALIDADO',
+    emailVerified: true,
+    studentEmail: String(user.email).toLowerCase().trim(),
+    institution: check.institution,
+    shortInstitution: check.shortInstitution,
+    studentEmailVerifiedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+  return { data: { success: true, validated: true } };
+}
+
+// Domínios oficiais conhecidos no projeto para as instituições locais.
+// O Google só pode conceder validação automática para estes domínios.
+export const AUTHORIZED_STUDENT_DOMAINS = [
+  'ifpr.edu.br',
+  'estudante.ifpr.edu.br',
+  'estudantes.ifpr.edu.br',
+  'univale.edu.br',
+  'faive.edu.br',
+  'univale.com.br',
+  'feati.edu.br',
+  'faculdadeivaipora.com.br',
+  'faculdadeivaipora.edu.br',
+  'fatec.edu.br',
+  'fatecivaipora.edu.br'
+];
+
+export function isAuthorizedStudentInstitutionEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const match = email.toLowerCase().trim().match(/<([^>]+)>/);
+  const clean = (match ? match[1] : email).toLowerCase().trim();
+  const atIndex = clean.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === clean.length - 1) return false;
+  const domain = clean.slice(atIndex + 1).trim();
+  return AUTHORIZED_STUDENT_DOMAINS.includes(domain);
+}
 
 // Mapeamento de domínios conhecidos para nomes oficiais das instituições
 const KNOWN_INSTITUTIONS = [
@@ -196,7 +260,18 @@ export function validateStudentEmail(email) {
     };
   }
 
-  // 2. Checa se bate com instituições conhecidas
+  // 2. Aceita apenas instituições oficialmente conhecidas no projeto
+  if (!isAuthorizedStudentInstitutionEmail(clean)) {
+    return {
+      isValid: false,
+      isPublicPersonalDomain: false,
+      institution: null,
+      shortInstitution: null,
+      domain,
+      error: 'O e-mail deve pertencer ao IFPR, UNIVALE ou FATEC Ivaiporã.'
+    };
+  }
+
   const detectedInst = getInstitutionFromEmail(clean);
   if (detectedInst) {
     return {
@@ -206,23 +281,6 @@ export function validateStudentEmail(email) {
       shortInstitution: detectedInst.shortName,
       domain,
       badge: detectedInst.badge
-    };
-  }
-
-  // 3. Checa regras genéricas de e-mail educacional:
-  // - Termina em .edu.br ou .edu
-  // - Contém termo "aluno", "alunos", "estudante", "estudantes", "academico", "escola"
-  const isEduDomain = domain.endsWith('.edu.br') || domain.endsWith('.edu');
-  const hasStudentSubdomain = /(^|\.)(aluno|alunos|estudante|estudantes|academico|pos|escola)/i.test(domain) || /estudantes?/i.test(domain);
-
-  if (isEduDomain || hasStudentSubdomain) {
-    return {
-      isValid: true,
-      isPublicPersonalDomain: false,
-      institution: 'Instituição de Ensino Reconhecida',
-      shortInstitution: 'Estudante',
-      domain,
-      badge: 'Acadêmica'
     };
   }
 
@@ -252,6 +310,18 @@ export async function sendStudentVerificationEmail(studentEmail = null, customUs
       success: false,
       error: 'É necessário estar autenticado para solicitar a validação do e-mail estudantil.'
     };
+  }
+  try {
+    const profileSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!profileSnap.exists()) {
+      return { success: false, error: 'Perfil de estudante não encontrado.' };
+    }
+    const profile = profileSnap.data();
+    if (String(profile.role || '').toLowerCase().trim() !== 'aluno') {
+      return { success: false, error: 'Esta validação é exclusiva para contas de estudante.' };
+    }
+  } catch (profileError) {
+    return { success: false, error: 'Não foi possível verificar o tipo da conta.' };
   }
 
   const targetEmail = (studentEmail || user.email || '').toLowerCase().trim();
@@ -284,9 +354,11 @@ export async function sendStudentVerificationEmail(studentEmail = null, customUs
     // 3. Disparo da verificação de acordo com o caso:
     // Se o e-mail for diferente do atual do Auth, usa verifyBeforeUpdateEmail (muda o email apenas após o clique do link)
     // Se for o mesmo e-mail, dispara o sendEmailVerification padrão
+    auth.languageCode = 'pt-BR';
     if (studentEmail && user.email && studentEmail.toLowerCase() !== user.email.toLowerCase()) {
       await verifyBeforeUpdateEmail(user, targetEmail);
     } else {
+      auth.languageCode = 'pt-BR';
       await sendEmailVerification(user);
     }
 
@@ -349,6 +421,18 @@ export async function checkStudentVerification(customUser = null) {
       message: 'Sessão expirada. Faça login novamente para verificar seu e-mail.'
     };
   }
+  try {
+    const profileSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!profileSnap.exists()) {
+      return { success: false, verified: false, message: 'Perfil de estudante não encontrado.' };
+    }
+    const profile = profileSnap.data();
+    if (String(profile.role || '').toLowerCase().trim() !== 'aluno') {
+      return { success: false, verified: false, message: 'Esta validação é exclusiva para contas de estudante.' };
+    }
+  } catch (profileError) {
+    return { success: false, verified: false, message: 'Não foi possível verificar o tipo da conta.' };
+  }
 
   // 1. Recarregar o usuário é OBRIGATÓRIO no Firebase Auth para atualizar a propriedade emailVerified
   try {
@@ -380,6 +464,7 @@ export async function checkStudentVerification(customUser = null) {
   const updatePayload = {
     isVerifiedStudent: true,
     emailVerified: true,
+    institutionalValidationStatus: 'VALIDADO',
     studentEmail: user.email.toLowerCase().trim(),
     institution: check.institution || 'Instituição de Ensino Superior',
     shortInstitution: check.shortInstitution || 'Ensino Superior',
@@ -390,6 +475,12 @@ export async function checkStudentVerification(customUser = null) {
     await setDoc(doc(db, 'users', user.uid), updatePayload, { merge: true });
   } catch (dbErr) {
     console.error('[checkStudentVerification] Erro ao salvar status verificado no Firestore:', dbErr);
+    return {
+      success: false,
+      verified: false,
+      message: 'A confirmação foi detectada, mas não foi possível atualizar o status da conta.',
+      error: dbErr.message
+    };
   }
 
   // 5. Atualizar cache local de sessão para efeito imediato na UI

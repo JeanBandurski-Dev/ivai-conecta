@@ -21,6 +21,7 @@ import {
   validateStudentEmail,
   sendStudentVerificationEmail,
   checkStudentVerification,
+  syncGoogleStudentVerification,
 } from './studentVerificationService.js';
 import { isGenericPlaceholderAvatar } from './chatService.js';
 
@@ -141,13 +142,17 @@ export function normalizeUserRole(role) {
 
 /**
  * Infere o papel sugerido a partir das informações básicas do Firebase Auth.
+ * Apenas retorna 'aluno' se o e-mail pertencer a um domínio estudantil reconhecido.
+ * Retorna 'professor' se for e-mail institucional docente.
+ * Retorna 'candidato' para e-mails pessoais/genéricos (padrão seguro).
  */
 function inferRoleFromFirebaseUser(fbUser) {
   const email = String(fbUser?.email || '').toLowerCase().trim();
-  if (!email) return 'aluno';
+  if (!email) return 'candidato';
   const studentCheck = validateStudentEmail(email);
   if (studentCheck.isValid) return 'aluno';
-  return 'aluno';
+  if (isInstitutionalEmail(email)) return 'professor';
+  return 'candidato';
 }
 
 /**
@@ -624,7 +629,7 @@ export async function login(email, password) {
         profileData = createdProfile;
       } catch (profileErr) {
         console.warn('[login] Não foi possível criar o perfil inicial no Firestore:', profileErr);
-        const guessedRole = isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno';
+        const guessedRole = isInstitutionalEmail(cleanEmail) ? 'professor' : 'candidato';
         const guessedRoleMeta = USER_ROLES[guessedRole] || USER_ROLES.aluno;
         profileData = {
           id: fbUser.uid,
@@ -675,7 +680,7 @@ export async function login(email, password) {
       profileData.selectedRole ||
       profileData.profileType ||
       profileData.role ||
-      (isInstitutionalEmail(cleanEmail) ? 'professor' : 'aluno');
+      (isInstitutionalEmail(cleanEmail) ? 'professor' : 'candidato');
     const role = normalizeUserRole(rawRole);
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
@@ -694,7 +699,9 @@ export async function login(email, password) {
       isVerifiedStudent: profileData.isVerifiedStudent ?? (role === 'aluno' ? false : true),
       isVerifiedCompany: profileData.isVerifiedCompany ?? (role === 'empresa'),
       ...profileData,
-      emailVerified: role === 'aluno' ? Boolean(fbUser.emailVerified || profileData?.emailVerified) : true
+      emailVerified: role === 'aluno'
+        ? Boolean(profileData?.isVerifiedStudent && profileData?.institutionalValidationStatus === 'VALIDADO')
+        : true
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -745,6 +752,7 @@ export async function register(data) {
       period: data.period || '',
       skills: data.skills || [],
       isVerifiedStudent: false, // Prova de Propriedade: Requer confirmação via Firebase Auth
+      institutionalValidationStatus: 'PENDENTE',
       studentEmailVerifiedAt: null,
       studentEmailDomain: studentVerification?.domain || null,
       studentEmail: cleanEmail,
@@ -803,20 +811,7 @@ export async function register(data) {
     const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     const fbUser = userCredential.user;
 
-    // 2. Disparar link de verificação de e-mail do Firebase Auth (apenas para alunos)
-    let emailVerificationSent = false;
-    let emailVerificationError = null;
-    if (selectedRole === 'aluno') {
-      try {
-        await sendEmailVerification(fbUser);
-        emailVerificationSent = true;
-      } catch (eErr) {
-        console.warn('[Firebase Auth Register] Falha ao disparar sendEmailVerification:', eErr);
-        emailVerificationError = eErr.message;
-      }
-    }
-
-    // 3. Salvar documento completo no Firestore em users/{uid}
+    // 2. Salvar documento completo no Firestore em users/{uid}
     const profileData = {
       id: fbUser.uid,
       uid: fbUser.uid,
@@ -829,8 +824,7 @@ export async function register(data) {
       avatar: (fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      ...roleSpecific,
-      ...(emailVerificationSent ? { studentEmailVerificationSentAt: new Date().toISOString() } : {})
+      ...roleSpecific
     };
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
     seedFirestoreIfEmpty();
@@ -856,9 +850,7 @@ export async function register(data) {
 
     return {
       success: true,
-      user: sessionUser,
-      emailVerificationSent,
-      emailVerificationError
+      user: sessionUser
     };
   } catch (error) {
     console.warn('[Firebase Auth Register] Falha no Firebase:', error.code, error.message);
@@ -914,7 +906,7 @@ export async function loginWithGoogle() {
     }
 
     const email = (fbUser.email || '').toLowerCase().trim();
-    const fallbackRole = isInstitutionalEmail(email) ? 'professor' : 'aluno';
+    const fallbackRole = isInstitutionalEmail(email) ? 'professor' : 'candidato';
     const rawRole = profileRes.profile?.activeRole ||
       profileRes.profile?.selectedRole ||
       profileRes.profile?.profileType ||
@@ -923,7 +915,25 @@ export async function loginWithGoogle() {
     const role = normalizeUserRole(rawRole);
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
     const studentCheck = validateStudentEmail(fbUser.email);
-    const isGoogleStudent = Boolean(studentCheck?.isValid && fbUser.emailVerified);
+    // Validação automática para alunos que usam Google com domínio institucional verificado
+    const isGoogleStudent = Boolean(
+      role === 'aluno' &&
+      studentCheck?.isValid &&
+      fbUser.emailVerified &&
+      fbUser.providerData?.some(p => p.providerId === 'google.com')
+    );
+
+    if (role === 'aluno') {
+      try {
+        const syncResult = await syncGoogleStudentVerification();
+        if (syncResult?.data?.validated) {
+          profileRes.profile.isVerifiedStudent = true;
+          profileRes.profile.institutionalValidationStatus = 'VALIDADO';
+        }
+      } catch (syncErr) {
+        console.warn('[loginWithGoogle] Não foi possível sincronizar validação estudantil:', syncErr.message);
+      }
+    }
 
     const sessionUser = {
       ...profileRes.profile,
@@ -1565,6 +1575,10 @@ export function watchAuthState(callback) {
           let isVerifiedStudent =
             profileRes.profile?.isVerifiedStudent ??
             (role === 'aluno' ? false : true);
+          let institutionalStatusValidated =
+            role === 'aluno'
+              ? profileRes.profile?.institutionalValidationStatus === 'VALIDADO'
+              : true;
 
           // Sincronização em tempo real da Prova de Propriedade:
           // Se o Firebase Auth confirmar user.emailVerified === true para um aluno com e-mail estudantil válido,
@@ -1573,6 +1587,7 @@ export function watchAuthState(callback) {
             const studentCheck = validateStudentEmail(fbUser.email);
             if (studentCheck.isValid) {
               isVerifiedStudent = true;
+              institutionalStatusValidated = true;
               try {
                 await setDoc(
                   doc(db, 'users', fbUser.uid),
@@ -1618,12 +1633,9 @@ export function watchAuthState(callback) {
             return;
           }
 
-          const isStudentVerified = Boolean(
-            profileRes.profile?.isVerifiedStudent ||
-            profileRes.profile?.emailVerified ||
-            fbUser.emailVerified ||
-            isVerifiedStudent
-          );
+          const isStudentVerified = role === 'aluno'
+            ? Boolean(isVerifiedStudent === true && institutionalStatusValidated)
+            : true;
 
           const sessionUser = {
             ...profileRes.profile,
@@ -1757,8 +1769,12 @@ export function watchAuthState(callback) {
                 const updatedUser = {
                   ...sessionUser,
                   ...profile,
-                  emailVerified: role === 'aluno' ? (fbUser.emailVerified || Boolean(profile?.emailVerified)) : true,
-                  isVerifiedStudent: profile?.isVerifiedStudent ?? sessionUser.isVerifiedStudent,
+                  emailVerified: role === 'aluno'
+                    ? Boolean(profile?.isVerifiedStudent === true && profile?.institutionalValidationStatus === 'VALIDADO')
+                    : true,
+                  isVerifiedStudent: role === 'aluno'
+                    ? Boolean(profile?.isVerifiedStudent === true && profile?.institutionalValidationStatus === 'VALIDADO')
+                    : true,
                   blocked: false,
                   blockedReason: null
                 };
@@ -2032,6 +2048,7 @@ export async function resendVerificationEmail() {
     return { success: false, error: 'Nenhum usuário logado no momento.' };
   }
   try {
+    auth.languageCode = 'pt-BR';
     await sendEmailVerification(auth.currentUser);
     return { success: true };
   } catch (error) {

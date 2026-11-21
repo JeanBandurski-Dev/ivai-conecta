@@ -986,6 +986,22 @@ export function getApplicationEligibility(user, jobOrId) {
 
   // 5. ALUNO / ESTUDANTE
   if (isStudent) {
+    if (!user.isVerifiedStudent) {
+      return {
+        canApply: false,
+        requiresVerification: true,
+        status: 'student_unverified',
+        roleType: 'aluno',
+        isPj: isPj,
+        isInternship,
+        badge: 'Estudante · Validação Pendente',
+        buttonLabel: 'Validar E-mail Estudantil',
+        message: 'Valide seu e-mail institucional antes de se candidatar a vagas ou enviar propostas. O código enviado confirma que o e-mail pertence ao titular da conta.',
+        actionLink: '/configuracoes?tab=verification',
+        actionLabel: 'Validar E-mail Institucional'
+      };
+    }
+
     if (isInternship) {
       if (!user.isVerifiedStudent) {
         return {

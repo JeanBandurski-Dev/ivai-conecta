@@ -733,6 +733,11 @@ export async function sendChatMessage(chatId, senderUser, text) {
   if (!chatId || !senderUser) {
     throw new Error('Identificação da conversa ou usuário remetente inválidos.');
   }
+  const normalizedSenderRole = String(senderUser.role || '').toLowerCase().trim();
+  if ((normalizedSenderRole === 'aluno' || normalizedSenderRole === 'estudante' || normalizedSenderRole === 'student') &&
+      senderUser.isVerifiedStudent !== true) {
+    throw new Error('Valide seu e-mail institucional antes de usar o chat.');
+  }
 
   // Validação estrita da mensagem
   const validation = validateChatMessage(text);
@@ -853,6 +858,11 @@ export async function sendChatMessage(chatId, senderUser, text) {
 export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'Contato Direto') {
   if (!currentUser || !targetUser) {
     throw new Error('Usuários inválidos para iniciar conversa.');
+  }
+  const currentRole = String(currentUser.role || '').toLowerCase().trim();
+  if ((currentRole === 'aluno' || currentRole === 'estudante' || currentRole === 'student') &&
+      currentUser.isVerifiedStudent !== true) {
+    throw new Error('Valide seu e-mail institucional antes de usar o chat.');
   }
 
   const user1Email = (currentUser?.email || '').toLowerCase().trim();

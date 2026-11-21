@@ -188,6 +188,7 @@ export default function CompletarPerfil() {
       avatar: auth.currentUser?.photoURL || currentUser?.avatar,
       ...(selectedRole === 'aluno' && {
         isVerifiedStudent: isStudentVerified,
+        institutionalValidationStatus: isStudentVerified ? 'VALIDADO' : 'PENDENTE',
         studentEmail: finalStudentEmail,
         institution: studentInstitution || 'IFPR Campus Ivaiporã',
         studentEmailVerifiedAt: isStudentVerified ? new Date().toISOString() : null

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Settings, Bell, Lock, Eye, EyeOff, Shield, LogOut, ArrowLeft,
   FileCheck, CheckCircle2, Mail, ShieldCheck, Upload,
@@ -62,6 +62,7 @@ import {
 export default function Configuracoes() {
   const { currentUser, setCurrentUser, logout, showToast } = useAppStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Abas disponíveis de acordo com o papel do usuário
   const userRole = currentUser?.role || 'candidato';
@@ -72,6 +73,14 @@ export default function Configuracoes() {
   // Define a aba inicial padrão
   const defaultTab = isAdmin ? 'account' : 'links';
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTab = params.get('tab');
+    if (requestedTab === 'verification' && isAluno) {
+      setActiveTab('verification');
+    }
+  }, [location.search, isAluno]);
 
   // ─── ESTADO: INFORMAÇÕES E REDES SOCIAIS (LINKS PROFISSIONAIS) ──────
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
@@ -126,7 +135,6 @@ export default function Configuracoes() {
     currentUser?.studentEmail || (currentUser?.email && (validateStudentEmail(currentUser.email)?.isValid || currentUser.email.includes('estudante') || currentUser.email.includes('.edu')) ? currentUser.email : '')
   );
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
-  const [checkingStudentStatus, setCheckingStudentStatus] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
 
   // ─── ESTADO: VERIFICAÇÃO DE CNPJ (EMPRESA) ──────────────────────────
@@ -163,7 +171,9 @@ export default function Configuracoes() {
       if (data.raNumber !== undefined) setRaNumber(data.raNumber || '');
       if (data.cnpj) setCnpj(data.cnpj);
       if (data.isVerifiedCompany != null) setCompanyVerified(Boolean(data.isVerifiedCompany));
-      if (data.isVerifiedStudent != null) setVerificationSubmitted(Boolean(data.isVerifiedStudent || data.emailVerified));
+      if (data.isVerifiedStudent != null) {
+        setVerificationSubmitted(Boolean(isAluno && (data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO')));
+      }
       if (data.studentEmail) setStudentInstEmail(data.studentEmail);
 
       if (data.notificationPreferences) {
@@ -188,6 +198,49 @@ export default function Configuracoes() {
       isMounted = false;
     };
   }, [currentUser?.uid, currentUser?.id]);
+
+  useEffect(() => {
+    if (!isAluno || verificationSubmitted) return;
+
+    let isMounted = true;
+    let isCheckingAutomatically = false;
+    let lastCheckAt = 0;
+
+    const checkAutomatically = async () => {
+      if (!isMounted || isCheckingAutomatically) return;
+      const now = Date.now();
+      if (now - lastCheckAt < 500) return;
+      lastCheckAt = now;
+      isCheckingAutomatically = true;
+      try {
+        const result = await checkStudentVerification();
+        if (isMounted && result.success && result.verified) {
+          setVerificationSubmitted(true);
+          if (result.user) setCurrentUser(result.user);
+          showToast('Seu e-mail institucional foi validado automaticamente!');
+        }
+      } catch {
+        // A próxima verificação automática tentará novamente.
+      } finally {
+        isCheckingAutomatically = false;
+      }
+    };
+
+    const intervalId = window.setInterval(checkAutomatically, 1000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkAutomatically();
+    };
+    window.addEventListener('focus', checkAutomatically);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    checkAutomatically();
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', checkAutomatically);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAluno, verificationSubmitted, setCurrentUser, showToast]);
 
   if (!currentUser) {
     return (
@@ -423,48 +476,19 @@ export default function Configuracoes() {
   // ─── HANDLERS: VERIFICAÇÃO ESTUDANTIL (ALUNO) ───────────────────────
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
-    const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
-    if (!emailToVerify) {
-      showToast('Por favor, informe seu e-mail estudantil institucional.');
-      return;
-    }
     setSubmittingStudentEmail(true);
     try {
-      const res = await sendStudentVerificationEmail(emailToVerify);
-      if (res.success) {
+      const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
+      const response = await sendStudentVerificationEmail(emailToVerify);
+      if (response.success) {
         setVerificationEmailSent(true);
-        if (res.alreadyVerified) {
-          await handleCheckStudentStatus();
-        } else {
-          showToast(res.message);
-        }
-      } else {
-        showToast(res.error || 'Erro ao enviar e-mail de verificação.');
+        showToast(response.message || 'Enviamos o link de validação para seu e-mail institucional.');
       }
+      else showToast(response.error || 'Não foi possível enviar o link de validação.');
     } catch (err) {
-      showToast('Erro ao disparar verificação: ' + (err.message || 'Tente novamente.'));
+      showToast(err?.message || 'Não foi possível enviar o link de validação.');
     } finally {
       setSubmittingStudentEmail(false);
-    }
-  };
-
-  const handleCheckStudentStatus = async () => {
-    setCheckingStudentStatus(true);
-    try {
-      const res = await checkStudentVerification();
-      if (res.success && res.verified) {
-        setVerificationSubmitted(true);
-        if (res.user) {
-          setCurrentUser(res.user);
-        }
-        showToast(res.message);
-      } else {
-        showToast(res.message || 'O e-mail ainda não foi confirmado. Acesse sua caixa de entrada e clique no link de validação.');
-      }
-    } catch (err) {
-      showToast('Erro ao verificar status no Firebase: ' + (err.message || 'Tente novamente.'));
-    } finally {
-      setCheckingStudentStatus(false);
     }
   };
 
@@ -1656,22 +1680,20 @@ export default function Configuracoes() {
                     </div>
 
                     <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                      Informe seu e-mail institucional acadêmico (ex: <strong>@estudante.ifpr.edu.br</strong>, <strong>@aluno.uenp.edu.br</strong>, <strong>@univale.edu.br</strong> ou qualquer domínio <strong>.edu.br</strong>). Enviaremos um link de confirmação para a sua caixa postal institucional para validar sua titularidade instantaneamente.
+                      E-mail institucional cadastrado. Enviaremos um link seguro pelo Firebase exclusivamente para este endereço.
                     </p>
 
                     <form onSubmit={handleSendVerificationEmail} className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="email"
                         value={studentInstEmail}
-                        onChange={e => setStudentInstEmail(e.target.value)}
-                        placeholder="seu.nome@estudante.ifpr.edu.br"
                         className="form-control text-xs sm:text-sm flex-1"
-                        required
-                        disabled={submittingStudentEmail || checkingStudentStatus}
+                        readOnly
+                        disabled
                       />
                       <button
                         type="submit"
-                        disabled={submittingStudentEmail || checkingStudentStatus}
+                        disabled={submittingStudentEmail}
                         className="btn btn-primary btn-sm font-bold shrink-0 flex items-center justify-center gap-1.5"
                       >
                         {submittingStudentEmail ? (
@@ -1682,7 +1704,7 @@ export default function Configuracoes() {
                         ) : (
                           <>
                             <Mail size={15} />
-                            <span>{verificationEmailSent ? 'Reenviar Link' : 'Enviar Link de Validação'}</span>
+                            <span>{verificationEmailSent ? 'Reenviar link' : 'Enviar link de validação'}</span>
                           </>
                         )}
                       </button>
@@ -1695,40 +1717,14 @@ export default function Configuracoes() {
                           <div className="space-y-1">
                             <p className="font-semibold">Confirmação pendente na sua caixa postal institucional!</p>
                             <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                              Um link de validação foi enviado para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra seu e-mail institucional, clique no link oficial do Firebase e em seguida clique no botão abaixo para ativar seu Selo de Estudante.
+                              Enviamos um link para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra-o e depois clique em verificar status.
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={handleCheckStudentStatus}
-                            disabled={checkingStudentStatus || submittingStudentEmail}
-                            className="btn btn-primary btn-sm font-bold text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl shadow-xs"
-                          >
-                            {checkingStudentStatus ? (
-                              <>
-                                <Loader2 size={14} className="animate-spin" />
-                                <span>Verificando com o Firebase...</span>
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck size={15} />
-                                <span>Já confirmei meu e-mail (Verificar Status)</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleSendVerificationEmail}
-                            disabled={submittingStudentEmail || checkingStudentStatus}
-                            className="btn btn-ghost btn-sm text-xs font-semibold text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1.5"
-                          >
-                            <RefreshCw size={13} className={submittingStudentEmail ? 'animate-spin' : ''} />
-                            <span>Reenviar link</span>
-                          </button>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Verificando automaticamente após a confirmação do link...</span>
                         </div>
                       </div>
                     )}

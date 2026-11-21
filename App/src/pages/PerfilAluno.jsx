@@ -19,6 +19,7 @@ import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
+import { normalizeUserRole } from '../services/authService';
 
 // Função auxiliar de montagem do perfil em fallback
 function buildFallbackTalent(user) {
@@ -34,7 +35,8 @@ function buildFallbackTalent(user) {
     avatar: user.avatar || user.photoURL || '',
     email: user.email || '',
     skills: Array.isArray(user.skills) ? user.skills : [],
-    isVerifiedStudent: Boolean(user.isVerifiedStudent || user.emailVerified),
+    isVerifiedStudent: (normalizeUserRole(user.role) === 'aluno') &&
+      Boolean(user.isVerifiedStudent || (user.institutionalValidationStatus === 'VALIDADO')),
     studentEmail: user.studentEmail || (validateStudentEmail(user.email)?.isValid ? user.email : ''),
     raNumber: user.raNumber || '',
     linkedin: user.linkedin || '',
@@ -236,8 +238,7 @@ export default function PerfilAluno() {
         const studentDocRef = doc(db, 'users', studentUid);
         setDoc(studentDocRef, {
           endorsements: merged,
-          endorsementCount: merged.length,
-          isVerifiedStudent: true
+          endorsementCount: merged.length
         }, { merge: true }).catch(() => {});
       } catch {}
     }
@@ -267,7 +268,8 @@ export default function PerfilAluno() {
           city: data.city || (currentUser?.city) || 'Ivaiporã',
           avatar: data.avatar || data.photoURL || (currentUser?.avatar) || '',
           skills: Array.isArray(data.skills) ? data.skills : (currentUser?.skills || []),
-          isVerifiedStudent: Boolean(data.isVerifiedStudent || data.emailVerified || currentUser?.isVerifiedStudent || currentUser?.emailVerified),
+          isVerifiedStudent: (normalizeUserRole(data.role || currentUser?.role) === 'aluno') &&
+            Boolean(data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO'),
           studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (currentUser?.studentEmail || '')),
           email: data.email || (currentUser?.email) || '',
           raNumber: data.raNumber || (currentUser?.raNumber) || '',
@@ -328,7 +330,8 @@ export default function PerfilAluno() {
                     city: d.city || 'Ivaiporã',
                     avatar: d.avatar || d.photoURL || '',
                     skills: Array.isArray(d.skills) ? d.skills : [],
-                    isVerifiedStudent: Boolean(d.isVerifiedStudent || d.emailVerified),
+                    isVerifiedStudent: normalizeUserRole(d.role) === 'aluno' &&
+                      Boolean(d.isVerifiedStudent || d.institutionalValidationStatus === 'VALIDADO'),
                     studentEmail: d.studentEmail || (validateStudentEmail(d.email)?.isValid ? d.email : ''),
                     email: d.email || '',
                     raNumber: d.raNumber || '',
@@ -589,7 +592,7 @@ export default function PerfilAluno() {
   return (
     <>
       {/* Alerta de Perfil Não Verificado para o próprio aluno */}
-      {isOwner && !currentUser?.isVerifiedStudent && (
+      {isOwner && normalizeUserRole(currentUser?.role) === 'aluno' && !currentUser?.isVerifiedStudent && (
         <div className="bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200 py-3 px-4 text-xs sm:text-sm">
           <div className="container flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 font-semibold">
