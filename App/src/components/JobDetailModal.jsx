@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   X, MapPin, Building2, Clock, DollarSign, CheckCircle2,
   Sparkles, Briefcase, Gift, Send, ShieldCheck, MessageSquare, XCircle, RotateCcw, Lightbulb, Users, Bookmark,
-  Wrench, GraduationCap, ShieldAlert, AlertCircle, ExternalLink, Loader2
+  Wrench, GraduationCap, ShieldAlert, AlertCircle, ExternalLink, Loader2, LogIn
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
@@ -71,12 +71,16 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
 
   const isFavorite = isJobFavorited(job, favoriteJobs);
 
-  const handleFavoriteToggle = (e) => {
+  const handleFavoriteToggle = async (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    const added = toggleFavoriteJob(job);
+    const added = await toggleFavoriteJob(job);
+    if (added === null) {
+      showToast('Não foi possível atualizar o favorito. Tente novamente.');
+      return;
+    }
     showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 
@@ -654,6 +658,14 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                   <ShieldCheck size={14} /> Enviar Matrícula
                 </Link>
               </div>
+            ) : eligibility.status === 'not_logged' ? (
+              <Link
+                to="/login"
+                onClick={onClose}
+                className="btn btn-primary btn-sm text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogIn size={14} /> Entrar para Candidatar-se
+              </Link>
             ) : eligibility.canApply ? (
               <button 
                 onClick={handleApply} 

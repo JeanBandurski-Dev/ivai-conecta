@@ -513,7 +513,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
         responsibilities: responsibilitiesArray,
         createdBy: userUid,
         companyUid: userUid,
-        isVerifiedCompany: true
+        isVerifiedCompany: Boolean(currentUser?.isVerifiedCompany)
       });
 
       showToast('🎉 Nova vaga publicada com sucesso no Mural Regional!');
@@ -675,7 +675,7 @@ export default function PublishJobModal({ isOpen, onClose, onJobCreated }) {
         responsibilities: form.responsibilities || [],
         createdBy: userUid,
         companyUid: userUid,
-        isVerifiedCompany: true
+        isVerifiedCompany: Boolean(currentUser?.isVerifiedCompany)
       });
 
       showToast('🎉 Nova vaga publicada com sucesso no Mural Regional!');

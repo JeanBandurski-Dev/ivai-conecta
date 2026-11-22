@@ -10,7 +10,7 @@ import { endorsementRepository } from '../repositories/index.js';
 import { EndorsementStatus } from '../models/enums.js';
 
 import { matchCity } from '../utils/searchUtils.js';
-import { isInstitutionalEmail } from './authService.js';
+import { isInstitutionalEmail, getUsersDB } from './authService.js';
 
 let _memTalentsCache = null;
 
@@ -155,13 +155,23 @@ export function hasTeacherEndorsedStudent(studentEndorsements, profUserOrEmail) 
 /**
  * Normaliza um documento de usuário para uso no Banco de Talentos / Perfis
  */
-function normalizeTalentRole(role) {
+function normalizeTalentRole(role, docData = {}) {
   const value = String(role || '').toLowerCase().trim();
   if (['estudante', 'estudantes', 'student', 'students', 'aluno'].includes(value)) return 'aluno';
-  if (['candidate', 'profissional'].includes(value)) return 'candidato';
-  if (['company', 'recrutador'].includes(value)) return 'empresa';
-  if (['teacher', 'docente'].includes(value)) return 'professor';
-  return value || 'aluno';
+  if (['candidate', 'profissional', 'candidato'].includes(value)) return 'candidato';
+  if (['freelancer', 'autonomo', 'autônomo', 'prestador'].includes(value)) return 'freelancer';
+  if (['company', 'recrutador', 'empresa'].includes(value)) return 'empresa';
+  if (['teacher', 'docente', 'professor'].includes(value)) return 'professor';
+  if (['admin', 'administrador'].includes(value)) return 'admin';
+
+  // Se não houver papel explícito, verifica evidências no perfil
+  if (docData.course || docData.institution || docData.raNumber || docData.studentEmail || docData.isVerifiedStudent) {
+    return 'aluno';
+  }
+  if (docData.category || docData.services) {
+    return 'freelancer';
+  }
+  return 'candidato';
 }
 
 function normalizeUserDoc(docData, docId) {
@@ -172,7 +182,7 @@ function normalizeUserDoc(docData, docId) {
     id: data.id != null ? data.id : docId,
     firestoreId: docId,
     name: data.name || 'Usuário',
-    role: normalizeTalentRole(data.activeRole || data.selectedRole || data.profileType || data.role || (data.isVerifiedStudent ? 'aluno' : '')),
+    role: normalizeTalentRole(data.activeRole || data.selectedRole || data.profileType || data.role || (data.isVerifiedStudent ? 'aluno' : ''), data),
     city: data.city || '',
     avatar: data.avatar || '',
     skills: data.skills || [],
@@ -186,6 +196,43 @@ function normalizeUserDoc(docData, docId) {
     institution: data.institution || '',
     period: data.period || '',
   };
+}
+
+export async function syncPublicProfile(uid, sourceData) {
+  if (!uid || !sourceData || typeof sourceData !== 'object') return;
+
+  const role = normalizeTalentRole(
+    sourceData.activeRole || sourceData.selectedRole || sourceData.profileType ||
+    sourceData.role || (sourceData.isVerifiedStudent ? 'aluno' : '')
+  );
+  const publicProfile = {
+    uid: String(uid),
+    name: String(sourceData.name || sourceData.displayName || '').slice(0, 120),
+    city: String(sourceData.city || '').slice(0, 100),
+    institution: String(sourceData.institution || '').slice(0, 160),
+    course: String(sourceData.course || '').slice(0, 160),
+    period: String(sourceData.period || '').slice(0, 80),
+    avatar: String(sourceData.avatar || sourceData.photoURL || '').slice(0, 2048),
+    photoURL: String(sourceData.photoURL || sourceData.avatar || '').slice(0, 2048),
+    skills: Array.isArray(sourceData.skills) ? sourceData.skills.slice(0, 100) : [],
+    experiences: Array.isArray(sourceData.experiences) ? sourceData.experiences.slice(0, 100) : [],
+    projects: Array.isArray(sourceData.projects) ? sourceData.projects.slice(0, 100) : [],
+    education: Array.isArray(sourceData.education) ? sourceData.education.slice(0, 100) : [],
+    bio: String(sourceData.bio || '').slice(0, 1000),
+    endorsements: Array.isArray(sourceData.endorsements)
+      ? sanitizeUniqueEndorsements(sourceData.endorsements).slice(0, 100)
+      : [],
+    endorsementCount: Math.max(0, Math.min(100, Number(sourceData.endorsementCount || 0) || 0)),
+    updatedAt: new Date().toISOString()
+  };
+  if (Object.prototype.hasOwnProperty.call(sourceData, 'isVerifiedStudent')) {
+    publicProfile.isVerifiedStudent = Boolean(sourceData.isVerifiedStudent);
+  }
+  if (role) {
+    publicProfile.role = role;
+  }
+
+  await setDoc(doc(db, 'public_profiles', String(uid)), publicProfile, { merge: true });
 }
 
 /**
@@ -265,67 +312,37 @@ export function isTalentUser(u) {
  * Escuta banco de talentos em tempo real via Firestore onSnapshot da coleção 'users'
  */
 export function subscribeToTalents(city = 'Todas as Cidades', callback) {
+  // Emissão inicial imediata para remover qualquer delay visual
   callback(getTalents(city));
 
   try {
-    const usersRef = collection(db, 'users');
-
+    const usersRef = collection(db, 'public_profiles');
     return onSnapshot(usersRef, (snapshot) => {
-      // 1. Extrai pareceres concedidos por professores via endorsementResponses
-      const profApprovedByStudent = new Map();
-      snapshot.docs.forEach(d => {
-        const u = d.data();
-        if (Array.isArray(u.endorsementResponses)) {
-          u.endorsementResponses.forEach(resp => {
-            if (resp && resp.status === 'Aprovado' && resp.studentId) {
-              const sId = String(resp.studentId);
-              const list = profApprovedByStudent.get(sId) || [];
-              list.push({
-                id: `end_${resp.reqId || resp.timestamp || d.id}`,
-                profUid: String(d.id),
-                profName: u.name || 'Professor Docente',
-                profEmail: u.email || '',
-                institution: u.institution || 'IFPR Campus Ivaiporã',
-                discipline: resp.discipline || u.discipline || 'Formação Acadêmica',
-                quote: resp.quote || 'Estudante com excelente desempenho acadêmico.',
-                isVerified: true,
-                date: resp.date || new Date().toLocaleDateString('pt-BR'),
-                timestamp: resp.timestamp || Date.now()
-              });
-              profApprovedByStudent.set(sId, list);
-            }
-          });
-        }
-      });
-
-      // 2. Normaliza os talentos mesclando pareceres diretos com os emitidos por professores
-      const allUsers = snapshot.docs.map(d => {
-        const normalized = normalizeUserDoc(d.data(), d.id);
-        const sId = String(normalized.id || normalized.firestoreId || d.id);
-        const profEndorsements = profApprovedByStudent.get(sId) || [];
-        if (profEndorsements.length > 0) {
-          const merged = sanitizeUniqueEndorsements([...(normalized.endorsements || []), ...profEndorsements]);
-          return {
-            ...normalized,
-            endorsements: merged,
-            endorsementCount: merged.length,
-            isVerifiedStudent: true
-          };
-        }
-        return normalized;
-      });
-
-      const remoteTalents = allUsers.filter(isTalentUser);
+      const remoteTalents = snapshot.docs
+        .map(documentSnapshot => normalizeUserDoc(documentSnapshot.data(), documentSnapshot.id))
+        .filter(isTalentUser);
 
       _memTalentsCache = remoteTalents;
       if (typeof localStorage !== 'undefined') {
+    // Mescla professores do banco local de usuários
+    try {
+      const allLocalUsers = getUsersDB ? getUsersDB() : [];
+      allLocalUsers.forEach(u => {
+        if (!u) return;
+        const r = (u.role || '').toLowerCase().trim();
+        const id = String(u.uid || u.id || '');
+        const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+        if ((r === 'professor' || r === 'docente') && !mockTeacherIds.has(id) && !mockTeacherEmails.has(email) && !id.startsWith('prof_')) {
+          teachers.push(normalizeTeacherDoc(u, id));
+        }
+      });
+    } catch {}
         try {
           localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remoteTalents));
         } catch {}
       }
 
-      const filtered = remoteTalents.filter(t => matchCity(t.city, city));
-      callback(filtered);
+      callback(remoteTalents.filter(talent => matchCity(talent.city, city)));
     }, (error) => {
       console.warn('[Firestore Talents Listener] Offline fallback:', error.message);
       callback(getTalents(city));
@@ -387,13 +404,15 @@ export function subscribeToTeachers(callback) {
     'prof_juliana_oliveira'
   ]);
 
-  // Callback imediato com dados disponíveis
+  // Callback imediato com dados disponíveis (sem delay)
   callback(getVerifiedTeachers());
 
-  try {
-    const usersRef = collection(db, 'users');
+  let unsubPublic = () => {};
+  let unsubUsers = () => {};
 
-    return onSnapshot(usersRef, (snapshot) => {
+  try {
+    const publicRef = collection(db, 'public_profiles');
+    unsubPublic = onSnapshot(publicRef, (snapshot) => {
       const remoteTeachers = snapshot.docs
         .map(d => normalizeTeacherDoc(d.data(), d.id))
         .filter(u => {
@@ -406,7 +425,8 @@ export function subscribeToTeachers(callback) {
           return r === 'professor' || r === 'docente';
         });
 
-      const merged = mergeWithInstitutionalFaculty(remoteTeachers);
+      const current = getVerifiedTeachers();
+      const merged = mergeWithInstitutionalFaculty([...current, ...remoteTeachers]);
 
       if (typeof localStorage !== 'undefined') {
         try {
@@ -416,9 +436,45 @@ export function subscribeToTeachers(callback) {
 
       callback(merged);
     }, (error) => {
-      console.warn('[Firestore Teachers Listener] Offline fallback:', error.message);
+      console.warn('[Firestore Teachers Listener] public_profiles fallback:', error.message);
       callback(getVerifiedTeachers());
     });
+
+    // Tenta também escutar a coleção users para professores caso o usuário tenha permissão
+    try {
+      const usersRef = collection(db, 'users');
+      unsubUsers = onSnapshot(usersRef, (snapshot) => {
+        const directTeachers = snapshot.docs
+          .map(d => normalizeTeacherDoc(d.data(), d.id))
+          .filter(u => {
+            const r = String(u.role || '').toLowerCase().trim();
+            const id = String(u.id || '');
+            const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
+            if (mockTeacherIds.has(id) || mockTeacherEmails.has(email) || id.startsWith('prof_')) {
+              return false;
+            }
+            return r === 'professor' || r === 'docente';
+          });
+
+        if (directTeachers.length > 0) {
+          const current = getVerifiedTeachers();
+          const merged = mergeWithInstitutionalFaculty([...current, ...directTeachers]);
+          if (typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(merged));
+            } catch {}
+          }
+          callback(merged);
+        }
+      }, () => {
+        // Ignora erro de permissão silenciosamente para usuários não-admins
+      });
+    } catch {}
+
+    return () => {
+      unsubPublic();
+      unsubUsers();
+    };
   } catch (error) {
     console.warn('[Firestore Teachers Listener] Falha ao assinar professores:', error.message);
     callback(getVerifiedTeachers());
@@ -514,7 +570,7 @@ export function subscribeToTalentById(talentId, callback) {
   if (local) callback(local);
 
   try {
-    const userDocRef = doc(db, 'users', idStr);
+    const userDocRef = doc(db, 'public_profiles', idStr);
     return onSnapshot(userDocRef, (snap) => {
       if (snap.exists()) {
         const normalized = normalizeUserDoc(snap.data(), snap.id);
@@ -612,9 +668,9 @@ export function getVerifiedTeachers() {
 
   const merged = mergeWithInstitutionalFaculty(teachers);
 
-  // Background sync com o Firestore (coleção 'users' role 'professor')
+  // Background sync com o Firestore (coleção pública public_profiles role 'professor')
   try {
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(db, 'public_profiles');
     getDocs(usersRef).then(snapshot => {
       const remote = snapshot.docs
         .map(d => normalizeTeacherDoc(d.data(), d.id))
@@ -1470,6 +1526,9 @@ export function updateTalentProfile(talentId, updatedData) {
       ...updatedData,
       updatedAt: new Date().toISOString()
     }, { merge: true }).catch(err => console.warn('[Firestore] Sync erro updateTalentProfile:', err.message));
+    syncPublicProfile(talentId, updatedData).catch(err =>
+      console.warn('[Firestore] Sync erro public_profiles:', err.message)
+    );
   } catch {}
 
   return updated;

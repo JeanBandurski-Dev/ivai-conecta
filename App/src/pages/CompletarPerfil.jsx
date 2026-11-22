@@ -206,7 +206,8 @@ export default function CompletarPerfil() {
         razaoSocial: cnpjData?.razaoSocial || name.trim(),
         nomeFantasia: cnpjData?.nomeFantasia || name.trim(),
         situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
-        isVerifiedCompany: true
+        isVerifiedCompany: false,
+        companyVerificationStatus: 'NAO_VERIFICADA'
       })
     });
 

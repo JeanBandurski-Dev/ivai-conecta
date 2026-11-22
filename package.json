@@ -8,7 +8,10 @@
     "check:mocks": "node scripts/check-no-mocks.cjs",
     "build": "npm run check:mocks && npm run build --prefix App",
     "dev:proto": "npm start --prefix Prototipo",
-    "test": "npm run check:mocks"
+    "test": "npm run check:mocks && npm run test:unit",
+    "test:unit": "npm run test --prefix App",
+    "package:release": "node scripts/package-release.cjs",
+    "emulators": "firebase emulators:start"
   },
   "repository": {
     "type": "git",

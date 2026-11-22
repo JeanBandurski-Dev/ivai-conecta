@@ -72,7 +72,7 @@ O **Ivaí Conecta** preenche a lacuna de comunicação entre o ecossistema acad�
 
 Antes de iniciar, certifique-se de possuir instalado em sua máquina:
 
-1. **[Node.js](https://nodejs.org/)** (versão 18.x, 20.x ou superior recomendada)
+1. **[Node.js](https://nodejs.org/)** 20.19+ ou 22.12+ (o Vite 8 exige `^20.19.0 || >=22.12.0`)
 2. **[npm](https://www.npmjs.com/)** (geralmente incluído com o Node.js) ou gerenciador de pacotes equivalente (yarn/pnpm)
 3. **[Git](https://git-scm.com/)** para controle de versão
 4. *(Opcional)* **[Firebase CLI](https://firebase.google.com/docs/cli)** caso deseje fazer deploy de novas regras de segurança (`firestore.rules` e `storage.rules`).

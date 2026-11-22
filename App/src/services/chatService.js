@@ -2,7 +2,7 @@
 // Arquitetura Híbrida: LocalStorage (0ms) + BroadcastChannel + Firestore Realtime
 // Com Bloqueio Estrito de Linguagem Imprópria & Suporte a Todos os Usuários (Empresa, Freelancer, Aluno, Professor, Admin)
 
-import { db } from '../lib/firebase.js';
+import { auth, db, functions } from '../lib/firebase.js';
 import {
   collection,
   doc,
@@ -10,12 +10,16 @@ import {
   addDoc,
   setDoc,
   deleteDoc,
+  getDocs,
+  writeBatch,
+  limit,
   query,
   where,
   orderBy,
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { detectProfanity } from './jobTaxonomy.js';
 
 export const STORAGE_KEY_CHAT_THREADS = 'ivai_conecta_chat_threads';
@@ -471,6 +475,39 @@ async function syncWithLocalServer() {
 export async function deleteChatThread(threadId) {
   if (!threadId) return [];
 
+  // Exclusao autorizada no servidor: remove todas as mensagens e o documento pai.
+  try {
+    const deleteRemoteThread = httpsCallable(functions, 'deleteChatThread');
+    await deleteRemoteThread({ threadId });
+  } catch (error) {
+    // Fallback para ambientes anteriores/deploys ainda sem a callable.
+    // Cada delecao continua protegida pelas Firestore Rules dos participantes.
+    const threadRef = doc(db, 'chats', threadId);
+    const threadSnap = await getDoc(threadRef);
+    if (threadSnap.exists()) {
+      const thread = threadSnap.data();
+      const uid = auth.currentUser?.uid;
+      const email = String(auth.currentUser?.email || '').toLowerCase().trim();
+      const participants = Array.isArray(thread.participants) ? thread.participants : [];
+      const participantUids = Array.isArray(thread.participantUids) ? thread.participantUids : [];
+      const participantIds = Array.isArray(thread.participantIds) ? thread.participantIds : [];
+      const isParticipant =
+        (uid && (participantUids.includes(uid) || participantIds.includes(uid))) ||
+        (email && participants.some((participant) => String(participant).toLowerCase().trim() === email));
+      if (!isParticipant) throw error;
+
+      while (true) {
+        const messagesSnap = await getDocs(query(collection(db, 'chats', threadId, 'messages'), limit(400)));
+        if (messagesSnap.empty) break;
+        const batch = writeBatch(db);
+        messagesSnap.docs.forEach((messageDoc) => batch.delete(messageDoc.ref));
+        await batch.commit();
+        if (messagesSnap.size < 400) break;
+      }
+      await deleteDoc(threadRef);
+    }
+  }
+
   // 1. Remove da lista local
   const all = getChatThreads().filter(t => t.id !== threadId);
   saveChatThreads(all);
@@ -502,11 +539,6 @@ export async function deleteChatThread(threadId) {
     } catch { }
   }
 
-  // 5. Remove do Firestore em background
-  try {
-    deleteDoc(doc(db, 'chats', threadId)).catch(() => { });
-  } catch { }
-
   return all;
 }
 
@@ -515,11 +547,15 @@ export async function deleteChatThread(threadId) {
 export function subscribeToUserThreads(userEmail, callback) {
   if (!userEmail) return () => { };
   const cleanEmail = userEmail.toLowerCase().trim();
+  const currentUid = auth.currentUser?.uid || '';
 
   const emitLocal = () => {
     const allThreads = getChatThreads();
     const myThreads = allThreads.filter(t =>
-      t.participants?.some(p => matchesUserEmail(p, cleanEmail)) &&
+      (
+        t.participants?.some(p => matchesUserEmail(p, cleanEmail)) ||
+        (currentUid && t.participantUids?.includes(currentUid))
+      ) &&
       !(t.participants?.length === 2 && matchesUserEmail(t.participants[0], t.participants[1]))
     );
     myThreads.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -548,50 +584,63 @@ export function subscribeToUserThreads(userEmail, callback) {
 
   // Listener oficial em tempo real com o Cloud Firestore
   let unsubscribeFirestore = () => { };
+  let unsubscribeFirestoreByUid = () => { };
   try {
-    const q = query(
+    const mergeRemoteChats = (snapshot) => {
+      if (snapshot.empty) return;
+
+      const remoteChats = snapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : (data.updatedAt || Date.now())
+        };
+      });
+
+      const local = getChatThreads();
+      const merged = [...local];
+      let changed = false;
+
+      remoteChats.forEach(rc => {
+        const sanitizedRc = sanitizeThreadAvatars(rc);
+        const idx = merged.findIndex(m => m.id === sanitizedRc.id);
+        if (idx === -1) {
+          merged.push(sanitizedRc);
+          changed = true;
+        } else {
+          merged[idx] = {
+            ...merged[idx],
+            ...sanitizedRc,
+            messages: merged[idx].messages || sanitizedRc.messages || []
+          };
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        saveChatThreads(merged);
+        emitLocal();
+      }
+    };
+
+    const emailQuery = query(
       collection(db, 'chats'),
       where('participants', 'array-contains', cleanEmail)
     );
-    unsubscribeFirestore = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const remoteChats = snapshot.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            ...data,
-            updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : (data.updatedAt || Date.now())
-          };
-        });
-
-        const local = getChatThreads();
-        const merged = [...local];
-        let changed = false;
-
-        remoteChats.forEach(rc => {
-          const sanitizedRc = sanitizeThreadAvatars(rc);
-          const idx = merged.findIndex(m => m.id === sanitizedRc.id);
-          if (idx === -1) {
-            merged.push(sanitizedRc);
-            changed = true;
-          } else {
-            merged[idx] = {
-              ...merged[idx],
-              ...sanitizedRc,
-              messages: merged[idx].messages || sanitizedRc.messages || []
-            };
-            changed = true;
-          }
-        });
-
-        if (changed) {
-          saveChatThreads(merged);
-          emitLocal();
-        }
-      }
-    }, (err) => {
-      console.warn('[Chat] Erro no listener do Firestore para conversas:', err);
+    unsubscribeFirestore = onSnapshot(emailQuery, mergeRemoteChats, (err) => {
+      console.warn('[Chat] Erro no listener do Firestore por e-mail:', err);
     });
+
+    if (currentUid) {
+      const uidQuery = query(
+        collection(db, 'chats'),
+        where('participantUids', 'array-contains', currentUid)
+      );
+      unsubscribeFirestoreByUid = onSnapshot(uidQuery, mergeRemoteChats, (err) => {
+        console.warn('[Chat] Erro no listener do Firestore por UID:', err);
+      });
+    }
   } catch (err) {
     console.warn('[Chat] Falha ao configurar listener de conversas:', err);
   }
@@ -604,6 +653,7 @@ export function subscribeToUserThreads(userEmail, callback) {
       chatChannel.removeEventListener('message', handleLocalUpdate);
     }
     unsubscribeFirestore();
+    unsubscribeFirestoreByUid();
   };
 }
 

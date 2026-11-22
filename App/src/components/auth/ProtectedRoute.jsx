@@ -34,14 +34,15 @@ import { normalizeUserRole } from '../../services/authService';
  * @param {string[]} [props.allowedRoles] - Roles permitidas (ex: ['empresa', 'admin'])
  */
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { currentUser, authLoading, setCurrentUser, logout, showToast } = useAppStore();
+  const { currentUser, authLoading, isAuthReady, setCurrentUser, logout, showToast } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
 
   // A verificação obrigatória de e-mail aplica-se exclusivamente a contas de alunos (estudantes)
   // Empresas e professores não possuem esse bloqueio
-  const userRole = normalizeUserRole(currentUser?.role);
-  const requiresEmailVerification = userRole === 'aluno';
+  const userRole = currentUser?.role ? normalizeUserRole(currentUser.role) : '';
+  const isStudentUser = Boolean(currentUser && userRole === 'aluno');
+  const requiresEmailVerification = isStudentUser;
 
   // Estado local para controle imediato de verificação
   const [isVerified, setIsVerified] = useState(() => {
@@ -109,7 +110,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }, [resendCooldown]);
 
   // 1. Enquanto valida o estado da autenticação no Firebase
-  if (authLoading && !currentUser) {
+  if (!isAuthReady || (authLoading && !currentUser)) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
         <div className="relative flex items-center justify-center mb-4">
@@ -197,8 +198,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         setStatusWarning('');
         const result = await checkStudentVerification(user);
         if (result.verified) {
-          const updatedUser = {
-            ...currentUser,
+        const updatedUser = {
+          ...(currentUser || {}),
             emailVerified: true,
             isVerifiedStudent: true,
             institutionalValidationStatus: 'VALIDADO'
@@ -269,7 +270,65 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     location.pathname.startsWith('/perfil/') ||
     location.pathname === '/configuracoes';
 
-  // 3. SE O E-MAIL NÃO ESTIVER VERIFICADO E FOR CONTA DE ALUNO (em rotas que exigem confirmação ativa):
+  // 3. Se houver restrição por role e o usuário atual não tiver permissão
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.map(normalizeUserRole).includes(userRole)) {
+    const roleLabels = {
+      empresa: 'Empresas e Recrutadores',
+      aluno: 'Estudantes',
+      professor: 'Professores e Docentes',
+      freelancer: 'Freelancers e Autônomos',
+      candidato: 'Candidatos Gerais',
+      admin: 'Administradores do Sistema',
+    };
+
+    const targetRolesText = allowedRoles.map((r) => {
+      const normalized = normalizeUserRole(r);
+      return roleLabels[normalized] || normalized;
+    }).join(' ou ');
+
+    return (
+      <div className="container max-w-2xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 dark:border-slate-700/60 relative overflow-hidden">
+          <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 text-amber-600 dark:text-amber-400 shadow-inner">
+            <ShieldAlert size={36} />
+          </div>
+
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 mb-4">
+            Acesso Restrito
+          </span>
+
+          <h1 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-3">
+            Área Exclusiva para {targetRolesText}
+          </h1>
+
+          <p className="text-gray-600 dark:text-slate-300 text-sm md:text-base mb-6 max-w-lg mx-auto">
+            Sua conta atual está configurada como{' '}
+            <strong className="text-primary-blue dark:text-sky-400 capitalize">
+              {roleLabels[userRole] || userRole}
+            </strong>
+            . Para acessar este recurso, é necessário um perfil compatível.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Link
+              to="/"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-sm bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 transition-colors"
+            >
+              Voltar ao Início
+            </Link>
+            <Link
+              to="/configuracoes"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-sm bg-primary-blue hover:bg-primary-hover text-white shadow-md shadow-primary-blue/20 transition-all"
+            >
+              Gerenciar Minha Conta
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. SE O E-MAIL NÃO ESTIVER VERIFICADO E FOR CONTA DE ALUNO (em rotas que exigem confirmação ativa):
   if (requiresEmailVerification && !isVerified && !isProfileOrSettingsRoute) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-12 md:py-20 text-center">
@@ -388,64 +447,6 @@ export default function ProtectedRoute({ children, allowedRoles }) {
           {/* Dica de usabilidade */}
           <div className="mt-4 p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-xl border border-amber-200/50 dark:border-amber-800/30 text-xs text-amber-800 dark:text-amber-300/90 text-center">
             💡 <strong>Dica:</strong> Não encontrou a mensagem? Confira sua pasta de <strong>Spam</strong> ou <strong>Lixo Eletrônico</strong>.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 4. Se houver restrição por role e o usuário atual não tiver permissão
-  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.map(normalizeUserRole).includes(userRole)) {
-    const roleLabels = {
-      empresa: 'Empresas e Recrutadores',
-      aluno: 'Estudantes',
-      professor: 'Professores e Docentes',
-      freelancer: 'Freelancers e Autônomos',
-      candidato: 'Candidatos Gerais',
-      admin: 'Administradores do Sistema',
-    };
-
-    const targetRolesText = allowedRoles.map((r) => {
-      const normalized = normalizeUserRole(r);
-      return roleLabels[normalized] || normalized;
-    }).join(' ou ');
-
-    return (
-      <div className="container max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 dark:border-slate-700/60 relative overflow-hidden">
-          <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 text-amber-600 dark:text-amber-400 shadow-inner">
-            <ShieldAlert size={36} />
-          </div>
-
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 mb-4">
-            Acesso Restrito
-          </span>
-
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-3">
-            Área Exclusiva para {targetRolesText}
-          </h1>
-
-          <p className="text-gray-600 dark:text-slate-300 text-sm md:text-base mb-6 max-w-lg mx-auto">
-            Sua conta atual está configurada como{' '}
-            <strong className="text-primary-blue dark:text-sky-400 capitalize">
-              {roleLabels[userRole] || userRole}
-            </strong>
-            . Para acessar este recurso, é necessário um perfil compatível.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Link
-              to="/"
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-sm bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 transition-colors"
-            >
-              Voltar ao Início
-            </Link>
-            <Link
-              to="/configuracoes"
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-sm bg-primary-blue hover:bg-primary-hover text-white shadow-md shadow-primary-blue/20 transition-all"
-            >
-              Gerenciar Minha Conta
-            </Link>
           </div>
         </div>
       </div>

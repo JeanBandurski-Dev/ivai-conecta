@@ -10,7 +10,7 @@ import { subscribeToUnreadCount, isGenericPlaceholderAvatar, getAvatarGradient }
 import { normalizeUserRole } from '../../services/authService';
 
 export default function Navbar() {
-  const { currentUser, theme, toggleTheme, logout, showToast, openChat, favoriteJobs = [], favoriteTalents = [] } = useAppStore();
+  const { currentUser, isAuthReady, theme, toggleTheme, logout, showToast, openChat, favoriteJobs = [], favoriteTalents = [] } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function Navbar() {
 
   return (
     <>
-      {currentUser && userRole === 'aluno' && currentUser.isVerifiedStudent !== true && (
+      {isAuthReady && currentUser && currentUser.role && userRole === 'aluno' && currentUser.isVerifiedStudent !== true && (
         <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
           <div className="container mx-auto px-4 py-2 flex items-center justify-between gap-3">
             <p className="text-xs sm:text-sm font-semibold text-amber-900 dark:text-amber-200">

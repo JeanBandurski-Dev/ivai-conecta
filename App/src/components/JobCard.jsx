@@ -82,14 +82,21 @@ export default function JobCard({ job, matchScore, onSelect }) {
     }
   };
 
-  const handleFavoriteToggle = (e) => {
+  const handleFavoriteToggle = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const added = toggleFavoriteJob(job);
+    const added = await toggleFavoriteJob(job);
+    if (added === null) {
+      showToast('Não foi possível atualizar o favorito. Tente novamente.');
+      return;
+    }
     showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
   };
 
-  const companyLinkTarget = `/empresa/${encodeURIComponent(job.companyUid || job.createdBy || company)}`;
+  const companyIdentifier = job.companyUid || job.createdBy || (company !== 'Empresa Regional' ? company : '');
+  const companyLinkTarget = companyIdentifier
+    ? `/empresa/${encodeURIComponent(companyIdentifier)}`
+    : '/vagas';
 
   return (
     <div className="card p-5 sm:p-5.5 gap-3.5 hover:border-primary-blue/40 transition-all group flex flex-col justify-between h-full relative rounded-2xl sm:rounded-3xl min-w-0 overflow-hidden">

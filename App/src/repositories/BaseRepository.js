@@ -9,6 +9,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  startAfter,
   setDoc,
   addDoc,
   updateDoc,
@@ -112,6 +114,39 @@ export class BaseRepository {
       }));
     } catch (err) {
       throw handleFirestoreError(err, 'findAll', this.collectionName);
+    }
+  }
+
+  /**
+   * Busca uma página da coleção e retorna o cursor da última linha.
+   * @param {Array} queryConstraints - Cláusulas where/orderBy opcionais
+   * @param {number} pageSize
+   * @param {Object|null} cursor - Último DocumentSnapshot da página anterior
+   * @returns {Promise<{items:Array<Object>, lastDoc:Object|null, hasMore:boolean}>}
+   */
+  async findPage(queryConstraints = [], pageSize = 25, cursor = null) {
+    const safePageSize = Math.max(1, Math.min(100, Number(pageSize) || 25));
+    try {
+      const constraints = [...queryConstraints];
+      if (cursor) constraints.push(startAfter(cursor));
+      constraints.push(limit(safePageSize + 1));
+
+      const q = query(this.collectionRef, ...constraints);
+      const snap = await getDocs(q);
+      const hasMore = snap.docs.length > safePageSize;
+      const pageDocs = hasMore ? snap.docs.slice(0, safePageSize) : snap.docs;
+
+      return {
+        items: pageDocs.map(d => ({
+          id: d.id,
+          firestoreId: d.id,
+          ...d.data(),
+        })),
+        lastDoc: pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null,
+        hasMore,
+      };
+    } catch (err) {
+      throw handleFirestoreError(err, 'findPage', this.collectionName);
     }
   }
 

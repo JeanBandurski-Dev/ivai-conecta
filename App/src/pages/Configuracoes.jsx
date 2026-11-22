@@ -77,10 +77,26 @@ export default function Configuracoes() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const requestedTab = params.get('tab');
-    if (requestedTab === 'verification' && isAluno) {
-      setActiveTab('verification');
+    const availableTabs = [
+      !isAdmin ? 'links' : null,
+      isAluno ? 'verification' : null,
+      isEmpresa ? 'company' : null,
+      'account',
+      'notifications',
+      'privacy'
+    ].filter(Boolean);
+
+    if (requestedTab && availableTabs.includes(requestedTab)) {
+      setActiveTab(requestedTab);
     }
-  }, [location.search, isAluno]);
+  }, [location.search, isAdmin, isAluno, isEmpresa]);
+
+  const changeTab = (tab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tab);
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: false });
+  };
 
   // ─── ESTADO: INFORMAÇÕES E REDES SOCIAIS (LINKS PROFISSIONAIS) ──────
   const [linkedin, setLinkedin] = useState(currentUser?.linkedin || '');
@@ -140,7 +156,9 @@ export default function Configuracoes() {
   // ─── ESTADO: VERIFICAÇÃO DE CNPJ (EMPRESA) ──────────────────────────
   const [cnpj, setCnpj] = useState(currentUser?.cnpj || '');
   const [companyFile, setCompanyFile] = useState(null);
-  const [companyVerified, setCompanyVerified] = useState(currentUser?.isVerifiedCompany || false);
+  const [companyVerified, setCompanyVerified] = useState(
+    currentUser?.companyVerificationStatus === 'VALIDADA' && currentUser?.isVerifiedCompany === true
+  );
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cnpjData, setCnpjData] = useState(null);
   const [cnpjError, setCnpjError] = useState('');
@@ -170,7 +188,11 @@ export default function Configuracoes() {
       if (data.additionalLink !== undefined) setAdditionalLink(data.additionalLink || '');
       if (data.raNumber !== undefined) setRaNumber(data.raNumber || '');
       if (data.cnpj) setCnpj(data.cnpj);
-      if (data.isVerifiedCompany != null) setCompanyVerified(Boolean(data.isVerifiedCompany));
+      if (data.isVerifiedCompany != null || data.companyVerificationStatus != null) {
+        setCompanyVerified(
+          data.companyVerificationStatus === 'VALIDADA' && data.isVerifiedCompany === true
+        );
+      }
       if (data.isVerifiedStudent != null) {
         setVerificationSubmitted(Boolean(isAluno && (data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO')));
       }
@@ -197,7 +219,7 @@ export default function Configuracoes() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.uid, currentUser?.id]);
+  }, [currentUser?.uid, currentUser?.id, isAluno]);
 
   useEffect(() => {
     if (!isAluno || verificationSubmitted) return;
@@ -271,6 +293,10 @@ export default function Configuracoes() {
       const v = validateAccountGitHubOrPortfolio(portfolio.trim());
       if (!v.valid) errors.portfolio = v.error;
     }
+    if (additionalLink?.trim()) {
+      const v = validateAccountGitHubOrPortfolio(additionalLink.trim());
+      if (!v.valid) errors.additionalLink = v.error;
+    }
     if (raNumber?.trim() && isAluno) {
       const v = validateStudentRA(raNumber.trim());
       if (!v.valid) errors.raNumber = v.error;
@@ -341,6 +367,7 @@ export default function Configuracoes() {
   // ─── HANDLERS: ALTERAÇÃO DE SENHA ───────────────────────────────────
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    if (submittingPassword) return;
 
     const check = validatePasswordChange({
       currentPassword,
@@ -428,6 +455,7 @@ export default function Configuracoes() {
     if (e) e.preventDefault();
     const uid = currentUser?.uid || currentUser?.id;
     if (!uid) return;
+    if (savingNotifPrefs) return;
 
     setSavingNotifPrefs(true);
     try {
@@ -437,6 +465,8 @@ export default function Configuracoes() {
       } else {
         showToast(res.error || 'Erro ao salvar preferências.', 'error');
       }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao salvar preferências de notificação.', 'error');
     } finally {
       setSavingNotifPrefs(false);
     }
@@ -447,6 +477,7 @@ export default function Configuracoes() {
     if (e) e.preventDefault();
     const uid = currentUser?.uid || currentUser?.id;
     if (!uid) return;
+    if (savingPrivacy) return;
 
     setSavingPrivacy(true);
     try {
@@ -456,6 +487,8 @@ export default function Configuracoes() {
       } else {
         showToast(res.error || 'Erro ao salvar privacidade.', 'error');
       }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao salvar configurações de privacidade.', 'error');
     } finally {
       setSavingPrivacy(false);
     }
@@ -476,6 +509,7 @@ export default function Configuracoes() {
   // ─── HANDLERS: VERIFICAÇÃO ESTUDANTIL (ALUNO) ───────────────────────
   const handleSendVerificationEmail = async (e) => {
     if (e) e.preventDefault();
+    if (submittingStudentEmail) return;
     setSubmittingStudentEmail(true);
     try {
       const emailToVerify = studentInstEmail.trim() || currentUser?.studentEmail || currentUser?.email;
@@ -535,6 +569,7 @@ export default function Configuracoes() {
 
   const handleCompanyVerificationSubmit = async (e) => {
     e.preventDefault();
+    if (submittingCompany) return;
     const cleanDigits = cleanCNPJ(cnpj);
     if (!cleanDigits || cleanDigits.length !== 14) {
       showToast('Por favor, informe um CNPJ válido com 14 dígitos.');
@@ -550,15 +585,23 @@ export default function Configuracoes() {
     showToast('⏳ Validando e processando CNPJ e documentos...');
 
     try {
-      let uploadedCnpjUrl = null;
-      if (companyFile) {
-        const uploadRes = await uploadUserDocument(companyFile, currentUser.uid || currentUser.id, 'cnpj_proof');
-        if (uploadRes.success) {
-          uploadedCnpjUrl = uploadRes.url;
-        }
+      if (!companyFile) {
+        showToast('⚠️ O documento comprobatório é obrigatório.');
+        return;
       }
 
-      const res = submitCompanyVerification(cnpj, companyFile, {
+      const uploadRes = await uploadUserDocument(
+        companyFile,
+        currentUser.uid || currentUser.id,
+        'cnpj_proof'
+      );
+      if (!uploadRes.success || !uploadRes.url) {
+        showToast(`⚠️ ${uploadRes.error || 'Não foi possível armazenar o documento. Envie novamente.'}`);
+        return;
+      }
+      const uploadedCnpjUrl = uploadRes.url;
+
+      const res = await submitCompanyVerification(cnpj, companyFile, {
         razaoSocial: cnpjData?.razaoSocial,
         nomeFantasia: cnpjData?.nomeFantasia,
         situacaoCadastral: cnpjData?.situacaoCadastral || 'ATIVA',
@@ -566,24 +609,17 @@ export default function Configuracoes() {
       });
 
       if (res.success) {
-        setCompanyVerified(true);
+        setCompanyVerified(false);
         setIsEditingCnpj(false);
-        const updated = updateAuthUser({
-          cnpj: maskCNPJ(cleanDigits),
-          isVerifiedCompany: true,
-          razaoSocial: cnpjData?.razaoSocial || currentUser?.razaoSocial || currentUser?.name,
-          nomeFantasia: cnpjData?.nomeFantasia || currentUser?.nomeFantasia || currentUser?.name,
-          situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
-          cnpjProofUrl: uploadedCnpjUrl,
-          companyProofFile: companyFile?.name || currentUser?.companyProofFile || 'Cartao_CNPJ.pdf'
-        });
-        if (updated) {
-          setCurrentUser(updated);
+        if (res.user) {
+          setCurrentUser(res.user);
         }
-        showToast('CNPJ autenticado! Sua empresa recebeu o Selo de Empresa Verificada.');
+        showToast('Solicitação enviada! O selo será concedido após análise administrativa.');
       } else {
         showToast(`⚠️ ${res.error}`);
       }
+    } catch (err) {
+      showToast(`⚠️ ${err?.message || 'Não foi possível enviar a solicitação de verificação.'}`, 'error');
     } finally {
       setSubmittingCompany(false);
     }
@@ -636,7 +672,7 @@ export default function Configuracoes() {
             {!isAdmin && (
               <button
                 type="button"
-                onClick={() => setActiveTab('links')}
+                onClick={() => changeTab('links')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'links'
                     ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -651,7 +687,7 @@ export default function Configuracoes() {
             {isAluno && (
               <button
                 type="button"
-                onClick={() => setActiveTab('verification')}
+                onClick={() => changeTab('verification')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'verification'
                     ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -671,7 +707,7 @@ export default function Configuracoes() {
             {isEmpresa && (
               <button
                 type="button"
-                onClick={() => setActiveTab('company')}
+                onClick={() => changeTab('company')}
                 className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'company'
                     ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -690,7 +726,7 @@ export default function Configuracoes() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('account')}
+              onClick={() => changeTab('account')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'account'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -703,7 +739,7 @@ export default function Configuracoes() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('notifications')}
+              onClick={() => changeTab('notifications')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'notifications'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -716,7 +752,7 @@ export default function Configuracoes() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('privacy')}
+              onClick={() => changeTab('privacy')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'privacy'
                   ? 'border-primary-blue text-primary-blue dark:text-blue-400 dark:border-blue-400'
@@ -871,10 +907,20 @@ export default function Configuracoes() {
                     <input
                       type="text"
                       value={additionalLink}
-                      onChange={e => setAdditionalLink(e.target.value)}
-                      className="form-control"
+                      onChange={e => {
+                        setAdditionalLink(e.target.value);
+                        if (linksErrors.additionalLink) {
+                          setLinksErrors(prev => ({ ...prev, additionalLink: null }));
+                        }
+                      }}
+                      className={`form-control ${linksErrors.additionalLink ? 'border-red-500 focus:border-red-500' : ''}`}
                       placeholder="https://behance.net/seu-perfil ou currículo Lattes"
                     />
+                    {linksErrors.additionalLink && (
+                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {linksErrors.additionalLink}
+                      </p>
+                    )}
                   </div>
 
                   {/* Campo de Matrícula (Exclusivo para Aluno) */}
@@ -1879,8 +1925,11 @@ export default function Configuracoes() {
                   )}
 
                   <div className="form-group">
-                    <label className="form-label">Anexar Comprovante / Cartão CNPJ (Opcional - PDF ou Imagem)</label>
+                    <label className="form-label" htmlFor="company-cnpj-proof">
+                      Anexar Comprovante / Cartão CNPJ (obrigatório - PDF ou Imagem)
+                    </label>
                     <input
+                      id="company-cnpj-proof"
                       type="file"
                       ref={companyFileInputRef}
                       accept=".pdf,.png,.jpg,.jpeg"
@@ -1889,6 +1938,15 @@ export default function Configuracoes() {
                     />
                     <div
                       onClick={() => companyFileInputRef.current?.click()}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          companyFileInputRef.current?.click();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Selecionar comprovante ou cartão CNPJ"
                       className="border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-6 text-center bg-gray-50 dark:bg-slate-800/80 hover:bg-gray-100/80 dark:hover:bg-slate-800 cursor-pointer transition-colors"
                     >
                       <Upload size={32} className="mx-auto mb-2 text-primary-blue dark:text-blue-400" />

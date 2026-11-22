@@ -1,5 +1,5 @@
 // Auth Service for Ivaí Conecta (Firebase + Local Storage Fallback)
-import { auth, db, googleProvider } from '../lib/firebase.js';
+import { auth, db, googleProvider, functions } from '../lib/firebase.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,9 +12,11 @@ import {
   reauthenticateWithPopup,
   sendEmailVerification,
   verifyBeforeUpdateEmail,
+  sendPasswordResetEmail,
   deleteUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
 import {
@@ -102,11 +104,31 @@ export function getAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+export function isProfileOwner(currentUser, profile, routeId = null) {
+  if (!currentUser) return false;
+
+  const currentUid = String(currentUser.uid || currentUser.id || '').trim();
+  if (!currentUid) return false;
+
+  if (!routeId || ['aluno', 'candidato', 'professor', 'freelancer', 'empresa'].includes(String(routeId).toLowerCase().trim())) {
+    return true;
+  }
+
+  const profileIds = [
+    profile?.uid,
+    profile?.firestoreId,
+    profile?.id
+  ].map(value => String(value || '').trim()).filter(Boolean);
+
+  return String(routeId).trim() === currentUid || profileIds.includes(currentUid);
+}
+
 /**
  * Normaliza o papel (role) do usuário, unificando aliases antigos ou variações para o padrão da plataforma.
  */
 export function normalizeUserRole(role) {
   const value = String(role || '').toLowerCase().trim();
+  if (!value) return '';
   const aliases = {
     aluno: 'aluno',
     estudante: 'aluno',
@@ -137,7 +159,7 @@ export function normalizeUserRole(role) {
     moderator: 'moderador',
   };
 
-  return aliases[value] || value || 'aluno';
+  return aliases[value] || value;
 }
 
 /**
@@ -177,7 +199,8 @@ function buildDefaultProfileForFirebaseUser(fbUser, preferredRole = null) {
     badge: (USER_ROLES[role] || USER_ROLES.aluno).badge,
     avatar: fbUser.photoURL || '',
     isVerifiedStudent: isVerified,
-    isVerifiedCompany: role === 'empresa',
+    isVerifiedCompany: false,
+    companyVerificationStatus: role === 'empresa' ? 'NAO_VERIFICADA' : null,
     createdAt: now,
     updatedAt: now,
     ...(role === 'aluno' ? {
@@ -204,6 +227,26 @@ function buildDefaultProfileForFirebaseUser(fbUser, preferredRole = null) {
 async function ensureUserProfile(fbUser, preferredRole = null) {
   const profile = buildDefaultProfileForFirebaseUser(fbUser, preferredRole);
   await setDoc(doc(db, 'users', fbUser.uid), profile, { merge: true });
+  await setDoc(doc(db, 'public_profiles', fbUser.uid), {
+    uid: fbUser.uid,
+    name: String(profile.name || profile.displayName || '').slice(0, 120),
+    city: String(profile.city || '').slice(0, 100),
+    institution: String(profile.institution || '').slice(0, 160),
+    course: String(profile.course || '').slice(0, 160),
+    period: String(profile.period || '').slice(0, 80),
+    avatar: String(profile.avatar || profile.photoURL || '').slice(0, 2048),
+    photoURL: String(profile.photoURL || profile.avatar || '').slice(0, 2048),
+    skills: Array.isArray(profile.skills) ? profile.skills.slice(0, 100) : [],
+    experiences: Array.isArray(profile.experiences) ? profile.experiences.slice(0, 100) : [],
+    projects: Array.isArray(profile.projects) ? profile.projects.slice(0, 100) : [],
+    education: Array.isArray(profile.education) ? profile.education.slice(0, 100) : [],
+    bio: String(profile.bio || '').slice(0, 1000),
+    endorsements: Array.isArray(profile.endorsements) ? profile.endorsements.slice(0, 100) : [],
+    endorsementCount: Number(profile.endorsementCount || 0) || 0,
+    isVerifiedStudent: Boolean(profile.isVerifiedStudent),
+    role: String(profile.role || '').slice(0, 30),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
   return profile;
 }
 
@@ -697,7 +740,12 @@ export async function login(email, password) {
       badge: roleMeta.badge,
       avatar: profileData.avatar || fbUser.photoURL || '',
       isVerifiedStudent: profileData.isVerifiedStudent ?? (role === 'aluno' ? false : true),
-      isVerifiedCompany: profileData.isVerifiedCompany ?? (role === 'empresa'),
+      isVerifiedCompany: role === 'empresa'
+        ? (profileData.companyVerificationStatus === 'VALIDADA' && profileData.isVerifiedCompany === true)
+        : false,
+      companyVerificationStatus: role === 'empresa'
+        ? (profileData.companyVerificationStatus || 'NAO_VERIFICADA')
+        : null,
       ...profileData,
       emailVerified: role === 'aluno'
         ? Boolean(profileData?.isVerifiedStudent && profileData?.institutionalValidationStatus === 'VALIDADO')
@@ -829,9 +877,37 @@ export async function register(data) {
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
     seedFirestoreIfEmpty();
 
+    // Sincroniza public_profiles para que alunos, candidatos, freelancers e professores apareçam imediatamente
+    try {
+      if (['aluno', 'candidato', 'freelancer', 'professor'].includes(selectedRole)) {
+        await setDoc(doc(db, 'public_profiles', fbUser.uid), {
+          uid: fbUser.uid,
+          name: cleanName,
+          city: city || 'Ivaiporã',
+          institution: String(profileData.institution || '').slice(0, 160),
+          course: String(profileData.course || '').slice(0, 160),
+          period: String(profileData.period || '').slice(0, 80),
+          avatar: profileData.avatar || '',
+          photoURL: profileData.avatar || '',
+          skills: Array.isArray(profileData.skills) ? profileData.skills : [],
+          bio: String(profileData.bio || '').slice(0, 1000),
+          isVerifiedStudent: Boolean(profileData.isVerifiedStudent),
+          role: selectedRole,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (pubErr) {
+      console.warn('[register] Aviso ao criar public_profiles:', pubErr?.message);
+    }
+
     const sessionUser = {
       ...profileData,
       isVerifiedCompany: selectedRole === 'empresa'
+        ? (profileData.companyVerificationStatus === 'VALIDADA' && profileData.isVerifiedCompany === true)
+        : false,
+      companyVerificationStatus: selectedRole === 'empresa'
+        ? (profileData.companyVerificationStatus || 'NAO_VERIFICADA')
+        : null
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -951,7 +1027,12 @@ export async function loginWithGoogle() {
         ? fbUser.photoURL
         : ((profileRes.profile?.avatar && !isGenericPlaceholderAvatar(profileRes.profile.avatar)) ? profileRes.profile.avatar : ''),
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? isGoogleStudent : false),
-      isVerifiedCompany: role === 'empresa',
+      isVerifiedCompany: role === 'empresa'
+        ? (profileRes.profile?.companyVerificationStatus === 'VALIDADA' && profileRes.profile?.isVerifiedCompany === true)
+        : false,
+      companyVerificationStatus: role === 'empresa'
+        ? (profileRes.profile?.companyVerificationStatus || 'NAO_VERIFICADA')
+        : null,
       ...(role === 'aluno' && isGoogleStudent && !profileRes.profile?.institution ? {
         institution: studentCheck?.institution || 'IFPR Campus Ivaiporã',
         studentEmailVerifiedAt: new Date().toISOString()
@@ -1014,7 +1095,6 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
-      ...(additionalData.isVerifiedCompany !== undefined ? { isVerifiedCompany: additionalData.isVerifiedCompany } : (additionalData.role === 'empresa' && !!additionalData.cnpj ? { isVerifiedCompany: true } : {})),
       ...(additionalData.role === 'aluno' ? {
         isVerifiedStudent: isStudentVerified,
         studentEmail: candidateEmail,
@@ -1047,7 +1127,6 @@ export async function completeUserProfile(uid, additionalData) {
       ...(additionalData.razaoSocial && { razaoSocial: additionalData.razaoSocial }),
       ...(additionalData.nomeFantasia && { nomeFantasia: additionalData.nomeFantasia }),
       ...(additionalData.situacaoCnpj && { situacaoCnpj: additionalData.situacaoCnpj }),
-      isVerifiedCompany: additionalData.isVerifiedCompany ?? (additionalData.role === 'empresa' && !!additionalData.cnpj),
       ...(additionalData.role === 'aluno' ? {
         isVerifiedStudent: isStudentVerified,
         studentEmail: candidateEmail,
@@ -1443,13 +1522,9 @@ export async function deleteUserAccount(currentPassword = '') {
     // a) Candidaturas: atualiza status para Cancelada (LGPD Direito ao Esquecimento preservando métricas da vaga)
     try {
       const appsSnap = await getDocs(query(collection(db, 'applications'), where('candidateUid', '==', uid)));
+      const withdrawApplication = httpsCallable(functions, 'withdrawJobApplication');
       for (const d of appsSnap.docs) {
-        await updateDoc(doc(db, 'applications', d.id), {
-          status: 'Cancelada',
-          candidateWithdrawn: true,
-          notes: 'Conta do titular excluída permanentemente sob solicitação LGPD.',
-          updatedAt: new Date().toISOString()
-        });
+        await withdrawApplication({ applicationId: d.id });
       }
     } catch (appErr) {
       console.warn('[deleteUserAccount] Aviso ao tratar candidaturas:', appErr.message);
@@ -1479,7 +1554,15 @@ export async function deleteUserAccount(currentPassword = '') {
       console.warn('[deleteUserAccount] Aviso ao fechar vagas:', jobErr.message);
     }
 
-    // d) Documento principal em /users/{uid}
+    // d) Conversas e todas as mensagens delas
+    try {
+      const deleteUserChats = httpsCallable(functions, 'deleteUserChatThreads');
+      await deleteUserChats({ uid });
+    } catch (chatErr) {
+      console.warn('[deleteUserAccount] Aviso ao limpar conversas:', chatErr.message);
+    }
+
+    // e) Documento principal em /users/{uid}
     try {
       await deleteDoc(doc(db, 'users', String(uid)));
     } catch (userDocErr) {
@@ -1564,7 +1647,7 @@ export function watchAuthState(callback) {
           }
 
           const userEmail = (fbUser.email || '').toLowerCase().trim();
-          const fallbackRole = isInstitutionalEmail(userEmail) ? 'professor' : 'aluno';
+          const fallbackRole = inferRoleFromFirebaseUser(fbUser);
           const rawRole = profileRes.profile?.activeRole ||
             profileRes.profile?.selectedRole ||
             profileRes.profile?.profileType ||
@@ -1657,9 +1740,12 @@ export function watchAuthState(callback) {
               ((fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '') ||
               '',
             isVerifiedStudent: isStudentVerified,
-            isVerifiedCompany:
-              profileRes.profile?.isVerifiedCompany ??
-              (role === 'empresa'),
+            isVerifiedCompany: role === 'empresa'
+              ? (profileRes.profile?.companyVerificationStatus === 'VALIDADA' && profileRes.profile?.isVerifiedCompany === true)
+              : false,
+            companyVerificationStatus: role === 'empresa'
+              ? (profileRes.profile?.companyVerificationStatus || 'NAO_VERIFICADA')
+              : null,
             blocked: false,
             blockedReason: null,
             ...(role === 'professor' && !profileRes.profile?.institution ? {
@@ -1932,9 +2018,11 @@ export function updateAuthUser(data, userOverride = null) {
   };
 
   const syncPromise = (async () => {
+    let firestoreSyncSucceeded = false;
     for (const uid of targetUids) {
       try {
         await setDoc(doc(db, 'users', uid), payload, { merge: true });
+        firestoreSyncSucceeded = true;
       } catch (err) {
         console.warn(`[Firestore] Sync erro updateAuthUser para uid ${uid}:`, err.message);
         // Se as regras de segurança do Firestore bloquearem a mutação direta da chave 'role',
@@ -1942,12 +2030,13 @@ export function updateAuthUser(data, userOverride = null) {
         try {
           const { role: _forbiddenRole, ...safePayload } = payload;
           await setDoc(doc(db, 'users', uid), safePayload, { merge: true });
+          firestoreSyncSucceeded = true;
         } catch (fallbackErr) {
           console.warn(`[Firestore] Fallback seguro erro para uid ${uid}:`, fallbackErr.message);
         }
       }
     }
-    return updated;
+    return { ...updated, __firestoreSyncSucceeded: firestoreSyncSucceeded };
   })();
 
   // Permite tanto uso síncrono imediato quanto async/await (Promise Thenable com propriedades do objeto)
@@ -1955,7 +2044,7 @@ export function updateAuthUser(data, userOverride = null) {
   return syncPromise;
 }
 
-export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
+export async function submitCompanyVerification(cnpj, fileData, extraData = {}) {
   const digits = cleanCNPJ(cnpj);
   if (digits.length !== 14) {
     return { success: false, error: 'O CNPJ deve conter 14 dígitos numéricos (Ex: 12.345.678/0001-90).' };
@@ -1964,25 +2053,42 @@ export function submitCompanyVerification(cnpj, fileData, extraData = {}) {
   if (!validateCNPJ(digits)) {
     return { success: false, error: 'CNPJ inválido (dígitos verificadores incorretos pelo cálculo oficial da Receita Federal).' };
   }
+  if (!fileData) {
+    return { success: false, error: 'Envie um documento comprobatório da empresa para iniciar a análise.' };
+  }
+  if (
+    typeof extraData.cnpjProofUrl !== 'string' ||
+    !/^https:\/\//i.test(extraData.cnpjProofUrl)
+  ) {
+    return { success: false, error: 'A solicitação só pode prosseguir após o documento ser armazenado com sucesso.' };
+  }
 
   const formattedCNPJ = maskCNPJ(digits);
   const filename = typeof fileData === 'object' && fileData?.name ? fileData.name : (fileData ? String(fileData) : 'Cartao_CNPJ.pdf');
   const _filesizeMB = typeof fileData === 'object' && fileData?.size ? (fileData.size / (1024 * 1024)).toFixed(2) : '0.85';
 
-  const updated = updateAuthUser({
+  const updated = await updateAuthUser({
     cnpj: formattedCNPJ,
-    isVerifiedCompany: true,
+    isVerifiedCompany: false,
+    companyVerificationStatus: 'PENDENTE',
     companyProofFile: filename,
-    verifiedAt: new Date().toISOString(),
+    companyVerificationSubmittedAt: new Date().toISOString(),
     ...(extraData.razaoSocial && { razaoSocial: extraData.razaoSocial }),
     ...(extraData.nomeFantasia && { nomeFantasia: extraData.nomeFantasia }),
     ...(extraData.situacaoCadastral && { situacaoCnpj: extraData.situacaoCadastral }),
     ...(extraData.cnpjProofUrl && { cnpjProofUrl: extraData.cnpjProofUrl })
   });
 
+  if (updated?.__firestoreSyncSucceeded === false) {
+    return {
+      success: false,
+      error: 'A solicitação foi preparada, mas não foi possível salvar no servidor. Tente novamente.'
+    };
+  }
+
   return {
     success: true,
-    message: `✅ CNPJ ${formattedCNPJ} autenticado com sucesso! Selo de Empresa Verificada concedido.`,
+    message: `✅ Solicitação enviada para análise. O selo será concedido somente após validação administrativa.`,
     user: updated
   };
 }
@@ -2037,6 +2143,46 @@ export async function reloadAuthUser() {
   } catch (error) {
     console.error('[reloadAuthUser] Erro ao recarregar auth.currentUser:', error);
     return { success: false, verified: false, error: error.message };
+  }
+}
+
+export async function requestPasswordReset(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { success: false, error: 'Informe seu e-mail para recuperar a senha.' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { success: false, error: 'Informe um endereço de e-mail válido.' };
+  }
+
+  try {
+    auth.languageCode = 'pt-BR';
+    const actionCodeSettings = typeof window !== 'undefined'
+      ? {
+          url: `${window.location.origin}/login`,
+          handleCodeInApp: false,
+        }
+      : undefined;
+    await sendPasswordResetEmail(auth, normalizedEmail, actionCodeSettings);
+    return {
+      success: true,
+      message: 'Enviamos um link de recuperação para o seu e-mail. Verifique também a caixa de spam.'
+    };
+  } catch (error) {
+    let message = 'Não foi possível enviar o e-mail de recuperação. Tente novamente.';
+    if (error.code === 'auth/user-not-found') {
+      return {
+        success: true,
+        message: 'Se houver uma conta associada a este e-mail, enviaremos um link de recuperação.'
+      };
+    } else if (error.code === 'auth/invalid-email') {
+      message = 'Informe um endereço de e-mail válido.';
+    } else if (error.code === 'auth/too-many-requests') {
+      message = 'Muitas solicitações recentes. Aguarde alguns minutos antes de tentar novamente.';
+    } else if (error.code === 'auth/network-request-failed') {
+      message = 'Não foi possível conectar ao serviço de autenticação. Verifique sua internet e tente novamente.';
+    }
+    return { success: false, error: message, errorCode: error.code };
   }
 }
 

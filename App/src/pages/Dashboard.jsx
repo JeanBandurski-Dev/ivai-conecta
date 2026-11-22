@@ -12,6 +12,7 @@ import {
   tokenizeQuery, scoreTalentMatch, scoreJobMatch, scoreServiceMatch,
   isJobActive
 } from '../lib/ivaiConecta';
+import { normalizeUserRole } from '../services/authService';
 import TalentsCarousel from '../components/TalentsCarousel';
 import EmpresasCarousel from '../components/EmpresasCarousel';
 import JobCard from '../components/JobCard';
@@ -132,7 +133,7 @@ export default function Dashboard() {
   const metrics = useMemo(() => [
     {
       value: `${platformMetrics.talentsCount || 0}`,
-      label: 'Talentos Registrados',
+      label: 'Alunos & Candidatos',
       color: 'text-[#4ADE80]'
     },
     {
@@ -256,7 +257,7 @@ export default function Dashboard() {
               </div>
 
               {/* Quick Actions */}
-              {currentUser?.role === 'freelancer' && (
+              {normalizeUserRole(currentUser?.role) === 'freelancer' && (
                 <div className="flex gap-3 mt-5 flex-wrap">
                   <Link to="/servicos?action=new" className="btn btn-teal btn-sm">+ Cadastrar Meu Serviço</Link>
                 </div>
@@ -543,7 +544,7 @@ export default function Dashboard() {
                 </h2>
               </div>
               <div className="flex gap-3 flex-wrap shrink-0">
-                {currentUser?.role === 'freelancer' && (
+                {normalizeUserRole(currentUser?.role) === 'freelancer' && (
                   <Link to="/servicos?action=new" className="btn btn-teal btn-sm">+ Cadastrar Meu Serviço</Link>
                 )}
                 <Link

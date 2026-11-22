@@ -1144,18 +1144,6 @@ export default function GerenciamentoVagasEmpresa() {
     const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
     const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
 
-    // 1. Atualização Otimista Imediata no React (sem F5!)
-    setLiveJobs(prev => prev.map(j => {
-      const jId = String(j.id);
-      const jFId = j.firestoreId ? String(j.firestoreId) : null;
-      const isTarget = jId === idStr || (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) || (jFId && jFId === idStr);
-      if (isTarget) {
-        return { ...j, status: 'Encerrada' };
-      }
-      return j;
-    }));
-
-    // 2. Persiste a alteração
     try {
       await updateJobStatus(firestoreIdStr || idStr, 'close');
       showToast('Processo seletivo encerrado com sucesso!');
@@ -1168,25 +1156,25 @@ export default function GerenciamentoVagasEmpresa() {
 
   const handleToggleJobStatus = async (jobId, currentStatus) => {
     const newStatus = currentStatus === 'Ativa' ? 'close' : 'reopen';
-    const idStr = String(jobId);
-
-    // Atualização otimista imediata
-    setLiveJobs(prev => prev.map(j => {
-      if (String(j.id) === idStr || String(j.firestoreId) === idStr) {
-        return { ...j, status: newStatus === 'close' ? 'Encerrada' : 'Ativa' };
-      }
-      return j;
-    }));
-
-    await updateJobStatus(jobId, newStatus);
-    showToast(newStatus === 'close' ? 'Vaga encerrada.' : 'Vaga reaberta e ativada com sucesso!');
-    forceUpdate(n => n + 1);
+    try {
+      await updateJobStatus(jobId, newStatus);
+      showToast(newStatus === 'close' ? 'Vaga encerrada.' : 'Vaga reaberta e ativada com sucesso!');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao atualizar status da vaga:', err);
+      showToast('Erro ao atualizar status da vaga.');
+    }
   };
 
-  const handleDuplicateJob = (jobId) => {
-    duplicateJob(jobId);
-    showToast('Vaga duplicada com sucesso!');
-    forceUpdate(n => n + 1);
+  const handleDuplicateJob = async (jobId) => {
+    try {
+      await duplicateJob(jobId);
+      showToast('Vaga duplicada com sucesso!');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao duplicar vaga:', err);
+      showToast('Erro ao duplicar vaga.');
+    }
   };
 
   const handleShareJob = (job) => {
@@ -1209,13 +1197,18 @@ export default function GerenciamentoVagasEmpresa() {
       badge: 'Exclusão Definitiva'
     });
     if (confirmed) {
-      deleteJob(jobId);
-      showToast('Vaga excluída com sucesso.');
-      forceUpdate(n => n + 1);
+      try {
+        await deleteJob(jobId);
+        showToast('Vaga excluída com sucesso.');
+        forceUpdate(n => n + 1);
+      } catch (err) {
+        console.error('Erro ao excluir vaga:', err);
+        showToast('Erro ao excluir vaga.');
+      }
     }
   };
 
-  const handleSaveJobEdit = (e) => {
+  const handleSaveJobEdit = async (e) => {
     e.preventDefault();
     if (!editingJob) return;
 
@@ -1263,14 +1256,19 @@ export default function GerenciamentoVagasEmpresa() {
       }
     }
 
-    updateJob(editingJob.id, {
-      ...editingJob,
-      title: titleClean,
-      workingHours: editingJob.workingHours || STANDARD_WORKING_HOURS[0]
-    });
-    showToast('Vaga atualizada com sucesso!');
-    setEditingJob(null);
-    forceUpdate(n => n + 1);
+    try {
+      await updateJob(editingJob.id, {
+        ...editingJob,
+        title: titleClean,
+        workingHours: editingJob.workingHours || STANDARD_WORKING_HOURS[0]
+      });
+      showToast('Vaga atualizada com sucesso!');
+      setEditingJob(null);
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao atualizar vaga:', err);
+      showToast('Erro ao atualizar vaga.');
+    }
   };
 
   const handleAddCustomStage = () => {
@@ -1377,25 +1375,33 @@ export default function GerenciamentoVagasEmpresa() {
     showToast('Etapa removida da lista. Lembre-se de salvar as alterações!');
   };
 
-  const handleSaveCustomStagesForJob = () => {
+  const handleSaveCustomStagesForJob = async () => {
     if (selectedJobId === 'default' || !currentJob) {
       saveCompanyCustomStages(customStages);
       showToast('Modelo padrão de etapas da empresa salvo com sucesso!');
       forceUpdate(n => n + 1);
       return;
     }
-    saveJobCustomStages(currentJob.id, customStages);
-    showToast(`Etapas do funil salvas exclusivamente para a vaga: "${currentJob.title}"!`);
-    forceUpdate(n => n + 1);
+    try {
+      await saveJobCustomStages(currentJob.id, customStages);
+      showToast(`Etapas do funil salvas exclusivamente para a vaga: "${currentJob.title}"!`);
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao salvar etapas da vaga:', err);
+      showToast('Erro ao salvar etapas da vaga.');
+    }
   };
 
-  const handleApplyCustomStagesToAllJobs = () => {
+  const handleApplyCustomStagesToAllJobs = async () => {
     saveCompanyCustomStages(customStages);
-    allCompanyJobs.forEach(job => {
-      saveJobCustomStages(job.id, customStages);
-    });
-    showToast('Estas etapas foram salvas e aplicadas a todas as vagas da empresa com sucesso!');
-    forceUpdate(n => n + 1);
+    try {
+      await Promise.all(allCompanyJobs.map(job => saveJobCustomStages(job.id, customStages)));
+      showToast('Estas etapas foram salvas e aplicadas a todas as vagas da empresa com sucesso!');
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.error('Erro ao aplicar etapas às vagas:', err);
+      showToast('Erro ao aplicar etapas às vagas.');
+    }
   };
 
   const handleCopyStagesFromAnotherJob = (sourceJobId) => {

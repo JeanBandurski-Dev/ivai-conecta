@@ -25,6 +25,8 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -37,13 +39,21 @@ export default function AdminUsers() {
   const [selectedRole, setSelectedRole] = useState('aluno');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadUsers = async () => {
+  const loadUsers = async (cursor = null, append = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchAllUsers({ limitCount: 150 });
+      const res = await fetchAllUsers({
+        role: roleFilter,
+        status: statusFilter,
+        search,
+        limitCount: 25,
+        cursor,
+      });
       if (res.success) {
-        setUsers(res.users || []);
+        setUsers(prev => append ? [...prev, ...(res.users || [])] : (res.users || []));
+        setLastDoc(res.lastDoc || null);
+        setHasMore(res.hasMore === true);
       } else {
         setError(res.error || 'Erro ao carregar usuários.');
       }
@@ -56,7 +66,7 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [roleFilter, statusFilter, search]);
 
   // Filtered users in memory
   const filteredUsers = useMemo(() => {
@@ -380,6 +390,17 @@ export default function AdminUsers() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center p-4 border-t border-gray-100 dark:border-slate-800">
+            <button
+              onClick={() => loadUsers(lastDoc, true)}
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-blue disabled:opacity-50"
+            >
+              {loading ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── MODAL DE BLOQUEIO / DESBLOQUEIO ── */}

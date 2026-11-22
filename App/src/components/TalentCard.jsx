@@ -19,10 +19,14 @@ export default function TalentCard({ talent, isHighlighted = false }) {
     )
   );
 
-  const handleFavoriteToggle = (e) => {
+  const handleFavoriteToggle = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const added = toggleFavoriteTalent(talent);
+    const added = await toggleFavoriteTalent(talent);
+    if (added === null) {
+      showToast('Não foi possível atualizar o favorito. Tente novamente.');
+      return;
+    }
     showToast(added ? 'Talento salvo nos seus Favoritos!' : 'Talento removido dos Favoritos.');
   };
 

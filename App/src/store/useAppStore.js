@@ -7,6 +7,7 @@ import {
   logout as libLogout,
   register as libRegister,
   loginWithGoogle as libLoginGoogle,
+  requestPasswordReset as libRequestPasswordReset,
   completeUserProfile as libCompleteProfile,
   getSelectedCity,
   setSelectedCity as libSetCity,
@@ -26,8 +27,8 @@ const initialAuthUser = getAuthUser();
 const useAppStore = create((set, get) => ({
   // ─── Auth State ────────────────────────────────────────
   currentUser: initialAuthUser,
-  authLoading: false,
-  isAuthReady: true,
+  authLoading: true,
+  isAuthReady: false,
 
   // ─── Favorites State (User-Scoped) ─────────────────────
   favoriteJobs: getFavoriteJobs(initialAuthUser),
@@ -40,9 +41,7 @@ const useAppStore = create((set, get) => ({
       set({ favoriteJobs: guestJobs, favoriteTalents: guestTalents });
       return;
     }
-    const localJobs = getFavoriteJobs(user);
-    const localTalents = getFavoriteTalents(user);
-    set({ favoriteJobs: localJobs, favoriteTalents: localTalents });
+    set({ favoriteJobs: [], favoriteTalents: [] });
 
     const userUid = user.uid || user.id;
     if (userUid) {
@@ -63,9 +62,9 @@ const useAppStore = create((set, get) => ({
 
   initAuthListener: () => {
     const safetyTimer = setTimeout(() => {
-      if (get().authLoading) {
-        set({ authLoading: false, isAuthReady: true });
-      }
+      // Mantém a rota protegida em estado de carregamento até o callback real
+      // do Firebase confirmar a sessão. Evita o flash da tela de acesso restrito.
+      set({ authLoading: false, isAuthReady: false });
     }, 1500);
 
     const unsubscribe = watchAuthState((user) => {
@@ -96,6 +95,8 @@ const useAppStore = create((set, get) => ({
     }
     return result;
   },
+
+  requestPasswordReset: async (email) => libRequestPasswordReset(email),
 
   register: async (data) => {
     const result = await libRegister(data);
@@ -182,22 +183,28 @@ const useAppStore = create((set, get) => ({
   },
 
   // ─── Favorites Actions ─────────────────────────────────
-  toggleFavoriteJob: (jobOrId) => {
+  toggleFavoriteJob: async (jobOrId) => {
     const user = get().currentUser;
-    const current = get().favoriteJobs;
-    const wasFavorite = isJobFavorited(jobOrId, current);
-    const updated = libToggleFavoriteJob(jobOrId, user);
-    set({ favoriteJobs: updated });
-    return !wasFavorite;
+    try {
+      const updated = await libToggleFavoriteJob(jobOrId, user);
+      set({ favoriteJobs: updated });
+      return isJobFavorited(jobOrId, updated);
+    } catch (err) {
+      console.error('Erro ao alterar favorito de vaga:', err);
+      return null;
+    }
   },
 
-  toggleFavoriteTalent: (talentOrId) => {
+  toggleFavoriteTalent: async (talentOrId) => {
     const user = get().currentUser;
-    const current = get().favoriteTalents;
-    const wasFavorite = isTalentFavorited(talentOrId, current);
-    const updated = libToggleFavoriteTalent(talentOrId, user);
-    set({ favoriteTalents: updated });
-    return !wasFavorite;
+    try {
+      const updated = await libToggleFavoriteTalent(talentOrId, user);
+      set({ favoriteTalents: updated });
+      return isTalentFavorited(talentOrId, updated);
+    } catch (err) {
+      console.error('Erro ao alterar favorito de talento:', err);
+      return null;
+    }
   },
 
   // ─── Toast State ──────────────────────────────────────

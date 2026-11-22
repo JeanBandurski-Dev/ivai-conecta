@@ -16,6 +16,7 @@ import TalentCard from '../components/TalentCard';
 import EditTeacherProfileModal from '../components/EditTeacherProfileModal';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
+import { isProfileOwner } from '../services/authService';
 
 export default function PerfilProfessor() {
   const { id } = useParams();
@@ -54,13 +55,7 @@ export default function PerfilProfessor() {
     } : null);
   }, [liveTeacherDoc, teacherId, currentUser]);
 
-  const isOwner = Boolean(
-    currentUser && teacher && (
-      (currentUser.email && teacher?.email && currentUser.email.toLowerCase() === teacher.email.toLowerCase()) ||
-      (currentUser.uid != null && (String(currentUser.uid) === String(teacher?.id) || String(currentUser.uid) === String(teacher?.firestoreId))) ||
-      (currentUser.id != null && String(currentUser.id) === String(teacher?.id))
-    )
-  );
+  const isOwner = isProfileOwner(currentUser, teacher, id);
 
   const [liveTalents, setLiveTalents] = useState(() => getTalents('Todas as Cidades'));
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -184,6 +179,11 @@ export default function PerfilProfessor() {
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
+    if (!isOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      setEditModal(false);
+      return;
+    }
     if (!teacher) return;
     setIsSaving(true);
     try {
@@ -206,6 +206,10 @@ export default function PerfilProfessor() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    if (!isOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       showToast('Enviando foto para o Firebase Storage...');
@@ -539,7 +543,7 @@ export default function PerfilProfessor() {
 
       {/* Modal Padronizado: Editar Perfil do Professor */}
       <EditTeacherProfileModal
-        isOpen={editModal}
+        isOpen={isOwner && editModal}
         onClose={() => !isSaving && setEditModal(false)}
         editData={editData}
         setEditData={setEditData}

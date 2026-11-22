@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
@@ -49,6 +49,21 @@ function MinhasVagasRoute() {
   return <MinhasVagas />;
 }
 
+function PerfilRoute() {
+  const { currentUser } = useAppStore();
+  const userRole = normalizeUserRole(currentUser?.role);
+  if (userRole === 'empresa') {
+    return <PerfilEmpresa />;
+  }
+  if (userRole === 'professor') {
+    return <PerfilProfessor />;
+  }
+  if (userRole === 'freelancer') {
+    return <PerfilFreelancer />;
+  }
+  return <PerfilAluno />;
+}
+
 function AppContent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -76,7 +91,7 @@ function AppContent() {
               <Route path="/vagas" element={<Vagas />} />
               <Route path="/servicos" element={<Servicos />} />
               <Route path="/talentos" element={<BancoDeTalentos />} />
-              <Route path="/perfil"           element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
+              <Route path="/perfil"           element={<ProtectedRoute><PerfilRoute /></ProtectedRoute>} />
               <Route path="/perfil/:id"       element={<PerfilAluno />} />
               <Route path="/empresa"          element={<ProtectedRoute allowedRoles={['empresa']}><PerfilEmpresa /></ProtectedRoute>} />
               <Route path="/empresa/:id"      element={<PerfilEmpresa />} />
@@ -218,9 +233,9 @@ function NotFound() {
       <p className="text-gray-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
         A rota que você tentou acessar não existe nesta plataforma.
       </p>
-      <a href="/" className="btn btn-primary">
+      <Link to="/" className="btn btn-primary">
         Voltar ao Dashboard
-      </a>
+      </Link>
     </div>
   );
 }

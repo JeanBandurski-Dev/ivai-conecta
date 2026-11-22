@@ -258,7 +258,33 @@ export default function BancoDeTalentos() {
               )}
             </div>
 
-            {savedTalents.length === 0 ? (
+            {!currentUser ? (
+              <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3 max-w-xl mx-auto my-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
+                  <Bookmark size={32} className="fill-amber-500" />
+                </div>
+                <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white">
+                  Acesse sua conta para ver talentos salvos
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+                  Faça login para salvar perfis de estudantes e profissionais, sincronizar seus favoritos em qualquer dispositivo e montar o banco de pré-seleção da sua empresa.
+                </p>
+                <div className="pt-2 flex justify-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="btn btn-primary px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    Fazer Login ou Cadastrar
+                  </button>
+                  <button
+                    onClick={() => handleTabChange('talents')}
+                    className="btn btn-outline px-5 py-2.5 font-bold rounded-xl shadow-xs inline-flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Search size={14} /> Explorar Talentos
+                  </button>
+                </div>
+              </div>
+            ) : savedTalents.length === 0 ? (
               <div className="py-20 text-center text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs space-y-3 max-w-xl mx-auto my-6">
                 <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-500 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
                   <Bookmark size={32} className="fill-amber-500" />

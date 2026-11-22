@@ -17,7 +17,7 @@ const TYPES = [
   { label: 'Tempo Integral (CLT)', value: 'Tempo Integral' },
   { label: 'Meio Período', value: 'Meio Período' },
   { label: 'Estágio / Trainee', value: 'Estágio' },
-  { label: 'Prestador de Serviço (PJ)', value: 'Prestador de Serviço' },
+  { label: 'Prestador de Serviço (PJ)', value: 'Prestador de Serviço (PJ)' },
 ];
 
 const MODALITIES = [

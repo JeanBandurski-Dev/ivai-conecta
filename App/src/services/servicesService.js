@@ -1,4 +1,6 @@
 import { db } from '../lib/firebase.js';
+import { functions } from '../lib/firebase.js';
+import { httpsCallable } from 'firebase/functions';
 import {
   collection,
   doc,
@@ -414,7 +416,12 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
     if (Array.isArray(e.detail)) {
       const orders = getServiceOrders();
       const enriched = e.detail.map(s => enrichServiceWithOrders(s, orders));
-      const filtered = enriched.filter(s => matchCity(s.city, city));
+      const filtered = enriched.filter(s =>
+        s.status !== 'paused' &&
+        s.status !== 'Pausado' &&
+        s.status !== 'Pausada' &&
+        matchCity(s.city, city)
+      );
       callback(filtered);
     }
   };
@@ -439,7 +446,12 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
         } catch { }
       }
 
-      const filtered = enriched.filter(s => matchCity(s.city, city));
+      const filtered = enriched.filter(s =>
+        s.status !== 'paused' &&
+        s.status !== 'Pausado' &&
+        s.status !== 'Pausada' &&
+        matchCity(s.city, city)
+      );
       callback(filtered);
     }, (error) => {
       console.warn('[Firestore Services Listener] Offline fallback:', error.message);
@@ -490,6 +502,12 @@ export function getServices(city = 'Todas as Cidades') {
   if (orders.length > 0) {
     services = services.map(s => enrichServiceWithOrders(s, orders));
   }
+
+  services = services.filter(s =>
+    s.status !== 'paused' &&
+    s.status !== 'Pausado' &&
+    s.status !== 'Pausada'
+  );
 
   if (!city || city === 'Todas as Cidades') return services;
   return services.filter(s => matchCity(s.city, city));
@@ -787,10 +805,17 @@ export async function submitServiceReview(orderId, {
   clientName,
   clientAvatar
 }) {
-  const reviewData = {
+  const submitReview = httpsCallable(functions, 'submitServiceReview');
+  const result = await submitReview({
     orderId: String(orderId),
-    rating: Number(rating) || 5,
-    stars: Number(rating) || 5,
+    rating,
+    comment: String(comment || '').trim()
+  });
+
+  const reviewData = result.data?.review || {
+    orderId: String(orderId),
+    rating: Number(rating),
+    stars: Number(rating),
     comment: String(comment || '').trim(),
     author: clientName || 'Cliente Ivaí Conecta',
     client: clientName || 'Cliente Ivaí Conecta',
@@ -798,26 +823,6 @@ export async function submitServiceReview(orderId, {
     date: new Date().toLocaleDateString('pt-BR'),
     timestamp: Date.now()
   };
-
-  // 1. Atualiza ordem de serviço para 'avaliado'
-  await updateServiceOrderStatus(orderId, 'avaliado', `Cliente avaliou o atendimento com ${rating} estrelas.`);
-
-  const docId = String(orderId);
-  try {
-    await updateDoc(doc(db, 'chats', docId), {
-      'serviceOrder.review': reviewData,
-      'serviceOrder.rating': reviewData.rating,
-      'serviceOrder.status': 'avaliado',
-      updatedAt: new Date().toISOString()
-    });
-  } catch {
-    try {
-      await setDoc(doc(db, 'chats', docId), {
-        serviceOrder: { review: reviewData, rating: reviewData.rating, status: 'avaliado' },
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch { }
-  }
 
   // Atualiza cache local com review e prepara patch com identificadores para Firestore
   const currentOrders = getServiceOrders();
@@ -838,77 +843,9 @@ export async function submitServiceReview(orderId, {
     } : {})
   };
 
-  try {
-    await setDoc(doc(db, 'service_orders', docId), orderPatch, { merge: true });
-  } catch (err) {
-    console.warn('[Firestore service_orders] Erro ao persistir avaliação:', err.message);
-  }
-
   const updatedOrders = currentOrders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, ...orderPatch } : o));
   saveServiceOrders(updatedOrders);
   notifyOrdersUpdated(updatedOrders);
-
-  // 2. Atualiza estatísticas e histórico do serviço correspondente
-  try {
-    const allServices = getServices('Todas as Cidades');
-    const targetServiceId = serviceId || existingOrder?.serviceId;
-    const targetProvId = providerId || existingOrder?.providerId || existingOrder?.providerUid;
-    const targetProvEmail = providerEmail || existingOrder?.providerEmail;
-    const targetTitle = serviceTitle || existingOrder?.serviceTitle;
-
-    let targetService = targetServiceId ? getServiceById(targetServiceId) : null;
-
-    if (!targetService) {
-      targetService = allServices.find(s => {
-        if (targetServiceId && (s.id === targetServiceId || s.firestoreId === targetServiceId || String(s.id) === String(targetServiceId))) return true;
-        if (targetProvId && (String(s.createdBy) === String(targetProvId) || String(s.providerUid) === String(targetProvId))) {
-          if (!targetTitle || s.title === targetTitle || s.name === targetTitle) return true;
-        }
-        if (targetProvEmail && s.providerEmail && s.providerEmail.toLowerCase() === targetProvEmail.toLowerCase()) {
-          if (!targetTitle || s.title === targetTitle || s.name === targetTitle) return true;
-        }
-        return false;
-      });
-    }
-
-    if (!targetService && targetServiceId) {
-      try {
-        targetService = await serviceRepository.findById(String(targetServiceId));
-      } catch { }
-    }
-
-    if (targetService) {
-      const currentReviews = Array.isArray(targetService.reviews) ? targetService.reviews : [];
-      const alreadyHasReview = currentReviews.some(r => r.orderId === String(orderId) || (r.author === reviewData.author && r.comment === reviewData.comment));
-      const updatedReviews = alreadyHasReview ? currentReviews : [reviewData, ...currentReviews];
-      const totalScore = updatedReviews.reduce((acc, r) => acc + (Number(r.rating || r.stars) || 5), 0);
-      const newAverage = Number((totalScore / updatedReviews.length).toFixed(1));
-
-      const currentClosed = targetService.analytics?.closedDeals || 0;
-      const newClosed = alreadyHasReview ? currentClosed : currentClosed + 1;
-      const views = targetService.analytics?.views || 1;
-      const newConversion = `${Math.min(100, Math.round((newClosed / Math.max(1, views)) * 100))}%`;
-
-      const updatedAnalytics = {
-        ...targetService.analytics,
-        closedDeals: newClosed,
-        conversionRate: newConversion
-      };
-
-      const patch = {
-        rating: newAverage,
-        reviewsCount: updatedReviews.length,
-        reviewCount: updatedReviews.length,
-        reviews: updatedReviews,
-        analytics: updatedAnalytics
-      };
-
-      const docIdToUpdate = targetService.firestoreId || targetService.id || targetServiceId;
-      await updateService(docIdToUpdate, patch);
-    }
-  } catch (err) {
-    console.warn('[Firestore] Erro ao atualizar notas do serviço:', err.message);
-  }
 
   return { success: true };
 }

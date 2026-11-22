@@ -24,6 +24,8 @@ export default function AdminJobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
 
   // Filters & Search
   const [search, setSearch] = useState('');
@@ -34,13 +36,15 @@ export default function AdminJobs() {
   const [modalAction, setModalAction] = useState(null); // 'approve' | 'reject' | 'close' | 'reactivate' | 'delete'
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadJobs = async () => {
+  const loadJobs = async (cursor = null, append = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchAllJobs({ limitCount: 150 });
+      const res = await fetchAllJobs({ status: statusFilter, search, limitCount: 25, cursor });
       if (res.success) {
-        setJobs(res.jobs || []);
+        setJobs(prev => append ? [...prev, ...(res.jobs || [])] : (res.jobs || []));
+        setLastDoc(res.lastDoc || null);
+        setHasMore(res.hasMore === true);
       } else {
         setError(res.error || 'Erro ao carregar vagas.');
       }
@@ -53,7 +57,7 @@ export default function AdminJobs() {
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [statusFilter, search]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter(j => {
@@ -338,6 +342,17 @@ export default function AdminJobs() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center p-4 border-t border-gray-100 dark:border-slate-800">
+            <button
+              onClick={() => loadJobs(lastDoc, true)}
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-blue disabled:opacity-50"
+            >
+              {loading ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── ACTION CONFIRMATION MODAL ── */}

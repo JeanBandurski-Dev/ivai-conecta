@@ -18,6 +18,7 @@ import SolicitarServicoModal from '../components/SolicitarServicoModal';
 import EditFreelancerProfileModal from '../components/EditFreelancerProfileModal';
 import PublishServiceModal from '../components/PublishServiceModal';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import { isProfileOwner } from '../services/authService';
 
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=1200';
 
@@ -66,13 +67,7 @@ export default function PerfilFreelancer() {
     return null;
   }, [liveUserDoc, currentUser, freelancerId, id]);
 
-  const isOwner = Boolean(
-    currentUser && freelancer && (
-      (currentUser.email && freelancer?.email && currentUser.email.toLowerCase().trim() === freelancer.email.toLowerCase().trim()) ||
-      (currentUser.uid != null && (String(currentUser.uid) === String(freelancer?.id) || String(currentUser.uid) === String(freelancer?.firestoreId))) ||
-      (currentUser.id != null && String(currentUser.id) === String(freelancer?.id))
-    )
-  );
+  const isOwner = isProfileOwner(currentUser, freelancer, id);
 
   // Escuta serviços reais criados pelo prestador
   const [allServices, setAllServices] = useState(() => getServices('Todas as Cidades'));
@@ -190,6 +185,11 @@ export default function PerfilFreelancer() {
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
+    if (!isOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      setEditModalOpen(false);
+      return;
+    }
     setIsSaving(true);
     try {
       const payload = {
@@ -224,6 +224,10 @@ export default function PerfilFreelancer() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    if (!isOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     showToast('Enviando foto de perfil...');
@@ -236,6 +240,10 @@ export default function PerfilFreelancer() {
   };
 
   const handleBannerFileChange = async (e) => {
+    if (!isOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     showToast('Enviando imagem de capa...');
@@ -783,7 +791,7 @@ export default function PerfilFreelancer() {
       </div>
 
       {/* Modal: Editar Perfil Freelancer */}
-      {editModalOpen && (
+      {isOwner && editModalOpen && (
         <EditFreelancerProfileModal
           isOpen={editModalOpen}
           onClose={() => !isSaving && setEditModalOpen(false)}

@@ -282,15 +282,6 @@ export default function MinhasVagas() {
     const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
     const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
 
-    setLiveJobs(prev => prev.map(j => {
-      const jId = String(j.id);
-      const jFId = j.firestoreId ? String(j.firestoreId) : null;
-      if (jId === idStr || (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) || (jFId && jFId === idStr)) {
-        return { ...j, status: 'Encerrada' };
-      }
-      return j;
-    }));
-
     try {
       await updateJobStatus(firestoreIdStr || idStr, 'close');
       showToast('🔒 Vaga encerrada com sucesso.');
@@ -307,16 +298,6 @@ export default function MinhasVagas() {
       : liveJobs.find(j => String(j.id) === String(jobOrId) || String(j.firestoreId) === String(jobOrId));
     const idStr = targetJob?.id ? String(targetJob.id) : String(jobOrId);
     const firestoreIdStr = targetJob?.firestoreId ? String(targetJob.firestoreId) : null;
-
-    // Atualização otimista imediata
-    setLiveJobs(prev => prev.filter(j => {
-      const jId = String(j.id);
-      const jFId = j.firestoreId ? String(j.firestoreId) : null;
-      if (jId === idStr) return false;
-      if (firestoreIdStr && (jId === firestoreIdStr || jFId === firestoreIdStr)) return false;
-      if (jFId && jFId === idStr) return false;
-      return true;
-    }));
 
     try {
       await deleteJob(firestoreIdStr || idStr);

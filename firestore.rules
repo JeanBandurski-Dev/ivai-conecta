@@ -10,10 +10,17 @@ service cloud.firestore {
     //   - id, uid: string (identificador igual a auth.uid)
     //   - name: string (2 a 120 caracteres)
     //   - email: string
+    //   - Dados privados: telefone, RA, CNPJ, documentos, e-mail institucional e configurações.
     //   - role: string (aluno, empresa, professor, freelancer, admin, candidato)
     //   - isVerifiedStudent: bool (apenas confirmado se email_verified via Firebase Auth)
     //   - isVerifiedCompany: bool
     //   - status, blocked: string / bool (controlados exclusivamente pelo Admin)
+    //
+    // Collection: public_profiles/{userId}
+    //   - name, city, institution, course, period: strings publicamente autorizadas
+    //   - skills, experiences, projects, education, endorsements: listas publicamente autorizadas
+    //   - avatar/photoURL, bio, role, isVerifiedStudent, endorsementCount: campos públicos
+    //   - Campos privados como email, studentEmail, raNumber, phone, CNPJ e documentos são proibidos
     //
     // Collection: jobs/{jobId}
     //   - title: string (min 3 chars)
@@ -50,6 +57,10 @@ service cloud.firestore {
     // Collection: chats/{chatId} & subcollection messages/{messageId}
     //   - participants / participantUids: array (apenas membros autorizados)
     //
+    // Collection: mail/{mailId}
+    //   - Criada exclusivamente pelo Firebase Admin SDK em Cloud Functions confiáveis.
+    //   - Campos controlados pelo servidor (to, message); nenhum cliente pode criar, alterar ou excluir.
+    //
     // ===============================================================
 
     // --- FUNÇÕES AUXILIARES DE AUTORIZAÇÃO E INTEGRIDADE ---
@@ -58,15 +69,61 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function chatParticipantUnchanged() {
+      return
+        (!('participants' in resource.data) ||
+         ('participants' in request.resource.data &&
+          request.resource.data.participants == resource.data.participants)) &&
+        (!('participantUids' in resource.data) ||
+         ('participantUids' in request.resource.data &&
+          request.resource.data.participantUids == resource.data.participantUids)) &&
+        (!('clientEmail' in resource.data) ||
+         ('clientEmail' in request.resource.data &&
+          request.resource.data.clientEmail == resource.data.clientEmail)) &&
+        (!('providerEmail' in resource.data) ||
+         ('providerEmail' in request.resource.data &&
+          request.resource.data.providerEmail == resource.data.providerEmail)) &&
+        (!('clientId' in resource.data) ||
+         ('clientId' in request.resource.data &&
+          request.resource.data.clientId == resource.data.clientId)) &&
+        (!('clientUid' in resource.data) ||
+         ('clientUid' in request.resource.data &&
+          request.resource.data.clientUid == resource.data.clientUid)) &&
+        (!('providerId' in resource.data) ||
+         ('providerId' in request.resource.data &&
+          request.resource.data.providerId == resource.data.providerId)) &&
+        (!('providerUid' in resource.data) ||
+         ('providerUid' in request.resource.data &&
+          request.resource.data.providerUid == resource.data.providerUid));
+    }
+
+    function isAllowedChatUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'lastMessage',
+        'lastMessageAt',
+        'lastSenderEmail',
+        'lastSenderName',
+        'participantNames',
+        'participantAvatars',
+        'participantRoles',
+        'contextTitle',
+        'isServiceOrder',
+        'serviceOrder',
+        'updatedAt'
+      ]) && chatParticipantUnchanged();
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
     function isAdmin() {
       return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-        request.auth.token.email == 'admin@ivaiconecta.com.br'
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role is string &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'administrador', 'Admin', 'Administrador']))
       );
     }
 
@@ -82,6 +139,33 @@ service cloud.firestore {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'aluno';
+    }
+
+    function isVerifiedCompany() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerifiedCompany == true &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyVerificationStatus == 'VALIDADA';
+    }
+
+    function applicationJobMatches(jobId) {
+      return exists(/databases/$(database)/documents/jobs/$(jobId)) &&
+        get(/databases/$(database)/documents/jobs/$(jobId)).data.status == 'Ativa';
+    }
+
+    function applicationDataMatchesJob(jobId) {
+      return applicationJobMatches(jobId) &&
+        request.resource.data.jobId == jobId &&
+        request.resource.data.firestoreJobId == jobId &&
+        request.resource.data.candidateUid == request.auth.uid &&
+        request.resource.data.recruiterUid == get(/databases/$(database)/documents/jobs/$(jobId)).data.createdBy &&
+        request.resource.data.companyUid == get(/databases/$(database)/documents/jobs/$(jobId)).data.createdBy &&
+        request.resource.data.company == get(/databases/$(database)/documents/jobs/$(jobId)).data.company &&
+        request.resource.data.title == get(/databases/$(database)/documents/jobs/$(jobId)).data.title &&
+        (
+          !('recruiterEmail' in get(/databases/$(database)/documents/jobs/$(jobId)).data) ||
+          request.resource.data.recruiterEmail == get(/databases/$(database)/documents/jobs/$(jobId)).data.recruiterEmail
+        );
     }
 
     function isAuthorizedStudentInstitutionEmail(email) {
@@ -102,7 +186,7 @@ service cloud.firestore {
 
     // -------------------------------------------------------------
     // 1. Coleção USERS (Perfis de Usuários)
-    // Leitura: Pública para visualização de perfis e diretórios.
+    // Leitura: Proprietário ou Admin. Dados privados nunca são públicos.
     // Criação: Próprio usuário logado (isOwner).
     //   - Proibida auto-promoção a 'admin'.
     //   - Proibido criar perfil pré-bloqueado.
@@ -111,20 +195,43 @@ service cloud.firestore {
     //   - Admin pode atualizar qualquer campo.
     //   - Usuário dono: NÃO pode alterar 'role', 'status', 'blocked' ou 'blockedReason'.
     //   - Aluno só pode ativar 'isVerifiedStudent' se o token de e-mail estiver verificado.
+    //   - O usuário não pode conceder ou alterar o selo empresarial. Somente o Admin
+    //     pode validar a empresa após análise dos documentos.
     // Deleção: Usuário dono ou Admin.
     // -------------------------------------------------------------
     match /users/{userId} {
-      allow read: if true;
+      allow read: if isOwner(userId) || isAdmin();
 
       allow create: if isOwner(userId) &&
         (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin()) &&
         (!('blocked' in request.resource.data) || request.resource.data.blocked == false) &&
         (!('status' in request.resource.data) || request.resource.data.status != 'blocked') &&
-        (!('isVerifiedStudent' in request.resource.data) || request.resource.data.isVerifiedStudent == false || isAdmin());
+        (!('isVerifiedStudent' in request.resource.data) || request.resource.data.isVerifiedStudent == false || isAdmin()) &&
+        (!('isVerifiedCompany' in request.resource.data) || request.resource.data.isVerifiedCompany == false) &&
+        (!('companyVerificationStatus' in request.resource.data) ||
+         request.resource.data.companyVerificationStatus in ['NAO_VERIFICADA', 'PENDENTE'] ||
+         isAdmin());
 
       allow update: if isAdmin() || (
         isOwner(userId) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'blocked', 'blockedReason']) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerifiedCompany']) ||
+          (request.resource.data.isVerifiedCompany == false &&
+           (!('isVerifiedCompany' in resource.data) || resource.data.isVerifiedCompany == false))
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['companyVerificationStatus']) ||
+          (
+            resource.data.companyVerificationStatus != 'VALIDADA' &&
+            request.resource.data.companyVerificationStatus in ['NAO_VERIFICADA', 'PENDENTE']
+          )
+        ) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'verifiedAt',
+          'companyVerifiedAt',
+          'companyVerificationReviewedBy'
+        ]) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerifiedStudent']) ||
           request.resource.data.isVerifiedStudent == resource.data.isVerifiedStudent ||
@@ -144,6 +251,84 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------
+    // 1.1 Coleção PUBLIC_PROFILES (Diretório Público de Talentos)
+    // Somente campos não privados podem ser armazenados aqui.
+    // Qualquer pessoa pode listar e ler esse diretório.
+    // Apenas o próprio usuário ou Admin pode criar/atualizar o perfil público.
+    // -------------------------------------------------------------
+    match /public_profiles/{userId} {
+      allow read: if true;
+
+      allow create: if (isOwner(userId) || isAdmin()) &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
+          'photoURL', 'skills', 'experiences', 'projects', 'education', 'bio',
+          'endorsements', 'endorsementCount', 'isVerifiedStudent', 'role',
+          'createdAt', 'updatedAt'
+        ]) &&
+        (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
+        (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 120)) &&
+        (!('city' in request.resource.data) || (request.resource.data.city is string && request.resource.data.city.size() <= 100)) &&
+        (!('institution' in request.resource.data) || (request.resource.data.institution is string && request.resource.data.institution.size() <= 160)) &&
+        (!('course' in request.resource.data) || (request.resource.data.course is string && request.resource.data.course.size() <= 160)) &&
+        (!('period' in request.resource.data) || (request.resource.data.period is string && request.resource.data.period.size() <= 80)) &&
+        (!('avatar' in request.resource.data) || (request.resource.data.avatar is string && request.resource.data.avatar.size() <= 2048)) &&
+        (!('photoURL' in request.resource.data) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048)) &&
+        (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 1000)) &&
+        (!('skills' in request.resource.data) || (request.resource.data.skills is list && request.resource.data.skills.size() <= 100)) &&
+        (!('experiences' in request.resource.data) || (request.resource.data.experiences is list && request.resource.data.experiences.size() <= 100)) &&
+        (!('projects' in request.resource.data) || (request.resource.data.projects is list && request.resource.data.projects.size() <= 100)) &&
+        (!('education' in request.resource.data) || (request.resource.data.education is list && request.resource.data.education.size() <= 100)) &&
+        (!('endorsements' in request.resource.data) || (request.resource.data.endorsements is list && request.resource.data.endorsements.size() <= 100)) &&
+        (!('endorsementCount' in request.resource.data) || (request.resource.data.endorsementCount is number && request.resource.data.endorsementCount >= 0 && request.resource.data.endorsementCount <= 100)) &&
+        (!('isVerifiedStudent' in request.resource.data) || (
+          request.resource.data.isVerifiedStudent is bool &&
+          (!request.resource.data.isVerifiedStudent ||
+           (exists(/databases/$(database)/documents/users/$(userId)) &&
+            get(/databases/$(database)/documents/users/$(userId)).data.isVerifiedStudent == true))
+        )) &&
+        (!('role' in request.resource.data) ||
+          (request.resource.data.role in ['aluno', 'candidato', 'freelancer', 'prestador', 'professor', 'empresa'] &&
+           exists(/databases/$(database)/documents/users/$(userId)) &&
+           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role));
+
+      allow update: if (isOwner(userId) || isAdmin()) &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
+          'photoURL', 'skills', 'experiences', 'projects', 'education', 'bio',
+          'endorsements', 'endorsementCount', 'isVerifiedStudent', 'role',
+          'createdAt', 'updatedAt'
+        ]) &&
+        (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
+        (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 120)) &&
+        (!('city' in request.resource.data) || (request.resource.data.city is string && request.resource.data.city.size() <= 100)) &&
+        (!('institution' in request.resource.data) || (request.resource.data.institution is string && request.resource.data.institution.size() <= 160)) &&
+        (!('course' in request.resource.data) || (request.resource.data.course is string && request.resource.data.course.size() <= 160)) &&
+        (!('period' in request.resource.data) || (request.resource.data.period is string && request.resource.data.period.size() <= 80)) &&
+        (!('avatar' in request.resource.data) || (request.resource.data.avatar is string && request.resource.data.avatar.size() <= 2048)) &&
+        (!('photoURL' in request.resource.data) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048)) &&
+        (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 1000)) &&
+        (!('skills' in request.resource.data) || (request.resource.data.skills is list && request.resource.data.skills.size() <= 100)) &&
+        (!('experiences' in request.resource.data) || (request.resource.data.experiences is list && request.resource.data.experiences.size() <= 100)) &&
+        (!('projects' in request.resource.data) || (request.resource.data.projects is list && request.resource.data.projects.size() <= 100)) &&
+        (!('education' in request.resource.data) || (request.resource.data.education is list && request.resource.data.education.size() <= 100)) &&
+        (!('endorsements' in request.resource.data) || (request.resource.data.endorsements is list && request.resource.data.endorsements.size() <= 100)) &&
+        (!('endorsementCount' in request.resource.data) || (request.resource.data.endorsementCount is number && request.resource.data.endorsementCount >= 0 && request.resource.data.endorsementCount <= 100)) &&
+        (!('isVerifiedStudent' in request.resource.data) || (
+          request.resource.data.isVerifiedStudent is bool &&
+          (!request.resource.data.isVerifiedStudent ||
+           (exists(/databases/$(database)/documents/users/$(userId)) &&
+            get(/databases/$(database)/documents/users/$(userId)).data.isVerifiedStudent == true))
+        )) &&
+        (!('role' in request.resource.data) ||
+          (request.resource.data.role in ['aluno', 'candidato', 'freelancer', 'prestador', 'professor', 'empresa'] &&
+           exists(/databases/$(database)/documents/users/$(userId)) &&
+           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role));
+
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // -------------------------------------------------------------
     // 2. Coleção JOBS (Vagas de Emprego)
     // Leitura: Pública.
     // Criação: Empresa, recrutador autenticado ou Admin.
@@ -153,7 +338,7 @@ service cloud.firestore {
     // Atualização:
     //   - Admin pode atualizar tudo.
     //   - Recrutador/Criador pode atualizar detalhes da vaga (createdBy é imutável).
-    //   - Candidato aplicando/desistindo só pode alterar applicantsCount de forma atômica (+1 ou -1).
+    //   - applicantsCount é imutável no cliente; criação/desistência são feitas por Cloud Functions.
     // Exclusão: Recrutador criador ou Admin.
     // -------------------------------------------------------------
     match /jobs/{jobId} {
@@ -166,6 +351,8 @@ service cloud.firestore {
           (!('recruiterEmail' in request.resource.data) || request.resource.data.recruiterEmail == request.auth.token.email) &&
           request.resource.data.title is string && request.resource.data.title.size() >= 3 &&
           request.resource.data.company is string && request.resource.data.company.size() >= 2 &&
+          (!('isVerifiedCompany' in request.resource.data) ||
+           (request.resource.data.isVerifiedCompany == false || isVerifiedCompany())) &&
           (!('applicantsCount' in request.resource.data) || request.resource.data.applicantsCount == 0)
         )
       );
@@ -174,14 +361,9 @@ service cloud.firestore {
         isAdmin() ||
         (
           (resource.data.createdBy == request.auth.uid || resource.data.recruiterEmail == request.auth.token.email) &&
-          request.resource.data.createdBy == resource.data.createdBy
-        ) ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicantsCount', 'updatedAt']) &&
-          (
-            request.resource.data.applicantsCount == resource.data.applicantsCount + 1 ||
-            (resource.data.applicantsCount > 0 && request.resource.data.applicantsCount == resource.data.applicantsCount - 1)
-          )
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.isVerifiedCompany == resource.data.isVerifiedCompany &&
+          request.resource.data.applicantsCount == resource.data.applicantsCount
         )
       );
 
@@ -216,9 +398,20 @@ service cloud.firestore {
         isAdmin() ||
         (
           (!isStudentProfile() || isVerifiedStudent()) &&
-          (request.resource.data.candidateUid == request.auth.uid || request.resource.data.candidateEmail == request.auth.token.email) &&
           request.resource.data.candidateUid == request.auth.uid &&
-          (!('status' in request.resource.data) || request.resource.data.status in ['Pendente', 'Enviada', 'Candidatura Enviada', 'Em Análise', 'Triagem de Currículo'])
+          request.resource.data.candidateEmail == request.auth.token.email &&
+          request.resource.data.keys().hasOnly([
+            'id', 'firestoreId', 'jobId', 'firestoreJobId', 'originalJobId',
+            'companyUid', 'company', 'companyLogo', 'recruiterEmail', 'recruiterUid', 'recruiterPhone',
+            'candidateUid', 'candidateId', 'candidateName', 'candidateRole', 'candidateEmail',
+            'candidateAvatar', 'candidateCourse', 'candidateInstitution', 'candidateCity', 'candidatePhone',
+            'isVerifiedStudent', 'skills', 'title', 'city', 'type', 'appliedAt', 'appliedTimestamp',
+            'matchScore', 'status', 'stage', 'statusClass', 'currentStageIndex', 'nextStepNote', 'stages',
+            'createdAt', 'updatedAt', '_timestamp'
+          ]) &&
+          (!('status' in request.resource.data) || request.resource.data.status in ['Pendente', 'Enviada', 'Candidatura Enviada', 'Proposta PJ Enviada', 'Em Análise', 'Triagem de Currículo']) &&
+          ('jobId' in request.resource.data) &&
+          applicationDataMatchesJob(request.resource.data.jobId)
         )
       );
 
@@ -226,25 +419,31 @@ service cloud.firestore {
         isAdmin() ||
         (
           (resource.data.recruiterUid == request.auth.uid || resource.data.recruiterEmail == request.auth.token.email) &&
+          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
+          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.createdBy == resource.data.recruiterUid &&
           request.resource.data.candidateUid == resource.data.candidateUid &&
-          request.resource.data.jobId == resource.data.jobId
+          request.resource.data.jobId == resource.data.jobId &&
+          request.resource.data.firestoreJobId == resource.data.firestoreJobId &&
+          request.resource.data.recruiterUid == resource.data.recruiterUid &&
+          request.resource.data.recruiterEmail == resource.data.recruiterEmail &&
+          request.resource.data.companyUid == resource.data.companyUid &&
+          request.resource.data.company == resource.data.company &&
+          request.resource.data.candidateUid == resource.data.candidateUid &&
+          request.resource.data.candidateEmail == resource.data.candidateEmail &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'stage', 'currentStageIndex', 'nextStepNote', 'feedback', 'stages',
+            'rating', 'interview', 'notes', 'activity', 'statusClass', 'updatedAt'
+          ])
         ) ||
         (
           (resource.data.candidateUid == request.auth.uid || resource.data.candidateEmail == request.auth.token.email) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'withdrawnAt', 'updatedAt', 'notes', 'coverLetter']) &&
-          (
-            request.resource.data.status == resource.data.status ||
-            request.resource.data.status in ['Cancelada', 'Desistente', 'Pendente']
-          )
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes', 'coverLetter', 'updatedAt']) &&
+          request.resource.data.candidateUid == resource.data.candidateUid &&
+          request.resource.data.jobId == resource.data.jobId
         )
       );
 
-      allow delete: if isAuthenticated() && (
-        isAdmin() ||
-        resource.data.candidateUid == request.auth.uid ||
-        resource.data.recruiterUid == request.auth.uid ||
-        resource.data.recruiterEmail == request.auth.token.email
-      );
+      allow delete: if isAdmin();
     }
 
     // -------------------------------------------------------------
@@ -255,7 +454,8 @@ service cloud.firestore {
     // Atualização:
     //   - Admin: total.
     //   - Prestador: pode editar dados do serviço, mas NÃO PODE alterar a própria nota (rating) nem reviewsCount.
-    //   - Clientes/Visitantes: podem registrar avaliações, fórum e métricas de visualização (rating limitado entre 0 e 5).
+    //   - Avaliações são criadas exclusivamente pela Cloud Function submitServiceReview.
+    //   - Clientes/Visitantes não podem alterar rating, contadores, reviews ou métricas.
     // Exclusão: Prestador criador ou Admin.
     // -------------------------------------------------------------
     match /services/{serviceId} {
@@ -280,15 +480,10 @@ service cloud.firestore {
            resource.data.providerUid == request.auth.uid ||
            resource.data.providerEmail == request.auth.token.email) &&
           request.resource.data.createdBy == resource.data.createdBy &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'reviewsCount', 'reviewCount'])
-        ) ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics', 'rating', 'reviewsCount', 'reviewCount', 'reviews', 'forumTopics', 'updatedAt']) &&
-          (!('rating' in request.resource.data) || (
-            (request.resource.data.rating is int || request.resource.data.rating is float || request.resource.data.rating is number) &&
-            request.resource.data.rating >= 0 &&
-            request.resource.data.rating <= 5
-          ))
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'rating', 'reviewsCount', 'reviewCount', 'reviews',
+            'analytics', 'forumTopics', 'status', 'moderatedAt', 'moderatedBy'
+          ])
         )
       );
 
@@ -298,6 +493,16 @@ service cloud.firestore {
         resource.data.providerUid == request.auth.uid ||
         resource.data.providerEmail == request.auth.token.email
       );
+    }
+
+    // -------------------------------------------------------------
+    // 4.1 Coleção SERVICE_REVIEWS
+    // Uma avaliação por ordem de serviço, criada apenas pela Cloud Function.
+    // O cliente não pode criar, alterar ou excluir documentos diretamente.
+    // -------------------------------------------------------------
+    match /service_reviews/{reviewId} {
+      allow read: if true;
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------------------
@@ -370,7 +575,13 @@ service cloud.firestore {
         (resource.data.participantUids != null && request.auth.uid in resource.data.participantUids)
       );
       
-      allow list: if isAuthenticated();
+      allow list: if isAuthenticated() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email in resource.data.participants ||
+          request.auth.token.email.lower() in resource.data.participants
+        )) ||
+        (resource.data.participantUids != null && request.auth.uid in resource.data.participantUids)
+      );
 
       allow create: if isAuthenticated() && (
         (!isStudentProfile() || isVerifiedStudent()) &&
@@ -383,7 +594,19 @@ service cloud.firestore {
         )
       );
 
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (!isStudentProfile() || isVerifiedStudent()) &&
+        (
+          (request.auth.token.email != null && (
+            request.auth.token.email in resource.data.participants ||
+            request.auth.token.email.lower() in resource.data.participants
+          )) ||
+          (resource.data.participantUids != null && request.auth.uid in resource.data.participantUids)
+        ) &&
+        isAllowedChatUpdate()
+      );
+
+      allow delete: if isAuthenticated() && (
         (!isStudentProfile() || isVerifiedStudent()) &&
         (
           (request.auth.token.email != null && (
@@ -420,10 +643,25 @@ service cloud.firestore {
           request.resource.data.senderId == request.auth.uid
         );
 
-        allow update, delete: if isAuthenticated() && (
+        allow update: if isAuthenticated() && (
           resource.data.senderEmail == request.auth.token.email ||
           resource.data.senderEmail == request.auth.token.email.lower() ||
           resource.data.senderId == request.auth.uid
+        );
+
+        allow delete: if isAuthenticated() && (
+          isAdmin() ||
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids != null &&
+            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantUids
+          ) ||
+          (
+            request.auth.token.email != null &&
+            (
+              request.auth.token.email in get(/databases/$(database)/documents/chats/$(chatId)).data.participants ||
+              request.auth.token.email.lower() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+            )
+          )
         );
       }
     }
@@ -455,7 +693,8 @@ service cloud.firestore {
           (resource.data.clientUid == request.auth.uid || resource.data.clientId == request.auth.uid || resource.data.clientEmail == request.auth.token.email ||
            resource.data.providerUid == request.auth.uid || resource.data.providerId == request.auth.uid || resource.data.providerEmail == request.auth.token.email) &&
           (!('clientUid' in resource.data) || request.resource.data.clientUid == resource.data.clientUid) &&
-          (!('providerUid' in resource.data) || request.resource.data.providerUid == resource.data.providerUid)
+          (!('providerUid' in resource.data) || request.resource.data.providerUid == resource.data.providerUid) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['review', 'rating', 'reviews'])
         )
       );
 
@@ -481,10 +720,13 @@ service cloud.firestore {
 
     // -------------------------------------------------------------
     // 10. Fila de E-mails / Notificações (Trigger Email Extension / Cloud Functions)
+    // Escrita: somente pelo Firebase Admin SDK das Cloud Functions.
+    // Admin SDK ignora estas regras; nenhum cliente autenticado ou anônimo pode escrever na fila.
+    // Leitura: exclusiva de administradores para auditoria.
     // -------------------------------------------------------------
     match /mail/{mailId} {
-      allow create: if isAuthenticated();
       allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }

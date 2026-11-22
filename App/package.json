@@ -8,6 +8,7 @@
     "build": "vite build",
     "check:mocks": "node ../scripts/check-no-mocks.cjs",
     "test:cbo": "node ../scripts/test-cbo.mjs",
+    "test": "vitest run",
     "clean:cbo": "node ./scripts/clean-invalid-cbo-jobs.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -30,6 +31,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "vitest": "^3.2.4",
     "oxlint": "^1.75.0",
     "vite": "^8.2.0"
   }

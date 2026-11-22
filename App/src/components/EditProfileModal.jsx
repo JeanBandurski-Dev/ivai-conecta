@@ -36,9 +36,9 @@ export default function EditProfileModal({
   addProject,
   removeProject,
   newExp = { role: '', company: '', period: '', description: '' },
-  setNewExp,
+  setNewExp = () => {},
   newProj = { title: '', tech: '', link: '', description: '' },
-  setNewProj,
+  setNewProj = () => {},
   isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('general');

@@ -65,7 +65,7 @@ export function normalizeUserDTO(raw, fallbackId = '') {
     cnpj: String(data.cnpj || '').trim(),
     razaoSocial: String(data.razaoSocial || data.name || '').trim(),
     nomeFantasia: String(data.nomeFantasia || data.tradingName || data.name || '').trim(),
-    isVerifiedCompany: Boolean(data.isVerifiedCompany || (data.cnpj && String(data.cnpj).length >= 14)),
+    isVerifiedCompany: data.companyVerificationStatus === 'VALIDADA' && data.isVerifiedCompany === true,
     sector: String(data.sector || data.industry || '').trim(),
     size: String(data.size || '').trim(),
     website: String(data.website || '').trim(),

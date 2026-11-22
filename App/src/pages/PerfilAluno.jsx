@@ -19,7 +19,7 @@ import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
 import useAppStore from '../store/useAppStore';
-import { normalizeUserRole } from '../services/authService';
+import { isProfileOwner, normalizeUserRole } from '../services/authService';
 
 // Função auxiliar de montagem do perfil em fallback
 function buildFallbackTalent(user) {
@@ -118,14 +118,7 @@ export default function PerfilAluno() {
     return availableTeachers.filter(t => t.id && String(t.id).startsWith('prof_'));
   }, [availableTeachers]);
 
-  const isOwner = Boolean(
-    currentUser && talent && (
-      (currentUser.id != null && talent.id != null && String(currentUser.id) === String(talent.id)) ||
-      (currentUser.uid != null && (String(currentUser.uid) === String(talent.id) || String(currentUser.uid) === String(talent.firestoreId) || String(currentUser.uid) === String(talent.uid))) ||
-      (currentUser.email && talent.email && currentUser.email.toLowerCase() === talent.email.toLowerCase()) ||
-      (!id) // Rota "/perfil" direta sem ID é sempre do usuário logado
-    )
-  );
+  const isOwner = isProfileOwner(currentUser, talent, id);
 
   const isProfessor = currentUser?.role === 'professor';
 
@@ -252,7 +245,9 @@ export default function PerfilAluno() {
     }
 
     let isMounted = true;
-    const docRef = doc(db, 'users', String(targetId));
+    const currentUid = String(currentUser?.uid || currentUser?.id || '');
+    const isOwnerProfile = currentUid && currentUid === String(targetId);
+    const docRef = doc(db, isOwnerProfile ? 'users' : 'public_profiles', String(targetId));
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (!isMounted) return;
@@ -307,13 +302,10 @@ export default function PerfilAluno() {
           try {
             const cleanTarget = decodeURIComponent(String(targetId)).trim();
             const cleanLower = cleanTarget.toLowerCase();
-            const usersCol = collection(db, 'users');
-            const queries = cleanLower.includes('@')
-              ? [query(usersCol, where('email', '==', cleanLower), limit(1))]
-              : [
-                  query(usersCol, where('name', '==', cleanTarget), limit(1)),
-                  query(usersCol, where('displayName', '==', cleanTarget), limit(1))
-                ];
+            const usersCol = collection(db, 'public_profiles');
+            const queries = [
+              query(usersCol, where('name', '==', cleanTarget), limit(1))
+            ];
             Promise.all(queries.map(q => getDocs(q))).then(results => {
               if (!isMounted) return;
               for (const r of results) {
@@ -363,10 +355,10 @@ export default function PerfilAluno() {
   }, [id, currentUser]);
 
   useEffect(() => {
-    if (searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true') {
+    if (isOwner && (searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true')) {
       setEditModalOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, isOwner]);
 
   useEffect(() => {
     if (!successBanner) return;
@@ -469,6 +461,10 @@ export default function PerfilAluno() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    if (!isOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       showToast('Enviando foto para o Firebase Storage...');
@@ -484,6 +480,11 @@ export default function PerfilAluno() {
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
+    if (!isOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      setEditModalOpen(false);
+      return;
+    }
     if (isSavingProfile) return;
     setIsSavingProfile(true);
     try {
@@ -1477,7 +1478,7 @@ export default function PerfilAluno() {
 
       {/* Modal: Edição Completa de Perfil & Currículo Estilo Gupy */}
       <EditProfileModal
-        isOpen={editModalOpen}
+        isOpen={isOwner && editModalOpen}
         onClose={() => !isSavingProfile && setEditModalOpen(false)}
         editData={editData}
         setEditData={setEditData}

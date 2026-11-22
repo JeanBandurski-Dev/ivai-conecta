@@ -1,8 +1,58 @@
 // Storage Service for Ivaí Conecta (Firebase Cloud Storage + Resilient Fallback)
 import { storage, db } from '../lib/firebase.js';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
 import { updateAuthUser } from './authService.js';
+
+function getStorageErrorMessage(error) {
+  if (error?.code === 'storage/unauthorized') {
+    return 'Permissão negada pelo armazenamento. Verifique sua conta e tente novamente.';
+  }
+  if (error?.code === 'storage/canceled' || error?.message === 'storage/timeout') {
+    return 'O envio excedeu o tempo limite e foi cancelado.';
+  }
+  return 'Não foi possível concluir o armazenamento do arquivo. Tente novamente.';
+}
+
+function uploadToStorage(storageRef, file, metadata, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, metadata);
+    let settled = false;
+
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      task.cancel();
+      reject(new Error('storage/timeout'));
+    }, timeoutMs);
+
+    task.on(
+      'state_changed',
+      () => {},
+      (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+      async () => {
+        if (settled) return;
+        try {
+          const downloadUrl = await getDownloadURL(task.snapshot.ref);
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(downloadUrl);
+        } catch (error) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      }
+    );
+  });
+}
 
 /**
  * Faz o upload da foto de perfil / avatar do usuário para o Firebase Storage.
@@ -22,7 +72,8 @@ export async function uploadUserProfilePicture(file, uid) {
   }
 
   // 2. Validação de tipo de imagem
-  if (!file.type.startsWith('image/')) {
+  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedImageTypes.includes(file.type)) {
     return { success: false, error: 'Formato inválido. Por favor, envie uma imagem (JPG, PNG, WEBP).' };
   }
 
@@ -30,14 +81,6 @@ export async function uploadUserProfilePicture(file, uid) {
   const fileExt = file.name.split('.').pop() || 'jpg';
   const filePath = `users/${cleanUid}/avatar_${Date.now()}.${fileExt}`;
   const storageRef = ref(storage, filePath);
-
-  // Helper para ler dataURL local
-  const readLocalDataUrl = () => new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(file);
-  });
 
   try {
     const metadata = {
@@ -48,18 +91,7 @@ export async function uploadUserProfilePicture(file, uid) {
       }
     };
 
-    // Timeout de 3.5 segundos para o upload na nuvem
-    const cloudUpload = (async () => {
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      return downloadUrl;
-    })();
-
-    const timeoutLimit = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('storage/timeout')), 3500)
-    );
-
-    const downloadUrl = await Promise.race([cloudUpload, timeoutLimit]);
+    const downloadUrl = await uploadToStorage(storageRef, file, metadata, 60 * 1000);
 
     // Salvar URL no Firestore
     try {
@@ -76,25 +108,8 @@ export async function uploadUserProfilePicture(file, uid) {
 
     return { success: true, url: downloadUrl };
   } catch (error) {
-    console.warn('[Firebase Storage] Fallback ativado (nuvem indisponível ou timeout):', error.message);
-
-    const localDataUrl = await readLocalDataUrl();
-    if (localDataUrl) {
-      updateAuthUser({ avatar: localDataUrl });
-      try {
-        await setDoc(doc(db, 'users', cleanUid), {
-          avatar: localDataUrl,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch {}
-      return {
-        success: true,
-        url: localDataUrl,
-        warning: 'Foto salva no perfil localmente.'
-      };
-    }
-
-    return { success: false, error: 'Não foi possível carregar a imagem.' };
+    console.warn('[Firebase Storage] Upload de avatar falhou:', error.message);
+    return { success: false, error: getStorageErrorMessage(error) };
   }
 }
 
@@ -109,11 +124,19 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
   if (!file) {
     return { success: false, error: 'Nenhum documento foi selecionado.' };
   }
+  if (!uid) {
+    return { success: false, error: 'Usuário não identificado. Faça login novamente.' };
+  }
 
   // Limite de 10MB
   const maxSizeBytes = 10 * 1024 * 1024;
   if (file.size > maxSizeBytes) {
     return { success: false, error: 'O documento excede o limite máximo permitido de 10MB.' };
+  }
+
+  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: 'Formato inválido. Envie PDF, JPG, PNG ou WEBP.' };
   }
 
   const cleanUid = String(uid || 'anon_' + Date.now());
@@ -132,17 +155,10 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
       }
     };
 
-    const cloudUpload = (async () => {
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      return downloadUrl;
-    })();
-
-    const timeoutLimit = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('storage/timeout')), 3500)
-    );
-
-    const downloadUrl = await Promise.race([cloudUpload, timeoutLimit]);
+    const downloadUrl = await uploadToStorage(storageRef, file, metadata, 60 * 1000);
+    if (typeof downloadUrl !== 'string' || !/^https:\/\//i.test(downloadUrl)) {
+      throw new Error('storage/url-not-confirmed');
+    }
 
     return {
       success: true,
@@ -151,14 +167,12 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
       sizeMB: (file.size / (1024 * 1024)).toFixed(2)
     };
   } catch (error) {
-    console.warn('[Firebase Storage Doc] Fallback ativado:', error.message);
-
+    console.warn('[Firebase Storage Doc] Upload falhou:', error.message);
     return {
-      success: true,
-      url: null,
+      success: false,
       filename: file.name,
       sizeMB: (file.size / (1024 * 1024)).toFixed(2),
-      warning: 'Documento registrado com sucesso no sistema local.'
+      error: getStorageErrorMessage(error)
     };
   }
 }

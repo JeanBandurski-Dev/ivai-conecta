@@ -1,25 +1,58 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Regra para a pasta do usuário: cada usuário só pode escrever e deletar dentro da sua própria pasta
-    match /users/{userId}/{allPaths=**} {
-      // Leitura pública (necessário para exibir fotos de perfil e logotipos nos murais)
-      allow read: if true;
 
-      // Escrita restrita ao usuário dono da pasta (limite de 10MB por arquivo)
-      allow write: if request.auth != null 
-        && request.auth.uid == userId
-        && request.resource.size < 10 * 1024 * 1024;
-
-      // Exclusão permitida apenas ao dono dos arquivos
-      allow delete: if request.auth != null && request.auth.uid == userId;
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Bloqueia qualquer tentativa de escrita fora das pastas autorizadas
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.admin == true;
+    }
+
+    // Fotos e logotipos usados publicamente em perfis e murais.
+    match /users/{userId}/{fileName} {
+      allow read: if fileName.matches('^avatar_.*');
+
+      allow write: if isOwner(userId)
+        && fileName.matches('^avatar_.*')
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Currículos, comprovantes estudantis e documentos empresariais.
+    // Somente o proprietário ou um administrador podem ler ou excluir.
+    match /users/{userId}/docs/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow write: if isOwner(userId)
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'application/pdf',
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Nenhum outro arquivo é público ou gravável por padrão.
     match /{allPaths=**} {
-      allow read: if true;
+      allow read: if false;
       allow write: if false;
+      allow delete: if false;
     }
   }
 }

@@ -64,7 +64,7 @@ export function getCompanies(city = 'Todas as Cidades') {
       logo: u.avatar || u.logo || '',
       about: u.about || 'Empresa atuante no Vale do Ivaí.',
       cnpj: u.cnpj || '',
-      isVerified: Boolean(u.cnpj || u.isVerifiedCompany),
+      isVerified: u.companyVerificationStatus === 'VALIDADA' && u.isVerifiedCompany === true,
       rating: u.rating || 5.0,
       reviews: u.reviewsCount || 0,
       perks: u.perks || ['Ambiente Colaborativo', 'Oportunidade de Crescimento']
@@ -185,7 +185,8 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
 }
 
 export function subscribeToPlatformMetrics(city = 'Todas as Cidades', callback) {
-  // Inicializa imediatamente com dados em cache para evitar emitir contadores parciais ou zerados
+  // Inicializa talentsList com dados já disponíveis em cache local para evitar
+  // delay no primeiro render (emitMetrics é chamado imediatamente).
   let talentsList = getTalents('Todas as Cidades') || [];
   let companiesList = getCompanies('Todas as Cidades') || [];
   let jobsList = getJobs('Todas as Cidades') || [];
@@ -193,8 +194,16 @@ export function subscribeToPlatformMetrics(city = 'Todas as Cidades', callback) 
 
   const emitMetrics = () => {
     const activeJobs = jobsList.filter(isJobActive);
+    const studentsCount = talentsList.filter(t => {
+      const r = String(t?.role || '').toLowerCase().trim();
+      return ['aluno', 'estudante', 'student'].includes(r) || Boolean(t?.course || t?.institution || t?.isVerifiedStudent);
+    }).length;
+    const candidatesCount = Math.max(0, talentsList.length - studentsCount);
+
     callback({
       talentsCount: talentsList.length,
+      studentsCount,
+      candidatesCount,
       companiesCount: companiesList.length,
       jobsCount: activeJobs.length,
       servicesCount: servicesList.length

@@ -3,7 +3,13 @@
  * @description Repositório de dados para a coleção 'applications' (Candidaturas e Funil de Vagas).
  */
 
-import { where, query, getDocs } from 'firebase/firestore';
+import {
+  where,
+  query,
+  getDocs,
+} from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../lib/firebase.js';
 import { BaseRepository, handleFirestoreError } from './BaseRepository.js';
 import {
   normalizeApplicationDTO,
@@ -57,10 +63,21 @@ export class ApplicationRepository extends BaseRepository {
     if (!jobId) return [];
     const idStr = String(jobId).trim();
     try {
-      const all = await this.findAll();
-      return all
-        .map(normalizeApplicationDTO)
-        .filter(a => String(a.jobId) === idStr || String(a.firestoreJobId) === idStr);
+      const [byJobId, byFirestoreJobId] = await Promise.all([
+        getDocs(query(this.collectionRef, where('jobId', '==', idStr))),
+        getDocs(query(this.collectionRef, where('firestoreJobId', '==', idStr))),
+      ]);
+
+      const applications = new Map();
+      [...byJobId.docs, ...byFirestoreJobId.docs].forEach((snapshot) => {
+        applications.set(snapshot.id, normalizeApplicationDTO({
+          id: snapshot.id,
+          firestoreId: snapshot.id,
+          ...snapshot.data(),
+        }));
+      });
+
+      return [...applications.values()];
     } catch (err) {
       throw handleFirestoreError(err, 'findByJobId', this.collectionName);
     }
@@ -96,11 +113,58 @@ export class ApplicationRepository extends BaseRepository {
   }
 
   /**
+   * Cria a candidatura e atualiza o contador da vaga em uma unica transacao.
+   * O ID deterministico impede candidaturas simultaneas duplicadas.
+   * @param {Object} rawData
+   * @param {string} jobDocId
+   * @returns {Promise<Object>}
+   */
+  async createApplicationAtomically(rawData, jobDocId) {
+    const validation = validateApplicationDTO(rawData);
+    if (!validation.isValid) {
+      throw new Error(`Validação de candidatura falhou: ${validation.errors.join('; ')}`);
+    }
+
+    const normalized = normalizeApplicationDTO(rawData);
+    try {
+      const createApplication = httpsCallable(functions, 'createJobApplication');
+      const result = await createApplication({
+        application: {
+          ...normalized,
+          jobId: String(jobDocId),
+          firestoreJobId: String(jobDocId),
+          originalJobId: String(jobDocId),
+        },
+      });
+      const data = result.data || {};
+      return normalizeApplicationDTO({ ...normalized, id: data.id, firestoreId: data.id });
+    } catch (err) {
+      if (err?.code === 'already-exists') throw err;
+      throw handleFirestoreError(err, 'createApplicationAtomically', this.collectionName);
+    }
+  }
+
+  async withdrawApplication(applicationId, jobId = '') {
+    const withdrawApplication = httpsCallable(functions, 'withdrawJobApplication');
+    try {
+      const result = await withdrawApplication({ applicationId, jobId });
+      return result.data;
+    } catch (err) {
+      throw handleFirestoreError(err, 'withdrawApplication', this.collectionName);
+    }
+  }
+
+  /**
    * Transiciona uma candidatura de estágio no funil de seleção.
    * @param {string} applicationId
    * @param {string} newStage - ApplicationStage
    * @param {string} [feedback]
    * @returns {Promise<Object>}
+   */
+  /**
+   * @deprecated Não utiliza o fluxo atual de candidatura. O fluxo ativo deve
+   * ser localizado no serviço de vagas/candidaturas e deve ser consolidado
+   * antes de novas alterações nesta função.
    */
   async updateStage(applicationId, newStage, feedback = '') {
     const validation = validateStageTransitionDTO(newStage);

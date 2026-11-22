@@ -59,7 +59,8 @@ export const AUTHORIZED_STUDENT_DOMAINS = [
   'faculdadeivaipora.com.br',
   'faculdadeivaipora.edu.br',
   'fatec.edu.br',
-  'fatecivaipora.edu.br'
+  'fatecivaipora.edu.br',
+  'uenp.edu.br'
 ];
 
 export function isAuthorizedStudentInstitutionEmail(email) {
@@ -268,7 +269,7 @@ export function validateStudentEmail(email) {
       institution: null,
       shortInstitution: null,
       domain,
-      error: 'O e-mail deve pertencer ao IFPR, UNIVALE ou FATEC Ivaiporã.'
+      error: 'O e-mail deve pertencer a uma instituição reconhecida, como IFPR, UENP, UNIVALE ou FATEC Ivaiporã.'
     };
   }
 

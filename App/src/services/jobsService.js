@@ -7,8 +7,7 @@ import {
   updateDoc,
   query,
   where,
-  onSnapshot,
-  increment
+  onSnapshot
 } from 'firebase/firestore';
 import { STORAGE_KEY_JOBS, STORAGE_KEY_APPLICATIONS, STORAGE_KEY_AUTH_USER, STORAGE_KEY_USERS_DB } from '../data/seedData.js';
 import { jobRepository, applicationRepository } from '../repositories/index.js';
@@ -675,8 +674,7 @@ export async function addJob(jobData) {
     newJob.firestoreId = created.firestoreId;
   } catch (err) {
     console.warn('[JobRepository] Erro ao cadastrar vaga no Firestore:', err.message);
-    newJob.id = `job_${Date.now()}`;
-    newJob.firestoreId = newJob.id;
+    throw err;
   }
 
   // 2. Mescla a nova vaga com todas as vagas existentes sem perder nada
@@ -698,14 +696,6 @@ export async function updateJobStatus(jobId, action) {
   const newStatus = action === 'close' ? JobStatus.ENCERRADA : JobStatus.ABERTA;
   const idStr = String(jobId);
 
-  // 1. Salva override persistente no localStorage
-  if (typeof localStorage !== 'undefined') {
-    const overrides = getJobStatusOverrides();
-    overrides[idStr] = newStatus;
-    localStorage.setItem(STORAGE_KEY_JOB_STATUSES, JSON.stringify(overrides));
-  }
-
-  // 2. Atualiza via JobRepository
   const jobs = getJobs('Todas as Cidades');
   const targetJob = jobs.find(j => j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr));
 
@@ -715,7 +705,10 @@ export async function updateJobStatus(jobId, action) {
       await jobRepository.update(String(docId), { status: newStatus });
     } catch (err) {
       console.warn('[JobRepository] Erro ao atualizar status da vaga:', err.message);
+      throw err;
     }
+  } else {
+    throw new Error(`Vaga não encontrada com ID: ${jobId}`);
   }
 
   const updated = jobs.map(j => {
@@ -724,6 +717,13 @@ export async function updateJobStatus(jobId, action) {
     }
     return j;
   });
+
+  if (typeof localStorage !== 'undefined') {
+    const overrides = getJobStatusOverrides();
+    overrides[idStr] = newStatus;
+    if (targetJob.firestoreId) overrides[String(targetJob.firestoreId)] = newStatus;
+    localStorage.setItem(STORAGE_KEY_JOB_STATUSES, JSON.stringify(overrides));
+  }
 
   persistJobs(updated);
 
@@ -745,16 +745,30 @@ export async function deleteJob(jobId) {
   const targetFirestoreId = target?.firestoreId || (isNaN(Number(jobId)) ? idStr : null);
   const targetNumericId = target?.id ? String(target.id) : (!isNaN(Number(jobId)) ? idStr : null);
 
-  // 2. Registra no banco de IDs deletados para não ressurgir em cache
+  // 2. Confirma a exclusao remota antes de alterar o cache local
+  try {
+    if (targetFirestoreId) {
+      await jobRepository.delete(targetFirestoreId);
+    }
+    if (targetNumericId) {
+      const qNum = query(collection(db, 'jobs'), where('id', '==', Number(targetNumericId)));
+      const snap = await getDocs(qNum);
+      await Promise.all(snap.docs.map(d => jobRepository.delete(d.id)));
+    }
+  } catch (err) {
+    console.warn('[JobRepository] Erro ao excluir vaga:', err.message);
+    throw err;
+  }
+
+  // 3. So apos a confirmacao remota, registra o ID deletado e atualiza o cache
   if (typeof localStorage !== 'undefined') {
     const deletedIds = getDeletedJobIds();
-    if (!deletedIds.includes(idStr)) deletedIds.push(idStr);
-    if (targetFirestoreId && !deletedIds.includes(targetFirestoreId)) deletedIds.push(targetFirestoreId);
-    if (targetNumericId && !deletedIds.includes(targetNumericId)) deletedIds.push(targetNumericId);
+    [idStr, targetFirestoreId, targetNumericId].forEach(id => {
+      if (id && !deletedIds.includes(id)) deletedIds.push(id);
+    });
     localStorage.setItem(STORAGE_KEY_DELETED_JOBS, JSON.stringify(deletedIds));
   }
 
-  // 3. Remove da lista local imediatamente
   const updated = jobs.filter(j => !(
     j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr ||
     (targetFirestoreId && (String(j.id) === targetFirestoreId || String(j.firestoreId) === targetFirestoreId)) ||
@@ -767,20 +781,6 @@ export async function deleteJob(jobId) {
     window.dispatchEvent(new CustomEvent('ivai_jobs_updated', { detail: updated }));
   } catch (evErr) {
     console.warn('[JobsService] Aviso no evento ivai_jobs_updated:', evErr);
-  }
-
-  // 4. Exclui via JobRepository
-  try {
-    if (targetFirestoreId) {
-      await jobRepository.delete(targetFirestoreId);
-    }
-    if (targetNumericId) {
-      const qNum = query(collection(db, 'jobs'), where('id', '==', Number(targetNumericId)));
-      const snap = await getDocs(qNum);
-      snap.forEach(d => jobRepository.delete(d.id).catch(() => {}));
-    }
-  } catch (err) {
-    console.warn('[JobRepository] Erro ao excluir vaga:', err.message);
   }
 
   return updated;
@@ -1201,24 +1201,26 @@ export async function applyToJob(jobOrId, user) {
     }
   });
 
-  // Grava candidatura via ApplicationRepository
+  // Grava candidatura e contador da vaga em uma única transação.
+  const targetDocId = job?.firestoreId || job?.id || jobId;
+  if (!targetDocId) {
+    return { success: false, message: 'Não foi possível identificar a vaga.' };
+  }
+
   try {
-    const created = await applicationRepository.createApplication(cleanApp);
+    const created = await applicationRepository.createApplicationAtomically(cleanApp, String(targetDocId));
     newApp.id = created.id;
     newApp.firestoreId = created.firestoreId;
-
-    // Incrementa o contador de inscritos na vaga no Firestore
-    const targetDocId = job?.firestoreId || job?.id || jobId;
-    if (targetDocId) {
-      try {
-        await jobRepository.update(String(targetDocId), {
-          applicantsCount: increment(1)
-        });
-      } catch {}
-    }
   } catch (err) {
-    console.warn('[ApplicationRepository] Erro ao gravar candidatura:', err.message);
-    newApp.id = `app_${Date.now()}`;
+    console.warn('[ApplicationRepository] Falha ao persistir candidatura:', err.message);
+    if (err?.code === 'already-exists') {
+      return { success: false, message: 'Você já se candidatou a esta vaga!' };
+    }
+    return {
+      success: false,
+      message: 'Não foi possível confirmar sua candidatura. Tente novamente.',
+      error: err?.code || 'persistence-error'
+    };
   }
 
   const allApps = getUserApplications();
@@ -1720,7 +1722,7 @@ export function scheduleCandidateInterview(jobId, candidateId, interviewData) {
   return updatedList;
 }
 
-export function updateJob(jobId, patchData) {
+export async function updateJob(jobId, patchData) {
   if (patchData && typeof patchData === 'object') {
     if (patchData.title) {
       const titleClean = String(patchData.title).trim();
@@ -1774,15 +1776,26 @@ export function updateJob(jobId, patchData) {
 
   const jobs = getJobs('Todas as Cidades');
   const idStr = String(jobId);
+  const target = jobs.find(j => j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr));
+  if (!target) {
+    throw new Error(`Vaga não encontrada com ID: ${jobId}`);
+  }
+
+  const docId = target.firestoreId || (isNaN(Number(jobId)) ? idStr : null);
+  if (docId) {
+    try {
+      await jobRepository.update(String(docId), patchData);
+    } catch (err) {
+      console.warn('[JobRepository] Erro ao atualizar vaga:', err.message);
+      throw err;
+    }
+  } else {
+    throw new Error(`A vaga ${jobId} não possui um ID válido do Firestore.`);
+  }
+
   const updated = jobs.map(j => {
     if (j.id === Number(jobId) || j.id === jobId || String(j.id) === idStr || (j.firestoreId && String(j.firestoreId) === idStr)) {
-      const updatedJob = { ...j, ...patchData, updatedAt: new Date().toLocaleDateString('pt-BR') };
-      if (j.firestoreId) {
-        try {
-          updateDoc(doc(db, 'jobs', j.firestoreId), patchData).catch(() => {});
-        } catch {}
-      }
-      return updatedJob;
+      return { ...j, ...patchData, updatedAt: new Date().toLocaleDateString('pt-BR') };
     }
     return j;
   });
@@ -1793,7 +1806,7 @@ export function updateJob(jobId, patchData) {
   return updated;
 }
 
-export function duplicateJob(jobId) {
+export async function duplicateJob(jobId) {
   const job = getJobById(jobId);
   if (!job) return null;
   const newJob = {
@@ -1856,11 +1869,12 @@ export function getJobCustomStages(jobId) {
   return getCompanyCustomStages();
 }
 
-export function saveJobCustomStages(jobId, stages) {
+export async function saveJobCustomStages(jobId, stages) {
   if (!jobId || !Array.isArray(stages)) return stages;
   const cleaned = stages.map(sanitizeStageItem);
 
-  // 1. Save in map
+  await updateJob(jobId, { customStages: cleaned });
+
   if (typeof localStorage !== 'undefined') {
     try {
       const map = { ...getAllJobCustomStagesMap() };
@@ -1869,9 +1883,6 @@ export function saveJobCustomStages(jobId, stages) {
       localStorage.setItem(STORAGE_KEY_JOB_CUSTOM_STAGES, JSON.stringify(map));
     } catch {}
   }
-
-  // 2. Save in job item
-  updateJob(jobId, { customStages: cleaned });
 
   return cleaned;
 }

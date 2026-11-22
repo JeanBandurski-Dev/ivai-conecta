@@ -222,10 +222,6 @@ export default function ServiceCard({ service, onDelete, onEdit, onRequestServic
             <button
               type="button"
               onClick={() => {
-                if (!currentUser) {
-                  showToast('Faça login para solicitar este serviço!');
-                  return;
-                }
                 if (onRequestService) {
                   onRequestService(service);
                 } else {

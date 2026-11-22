@@ -24,6 +24,8 @@ export default function AdminServices() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
 
   // Search and Category Filter
   const [search, setSearch] = useState('');
@@ -34,13 +36,15 @@ export default function AdminServices() {
   const [modalAction, setModalAction] = useState(null); // 'pause' | 'activate' | 'delete'
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadServices = async () => {
+  const loadServices = async (cursor = null, append = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchAllServices({ limitCount: 150 });
+      const res = await fetchAllServices({ category: categoryFilter, search, limitCount: 25, cursor });
       if (res.success) {
-        setServices(res.services || []);
+        setServices(prev => append ? [...prev, ...(res.services || [])] : (res.services || []));
+        setLastDoc(res.lastDoc || null);
+        setHasMore(res.hasMore === true);
       } else {
         setError(res.error || 'Erro ao consultar serviços.');
       }
@@ -53,7 +57,7 @@ export default function AdminServices() {
 
   useEffect(() => {
     loadServices();
-  }, []);
+  }, [categoryFilter, search]);
 
   // Filtered services
   const filteredServices = useMemo(() => {
@@ -309,6 +313,17 @@ export default function AdminServices() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center p-4 border-t border-gray-100 dark:border-slate-800">
+            <button
+              onClick={() => loadServices(lastDoc, true)}
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-blue disabled:opacity-50"
+            >
+              {loading ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── MODAL DE CONFIRMAÇÃO ── */}

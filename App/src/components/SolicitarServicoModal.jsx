@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
   X, Send, Sparkles, AlertCircle, CheckCircle2, MapPin, DollarSign,
@@ -20,6 +21,8 @@ import {
 
 export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
   const { currentUser, showToast } = useAppStore();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Identificação do tipo de contratante (Empresa vs Pessoa Física)
   const isCompanyUser = useMemo(() => Boolean(
@@ -244,6 +247,25 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
 
         {/* Formulário com Validação Aprimorada */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {!currentUser && (
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Você precisa estar conectado para solicitar este serviço.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  navigate('/login', { state: { from: location.pathname } });
+                }}
+                className="btn btn-primary btn-sm text-xs font-bold shrink-0 py-1 px-3 cursor-pointer"
+              >
+                Fazer Login
+              </button>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl flex items-center gap-2.5 text-xs font-medium text-red-700 dark:text-red-300 animate-in fade-in">
               <AlertCircle size={16} className="shrink-0 text-red-500" />
@@ -529,18 +551,32 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
               >
                 Cancelar
               </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || !descVal.valid || !phoneVal.valid || !budgetVal.valid || !deadlineVal.valid}
-                className={`btn btn-sm text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer ${
-                  descVal.valid && phoneVal.valid && budgetVal.valid && deadlineVal.valid
-                    ? 'btn-primary'
-                    : 'bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                <Send size={13} />
-                {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
-              </button>
+              {!currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    navigate('/login', { state: { from: location.pathname } });
+                  }}
+                  className="btn btn-primary btn-sm text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send size={13} />
+                  Fazer Login para Solicitar
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !descVal.valid || !phoneVal.valid || !budgetVal.valid || !deadlineVal.valid}
+                  className={`btn btn-sm text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer ${
+                    descVal.valid && phoneVal.valid && budgetVal.valid && deadlineVal.valid
+                      ? 'btn-primary'
+                      : 'bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Send size={13} />
+                  {isSubmitting ? 'Enviando...' : 'Enviar Solicitação'}
+                </button>
+              )}
             </div>
           </div>
         </form>

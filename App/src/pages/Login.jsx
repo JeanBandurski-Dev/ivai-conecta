@@ -17,7 +17,7 @@ const ROLES = [
 ];
 
 export default function Login() {
-  const { login, register, loginWithGoogle, showToast } = useAppStore();
+  const { login, register, loginWithGoogle, requestPasswordReset, showToast } = useAppStore();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTarget = location.state?.from?.pathname || '/';
@@ -27,6 +27,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [alert, setAlert] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Password visibility
   const [showLoginPass, setShowLoginPass] = useState(false);
@@ -96,6 +98,35 @@ export default function Login() {
       }
     } else {
       setCnpjError(res.error || 'Não foi possível validar os dados do CNPJ na Receita Federal.');
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setAlert('');
+    setResetMessage('');
+    const email = loginEmail.trim();
+    if (!email) {
+      setAlert('Informe seu e-mail no campo acima para recuperar a senha.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAlert('Informe um endereço de e-mail válido.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const result = await requestPasswordReset(email);
+      if (result.success) {
+        setResetMessage(result.message);
+        showToast(result.message, 'success');
+      } else {
+        setAlert(result.error);
+      }
+    } catch (error) {
+      setAlert(error?.message || 'Não foi possível iniciar a recuperação da senha.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -174,7 +205,8 @@ export default function Login() {
         razaoSocial: cnpjData?.razaoSocial || regName.trim(),
         nomeFantasia: cnpjData?.nomeFantasia || regName.trim(),
         situacaoCnpj: cnpjData?.situacaoCadastral || 'ATIVA',
-        isVerifiedCompany: true
+        isVerifiedCompany: false,
+        companyVerificationStatus: 'NAO_VERIFICADA'
       })
     });
     setLoading(false);
@@ -442,6 +474,29 @@ export default function Login() {
                 </div>
               </div>
             )}
+            {resetMessage && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 rounded-xl animate-in fade-in duration-300"
+              >
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 size={15} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                  <p className="flex-1 text-xs font-semibold text-emerald-800 dark:text-emerald-200 leading-snug">
+                    {resetMessage}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setResetMessage('')}
+                    className="p-1 -mr-1 -mt-1 rounded-lg text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+                    title="Fechar mensagem"
+                    aria-label="Fechar mensagem"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ═════════════════════════════════════════════════════════════
                 FORMULÁRIO DE LOGIN (ANIMAÇÃO SUAVE)
@@ -456,7 +511,11 @@ export default function Login() {
                     <input
                       type="email"
                       value={loginEmail}
-                      onChange={e => setLoginEmail(e.target.value)}
+                      onChange={e => {
+                        setLoginEmail(e.target.value);
+                        if (resetMessage) setResetMessage('');
+                        if (alert) setAlert('');
+                      }}
                       className="w-full bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 text-gray-900 dark:text-white transition-all duration-200 placeholder:text-gray-400 placeholder:font-normal"
                       placeholder="seu.email@exemplo.com"
                       autoComplete="email"
@@ -479,10 +538,12 @@ export default function Login() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => showToast('Digite seu e-mail e solicite recuperação ao suporte se necessário.')}
-                      className="text-[11px] font-semibold text-primary-blue dark:text-blue-400 hover:underline cursor-pointer transition-colors duration-200"
+                      onClick={handlePasswordReset}
+                      disabled={resetLoading}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary-blue dark:text-blue-400 hover:underline cursor-pointer transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Esqueceu a senha?
+                      {resetLoading && <Loader2 size={11} className="animate-spin" />}
+                      {resetLoading ? 'Enviando...' : 'Esqueceu a senha?'}
                     </button>
                   </div>
                   <div className="relative group">

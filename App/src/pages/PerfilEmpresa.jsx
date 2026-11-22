@@ -5,8 +5,8 @@ import {
   Edit3, ShieldCheck, CheckCircle2, Plus, HeartHandshake,
   BarChart3, Camera, MessageSquare, Share2, Globe, Phone, Loader2, ShieldAlert
 } from 'lucide-react';
-import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser } from '../lib/ivaiConecta';
-import { getUserProfile, normalizeUserRole } from '../services/authService';
+import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser, subscribeToJobs } from '../lib/ivaiConecta';
+import { getUserProfile, isProfileOwner, normalizeUserRole } from '../services/authService';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
@@ -54,6 +54,15 @@ export default function PerfilEmpresa() {
   });
 
   const [, setRefreshKey] = useState(0);
+  const [allJobsLive, setAllJobsLive] = useState(() => getJobs('Todas as Cidades'));
+
+  // Subscrição em tempo real para a lista de vagas — atualiza ao criar nova vaga
+  useEffect(() => {
+    const unsub = subscribeToJobs('Todas as Cidades', (data) => {
+      if (Array.isArray(data)) setAllJobsLive(data);
+    });
+    return () => unsub();
+  }, []);
 
   const [company, setCompany] = useState(() => {
     const roleNormalized = normalizeUserRole(currentUser?.role);
@@ -65,15 +74,12 @@ export default function PerfilEmpresa() {
         currentUser.role === 'recrutador'
       )
     );
-    const decId = id && String(id) !== 'empresa' ? decodeURIComponent(id).toLowerCase().trim() : '';
-    const compName = String(currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || '').toLowerCase().trim();
     const isOwner = Boolean(
       isCompanyUser && (
         !id ||
         String(id) === 'empresa' ||
         String(id) === String(currentUser.uid) ||
-        String(id) === String(currentUser.id) ||
-        (decId && compName && decId === compName)
+        String(id) === String(currentUser.id)
       )
     );
     if (isOwner && currentUser) {
@@ -130,26 +136,10 @@ export default function PerfilEmpresa() {
   const decodedId = id && String(id) !== 'empresa' ? decodeURIComponent(id).toLowerCase().trim() : '';
   const currentCompanyName = String(currentUser?.razaoSocial || currentUser?.nomeFantasia || currentUser?.name || '').toLowerCase().trim();
 
-  const isCompanyOwner = Boolean(
-    isCompany && (
-      !id ||
-      String(id) === 'empresa' ||
-      (currentUser?.uid && (String(id) === String(currentUser.uid) || String(company?.uid) === String(currentUser.uid))) ||
-      (currentUser?.id && (String(id) === String(currentUser.id) || String(company?.id) === String(currentUser.id))) ||
-      (decodedId && currentCompanyName && decodedId === currentCompanyName)
-    )
-  );
+  const isCompanyOwner = isCompany && isProfileOwner(currentUser, company, id);
 
   useEffect(() => {
-    const isOwnerByAuthOrId = Boolean(
-      isCompany && (
-        !id ||
-        String(id) === 'empresa' ||
-        String(id) === String(currentUser.uid) ||
-        String(id) === String(currentUser.id) ||
-        (decodedId && currentCompanyName && decodedId === currentCompanyName)
-      )
-    );
+    const isOwnerByAuthOrId = isCompany && isProfileOwner(currentUser, company, id);
 
     if (isOwnerByAuthOrId && currentUser) {
       const companyDisplayName = currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada';
@@ -248,7 +238,7 @@ export default function PerfilEmpresa() {
           perks: matchCompany.perks && matchCompany.perks.length > 0 ? matchCompany.perks : prev.perks,
         }));
       } else {
-        const allJobs = getJobs('Todas as Cidades');
+        const allJobs = allJobsLive;
         const matchJob = allJobs.find(j =>
           (j.createdBy && String(j.createdBy).toLowerCase() === decodedId) ||
           (j.companyUid && String(j.companyUid).toLowerCase() === decodedId) ||
@@ -268,7 +258,7 @@ export default function PerfilEmpresa() {
     }
   }, [currentUser, id]);
 
-  const allJobs = getJobs('Todas as Cidades');
+  const allJobs = allJobsLive;
   const jobs = allJobs.filter(j => {
     if (!j) return false;
     if (isCompanyOwner) {
@@ -296,11 +286,15 @@ export default function PerfilEmpresa() {
   const closedJobsCount = jobs.filter(j => j.status === 'Encerrada').length;
 
   const handleLogoUpload = async (e) => {
+    if (!isCompanyOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true);
     showToast('⏳ Enviando logotipo para o Firebase Storage...');
-    const res = await uploadUserProfilePicture(file, `${currentUser?.uid || currentUser?.id || 'empresa'}_logo`);
+    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id);
     setUploadingLogo(false);
     if (res.success) {
       setCompany(c => ({ ...c, logo: res.url }));
@@ -317,11 +311,15 @@ export default function PerfilEmpresa() {
   };
 
   const handleBannerUpload = async (e) => {
+    if (!isCompanyOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingBanner(true);
     showToast('⏳ Atualizando imagem de capa no Storage...');
-    const res = await uploadUserProfilePicture(file, `${currentUser?.uid || currentUser?.id || 'empresa'}_banner`);
+    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id);
     setUploadingBanner(false);
     if (res.success) {
       setCompany(c => ({ ...c, banner: res.url }));
@@ -338,6 +336,10 @@ export default function PerfilEmpresa() {
   };
 
   const _handleSelectPresetBanner = (presetUrl) => {
+    if (!isCompanyOwner) {
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
     setCompany(c => ({ ...c, banner: presetUrl }));
     setEditCompanyData(d => ({ ...d, coverImage: presetUrl }));
     if (currentUser && isCompanyOwner) {
@@ -358,6 +360,10 @@ export default function PerfilEmpresa() {
   };
 
   const handleOpenEditModal = () => {
+    if (!isCompanyOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      return;
+    }
     setEditCompanyData({
       name: company.name || currentUser?.razaoSocial || currentUser?.name || '',
       tradingName: currentUser?.nomeFantasia || company.name || '',
@@ -382,6 +388,11 @@ export default function PerfilEmpresa() {
 
   const handleSaveCompany = async (e) => {
     if (e) e.preventDefault();
+    if (!isCompanyOwner) {
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      setEditModal(false);
+      return;
+    }
     const validation = validateCompanyProfileForm(editCompanyData || {});
     if (!validation.isValid) {
       showToast('⚠️ Corrija os erros apontados no perfil da empresa antes de salvar.');
