@@ -1,6 +1,6 @@
 /**
  * Base de conhecimento contextual e guia rápido do Ivaí Conecta.
- * Fornece atalhos por página/perfil, correspondência local de FAQ
+ * Fornece atalhos distintos por página e perfil, correspondência local de FAQ
  * e parser de ações clicáveis para o Assistente de Ajuda.
  */
 
@@ -94,11 +94,11 @@ export const HELP_ARTICLES = [
   {
     id: 'vagas-candidatura',
     roles: ['aluno', 'candidato', 'freelancer', 'visitante'],
-    keywords: ['vaga', 'vagas', 'candidatar', 'candidatura', 'match', 'emprego', 'estagio', 'estágio', 'acompanhar', 'status'],
+    keywords: ['vaga', 'vagas', 'candidatar', 'candidatura', 'match', 'emprego', 'estagio', 'estágio', 'acompanhar', 'status', 'etapas'],
     title: 'Como buscar vagas e acompanhar candidaturas',
     answer:
       'Na aba **Vagas & Match**, você pode filtrar oportunidades por cidade do Vale do Ivaí, modalidade e área.\n\n' +
-      '• Clique em uma vaga para ver requisitos, empresa e faixa/condições.\n' +
+      '• Clique em uma vaga para ver requisitos, empresa e condições.\n' +
       '• Após se candidatar, acompanhe o andamento das etapas em **Minhas Vagas**.\n' +
       '• Dica: manter habilidades e resumo preenchidos no perfil melhora sua compatibilidade (Match).',
     actions: [
@@ -146,13 +146,16 @@ export const HELP_ARTICLES = [
   {
     id: 'servicos-freelancer',
     roles: ['freelancer', 'aluno', 'empresa', 'visitante'],
-    keywords: ['servico', 'serviço', 'servicos', 'freelancer', 'prestador', 'orcamento', 'orçamento', 'solicitar', 'divulgar', 'avaliar'],
+    keywords: ['servico', 'serviço', 'servicos', 'serviços', 'freelancer', 'prestador', 'orcamento', 'orçamento', 'solicitar', 'divulgar', 'avaliar', 'pedido'],
     title: 'Serviços Locais e atuação como Freelancer',
     answer:
       'Em **Serviços Locais**, profissionais da região divulgam serviços (TI, design, aulas, manutenção, consultoria e mais).\n\n' +
       '• **Para contratar:** escolha um serviço, clique para solicitar atendimento/orçamento e alinhe detalhes pelo chat.\n' +
       '• **Para prestar serviços:** com perfil Freelancer, publique seu serviço com descrição objetiva, cidade atendida e faixa de valor.',
-    actions: [{ type: 'navigate', to: '/servicos', label: 'Ver Serviços Locais' }]
+    actions: [
+      { type: 'navigate', to: '/servicos', label: 'Ver Serviços Locais' },
+      { type: 'navigate', to: '/freelancer', label: 'Perfil Freelancer', requiresAuth: true }
+    ]
   },
   {
     id: 'chat-mensagens',
@@ -166,9 +169,22 @@ export const HELP_ARTICLES = [
     actions: [{ type: 'open_chat', label: 'Abrir Chat Agora', requiresAuth: true }]
   },
   {
+    id: 'excluir-conta',
+    roles: ['aluno', 'candidato', 'empresa', 'freelancer', 'professor', 'admin'],
+    keywords: ['apagar conta', 'excluir conta', 'deletar conta', 'remover conta', 'encerrar conta', 'apagar minha conta', 'excluir minha conta', 'zona de perigo'],
+    title: 'Como apagar / excluir sua conta definitivamente',
+    answer:
+      'Para excluir sua conta do Ivaí Conecta (ação irreversível pela LGPD):\n\n' +
+      '1. Acesse **Configurações** no menu do seu perfil.\n' +
+      '2. Entre na aba **Conta e Segurança**.\n' +
+      '3. Role até **Zona de Perigo: Exclusão Permanente da Conta** e clique em **Excluir Minha Conta Definitivamente**.\n' +
+      '4. Confirme sua senha (ou digite **EXCLUIR** se entrou com Google) para remover seus dados pessoais, perfil e candidaturas.',
+    actions: [{ type: 'navigate', to: '/configuracoes?tab=account', label: 'Ir para Conta e Segurança', requiresAuth: true }]
+  },
+  {
     id: 'conta-privacidade-notificacoes',
     roles: ['aluno', 'candidato', 'empresa', 'freelancer', 'professor', 'admin', 'visitante'],
-    keywords: ['senha', 'privacidade', 'notificacao', 'notificações', 'excluir conta', 'configuracoes', 'configurações', 'perfil publico', 'lgpd', 'dados'],
+    keywords: ['senha', 'privacidade', 'notificacao', 'notificações', 'configuracoes', 'configurações', 'perfil publico', 'lgpd', 'dados', 'links'],
     title: 'Conta, privacidade e notificações',
     answer:
       'Em **Configurações**, você controla links profissionais, preferências de notificação, visibilidade/privacidade do perfil e segurança da conta.\n\n' +
@@ -178,7 +194,7 @@ export const HELP_ARTICLES = [
   {
     id: 'cadastro-acesso',
     roles: ['visitante', 'aluno', 'candidato', 'empresa', 'freelancer', 'professor'],
-    keywords: ['cadastro', 'cadastrar', 'entrar', 'login', 'google', 'conta', 'criar conta', 'papel', 'perfil'],
+    keywords: ['cadastro', 'cadastrar', 'entrar', 'login', 'google', 'criar conta', 'papel', 'perfil'],
     title: 'Como criar conta e escolher seu perfil',
     answer:
       'No Ivaí Conecta você pode entrar com e-mail e senha ou conta Google.\n\n' +
@@ -208,106 +224,367 @@ export function getPageLabel(pathname = '/') {
   return found ? found.label : 'Plataforma';
 }
 
+/**
+ * Gera sugestões de ajuda específicas para a rota atual, adaptando detalhes ao papel do usuário.
+ */
 export function getContextualHelpTopics({ pathname = '/', userRole = 'visitante', isAuthenticated = false } = {}) {
   const role = normalizeRoleKey(userRole);
   const path = String(pathname || '/');
-  const topics = [];
 
-  if (!isAuthenticated || path.startsWith('/login')) {
-    topics.push(
+  if (path.startsWith('/login') || path.startsWith('/completar-perfil')) {
+    return [
       {
-        id: 'quick-cadastro',
-        label: 'Como criar minha conta?',
+        id: 'login-cadastro',
+        label: 'Como criar conta e escolher perfil?',
         question: 'Como faço para criar uma conta e escolher meu perfil?',
         articleId: 'cadastro-acesso'
       },
       {
-        id: 'quick-validacao-visitor',
-        label: 'Quais faculdades são aceitas?',
+        id: 'login-validacao',
+        label: 'Como funciona a validação estudantil?',
         question: 'Como funciona a validação de e-mail estudantil?',
         articleId: 'validacao-estudantil'
+      },
+      {
+        id: 'login-ai-duvida',
+        label: 'IA: Qual perfil devo escolher?',
+        question: 'Qual a diferença entre os perfis Aluno, Freelancer, Empresa e Professor no Ivaí Conecta?',
+        preferAI: true
       }
-    );
+    ];
   }
 
-  if (role === 'empresa' || path.startsWith('/gerenciamento-vagas') || path.startsWith('/painel-empresa') || path.startsWith('/talentos') || path.startsWith('/empresa')) {
-    topics.push(
+  if (path.startsWith('/vagas')) {
+    if (role === 'empresa') {
+      return [
+        {
+          id: 'vagas-emp-publicar',
+          label: 'Como publicar uma nova vaga?',
+          question: 'Como publicar uma vaga e escolher o CBO correto?',
+          articleId: 'publicar-vaga-cbo'
+        },
+        {
+          id: 'vagas-emp-talentos',
+          label: 'Buscar candidatos no Banco de Talentos',
+          question: 'Como buscar e contatar candidatos no Banco de Talentos?',
+          articleId: 'banco-talentos'
+        },
+        {
+          id: 'vagas-emp-ai',
+          label: 'IA: Escrever descrição de vaga',
+          question: 'Me ajude a escrever uma descrição clara e atrativa para publicar uma vaga no Ivaí Conecta.',
+          preferAI: true
+        }
+      ];
+    }
+
+    return [
       {
-        id: 'quick-cbo',
+        id: 'vagas-match',
+        label: 'Como funciona o Match e candidatura?',
+        question: 'Como buscar vagas e acompanhar minhas candidaturas?',
+        articleId: 'vagas-candidatura'
+      },
+      {
+        id: 'vagas-curriculo',
+        label: 'Como melhorar meu currículo em PDF?',
+        question: 'Como preencher e baixar meu currículo em PDF?',
+        articleId: 'curriculo-pdf'
+      },
+      {
+        id: 'vagas-ai-entrevista',
+        label: 'IA: Dicas para me destacar na vaga',
+        question: 'Quais dicas práticas para me destacar ao me candidatar a uma vaga na minha região?',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (path.startsWith('/minhas-vagas')) {
+    return [
+      {
+        id: 'mv-status',
+        label: 'Como acompanhar etapas da vaga?',
+        question: 'Como buscar vagas e acompanhar minhas candidaturas?',
+        articleId: 'vagas-candidatura'
+      },
+      {
+        id: 'mv-chat',
+        label: 'Como falar com a empresa no chat?',
+        question: 'Como usar o chat em tempo real da plataforma?',
+        articleId: 'chat-mensagens'
+      },
+      {
+        id: 'mv-ai-prep',
+        label: 'IA: Preparação para entrevista',
+        question: 'Me dê um roteiro rápido para me preparar bem para uma entrevista de estágio ou emprego.',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (path.startsWith('/gerenciamento-vagas') || path.startsWith('/painel-empresa')) {
+    return [
+      {
+        id: 'gv-cbo',
         label: 'Publicar vaga e escolher CBO',
         question: 'Como publicar uma vaga e escolher o CBO correto?',
         articleId: 'publicar-vaga-cbo'
       },
       {
-        id: 'quick-talentos',
+        id: 'gv-talentos',
         label: 'Como usar o Banco de Talentos?',
         question: 'Como buscar e contatar candidatos no Banco de Talentos?',
         articleId: 'banco-talentos'
       },
       {
-        id: 'quick-ai-vaga',
-        label: 'IA: Escrever descrição de vaga',
-        question: 'Me ajude a escrever uma boa descrição de vaga com requisitos claros para publicar no Ivaí Conecta.',
+        id: 'gv-cnpj',
+        label: 'Como validar CNPJ da empresa?',
+        question: 'Como validar o CNPJ da minha empresa?',
+        articleId: 'validacao-empresa-cnpj'
+      },
+      {
+        id: 'gv-ai-vaga',
+        label: 'IA: Gerar texto de vaga',
+        question: 'Me ajude a estruturar uma vaga com responsabilidades, requisitos e benefícios claros.',
         preferAI: true
       }
-    );
-  } else if (role === 'freelancer' || path.startsWith('/servicos') || path.startsWith('/freelancer')) {
-    topics.push(
+    ];
+  }
+
+  if (path.startsWith('/talentos')) {
+    return [
       {
-        id: 'quick-servicos',
-        label: 'Como funcionam os Serviços Locais?',
+        id: 'tal-buscar',
+        label: 'Filtrar e favoritar talentos',
+        question: 'Como buscar e contatar candidatos no Banco de Talentos?',
+        articleId: 'banco-talentos'
+      },
+      {
+        id: 'tal-chat',
+        label: 'Como chamar talento no chat?',
+        question: 'Como usar o chat em tempo real da plataforma?',
+        articleId: 'chat-mensagens'
+      },
+      {
+        id: 'tal-ai-abordagem',
+        label: 'IA: Mensagem para abordar candidato',
+        question: 'Escreva um modelo curto e profissional de primeira mensagem no chat para convidar um talento para entrevista.',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (path.startsWith('/servicos')) {
+    return [
+      {
+        id: 'srv-guia',
+        label: 'Como contratar ou prestar serviços?',
         question: 'Como divulgar ou solicitar um serviço no Ivaí Conecta?',
         articleId: 'servicos-freelancer'
       },
       {
-        id: 'quick-ai-servico',
-        label: 'IA: Melhorar descrição de serviço',
+        id: 'srv-chat',
+        label: 'Combinar orçamento pelo chat',
+        question: 'Como usar o chat em tempo real da plataforma?',
+        articleId: 'chat-mensagens'
+      },
+      {
+        id: 'srv-ai-anuncio',
+        label: 'IA: Melhorar descrição do serviço',
         question: 'Me dê dicas práticas para criar um título e descrição atrativos para meu serviço freelancer.',
         preferAI: true
       }
-    );
-  } else {
-    topics.push(
+    ];
+  }
+
+  if (path.startsWith('/configuracoes')) {
+    const configTopics = [
       {
-        id: 'quick-curriculo',
-        label: 'Como baixar currículo em PDF?',
+        id: 'cfg-privacidade',
+        label: 'Privacidade e notificações',
+        question: 'Onde altero configurações de privacidade e notificações?',
+        articleId: 'conta-privacidade-notificacoes'
+      },
+      {
+        id: 'cfg-excluir',
+        label: 'Como apagar minha conta?',
+        question: 'Como faço para apagar minha conta no site?',
+        articleId: 'excluir-conta'
+      }
+    ];
+    if (role === 'aluno') {
+      configTopics.unshift({
+        id: 'cfg-validacao',
+        label: 'Validar e-mail institucional',
+        question: 'Como validar meu e-mail de estudante?',
+        articleId: 'validacao-estudantil'
+      });
+    } else if (role === 'empresa') {
+      configTopics.unshift({
+        id: 'cfg-cnpj',
+        label: 'Validar CNPJ da empresa',
+        question: 'Como validar o CNPJ da minha empresa?',
+        articleId: 'validacao-empresa-cnpj'
+      });
+    }
+    return configTopics.slice(0, 4);
+  }
+
+  if (path.startsWith('/perfil')) {
+    return [
+      {
+        id: 'prf-pdf',
+        label: 'Baixar meu currículo em PDF',
         question: 'Como preencher e baixar meu currículo em PDF?',
         articleId: 'curriculo-pdf'
       },
       {
-        id: 'quick-vagas',
-        label: 'Como acompanhar candidaturas?',
+        id: 'prf-validacao',
+        label: 'Validar e-mail estudantil',
+        question: 'Como validar meu e-mail de estudante?',
+        articleId: 'validacao-estudantil'
+      },
+      {
+        id: 'prf-ai-bio',
+        label: 'IA: Melhorar meu "Sobre mim"',
+        question: 'Me ajude a escrever um resumo profissional ("Sobre mim") forte para meu currículo.',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (path.startsWith('/freelancer')) {
+    return [
+      {
+        id: 'frl-servicos',
+        label: 'Divulgar serviços no catálogo',
+        question: 'Como divulgar ou solicitar um serviço no Ivaí Conecta?',
+        articleId: 'servicos-freelancer'
+      },
+      {
+        id: 'frl-config',
+        label: 'Privacidade e links do perfil',
+        question: 'Onde altero configurações de privacidade e notificações?',
+        articleId: 'conta-privacidade-notificacoes'
+      },
+      {
+        id: 'frl-ai-bio',
+        label: 'IA: Melhorar bio de freelancer',
+        question: 'Me ajude a escrever uma apresentação profissional atrativa para meu perfil de freelancer.',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (path.startsWith('/empresa')) {
+    return [
+      {
+        id: 'emp-cnpj',
+        label: 'Validar empresa e CNPJ',
+        question: 'Como validar o CNPJ da minha empresa?',
+        articleId: 'validacao-empresa-cnpj'
+      },
+      {
+        id: 'emp-vagas',
+        label: 'Publicar vaga e escolher CBO',
+        question: 'Como publicar uma vaga e escolher o CBO correto?',
+        articleId: 'publicar-vaga-cbo'
+      },
+      {
+        id: 'emp-ai-sobre',
+        label: 'IA: Apresentação da empresa',
+        question: 'Me ajude a escrever uma descrição institucional atrativa para minha empresa atrair talentos.',
+        preferAI: true
+      }
+    ];
+  }
+
+  // Dashboard / Início ("/") ou demais rotas
+  if (role === 'empresa') {
+    return [
+      {
+        id: 'home-emp-vaga',
+        label: 'Publicar vaga e escolher CBO',
+        question: 'Como publicar uma vaga e escolher o CBO correto?',
+        articleId: 'publicar-vaga-cbo'
+      },
+      {
+        id: 'home-emp-talentos',
+        label: 'Usar o Banco de Talentos',
+        question: 'Como buscar e contatar candidatos no Banco de Talentos?',
+        articleId: 'banco-talentos'
+      },
+      {
+        id: 'home-emp-ai',
+        label: 'IA: Criar descrição de vaga',
+        question: 'Me ajude a escrever uma boa descrição de vaga com requisitos claros.',
+        preferAI: true
+      }
+    ];
+  }
+
+  if (role === 'freelancer') {
+    return [
+      {
+        id: 'home-frl-servicos',
+        label: 'Publicar e gerenciar serviços',
+        question: 'Como divulgar ou solicitar um serviço no Ivaí Conecta?',
+        articleId: 'servicos-freelancer'
+      },
+      {
+        id: 'home-frl-vagas',
+        label: 'Explorar Vagas & Match',
         question: 'Como buscar vagas e acompanhar minhas candidaturas?',
         articleId: 'vagas-candidatura'
       },
       {
-        id: 'quick-ai-bio',
-        label: 'IA: Melhorar meu resumo profissional',
-        question: 'Me ajude a escrever um resumo profissional ("Sobre mim") forte para meu currículo de estágio/emprego.',
+        id: 'home-frl-ai',
+        label: 'IA: Destacar meus serviços',
+        question: 'Como tornar meus serviços mais atrativos para clientes locais do Vale do Ivaí?',
         preferAI: true
       }
-    );
+    ];
   }
 
-  if (role === 'aluno' && !topics.some((t) => t.articleId === 'validacao-estudantil')) {
-    topics.push({
-      id: 'quick-validacao-aluno',
-      label: 'Validar e-mail institucional',
-      question: 'Como validar meu e-mail de estudante?',
-      articleId: 'validacao-estudantil'
+  const homeTopics = [
+    {
+      id: 'home-vagas',
+      label: 'Buscar vagas e candidaturas',
+      question: 'Como buscar vagas e acompanhar minhas candidaturas?',
+      articleId: 'vagas-candidatura'
+    },
+    {
+      id: 'home-curriculo',
+      label: 'Montar e baixar currículo PDF',
+      question: 'Como preencher e baixar meu currículo em PDF?',
+      articleId: 'curriculo-pdf'
+    },
+    {
+      id: 'home-servicos',
+      label: 'Como funcionam os Serviços?',
+      question: 'Como divulgar ou solicitar um serviço no Ivaí Conecta?',
+      articleId: 'servicos-freelancer'
+    }
+  ];
+
+  if (!isAuthenticated) {
+    homeTopics.push({
+      id: 'home-cadastro',
+      label: 'Como criar minha conta?',
+      question: 'Como faço para criar uma conta e escolher meu perfil?',
+      articleId: 'cadastro-acesso'
+    });
+  } else {
+    homeTopics.push({
+      id: 'home-ai-dica',
+      label: 'IA: Dica para melhorar perfil',
+      question: 'Quais informações mais chamam atenção das empresas no meu perfil do Ivaí Conecta?',
+      preferAI: true
     });
   }
 
-  if (isAuthenticated && topics.length < 4) {
-    topics.push({
-      id: 'quick-privacidade',
-      label: 'Privacidade e conta',
-      question: 'Onde altero configurações de privacidade e notificações?',
-      articleId: 'conta-privacidade-notificacoes'
-    });
-  }
-
-  return topics.slice(0, 4);
+  return homeTopics.slice(0, 4);
 }
 
 function normalizeText(value) {
@@ -343,7 +620,7 @@ export function findLocalHelpMatch(queryText, { userRole = 'visitante', isAuthen
     for (const kw of article.keywords) {
       const normalizedKw = normalizeText(kw);
       if (normalizedQuery.includes(normalizedKw)) {
-        score += normalizedKw.includes(' ') ? 4 : 3;
+        score += normalizedKw.includes(' ') ? 5 : 3;
       } else if (tokens.some((token) => normalizedKw.includes(token) && token.length >= 4)) {
         score += 1;
       }

@@ -9,12 +9,13 @@ import {
 } from '../data/helpKnowledgeBase';
 
 export const MAX_HELP_MESSAGE_LENGTH = 600;
-export const DAILY_LIMIT_AUTHENTICATED = 30;
-export const DAILY_LIMIT_GUEST = 8;
+export const DAILY_LIMIT_AUTHENTICATED = 100;
+export const DAILY_LIMIT_GUEST = 30;
+export const AI_REQUEST_TIMEOUT_MS = 12000;
 
 const QUOTA_STORAGE_KEY = 'ivai_conecta_ai_help_quota_v1';
-const DEFAULT_PRIMARY_MODEL = 'gemini-3.8-flash';
-const FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+const DEFAULT_PRIMARY_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODEL = 'gemini-3.8-flash';
 
 let cachedAiInstance = null;
 
@@ -28,7 +29,8 @@ function getAiInstance() {
 function getModelCandidates() {
   const envModel = import.meta?.env?.VITE_FIREBASE_AI_MODEL;
   const primary = typeof envModel === 'string' && envModel.trim() ? envModel.trim() : DEFAULT_PRIMARY_MODEL;
-  return primary === FALLBACK_MODEL ? [primary] : [primary, FALLBACK_MODEL];
+  const candidates = [primary, DEFAULT_PRIMARY_MODEL, FALLBACK_MODEL];
+  return [...new Set(candidates)];
 }
 
 function getTodayKey() {
@@ -127,7 +129,7 @@ export function buildHelpSystemInstruction({
     '- "/servicos" : Serviços Locais (catálogo para contratar ou divulgar serviços como Freelancer).',
     '- "/perfil" : Perfil de Aluno/Candidato (onde edita bio, formação, experiências, habilidades e exporta o Currículo em PDF).',
     '- "/empresa" | "/freelancer" | "/professor" : Perfis específicos por tipo de conta.',
-    '- "/configuracoes" : Aba "links", "verification" (validação estudantil por e-mail institucional para alunos), "company" (validação CNPJ para empresas), "account", "notifications", "privacy".',
+    '- "/configuracoes" : Abas "links", "verification" (validação estudantil por e-mail institucional para alunos), "company" (validação CNPJ para empresas), "account" (Conta e Segurança, incluindo exclusão permanente da conta na Zona de Perigo), "notifications", "privacy".',
     '- "/login" : Entrar ou criar conta (e-mail/senha ou Google) e "Esqueci minha senha".',
     '- "/completar-perfil" : Finalizar dados do perfil após o primeiro acesso.',
     '- Chat em tempo real : Ícone de balão de conversa no topo da barra de navegação (para usuários logados).',
@@ -169,7 +171,6 @@ export function normalizeChatHistory(messages = []) {
     }
   }
 
-  // O histórico passado ao startChat não deve terminar em 'user' se vamos enviar nova mensagem em seguida
   if (alternating.length > 0 && alternating[alternating.length - 1].role === 'user') {
     alternating.pop();
   }
@@ -179,8 +180,16 @@ export function normalizeChatHistory(messages = []) {
 
 function classifyAiError(error) {
   const message = String(error?.message || error || '').toLowerCase();
-  if (message.includes('permission_denied') || message.includes('api has not been used') || message.includes('disabled') || message.includes('ai logic')) {
+  if (
+    message.includes('api_not_enabled') ||
+    message.includes('permission_denied') ||
+    message.includes('api has not been used') ||
+    message.includes('disabled')
+  ) {
     return 'not_provisioned';
+  }
+  if (message.includes('timeout') || message.includes('aborted')) {
+    return 'timeout';
   }
   if (message.includes('quota') || message.includes('429') || message.includes('resource_exhausted')) {
     return 'quota_exceeded';
@@ -223,7 +232,7 @@ function buildFallbackResponse({ question, userRole, isAuthenticated, reason }) 
   const messageByReason =
     reason === 'quota_limit'
       ? 'Você atingiu o limite diário de perguntas livres para a IA hoje. Use os atalhos de ajuda rápida acima ou navegue diretamente pelas páginas abaixo.'
-      : 'No momento a resposta por IA não pôde ser concluída, mas você pode usar os atalhos contextuais acima ou acessar diretamente as áreas principais do Ivaí Conecta.';
+      : 'Não consegui concluir a resposta por IA neste instante, mas você pode usar os atalhos contextuais acima ou acessar diretamente as áreas do Ivaí Conecta.';
 
   return {
     text: messageByReason,
@@ -231,6 +240,83 @@ function buildFallbackResponse({ question, userRole, isAuthenticated, reason }) 
     source: 'local-fallback',
     reason
   };
+}
+
+function withTimeout(promise, ms, controller) {
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      if (controller) {
+        controller.abort(new Error('Tempo limite da requisição excedido'));
+      }
+      reject(new Error('Timeout excedido ao aguardar resposta da IA'));
+    }, ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timerId);
+  });
+}
+
+async function runModelAttempt({
+  modelName,
+  systemInstruction,
+  chatHistory,
+  question,
+  isAuthenticated,
+  onChunk
+}) {
+  const controller = new AbortController();
+  const ai = getAiInstance();
+  const model = getGenerativeModel(
+    ai,
+    {
+      model: modelName,
+      systemInstruction,
+      generationConfig: {
+        temperature: 0.45,
+        topP: 0.9,
+        maxOutputTokens: 700
+      }
+    },
+    { timeout: AI_REQUEST_TIMEOUT_MS }
+  );
+
+  const chat = model.startChat({ history: chatHistory });
+
+  const executeStream = async () => {
+    const result = await chat.sendMessageStream(question, {
+      signal: controller.signal,
+      timeout: AI_REQUEST_TIMEOUT_MS
+    });
+
+    let accumulated = '';
+    for await (const chunk of result.stream) {
+      const piece = typeof chunk.text === 'function' ? chunk.text() : '';
+      if (piece) {
+        accumulated += piece;
+        if (typeof onChunk === 'function') {
+          const { cleanText } = parseHelpResponseActions(accumulated, { isAuthenticated });
+          onChunk(cleanText);
+        }
+      }
+    }
+
+    if (!accumulated.trim()) {
+      const finalResponse = await result.response;
+      accumulated = typeof finalResponse?.text === 'function' ? finalResponse.text() : '';
+    }
+
+    return accumulated;
+  };
+
+  const accumulated = await withTimeout(executeStream(), AI_REQUEST_TIMEOUT_MS, controller);
+  const { cleanText, actions } = parseHelpResponseActions(accumulated, { isAuthenticated });
+  if (!cleanText) {
+    throw new Error('Resposta vazia do modelo');
+  }
+
+  return { cleanText, actions };
 }
 
 export async function askAiHelp({
@@ -246,8 +332,8 @@ export async function askAiHelp({
     throw new Error(validation.error);
   }
 
-  const quota = consumeAiQuota(isAuthenticated);
-  if (!quota.allowed) {
+  const quotaStatus = getAiQuotaStatus(isAuthenticated);
+  if (quotaStatus.remaining <= 0) {
     return {
       ...buildFallbackResponse({
         question: validation.text,
@@ -266,53 +352,29 @@ export async function askAiHelp({
 
   for (const modelName of candidates) {
     try {
-      const ai = getAiInstance();
-      const model = getGenerativeModel(ai, {
-        model: modelName,
+      const { cleanText, actions } = await runModelAttempt({
+        modelName,
         systemInstruction,
-        generationConfig: {
-          temperature: 0.45,
-          topP: 0.9,
-          maxOutputTokens: 700
-        }
+        chatHistory,
+        question: validation.text,
+        isAuthenticated,
+        onChunk
       });
 
-      const chat = model.startChat({ history: chatHistory });
-      const result = await chat.sendMessageStream(validation.text);
-
-      let accumulated = '';
-      for await (const chunk of result.stream) {
-        const piece = typeof chunk.text === 'function' ? chunk.text() : '';
-        if (piece) {
-          accumulated += piece;
-          if (typeof onChunk === 'function') {
-            const { cleanText } = parseHelpResponseActions(accumulated, { isAuthenticated });
-            onChunk(cleanText);
-          }
-        }
-      }
-
-      if (!accumulated.trim()) {
-        const finalResponse = await result.response;
-        accumulated = typeof finalResponse?.text === 'function' ? finalResponse.text() : '';
-      }
-
-      const { cleanText, actions } = parseHelpResponseActions(accumulated, { isAuthenticated });
-      if (!cleanText) {
-        throw new Error('Resposta vazia do modelo');
-      }
+      // Só consome a cota diária quando a IA responde com sucesso
+      const updatedQuota = consumeAiQuota(isAuthenticated);
 
       return {
         text: cleanText,
         actions,
         source: 'ai',
         model: modelName,
-        remainingQuota: quota.remaining
+        remainingQuota: updatedQuota.remaining
       };
     } catch (err) {
       lastError = err;
       const errType = classifyAiError(err);
-      if (errType !== 'model_unavailable') {
+      if (errType === 'not_provisioned') {
         break;
       }
     }
@@ -330,6 +392,6 @@ export async function askAiHelp({
       isAuthenticated,
       reason: errorReason
     }),
-    remainingQuota: quota.remaining
+    remainingQuota: quotaStatus.remaining
   };
 }

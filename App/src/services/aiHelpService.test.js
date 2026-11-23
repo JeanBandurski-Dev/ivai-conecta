@@ -25,7 +25,8 @@ import {
   consumeAiQuota,
   askAiHelp,
   MAX_HELP_MESSAGE_LENGTH,
-  DAILY_LIMIT_GUEST
+  DAILY_LIMIT_GUEST,
+  DAILY_LIMIT_AUTHENTICATED
 } from './aiHelpService';
 
 describe('aiHelpService', () => {
@@ -94,23 +95,51 @@ describe('aiHelpService', () => {
     expect(result.source).toBe('ai');
     expect(result.text).toBe('Você pode editar seu currículo no perfil.');
     expect(result.actions).toEqual([{ type: 'navigate', to: '/perfil', label: 'Ir para Meu Perfil' }]);
+    expect(result.remainingQuota).toBe(DAILY_LIMIT_AUTHENTICATED - 1);
     expect(streamedChunks.length).toBeGreaterThan(0);
   });
 
-  it('falls back to local knowledge base when AI service fails', async () => {
-    mockSendMessageStream.mockRejectedValueOnce(new Error('PERMISSION_DENIED: AI Logic disabled'));
+  it('retries fallback model on 500 high demand error and succeeds', async () => {
+    async function* fakeStream() {
+      yield { text: () => 'Resposta rápida do modelo alternativo.' };
+    }
+
+    mockSendMessageStream
+      .mockRejectedValueOnce(new Error('[500 Internal Server Error] high demand'))
+      .mockResolvedValueOnce({
+        stream: fakeStream(),
+        response: Promise.resolve({ text: () => 'Resposta rápida do modelo alternativo.' })
+      });
 
     const result = await askAiHelp({
-      question: 'Como validar meu e-mail institucional de estudante?',
+      question: 'Como funciona o match?',
       history: [],
-      pathname: '/',
+      pathname: '/vagas',
       userRole: 'aluno',
       isAuthenticated: true
     });
 
+    expect(result.source).toBe('ai');
+    expect(result.text).toBe('Resposta rápida do modelo alternativo.');
+    expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to local knowledge base without consuming quota when AI fails', async () => {
+    mockSendMessageStream.mockRejectedValue(new Error('PERMISSION_DENIED: AI Logic disabled'));
+
+    const before = getAiQuotaStatus(true).remaining;
+    const result = await askAiHelp({
+      question: 'como faço para apagar minha conta no site ?',
+      history: [],
+      pathname: '/',
+      userRole: 'freelancer',
+      isAuthenticated: true
+    });
+
     expect(result.source).toBe('local-fallback');
-    expect(result.text).toContain('Validação do vínculo estudantil');
-    expect(result.actions.some((a) => a.to === '/configuracoes?tab=verification')).toBe(true);
+    expect(result.text).toContain('excluir sua conta');
+    expect(result.actions.some((a) => a.to === '/configuracoes?tab=account')).toBe(true);
+    expect(getAiQuotaStatus(true).remaining).toBe(before);
   });
 
   it('enforces daily guest quota when localStorage is available', () => {

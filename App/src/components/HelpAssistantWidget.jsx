@@ -496,11 +496,11 @@ export default function HelpAssistantWidget() {
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 108)}px`;
                   }}
                   onKeyDown={handleTextareaKeyDown}
-                  placeholder="Pergunte sobre vagas, currículo, CBO, serviços..."
+                  placeholder="Digite sua dúvida sobre o site..."
                   rows={1}
                   disabled={isGenerating}
                   aria-label="Digite sua dúvida para o assistente"
-                  className="w-full text-[13px] py-2.5 px-3.5 rounded-2xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden focus:border-primary-blue dark:focus:border-sky-400 resize-none max-h-[108px] overflow-y-auto"
+                  className="w-full text-[13px] py-2.5 px-3.5 rounded-2xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden focus:border-primary-blue dark:focus:border-sky-400 resize-none min-h-[42px] max-h-[108px] overflow-y-auto"
                 />
               </div>
 
@@ -523,7 +523,9 @@ export default function HelpAssistantWidget() {
               <span className="shrink-0 font-semibold">
                 {inputValue.length >= 450
                   ? `${inputValue.length}/${MAX_HELP_MESSAGE_LENGTH}`
-                  : `${quota.remaining}/${quota.limit} IA hoje`}
+                  : quota.remaining <= 10
+                    ? `Restam ${quota.remaining} IA hoje`
+                    : 'Guia grátis · IA pronta'}
               </span>
             </div>
           </div>

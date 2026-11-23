@@ -15,6 +15,36 @@ describe('helpKnowledgeBase', () => {
     expect(normalizeRoleKey('')).toBe('visitante');
   });
 
+  it('returns distinct contextual topics across different routes for the same user role', () => {
+    const onHome = getContextualHelpTopics({
+      pathname: '/',
+      userRole: 'freelancer',
+      isAuthenticated: true
+    }).map((t) => t.id);
+
+    const onVagas = getContextualHelpTopics({
+      pathname: '/vagas',
+      userRole: 'freelancer',
+      isAuthenticated: true
+    }).map((t) => t.id);
+
+    const onServicos = getContextualHelpTopics({
+      pathname: '/servicos',
+      userRole: 'freelancer',
+      isAuthenticated: true
+    }).map((t) => t.id);
+
+    const onConfig = getContextualHelpTopics({
+      pathname: '/configuracoes',
+      userRole: 'freelancer',
+      isAuthenticated: true
+    }).map((t) => t.id);
+
+    expect(onHome).not.toEqual(onVagas);
+    expect(onVagas).not.toEqual(onServicos);
+    expect(onServicos).not.toEqual(onConfig);
+  });
+
   it('returns contextual topics tailored to empresa on gerenciamento-vagas', () => {
     const topics = getContextualHelpTopics({
       pathname: '/gerenciamento-vagas',
@@ -42,14 +72,22 @@ describe('helpKnowledgeBase', () => {
     expect(getPageLabel('/')).toBe('Início');
   });
 
-  it('matches local FAQ articles for common platform questions', () => {
-    const match = findLocalHelpMatch('Como faço para baixar meu currículo em PDF?', {
+  it('matches local FAQ articles including account deletion', () => {
+    const resumeMatch = findLocalHelpMatch('Como faço para baixar meu currículo em PDF?', {
       userRole: 'aluno',
       isAuthenticated: true
     });
-    expect(match).not.toBeNull();
-    expect(match.id).toBe('curriculo-pdf');
-    expect(match.actions.some((a) => a.to === '/perfil')).toBe(true);
+    expect(resumeMatch).not.toBeNull();
+    expect(resumeMatch.id).toBe('curriculo-pdf');
+    expect(resumeMatch.actions.some((a) => a.to === '/perfil')).toBe(true);
+
+    const deleteMatch = findLocalHelpMatch('como faço para apagar minha conta no site ?', {
+      userRole: 'freelancer',
+      isAuthenticated: true
+    });
+    expect(deleteMatch).not.toBeNull();
+    expect(deleteMatch.id).toBe('excluir-conta');
+    expect(deleteMatch.actions.some((a) => a.to === '/configuracoes?tab=account')).toBe(true);
   });
 
   it('filters auth-only actions for guests and blocks unsafe routes in AI markers', () => {
