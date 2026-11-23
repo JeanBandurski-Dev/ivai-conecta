@@ -15,7 +15,7 @@ import {
   sendPasswordResetEmail,
   deleteUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit, deleteField } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
@@ -162,6 +162,39 @@ export function normalizeUserRole(role) {
   return aliases[value] || value;
 }
 
+async function syncPublicCompanyProfile(uid, sourceData) {
+  if (!uid || !sourceData || typeof sourceData !== 'object') return;
+  const role = normalizeUserRole(
+    sourceData.activeRole ||
+    sourceData.selectedRole ||
+    sourceData.profileType ||
+    sourceData.role ||
+    ''
+  );
+  if (role !== 'empresa') return;
+
+  await setDoc(doc(db, 'public_profiles', String(uid)), {
+    uid: String(uid),
+    name: String(sourceData.name || sourceData.razaoSocial || sourceData.nomeFantasia || '').slice(0, 120),
+    city: String(sourceData.city || 'Ivaiporã').slice(0, 100),
+    avatar: String(sourceData.avatar || sourceData.photoURL || sourceData.logo || '').slice(0, 2048),
+    photoURL: String(sourceData.photoURL || sourceData.avatar || sourceData.logo || '').slice(0, 2048),
+    bio: String(sourceData.bio || sourceData.about || '').slice(0, 1000),
+    razaoSocial: String(sourceData.razaoSocial || '').slice(0, 120),
+    nomeFantasia: String(sourceData.nomeFantasia || '').slice(0, 120),
+    sector: String(sourceData.sector || '').slice(0, 160),
+    about: String(sourceData.about || '').slice(0, 1000),
+    cnpj: deleteField(),
+    isVerifiedCompany: Boolean(sourceData.isVerifiedCompany),
+    companyVerificationStatus: String(sourceData.companyVerificationStatus || '').slice(0, 30),
+    isActive: sourceData.blocked !== true && String(sourceData.status || '').toLowerCase() !== 'blocked' && sourceData.isDeactivated !== true,
+    blocked: sourceData.blocked === true,
+    status: sourceData.blocked === true || String(sourceData.status || '').toLowerCase() === 'blocked' ? 'blocked' : 'active',
+    role: 'empresa',
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
+}
+
 /**
  * Infere o papel sugerido a partir das informações básicas do Firebase Auth.
  * Apenas retorna 'aluno' se o e-mail pertencer a um domínio estudantil reconhecido.
@@ -231,6 +264,12 @@ async function ensureUserProfile(fbUser, preferredRole = null) {
     uid: fbUser.uid,
     name: String(profile.name || profile.displayName || '').slice(0, 120),
     city: String(profile.city || '').slice(0, 100),
+    razaoSocial: String(profile.razaoSocial || '').slice(0, 120),
+    nomeFantasia: String(profile.nomeFantasia || '').slice(0, 120),
+    sector: String(profile.sector || '').slice(0, 160),
+    about: String(profile.about || '').slice(0, 1000),
+    isVerifiedCompany: Boolean(profile.isVerifiedCompany),
+    companyVerificationStatus: String(profile.companyVerificationStatus || '').slice(0, 30),
     institution: String(profile.institution || '').slice(0, 160),
     course: String(profile.course || '').slice(0, 160),
     period: String(profile.period || '').slice(0, 80),
@@ -725,6 +764,11 @@ export async function login(email, password) {
       profileData.role ||
       (isInstitutionalEmail(cleanEmail) ? 'professor' : 'candidato');
     const role = normalizeUserRole(rawRole);
+    if (role === 'empresa') {
+      await syncPublicCompanyProfile(fbUser.uid, profileData).catch(error => {
+        console.warn('[login] Não foi possível sincronizar o perfil público da empresa:', error.message);
+      });
+    }
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
 
     const sessionUser = {
@@ -875,11 +919,12 @@ export async function register(data) {
       ...roleSpecific
     };
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
+    await syncPublicCompanyProfile(fbUser.uid, profileData);
     seedFirestoreIfEmpty();
 
-    // Sincroniza public_profiles para que alunos, candidatos, freelancers e professores apareçam imediatamente
+    // Sincroniza public_profiles para que os perfis públicos apareçam imediatamente
     try {
-      if (['aluno', 'candidato', 'freelancer', 'professor'].includes(selectedRole)) {
+      if (['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(selectedRole)) {
         await setDoc(doc(db, 'public_profiles', fbUser.uid), {
           uid: fbUser.uid,
           name: cleanName,
@@ -892,6 +937,12 @@ export async function register(data) {
           skills: Array.isArray(profileData.skills) ? profileData.skills : [],
           bio: String(profileData.bio || '').slice(0, 1000),
           isVerifiedStudent: Boolean(profileData.isVerifiedStudent),
+          razaoSocial: String(profileData.razaoSocial || '').slice(0, 120),
+          nomeFantasia: String(profileData.nomeFantasia || '').slice(0, 120),
+          sector: String(profileData.sector || '').slice(0, 160),
+          about: String(profileData.about || '').slice(0, 1000),
+          isVerifiedCompany: Boolean(profileData.isVerifiedCompany),
+          companyVerificationStatus: String(profileData.companyVerificationStatus || '').slice(0, 30),
           role: selectedRole,
           updatedAt: new Date().toISOString()
         }, { merge: true });
@@ -989,6 +1040,11 @@ export async function loginWithGoogle() {
       profileRes.profile?.role ||
       fallbackRole;
     const role = normalizeUserRole(rawRole);
+    if (role === 'empresa') {
+      await syncPublicCompanyProfile(fbUser.uid, profileRes.profile).catch(error => {
+        console.warn('[loginWithGoogle] Não foi possível sincronizar o perfil público da empresa:', error.message);
+      });
+    }
     const roleMeta = USER_ROLES[role] || USER_ROLES.aluno;
     const studentCheck = validateStudentEmail(fbUser.email);
     // Validação automática para alunos que usam Google com domínio institucional verificado
@@ -1108,6 +1164,31 @@ export async function completeUserProfile(uid, additionalData) {
     };
 
     await setDoc(doc(db, 'users', uid), payload, { merge: true });
+    await syncPublicCompanyProfile(uid, payload);
+
+    if (['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(additionalData.role)) {
+      await setDoc(doc(db, 'public_profiles', uid), {
+        uid,
+        name: cleanName,
+        city: String(additionalData.city || 'Ivaiporã').slice(0, 100),
+        avatar,
+        photoURL: avatar,
+        institution: String(payload.institution || '').slice(0, 160),
+        course: String(additionalData.course || '').slice(0, 160),
+        period: String(additionalData.period || '').slice(0, 80),
+        skills: Array.isArray(additionalData.skills) ? additionalData.skills.slice(0, 100) : [],
+        bio: String(additionalData.bio || '').slice(0, 1000),
+        isVerifiedStudent: Boolean(payload.isVerifiedStudent),
+        razaoSocial: String(additionalData.razaoSocial || '').slice(0, 120),
+        nomeFantasia: String(additionalData.nomeFantasia || '').slice(0, 120),
+        sector: String(additionalData.sector || '').slice(0, 160),
+        about: String(additionalData.about || '').slice(0, 1000),
+        isVerifiedCompany: Boolean(payload.isVerifiedCompany),
+        companyVerificationStatus: String(payload.companyVerificationStatus || '').slice(0, 30),
+        role: additionalData.role,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
 
     const updated = updateAuthUser({
       name: additionalData.name,
@@ -1562,7 +1643,12 @@ export async function deleteUserAccount(currentPassword = '') {
       console.warn('[deleteUserAccount] Aviso ao limpar conversas:', chatErr.message);
     }
 
-    // e) Documento principal em /users/{uid}
+    // e) Documento público e documento principal em /users/{uid}
+    try {
+      await deleteDoc(doc(db, 'public_profiles', String(uid)));
+    } catch (publicDocErr) {
+      console.warn('[deleteUserAccount] Aviso ao remover perfil público:', publicDocErr.message);
+    }
     try {
       await deleteDoc(doc(db, 'users', String(uid)));
     } catch (userDocErr) {
@@ -2023,6 +2109,7 @@ export function updateAuthUser(data, userOverride = null) {
       try {
         await setDoc(doc(db, 'users', uid), payload, { merge: true });
         firestoreSyncSucceeded = true;
+        await syncPublicCompanyProfile(uid, { ...updated, ...payload });
       } catch (err) {
         console.warn(`[Firestore] Sync erro updateAuthUser para uid ${uid}:`, err.message);
         // Se as regras de segurança do Firestore bloquearem a mutação direta da chave 'role',

@@ -1,5 +1,5 @@
 const { applicationDefault, initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 initializeApp({
   credential: applicationDefault(),
@@ -26,9 +26,13 @@ async function migratePublicProfiles() {
 
   for (const userDoc of usersSnapshot.docs) {
     const data = userDoc.data();
-    const role = String(data.role || data.activeRole || data.selectedRole || "").toLowerCase().trim();
+    let role = String(data.role || data.activeRole || data.selectedRole || "").toLowerCase().trim();
 
-    if (!role || ["admin", "empresa", "company", "recrutador"].includes(role)) {
+    if (["company", "recrutador", "recruiter"].includes(role)) {
+      role = "empresa";
+    }
+
+    if (!role || role === "admin" || role === "administrador") {
       skipped += 1;
       continue;
     }
@@ -50,6 +54,13 @@ async function migratePublicProfiles() {
       endorsements: cleanList(data.endorsements),
       endorsementCount: Math.max(0, Math.min(100, Number(data.endorsementCount || 0) || 0)),
       isVerifiedStudent: Boolean(data.isVerifiedStudent),
+      razaoSocial: cleanString(data.razaoSocial, 120),
+      nomeFantasia: cleanString(data.nomeFantasia, 120),
+      sector: cleanString(data.sector, 160),
+      about: cleanString(data.about, 1000),
+      cnpj: FieldValue.delete(),
+      isVerifiedCompany: Boolean(data.isVerifiedCompany),
+      companyVerificationStatus: cleanString(data.companyVerificationStatus, 30),
       role,
       updatedAt: new Date().toISOString()
     };

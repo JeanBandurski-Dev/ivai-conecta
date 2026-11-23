@@ -2,14 +2,15 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
+  doc,
   onSnapshot,
-  query,
-  where
+  setDoc,
+  deleteField
 } from 'firebase/firestore';
 import { getJobs, subscribeToJobs, isJobActive } from './jobsService.js';
 import { getTalents, subscribeToTalents } from './talentsService.js';
 import { getServices, subscribeToServices } from './servicesService.js';
-import { getUsersDB, getAuthUser } from './authService.js';
+import { getUsersDB, getAuthUser, normalizeUserRole } from './authService.js';
 import { matchCity } from '../utils/searchUtils.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
@@ -17,18 +18,59 @@ export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 export const DEFAULT_COMPANIES = [];
 
 let _memCompanyUsers = null;
+let _memPublicCompanyUsers = [];
 
 export function isCompanyUser(u) {
   if (!u || typeof u !== 'object') return false;
-  const r = String(u.role || '').toLowerCase().trim();
-  return r === 'empresa' || r === 'company' || r === 'recrutador' || Boolean(u.isVerifiedCompany && r !== 'aluno' && r !== 'professor' && r !== 'admin');
+  if (u.isActive === false || u.blocked === true || String(u.status || '').toLowerCase() === 'blocked') return false;
+  const r = normalizeUserRole(
+    u.activeRole ||
+    u.selectedRole ||
+    u.profileType ||
+    u.role ||
+    ''
+  );
+  return r === 'empresa' || Boolean(u.isVerifiedCompany && !['aluno', 'professor', 'admin'].includes(r));
+}
+
+export async function syncPublicCompanyProfile(uid, sourceData) {
+  if (!uid || !sourceData || typeof sourceData !== 'object') return;
+  const role = normalizeUserRole(
+    sourceData.activeRole ||
+    sourceData.selectedRole ||
+    sourceData.profileType ||
+    sourceData.role ||
+    ''
+  );
+  if (role !== 'empresa') return;
+
+  await setDoc(doc(db, 'public_profiles', String(uid)), {
+    uid: String(uid),
+    name: String(sourceData.name || sourceData.razaoSocial || sourceData.nomeFantasia || '').slice(0, 120),
+    city: String(sourceData.city || 'Ivaiporã').slice(0, 100),
+    avatar: String(sourceData.avatar || sourceData.photoURL || sourceData.logo || '').slice(0, 2048),
+    photoURL: String(sourceData.photoURL || sourceData.avatar || sourceData.logo || '').slice(0, 2048),
+    bio: String(sourceData.bio || sourceData.about || '').slice(0, 1000),
+    razaoSocial: String(sourceData.razaoSocial || '').slice(0, 120),
+    nomeFantasia: String(sourceData.nomeFantasia || '').slice(0, 120),
+    sector: String(sourceData.sector || '').slice(0, 160),
+    about: String(sourceData.about || '').slice(0, 1000),
+    cnpj: deleteField(),
+    isVerifiedCompany: Boolean(sourceData.isVerifiedCompany),
+    companyVerificationStatus: String(sourceData.companyVerificationStatus || '').slice(0, 30),
+    isActive: sourceData.blocked !== true && String(sourceData.status || '').toLowerCase() !== 'blocked' && sourceData.isDeactivated !== true,
+    blocked: sourceData.blocked === true,
+    status: sourceData.blocked === true || String(sourceData.status || '').toLowerCase() === 'blocked' ? 'blocked' : 'active',
+    role: 'empresa',
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }
 
 export function getCompanies(city = 'Todas as Cidades') {
   const companyUsersMap = new Map();
 
   // 1. Prioriza dados reais vindos da assinatura do Firestore em memória
-  if (Array.isArray(_memCompanyUsers) && _memCompanyUsers.length > 0) {
+  if (Array.isArray(_memCompanyUsers)) {
     _memCompanyUsers.filter(isCompanyUser).forEach(u => companyUsersMap.set(String(u.uid || u.id || u.email), u));
   } else {
     // Fallback inicial para cache local
@@ -59,6 +101,8 @@ export function getCompanies(city = 'Todas as Cidades') {
       uid: u.uid || u.id || uidKey,
       _cleanKey: cleanKey,
       name: compName,
+      email: u.email || u.recruiterEmail || '',
+      recruiterEmail: u.recruiterEmail || u.email || '',
       city: u.city || 'Ivaiporã',
       sector: u.sector || 'Comércio & Serviços',
       logo: u.avatar || u.logo || '',
@@ -84,6 +128,28 @@ export function getCompanies(city = 'Todas as Cidades') {
         targetComp = comp;
         break;
       }
+    }
+
+    if (!targetComp && compName) {
+      const uidKey = createdBy || cleanCompName;
+      targetComp = {
+        id: uidKey,
+        uid: uidKey,
+        _cleanKey: cleanCompName,
+        name: compName,
+        email: job.recruiterEmail || '',
+        recruiterEmail: job.recruiterEmail || '',
+        city: job.city || 'Ivaiporã',
+        sector: job.sector || 'Comércio & Serviços',
+        logo: job.companyLogo || '',
+        about: 'Empresa parceira cadastrada no Ivaí Conecta.',
+        cnpj: '',
+        isVerified: false,
+        rating: 5.0,
+        reviews: 0,
+        perks: []
+      };
+      map.set(uidKey, targetComp);
     }
 
     if (targetComp) {
@@ -129,6 +195,20 @@ export function getCompanies(city = 'Todas as Cidades') {
   );
 }
 
+export function getRegisteredCompaniesCount() {
+  const sources = _memPublicCompanyUsers.length > 0
+    ? _memPublicCompanyUsers
+    : (Array.isArray(_memCompanyUsers) ? _memCompanyUsers : []);
+
+  const ids = new Set();
+  sources.filter(isCompanyUser).forEach(company => {
+    const id = String(company.uid || company.id || company.email || '').trim();
+    if (id) ids.add(id);
+  });
+
+  return ids.size;
+}
+
 export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
   let unsubscribeFirestore = () => {};
 
@@ -147,20 +227,21 @@ export function subscribeToCompanies(city = 'Todas as Cidades', callback) {
 
   // Escuta users (empresas) do Firestore em tempo real
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', '==', 'empresa'));
-    unsubscribeFirestore = onSnapshot(q, (snap) => {
-      // Empresas reais vindas do Firestore (pode ser lista vazia)
-      const remoteCompanyUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      _memCompanyUsers = remoteCompanyUsers;
+    const publicProfilesRef = collection(db, 'public_profiles');
+    unsubscribeFirestore = onSnapshot(publicProfilesRef, (snap) => {
+      // Perfis públicos permitem que visitantes anônimos vejam as empresas.
+      _memPublicCompanyUsers = snap.docs
+        .map(d => ({ uid: d.id, ...d.data() }))
+        .filter(isCompanyUser);
+      _memCompanyUsers = _memPublicCompanyUsers;
 
       // Mantém usuários não-empresa intactos e descarta empresas que não existem no Firestore
       const local = getUsersDB();
-      const nonCompanyUsers = local.filter(u => u?.role !== 'empresa');
+      const nonCompanyUsers = local.filter(u => !isCompanyUser(u));
 
       // Faz merge: parte dos não-empresa + empresas reais do Firestore
       const merged = [...nonCompanyUsers];
-      remoteCompanyUsers.forEach(rc => {
+      _memPublicCompanyUsers.forEach(rc => {
         const idx = merged.findIndex(m => m.uid === rc.uid || m.email === rc.email);
         if (idx !== -1) merged[idx] = { ...merged[idx], ...rc };
         else merged.push(rc);
@@ -204,7 +285,7 @@ export function subscribeToPlatformMetrics(city = 'Todas as Cidades', callback) 
       talentsCount: talentsList.length,
       studentsCount,
       candidatesCount,
-      companiesCount: companiesList.length,
+      companiesCount: getRegisteredCompaniesCount(),
       jobsCount: activeJobs.length,
       servicesCount: servicesList.length
     });

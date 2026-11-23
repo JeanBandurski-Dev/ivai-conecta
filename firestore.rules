@@ -264,6 +264,11 @@ service cloud.firestore {
           'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
           'photoURL', 'skills', 'experiences', 'projects', 'education', 'bio',
           'endorsements', 'endorsementCount', 'isVerifiedStudent', 'role',
+          'razaoSocial', 'nomeFantasia', 'sector', 'about',
+          'isVerifiedCompany', 'companyVerificationStatus',
+          'razaoSocial', 'nomeFantasia', 'sector', 'about',
+          'isVerifiedCompany', 'companyVerificationStatus',
+          'isActive', 'blocked', 'status',
           'createdAt', 'updatedAt'
         ]) &&
         (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
@@ -290,13 +295,17 @@ service cloud.firestore {
         (!('role' in request.resource.data) ||
           (request.resource.data.role in ['aluno', 'candidato', 'freelancer', 'prestador', 'professor', 'empresa'] &&
            exists(/databases/$(database)/documents/users/$(userId)) &&
-           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role));
+           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role)) &&
+        (!('isActive' in request.resource.data) || isAdmin() || request.resource.data.isActive == true);
 
       allow update: if (isOwner(userId) || isAdmin()) &&
         request.resource.data.keys().hasOnly([
           'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
           'photoURL', 'skills', 'experiences', 'projects', 'education', 'bio',
           'endorsements', 'endorsementCount', 'isVerifiedStudent', 'role',
+          'razaoSocial', 'nomeFantasia', 'sector', 'about',
+          'isVerifiedCompany', 'companyVerificationStatus',
+          'isActive', 'blocked', 'status',
           'createdAt', 'updatedAt'
         ]) &&
         (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
@@ -323,7 +332,13 @@ service cloud.firestore {
         (!('role' in request.resource.data) ||
           (request.resource.data.role in ['aluno', 'candidato', 'freelancer', 'prestador', 'professor', 'empresa'] &&
            exists(/databases/$(database)/documents/users/$(userId)) &&
-           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role));
+           get(/databases/$(database)/documents/users/$(userId)).data.role == request.resource.data.role)) &&
+        (!('isActive' in request.resource.data) ||
+          (isAdmin() || request.resource.data.isActive == true)) &&
+        (!('blocked' in request.resource.data) ||
+          (isAdmin() || request.resource.data.blocked == false)) &&
+        (!('status' in request.resource.data) ||
+          (isAdmin() || request.resource.data.status == 'active'));
 
       allow delete: if isOwner(userId) || isAdmin();
     }

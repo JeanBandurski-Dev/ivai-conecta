@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  setDoc,
   deleteDoc,
   query,
   where,
@@ -19,7 +20,21 @@ import {
   orderBy,
   startAfter,
   getCountFromServer,
+  deleteField,
 } from 'firebase/firestore';
+
+function getEffectiveUserRole(user) {
+  if (!user || typeof user !== 'object') return '';
+
+  const role =
+    user.role ||
+    user.activeRole ||
+    user.selectedRole ||
+    user.profileType ||
+    '';
+
+  return normalizeUserRole(role);
+}
 
 /**
  * Executa uma contagem defensiva no Firestore.
@@ -110,16 +125,16 @@ export async function fetchPlatformStats() {
     });
 
     const totalUsers = allUsers.length;
-    let studentsCount = allUsers.filter(u => normalizeUserRole(u.role) === 'aluno').length;
-    let companiesCount = allUsers.filter(u => normalizeUserRole(u.role) === 'empresa').length;
-    let teachersCount = allUsers.filter(u => normalizeUserRole(u.role) === 'professor').length;
-    let adminsCount = allUsers.filter(u => normalizeUserRole(u.role) === 'admin').length;
-    let freelancersCount = allUsers.filter(u => normalizeUserRole(u.role) === 'freelancer').length;
-    let candidatesCount = allUsers.filter(u => normalizeUserRole(u.role) === 'candidato').length;
+    let studentsCount = allUsers.filter(u => getEffectiveUserRole(u) === 'aluno').length;
+    let companiesCount = allUsers.filter(u => getEffectiveUserRole(u) === 'empresa').length;
+    let teachersCount = allUsers.filter(u => getEffectiveUserRole(u) === 'professor').length;
+    let adminsCount = allUsers.filter(u => getEffectiveUserRole(u) === 'admin').length;
+    let freelancersCount = allUsers.filter(u => getEffectiveUserRole(u) === 'freelancer').length;
+    let candidatesCount = allUsers.filter(u => getEffectiveUserRole(u) === 'candidato').length;
 
     // Trava defensiva: se o usuário conectado no app é Admin e adminsCount deu 0, garante no mínimo 1 admin
     const currentAuth = getAuthUser();
-    if (adminsCount === 0 && currentAuth && normalizeUserRole(currentAuth.role) === 'admin') {
+    if (adminsCount === 0 && currentAuth && getEffectiveUserRole(currentAuth) === 'admin') {
       adminsCount = 1;
       if (!allUsers.some(u => u.uid === currentAuth.uid || u.id === currentAuth.id)) {
         allUsers.unshift({ ...currentAuth, role: 'admin' });
@@ -216,6 +231,66 @@ export async function fetchPlatformStats() {
   }
 }
 
+export async function syncPublicCompanyProfiles() {
+  try {
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+    let migrated = 0;
+    let skipped = 0;
+
+    for (const userDoc of usersSnapshot.docs) {
+      const data = userDoc.data();
+      let role = getEffectiveUserRole(data);
+      if (role !== 'empresa') {
+        skipped += 1;
+        continue;
+      }
+
+      const isActive = data.blocked !== true && data.status !== 'blocked';
+
+      await setDoc(doc(db, 'public_profiles', userDoc.id), {
+        uid: userDoc.id,
+        name: String(data.name || data.displayName || data.razaoSocial || data.nomeFantasia || '').slice(0, 120),
+        city: String(data.city || 'Ivaiporã').slice(0, 100),
+        institution: String(data.institution || '').slice(0, 160),
+        course: String(data.course || '').slice(0, 160),
+        period: String(data.period || '').slice(0, 80),
+        avatar: String(data.avatar || data.photoURL || data.logo || '').slice(0, 2048),
+        photoURL: String(data.photoURL || data.avatar || data.logo || '').slice(0, 2048),
+        skills: Array.isArray(data.skills) ? data.skills.slice(0, 100) : [],
+        experiences: Array.isArray(data.experiences) ? data.experiences.slice(0, 100) : [],
+        projects: Array.isArray(data.projects) ? data.projects.slice(0, 100) : [],
+        education: Array.isArray(data.education) ? data.education.slice(0, 100) : [],
+        bio: String(data.bio || data.about || '').slice(0, 1000),
+        endorsements: Array.isArray(data.endorsements) ? data.endorsements.slice(0, 100) : [],
+        endorsementCount: Math.max(0, Math.min(100, Number(data.endorsementCount || 0) || 0)),
+        isVerifiedStudent: Boolean(data.isVerifiedStudent),
+        razaoSocial: String(data.razaoSocial || '').slice(0, 120),
+        nomeFantasia: String(data.nomeFantasia || '').slice(0, 120),
+        sector: String(data.sector || '').slice(0, 160),
+        about: String(data.about || '').slice(0, 1000),
+        cnpj: deleteField(),
+        isVerifiedCompany: Boolean(data.isVerifiedCompany),
+        companyVerificationStatus: String(data.companyVerificationStatus || '').slice(0, 30),
+        isActive,
+        blocked: Boolean(data.blocked),
+        status: String(data.status || (isActive ? 'active' : 'blocked')).slice(0, 30),
+        role,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      migrated += 1;
+    }
+
+    return { success: true, users: usersSnapshot.size, migrated, skipped };
+  } catch (error) {
+    console.error('[adminService] Erro ao sincronizar perfis públicos das empresas:', error);
+    return {
+      success: false,
+      error: error.message || 'Falha ao sincronizar empresas para o diretório público'
+    };
+  }
+}
+
 /**
  * Busca todos os usuários do Firestore com filtros opcionais de role, status e busca textual
  */
@@ -247,7 +322,7 @@ export async function fetchAllUsers({ role = 'all', status = 'all', search = '',
     // Filtro por Role em memória (normalizado para aceitar 'docente', 'professor', etc.)
     if (role && role !== 'all') {
       const targetRole = normalizeUserRole(role);
-      users = users.filter(u => normalizeUserRole(u.role) === targetRole);
+      users = users.filter(u => getEffectiveUserRole(u) === targetRole);
     }
 
     // Filtro por Status em memória (seguro contra campos ausentes)
@@ -300,7 +375,7 @@ export async function fetchAllUsers({ role = 'all', status = 'all', search = '',
         }
       });
       const currentAuth = getAuthUser();
-      if (currentAuth && normalizeUserRole(currentAuth.role) === 'admin') {
+      if (currentAuth && getEffectiveUserRole(currentAuth) === 'admin') {
         if (!users.some(u => u.uid === currentAuth.uid || u.id === currentAuth.id)) {
           users.unshift({ ...currentAuth, role: 'admin' });
         }
@@ -308,7 +383,7 @@ export async function fetchAllUsers({ role = 'all', status = 'all', search = '',
 
       if (role && role !== 'all') {
         const targetRole = normalizeUserRole(role);
-        users = users.filter(u => normalizeUserRole(u.role) === targetRole);
+        users = users.filter(u => getEffectiveUserRole(u) === targetRole);
       }
       if (status === 'blocked') {
         users = users.filter(u => u.blocked === true || u.status === 'blocked');
@@ -428,6 +503,16 @@ export async function updateUserStatus(userId, isBlocked, reason = '') {
     };
 
     await updateDoc(doc(db, 'users', String(userId)), payload);
+    if (normalizeUserRole(targetUser.role || targetUser.activeRole || targetUser.selectedRole) === 'empresa') {
+      await setDoc(doc(db, 'public_profiles', String(userId)), {
+        uid: String(userId),
+        role: 'empresa',
+        isActive: !isBlocked,
+        blocked: Boolean(isBlocked),
+        status: isBlocked ? 'blocked' : 'active',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
 
     return {
       success: true,
@@ -475,6 +560,18 @@ export async function updateUserRole(userId, newRole) {
       uid: String(userId),
       role: cleanNewRole
     });
+    if (cleanNewRole === 'empresa') {
+      await setDoc(doc(db, 'public_profiles', String(userId)), {
+        uid: String(userId),
+        role: 'empresa',
+        isActive: true,
+        blocked: false,
+        status: 'active',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } else if (normalizeUserRole(currentRole) === 'empresa') {
+      await deleteDoc(doc(db, 'public_profiles', String(userId)));
+    }
 
     return {
       success: true,
@@ -506,6 +603,7 @@ export async function deleteUserDocument(userId) {
     }
 
     await deleteDoc(doc(db, 'users', String(userId)));
+    await deleteDoc(doc(db, 'public_profiles', String(userId)));
     return {
       success: true,
       message: 'Perfil removido do Firestore. Para liberar o e-mail permanentemente no Firebase Authentication, exclua o usuário também em Authentication → Users.'

@@ -284,7 +284,13 @@ export function isTalentUser(u) {
     return false;
   }
 
-  const role = String(u.role || '').toLowerCase().trim();
+  const role = normalizeTalentRole(
+    u.activeRole ||
+    u.selectedRole ||
+    u.profileType ||
+    u.role ||
+    ''
+  );
 
   // Exclui papéis expressamente não relacionados a talentos/estudantes/profissionais autônomos
   if (['empresa', 'company', 'recrutador', 'professor', 'docente', 'teacher', 'admin'].includes(role)) {

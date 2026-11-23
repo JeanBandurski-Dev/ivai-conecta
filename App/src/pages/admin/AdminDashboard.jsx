@@ -19,7 +19,7 @@ import {
   SlidersHorizontal,
   Compass
 } from 'lucide-react';
-import { fetchPlatformStats } from '../../services/adminService';
+import { fetchPlatformStats, syncPublicCompanyProfiles } from '../../services/adminService';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -27,11 +27,25 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activityFilter, setActivityFilter] = useState('all'); // 'all' | 'user' | 'job' | 'service'
+  const [syncingCompanies, setSyncingCompanies] = useState(false);
+
+  const synchronizeCompanies = async () => {
+    setSyncingCompanies(true);
+    try {
+      const res = await syncPublicCompanyProfiles();
+      if (res.success) {
+        await loadData();
+      }
+    } finally {
+      setSyncingCompanies(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
+      await syncPublicCompanyProfiles();
       const res = await fetchPlatformStats();
       if (res.success) {
         setStats(res.stats);
@@ -89,6 +103,14 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={synchronizeCompanies}
+            disabled={syncingCompanies}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:border-purple-500 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={syncingCompanies ? 'animate-spin' : ''} />
+            <span>{syncingCompanies ? 'Sincronizando...' : 'Sincronizar empresas'}</span>
+          </button>
           <button
             onClick={loadData}
             disabled={loading}

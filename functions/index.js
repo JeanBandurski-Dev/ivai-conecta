@@ -384,6 +384,126 @@ async function deleteUserStorage(targetUid) {
   return files.length;
 }
 
+exports.getPublicPlatformMetrics = onCall({ region: "us-central1" }, async () => {
+  const [usersSnapshot, jobsSnapshot, servicesSnapshot] = await Promise.all([
+    db.collection("users").get(),
+    db.collection("jobs").get(),
+    db.collection("services").get()
+  ]);
+
+  const effectiveRole = (data) => {
+    const role = String(
+      data.role || data.activeRole || data.selectedRole || data.profileType || ""
+    ).toLowerCase().trim();
+    const aliases = {
+      student: "aluno",
+      estudante: "aluno",
+      students: "aluno",
+      candidate: "candidato",
+      candidato: "candidato",
+      freelancer: "freelancer",
+      autonomo: "freelancer",
+      company: "empresa",
+      recrutador: "empresa",
+      recruiter: "empresa",
+      empresa: "empresa",
+      professor: "professor",
+      docente: "professor",
+      teacher: "professor",
+      admin: "admin",
+      administrador: "admin"
+    };
+    return aliases[role] || role;
+  };
+
+  let talentsCount = 0;
+  let companiesCount = 0;
+  for (const userDoc of usersSnapshot.docs) {
+    const role = effectiveRole(userDoc.data());
+    if (role === "empresa") companiesCount += 1;
+    if (["aluno", "candidato", "freelancer"].includes(role)) talentsCount += 1;
+  }
+
+  const jobsCount = jobsSnapshot.docs.filter((jobDoc) => {
+    return String(jobDoc.data().status || "").trim() === "Ativa";
+  }).length;
+
+  return {
+    talentsCount,
+    companiesCount,
+    jobsCount,
+    servicesCount: servicesSnapshot.size
+  };
+});
+
+exports.syncPublicCompanyProfiles = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "É necessário entrar na conta.");
+  }
+  if (!(await isAdminRequest(request))) {
+    throw new HttpsError("permission-denied", "Apenas administradores podem sincronizar empresas.");
+  }
+
+  const usersSnapshot = await db.collection("users").get();
+  let migrated = 0;
+  let skipped = 0;
+  const batch = db.batch();
+  let operations = 0;
+
+  for (const userDoc of usersSnapshot.docs) {
+    const data = userDoc.data();
+    let role = String(data.role || data.activeRole || data.selectedRole || data.profileType || "").toLowerCase().trim();
+    if (["company", "recrutador", "recruiter"].includes(role)) role = "empresa";
+
+    if (!role || role === "admin" || role === "administrador") {
+      skipped += 1;
+      continue;
+    }
+
+    const publicProfile = {
+      uid: userDoc.id,
+      name: String(data.name || data.displayName || data.razaoSocial || data.nomeFantasia || "").slice(0, 120),
+      city: String(data.city || "Ivaiporã").slice(0, 100),
+      institution: String(data.institution || "").slice(0, 160),
+      course: String(data.course || "").slice(0, 160),
+      period: String(data.period || "").slice(0, 80),
+      avatar: String(data.avatar || data.photoURL || data.logo || "").slice(0, 2048),
+      photoURL: String(data.photoURL || data.avatar || data.logo || "").slice(0, 2048),
+      skills: Array.isArray(data.skills) ? data.skills.slice(0, 100) : [],
+      experiences: Array.isArray(data.experiences) ? data.experiences.slice(0, 100) : [],
+      projects: Array.isArray(data.projects) ? data.projects.slice(0, 100) : [],
+      education: Array.isArray(data.education) ? data.education.slice(0, 100) : [],
+      bio: String(data.bio || data.about || "").slice(0, 1000),
+      endorsements: Array.isArray(data.endorsements) ? data.endorsements.slice(0, 100) : [],
+      endorsementCount: Math.max(0, Math.min(100, Number(data.endorsementCount || 0) || 0)),
+      isVerifiedStudent: Boolean(data.isVerifiedStudent),
+      razaoSocial: String(data.razaoSocial || "").slice(0, 120),
+      nomeFantasia: String(data.nomeFantasia || "").slice(0, 120),
+      sector: String(data.sector || "").slice(0, 160),
+      about: String(data.about || "").slice(0, 1000),
+      isVerifiedCompany: Boolean(data.isVerifiedCompany),
+      companyVerificationStatus: String(data.companyVerificationStatus || "").slice(0, 30),
+      role,
+      updatedAt: new Date().toISOString()
+    };
+
+    batch.set(db.doc(`public_profiles/${userDoc.id}`), publicProfile, { merge: true });
+    operations += 1;
+    migrated += 1;
+
+    if (operations === 400) {
+      await batch.commit();
+      operations = 0;
+    }
+  }
+
+  if (operations > 0) {
+    await batch.commit();
+  }
+
+  return { success: true, users: usersSnapshot.size, migrated, skipped };
+});
+
 exports.setUserAdminRole = onCall({ region: "us-central1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "É necessário entrar na conta.");

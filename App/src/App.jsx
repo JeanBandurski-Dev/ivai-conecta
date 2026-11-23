@@ -211,6 +211,8 @@ export default function App() {
     };
   }, [initAuthListener]);
 
+
+
   return (
     <BrowserRouter>
       <ScrollToTop />
