@@ -19,7 +19,7 @@ export default function Toast() {
       role="region"
       aria-live="polite"
       aria-label="Notificações do sistema"
-      className="fixed top-6 right-6 sm:bottom-6 sm:top-auto z-[250] flex flex-col gap-3 pointer-events-none max-w-md w-full px-4 sm:px-0"
+      className="fixed top-6 right-6 sm:bottom-6 sm:top-auto z-[100000] flex flex-col gap-3 pointer-events-none max-w-md w-full px-4 sm:px-0"
     >
       {toasts.map(t => {
         const isSuccess = t.type === 'success' ||

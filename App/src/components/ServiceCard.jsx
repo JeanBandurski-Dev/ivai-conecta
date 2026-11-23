@@ -38,9 +38,14 @@ export default function ServiceCard({ service, onDelete, onEdit, onRequestServic
       badge: 'Exclusão'
     });
     if (confirmed) {
-      deleteService(id);
-      showToast('🗑️ Serviço excluído com sucesso.');
-      if (onDelete) onDelete(id);
+      try {
+        await deleteService(id);
+        showToast('🗑️ Serviço excluído com sucesso.');
+        if (onDelete) onDelete(id);
+      } catch (err) {
+        console.error('[ServiceCard] Erro ao excluir serviço:', err);
+        showToast(err?.message || 'Erro ao excluir serviço no servidor.', 'error');
+      }
     }
   };
 

@@ -5,6 +5,7 @@ import {
   MapPin, Phone, DollarSign, FileText, Check, Wand2, ShieldCheck, Tag, Edit3
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
+import { auth } from '../lib/firebase.js';
 import {
   addService,
   updateService,
@@ -18,6 +19,15 @@ import {
   SERVICE_CATEGORIES
 } from '../lib/ivaiConecta';
 import { formatCurrencyBRL } from '../utils/formValidation';
+
+const VALID_SERVICE_CITIES = CITIES.filter(c => c !== 'Todas as Cidades');
+
+function resolveInitialCity(rawCity) {
+  const clean = String(rawCity || '').trim();
+  if (VALID_SERVICE_CITIES.includes(clean)) return clean;
+  const matched = VALID_SERVICE_CITIES.find(c => clean.toLowerCase().includes(c.toLowerCase()));
+  return matched || 'Ivaiporã';
+}
 
 const BUDGET_TYPES = [
   { id: 'combinar', label: 'A Combinar', desc: 'Negociar com o cliente' },
@@ -38,7 +48,7 @@ export default function PublishServiceModal({ serviceToEdit = null, onClose, onS
 
   const [title, setTitle] = useState(serviceToEdit?.title || serviceToEdit?.name || '');
   const [category, setCategory] = useState(serviceToEdit?.category || SERVICE_CATEGORIES[0] || 'Construção & Manutenção');
-  const [city, setCity] = useState(serviceToEdit?.city || currentUser?.city || 'Ivaiporã');
+  const [city, setCity] = useState(() => resolveInitialCity(serviceToEdit?.city || currentUser?.city));
   const [phone, setPhone] = useState(
     serviceToEdit?.phone
       ? maskPhone(serviceToEdit.phone)
@@ -141,6 +151,16 @@ export default function PublishServiceModal({ serviceToEdit = null, onClose, onS
       return;
     }
 
+    const effectiveUid = String(auth?.currentUser?.uid || currentUser?.uid || currentUser?.id || '').trim();
+    const effectiveEmail = String(auth?.currentUser?.email || currentUser?.email || '').toLowerCase().trim();
+
+    if (!effectiveUid) {
+      const msg = 'Você precisa estar conectado à sua conta para publicar ou editar um serviço.';
+      setFieldErrors({ submit: msg });
+      showToast(`❌ ${msg}`, 'error');
+      return;
+    }
+
     const payload = {
       title: title.trim(),
       name: title.trim(),
@@ -153,9 +173,9 @@ export default function PublishServiceModal({ serviceToEdit = null, onClose, onS
       description: description.trim(),
       providerName: currentUser?.name || 'Profissional Autônomo',
       avatar: currentUser?.avatar || '',
-      providerEmail: currentUser?.email || '',
-      createdBy: currentUser?.uid || currentUser?.id || currentUser?.email || 'freelancer',
-      providerUid: currentUser?.uid || currentUser?.id || '',
+      providerEmail: effectiveEmail,
+      createdBy: effectiveUid,
+      providerUid: effectiveUid,
       badge: currentUser?.badge || (currentUser?.cnpj ? 'Prestador PJ Verificado' : 'Prestador Regional')
     };
 
@@ -530,6 +550,13 @@ export default function PublishServiceModal({ serviceToEdit = null, onClose, onS
               </p>
             )}
           </div>
+
+          {fieldErrors.submit && (
+            <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400 font-semibold p-3 bg-red-50 dark:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-800">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" />
+              <span>{fieldErrors.submit}</span>
+            </div>
+          )}
 
           {/* Footer de Ações */}
           <div className="pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-3">

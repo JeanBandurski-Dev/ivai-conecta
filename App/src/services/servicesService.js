@@ -1,5 +1,4 @@
-import { db } from '../lib/firebase.js';
-import { functions } from '../lib/firebase.js';
+import { db, auth, functions } from '../lib/firebase.js';
 import { httpsCallable } from 'firebase/functions';
 import {
   collection,
@@ -101,7 +100,12 @@ export function validateServiceTitle(title) {
     'enfermeir', 'motorist', 'frete', 'mudanc', 'transport', 'entreg', 'veterinar', 'adestrad',
     'jardin', 'piscineir', 'serralheir', 'vidraceir', 'calheiro', 'marceneir', 'marketing',
     'social media', 'gestao', 'gestor', 'tradut', 'redator', 'copywrit', 'artesanat',
-    'servico', 'servicos', 'prestador', 'especialista', 'profissional', 'assistencia', 'seguranca'
+    'servico', 'servicos', 'prestador', 'especialista', 'profissional', 'assistencia', 'seguranca',
+    'suporte', 'criac', 'edicao', 'audio', 'music', 'logo', 'refrigerac', 'climatiz',
+    'solar', 'gess', 'drywall', 'chaveir', 'dedetiz', 'desentup', 'maquiag', 'sobrancelh',
+    'tatuag', 'sold', 'funil', 'estof', 'tapec', 'poda', 'agro', 'psicolog', 'nutric',
+    'podolog', 'automacao', 'iluminac', 'hidraulic', 'consultoria', 'mentoria', 'aula',
+    'ti ', ' ti', 't.i', 'webdesign', 'dev', 'freelancer'
   ];
 
   const isStandardTitle = STANDARD_JOB_TITLES.some(st => {
@@ -180,7 +184,10 @@ export function validateServiceDescription(description) {
     'ofereco', 'realizo', 'faco', 'prestador', 'prestacao', 'prazo', 'ferramenta', 'ferramentas',
     'padrao', 'seguranca', 'suporte', 'assistencia', 'montagem', 'costura', 'frete',
     'transporte', 'fotografia', 'foto', 'video', 'evento', 'decoracao', 'saude', 'estetica',
-    'comunicacao', 'diagnostico', 'elaboracao', 'revisao', 'consultor', 'ensino', 'curso'
+    'comunicacao', 'diagnostico', 'elaboracao', 'revisao', 'consultor', 'ensino', 'curso',
+    'entreg', 'atend', 'execut', 'residenc', 'comerc', 'empresa', 'regiao', 'ivaipor',
+    'vale do ivai', 'agend', 'valor', 'preco', 'equipament', 'material', 'materiais',
+    'sistema', 'digital', 'rapido', 'seguro', 'dedic', 'certific', 'experiencia'
   ];
 
   const hasContext = SERVICE_CONTEXT_KEYWORDS.some(kw => norm.includes(kw));
@@ -528,9 +535,16 @@ export async function addService(serviceData) {
 
   const services = getServices('Todas as Cidades');
   const titleClean = (serviceData.title || serviceData.name || '').trim();
+  const authUid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : '';
+  const authEmail = auth?.currentUser?.email ? String(auth.currentUser.email).toLowerCase().trim() : '';
+  const ownerUid = authUid || String(serviceData.createdBy || serviceData.providerUid || '').trim();
+
+  if (!ownerUid) {
+    throw new Error('Sessão expirada ou usuário não autenticado. Faça login novamente para publicar.');
+  }
+
+  // Regras do Firestore exigem rating inicial 0 ou null e reviewsCount 0 na criação.
   const newService = {
-    rating: 5.0,
-    reviewsCount: 0,
     badge: serviceData.badge || 'Prestador Regional',
     analytics: { views: 0, contacts: 0, closedDeals: 0, nonBuyers: 0, conversionRate: '0%' },
     reviews: [],
@@ -539,6 +553,11 @@ export async function addService(serviceData) {
     createdAtTimestamp: Date.now(),
     status: 'active',
     ...serviceData,
+    rating: 0,
+    reviewsCount: 0,
+    createdBy: ownerUid,
+    providerUid: ownerUid,
+    providerEmail: (authEmail || serviceData.providerEmail || '').toLowerCase().trim(),
     title: titleClean,
     name: titleClean,
     description: (serviceData.description || '').trim(),
@@ -551,8 +570,8 @@ export async function addService(serviceData) {
     newService.id = created.id;
     newService.firestoreId = created.firestoreId;
   } catch (err) {
-    console.warn('[ServiceRepository] Erro ao cadastrar serviço:', err.message);
-    newService.id = `serv_${Date.now()}`;
+    console.warn('[ServiceRepository] Erro ao cadastrar serviço:', err?.message || err);
+    throw err;
   }
 
   const updated = [newService, ...services.filter(s => s.id !== newService.id && s.firestoreId !== newService.id)];
@@ -576,7 +595,8 @@ export async function updateService(id, serviceData) {
     try {
       await serviceRepository.update(String(docId), serviceData);
     } catch (err) {
-      console.warn('[ServiceRepository] Erro ao atualizar serviço:', err.message);
+      console.warn('[ServiceRepository] Erro ao atualizar serviço:', err?.message || err);
+      throw err;
     }
   }
 
@@ -604,7 +624,8 @@ export async function deleteService(id) {
     try {
       await serviceRepository.delete(String(docId));
     } catch (err) {
-      console.warn('[ServiceRepository] Erro ao deletar serviço:', err.message);
+      console.warn('[ServiceRepository] Erro ao deletar serviço:', err?.message || err);
+      throw err;
     }
   }
 

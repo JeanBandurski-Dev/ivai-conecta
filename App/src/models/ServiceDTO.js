@@ -26,7 +26,7 @@ export function normalizeServiceDTO(raw, fallbackId = '') {
         ? data.reviewCount
         : reviews.length);
 
-  let rating = 5.0;
+  let rating = 0;
   if (typeof data.rating === 'number' && !isNaN(data.rating)) {
     rating = data.rating;
   } else if (data.rating !== undefined && data.rating !== null && !isNaN(Number(data.rating))) {

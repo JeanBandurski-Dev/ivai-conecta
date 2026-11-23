@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import {
-  updateService, CITIES, matchCity,
+  CITIES, matchCity,
   subscribeToServiceOrders, updateServiceOrderStatus, getServiceOrders,
   useServices, UserRole
 } from '../lib/ivaiConecta';
@@ -167,20 +167,8 @@ export default function Servicos() {
     });
   }, [all, liveOrders]);
 
-  // Sincroniza em segundo plano avaliações pendentes com o documento de serviço no Firestore
-  useEffect(() => {
-    enrichedServices.forEach(s => {
-      const raw = all.find(r => (r.id === s.id || r.firestoreId === s.id));
-      if (raw && (s.reviewsCount || 0) > (raw.reviewsCount || 0)) {
-        updateService(s.firestoreId || s.id, {
-          rating: s.rating,
-          reviewsCount: s.reviewsCount,
-          reviewCount: s.reviewsCount,
-          reviews: s.reviews
-        }).catch(() => {});
-      }
-    });
-  }, [enrichedServices, all]);
+  // As avaliações de ordens finalizadas são consolidadas em tempo real via enrichedServices
+  // e persistidas oficialmente pela Cloud Function submitServiceReview.
 
   const myServices = useMemo(() => {
     return enrichedServices.filter(s => 
