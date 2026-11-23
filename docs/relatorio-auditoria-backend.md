@@ -2,7 +2,7 @@
 **Projeto:** Ivaí Conecta (React + Firebase Firestore / Auth / Storage)  
 **Papel:** Arquiteto de Software Sênior & Tech Lead  
 **Data:** 04 de Setembro de 2026  
-
+--
 ---
 
 ## 📌 Contexto e Escopo da Auditoria
