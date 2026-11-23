@@ -11,6 +11,7 @@ import { EndorsementStatus } from '../models/enums.js';
 
 import { matchCity } from '../utils/searchUtils.js';
 import { isInstitutionalEmail, getUsersDB } from './authService.js';
+import { syncPublicProfileSafe } from './publicProfileSync.js';
 
 let _memTalentsCache = null;
 
@@ -184,7 +185,8 @@ function normalizeUserDoc(docData, docId) {
     name: data.name || 'Usuário',
     role: normalizeTalentRole(data.activeRole || data.selectedRole || data.profileType || data.role || (data.isVerifiedStudent ? 'aluno' : ''), data),
     city: data.city || '',
-    avatar: data.avatar || '',
+    avatar: data.avatar || data.photoURL || '',
+    banner: data.banner || data.coverImage || '',
     skills: data.skills || [],
     endorsements: cleanEndorsements,
     endorsementCount: cleanEndorsements.length,
@@ -200,39 +202,13 @@ function normalizeUserDoc(docData, docId) {
 
 export async function syncPublicProfile(uid, sourceData) {
   if (!uid || !sourceData || typeof sourceData !== 'object') return;
-
-  const role = normalizeTalentRole(
-    sourceData.activeRole || sourceData.selectedRole || sourceData.profileType ||
-    sourceData.role || (sourceData.isVerifiedStudent ? 'aluno' : '')
-  );
-  const publicProfile = {
-    uid: String(uid),
-    name: String(sourceData.name || sourceData.displayName || '').slice(0, 120),
-    city: String(sourceData.city || '').slice(0, 100),
-    institution: String(sourceData.institution || '').slice(0, 160),
-    course: String(sourceData.course || '').slice(0, 160),
-    period: String(sourceData.period || '').slice(0, 80),
-    avatar: String(sourceData.avatar || sourceData.photoURL || '').slice(0, 2048),
-    photoURL: String(sourceData.photoURL || sourceData.avatar || '').slice(0, 2048),
-    skills: Array.isArray(sourceData.skills) ? sourceData.skills.slice(0, 100) : [],
-    experiences: Array.isArray(sourceData.experiences) ? sourceData.experiences.slice(0, 100) : [],
-    projects: Array.isArray(sourceData.projects) ? sourceData.projects.slice(0, 100) : [],
-    education: Array.isArray(sourceData.education) ? sourceData.education.slice(0, 100) : [],
-    bio: String(sourceData.bio || '').slice(0, 1000),
-    endorsements: Array.isArray(sourceData.endorsements)
-      ? sanitizeUniqueEndorsements(sourceData.endorsements).slice(0, 100)
-      : [],
-    endorsementCount: Math.max(0, Math.min(100, Number(sourceData.endorsementCount || 0) || 0)),
-    updatedAt: new Date().toISOString()
-  };
-  if (Object.prototype.hasOwnProperty.call(sourceData, 'isVerifiedStudent')) {
-    publicProfile.isVerifiedStudent = Boolean(sourceData.isVerifiedStudent);
-  }
-  if (role) {
-    publicProfile.role = role;
-  }
-
-  await setDoc(doc(db, 'public_profiles', String(uid)), publicProfile, { merge: true });
+  const cleanEndorsements = Array.isArray(sourceData.endorsements)
+    ? sanitizeUniqueEndorsements(sourceData.endorsements)
+    : undefined;
+  await syncPublicProfileSafe(uid, {
+    ...sourceData,
+    ...(cleanEndorsements ? { endorsements: cleanEndorsements } : {}),
+  });
 }
 
 /**
@@ -255,7 +231,8 @@ function normalizeTeacherDoc(docData, docId) {
     discipline: data.discipline || '',
     endorsementCount: data.endorsementCount || 0,
     verified: data.verified ?? false,
-    avatar: data.avatar || '',
+    avatar: data.avatar || data.photoURL || '',
+    banner: data.banner || data.coverImage || '',
     bio: data.bio || '',
     education: data.education || [],
     classes: data.classes || [],
@@ -722,20 +699,23 @@ export function getTeacherById(id) {
 }
 
 export async function updateTeacherProfile(teacherId, data) {
+  const { newClass: _newClass, newEdu: _newEdu, ...cleanData } = data || {};
   const teachers = getVerifiedTeachers();
-  const updated = teachers.map(t => (t.id === teacherId || String(t.id) === String(teacherId) || t.firestoreId === teacherId ? { ...t, ...data } : t));
+  const updated = teachers.map(t => (t.id === teacherId || String(t.id) === String(teacherId) || t.firestoreId === teacherId ? { ...t, ...cleanData } : t));
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
   }
 
-  // Sync imediato com a coleção 'users' do Firestore
+  // Sync imediato com a coleção 'users' e 'public_profiles' do Firestore
   try {
     const docRef = doc(db, 'users', String(teacherId));
-    await setDoc(docRef, {
-      ...data,
+    const payload = {
+      ...cleanData,
       role: 'professor',
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    };
+    await setDoc(docRef, payload, { merge: true });
+    await syncPublicProfileSafe(teacherId, payload);
   } catch (err) {
     console.warn('[Firestore] Sync updateTeacherProfile:', err.message);
   }
@@ -1494,18 +1474,19 @@ export async function rejectEndorsementRequest(requestId, profUser = null) {
 }
 
 export function updateTalentProfile(talentId, updatedData) {
+  const { newSkill: _newSkill, ...cleanData } = updatedData || {};
   const talents = getTalents('Todas as Cidades');
   let found = false;
   const updated = talents.map(t => {
     if (t.id === Number(talentId) || t.id === talentId || String(t.id) === String(talentId) || t.firestoreId === talentId) {
       found = true;
-      return { ...t, ...updatedData };
+      return { ...t, ...cleanData };
     }
     return t;
   });
 
-  if (!found && isTalentUser(updatedData)) {
-    updated.push({ id: talentId, ...updatedData });
+  if (!found && isTalentUser(cleanData)) {
+    updated.push({ id: talentId, ...cleanData });
   }
 
   const cleanTalents = updated.filter(isTalentUser);
@@ -1517,8 +1498,8 @@ export function updateTalentProfile(talentId, updatedData) {
     if (rawAuth) {
       try {
         const auth = JSON.parse(rawAuth);
-        if (auth && (String(auth.id) === String(talentId) || String(auth.uid) === String(talentId) || auth.email === updatedData.email)) {
-          const updatedAuth = { ...auth, ...updatedData };
+        if (auth && (String(auth.id) === String(talentId) || String(auth.uid) === String(talentId) || auth.email === cleanData.email)) {
+          const updatedAuth = { ...auth, ...cleanData };
           localStorage.setItem('ivai_conecta_auth_user', JSON.stringify(updatedAuth));
         }
       } catch {}
@@ -1529,10 +1510,10 @@ export function updateTalentProfile(talentId, updatedData) {
   try {
     const docRef = doc(db, 'users', String(talentId));
     setDoc(docRef, {
-      ...updatedData,
+      ...cleanData,
       updatedAt: new Date().toISOString()
     }, { merge: true }).catch(err => console.warn('[Firestore] Sync erro updateTalentProfile:', err.message));
-    syncPublicProfile(talentId, updatedData).catch(err =>
+    syncPublicProfile(talentId, cleanData).catch(err =>
       console.warn('[Firestore] Sync erro public_profiles:', err.message)
     );
   } catch {}

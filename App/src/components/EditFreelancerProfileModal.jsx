@@ -47,6 +47,8 @@ export default function EditFreelancerProfileModal({
   handleSaveProfile,
   handleAvatarFileChange,
   handleBannerFileChange,
+  uploadingAvatar = false,
+  uploadingBanner = false,
   isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('general');
@@ -591,18 +593,27 @@ export default function EditFreelancerProfileModal({
                       </div>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <label className="btn btn-outline btn-sm text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer">
-                      <Upload size={13} />
-                      Carregar Foto do Computador
+                  <div className="space-y-2 flex-1 min-w-[200px]">
+                    <label className="btn btn-outline btn-sm text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer">
+                      {uploadingAvatar ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                      <span>{uploadingAvatar ? 'Enviando Foto...' : 'Carregar Foto do Computador'}</span>
                       <input
                         type="file"
-                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        accept="image/*"
                         className="hidden"
+                        disabled={uploadingAvatar}
                         onChange={handleAvatarFileChange}
                       />
                     </label>
-                    <span className="text-[11px] text-gray-400 block">Recomendado: imagem quadrada de até 5MB</span>
+                    <input
+                      type="text"
+                      inputMode="url"
+                      value={editData?.avatar || ''}
+                      onChange={e => setEditData(prev => ({ ...prev, avatar: e.target.value }))}
+                      placeholder="Ou cole a URL direta de uma foto..."
+                      className="input w-full text-xs rounded-xl"
+                    />
+                    <span className="text-[11px] text-gray-400 block">Recomendado: imagem quadrada de até 10MB</span>
                   </div>
                 </div>
 
@@ -626,21 +637,55 @@ export default function EditFreelancerProfileModal({
               </div>
 
               {/* Imagem de Capa */}
-              <div className="pt-4 border-t border-gray-100 dark:border-slate-800">
-                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">
+              <div className="pt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">
                   Banner / Imagem de Capa
                 </label>
-                <div className="space-y-2">
-                  <label className="btn btn-outline btn-sm text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer">
-                    <Upload size={13} />
-                    Carregar Banner do Computador
+
+                <div className="relative rounded-2xl overflow-hidden h-36 border-2 border-dashed border-gray-300 dark:border-slate-700 group">
+                  <img
+                    src={editData?.banner || FREELANCER_COVER_PRESETS[0]}
+                    alt="Pré-visualização da Capa"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = FREELANCER_COVER_PRESETS[0];
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-md">
+                      {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                      <span>{uploadingBanner ? 'Enviando Capa...' : 'Alterar Capa do Computador'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingBanner}
+                        onChange={handleBannerFileChange}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="btn btn-outline btn-sm text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                    {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                    <span>{uploadingBanner ? 'Enviando Banner...' : 'Carregar Banner do Computador'}</span>
                     <input
                       type="file"
-                      accept="image/png, image/jpeg, image/jpg, image/webp"
+                      accept="image/*"
                       className="hidden"
+                      disabled={uploadingBanner}
                       onChange={handleBannerFileChange}
                     />
                   </label>
+                  <input
+                    type="text"
+                    inputMode="url"
+                    value={editData?.banner || ''}
+                    onChange={e => setEditData(prev => ({ ...prev, banner: e.target.value }))}
+                    placeholder="Ou cole a URL direta de uma imagem de capa..."
+                    className="input flex-1 text-xs rounded-xl min-w-[200px]"
+                  />
                 </div>
 
                 <div className="mt-3">

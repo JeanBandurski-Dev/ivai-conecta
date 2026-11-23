@@ -2,16 +2,14 @@
 import { db } from '../lib/firebase.js';
 import {
   collection,
-  doc,
-  onSnapshot,
-  setDoc,
-  deleteField
+  onSnapshot
 } from 'firebase/firestore';
 import { getJobs, subscribeToJobs, isJobActive } from './jobsService.js';
 import { getTalents, subscribeToTalents } from './talentsService.js';
 import { getServices, subscribeToServices } from './servicesService.js';
 import { getUsersDB, getAuthUser, normalizeUserRole } from './authService.js';
 import { matchCity } from '../utils/searchUtils.js';
+import { syncPublicProfileSafe } from './publicProfileSync.js';
 
 export const STORAGE_KEY_COMPANIES = 'ivai_conecta_db_companies';
 
@@ -44,26 +42,7 @@ export async function syncPublicCompanyProfile(uid, sourceData) {
   );
   if (role !== 'empresa') return;
 
-  await setDoc(doc(db, 'public_profiles', String(uid)), {
-    uid: String(uid),
-    name: String(sourceData.name || sourceData.razaoSocial || sourceData.nomeFantasia || '').slice(0, 120),
-    city: String(sourceData.city || 'Ivaiporã').slice(0, 100),
-    avatar: String(sourceData.avatar || sourceData.photoURL || sourceData.logo || '').slice(0, 2048),
-    photoURL: String(sourceData.photoURL || sourceData.avatar || sourceData.logo || '').slice(0, 2048),
-    bio: String(sourceData.bio || sourceData.about || '').slice(0, 1000),
-    razaoSocial: String(sourceData.razaoSocial || '').slice(0, 120),
-    nomeFantasia: String(sourceData.nomeFantasia || '').slice(0, 120),
-    sector: String(sourceData.sector || '').slice(0, 160),
-    about: String(sourceData.about || '').slice(0, 1000),
-    cnpj: deleteField(),
-    isVerifiedCompany: Boolean(sourceData.isVerifiedCompany),
-    companyVerificationStatus: String(sourceData.companyVerificationStatus || '').slice(0, 30),
-    isActive: sourceData.blocked !== true && String(sourceData.status || '').toLowerCase() !== 'blocked' && sourceData.isDeactivated !== true,
-    blocked: sourceData.blocked === true,
-    status: sourceData.blocked === true || String(sourceData.status || '').toLowerCase() === 'blocked' ? 'blocked' : 'active',
-    role: 'empresa',
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  await syncPublicProfileSafe(uid, { ...sourceData, role: 'empresa' });
 }
 
 export function getCompanies(city = 'Todas as Cidades') {
@@ -106,6 +85,7 @@ export function getCompanies(city = 'Todas as Cidades') {
       city: u.city || 'Ivaiporã',
       sector: u.sector || 'Comércio & Serviços',
       logo: u.avatar || u.logo || '',
+      banner: u.banner || u.coverImage || '',
       about: u.about || 'Empresa atuante no Vale do Ivaí.',
       cnpj: u.cnpj || '',
       isVerified: u.companyVerificationStatus === 'VALIDADA' && u.isVerifiedCompany === true,

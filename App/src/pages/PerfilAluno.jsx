@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   GraduationCap, Building2, MapPin, Award, ShieldCheck,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   getTalentById, requestTeacherEndorsement, updateTalentProfile,
-  proactiveEndorseStudent, uploadUserProfilePicture,
+  proactiveEndorseStudent, uploadUserProfilePicture, syncPublicProfile,
   subscribeToStudentEndorsementRequests, getVerifiedTeachers, subscribeToTeachers,
   hasTeacherEndorsedStudent, sanitizeUniqueEndorsements, getEndorsementRequests,
   deduplicateRequestsByTeacher, isSameProfessor, STORAGE_KEY_ENDORSEMENT_REQUESTS,
@@ -33,6 +33,7 @@ function buildFallbackTalent(user) {
     period: user.period || '',
     city: user.city || 'Ivaiporã',
     avatar: user.avatar || user.photoURL || '',
+    banner: user.banner || user.coverImage || '',
     email: user.email || '',
     skills: Array.isArray(user.skills) ? user.skills : [],
     isVerifiedStudent: (normalizeUserRole(user.role) === 'aluno') &&
@@ -78,7 +79,13 @@ export default function PerfilAluno() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isSubmittingProactive, setIsSubmittingProactive] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [successBanner, setSuccessBanner] = useState(null);
+  const editModalOpenRef = useRef(editModalOpen);
+  useEffect(() => {
+    editModalOpenRef.current = editModalOpen;
+  }, [editModalOpen]);
 
   // 4. Formulários de endosso
   const [proactiveQuote, setProactiveQuote] = useState('');
@@ -92,6 +99,7 @@ export default function PerfilAluno() {
   const [editData, setEditData] = useState(() => ({
     name: talent?.name || currentUser?.name || '',
     avatar: talent?.avatar || currentUser?.avatar || '',
+    banner: talent?.banner || currentUser?.banner || '',
     city: talent?.city || currentUser?.city || 'Ivaiporã',
     institution: talent?.institution || currentUser?.institution || '',
     course: talent?.course || currentUser?.course || '',
@@ -262,6 +270,7 @@ export default function PerfilAluno() {
           period: data.period || (currentUser?.period) || 'Em andamento',
           city: data.city || (currentUser?.city) || 'Ivaiporã',
           avatar: data.avatar || data.photoURL || (currentUser?.avatar) || '',
+          banner: data.banner || data.coverImage || (currentUser?.banner) || '',
           skills: Array.isArray(data.skills) ? data.skills : (currentUser?.skills || []),
           isVerifiedStudent: (normalizeUserRole(data.role || currentUser?.role) === 'aluno') &&
             Boolean(data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO'),
@@ -278,22 +287,25 @@ export default function PerfilAluno() {
         };
 
         setTalent(mergedTalent);
-        setEditData({
-          name: mergedTalent.name,
-          avatar: mergedTalent.avatar,
-          city: mergedTalent.city,
-          institution: mergedTalent.institution,
-          course: mergedTalent.course,
-          period: mergedTalent.period,
-          bio: mergedTalent.bio,
-          linkedin: mergedTalent.linkedin,
-          github: mergedTalent.github,
-          skills: [...mergedTalent.skills],
-          experiences: [...mergedTalent.experiences],
-          projects: [...mergedTalent.projects],
-          education: [...mergedTalent.education],
-          newSkill: ''
-        });
+        if (!editModalOpenRef.current) {
+          setEditData({
+            name: mergedTalent.name,
+            avatar: mergedTalent.avatar,
+            banner: mergedTalent.banner,
+            city: mergedTalent.city,
+            institution: mergedTalent.institution,
+            course: mergedTalent.course,
+            period: mergedTalent.period,
+            bio: mergedTalent.bio,
+            linkedin: mergedTalent.linkedin,
+            github: mergedTalent.github,
+            skills: [...mergedTalent.skills],
+            experiences: [...mergedTalent.experiences],
+            projects: [...mergedTalent.projects],
+            education: [...mergedTalent.education],
+            newSkill: ''
+          });
+        }
       } else {
         const fallback = getTalentById(targetId) || (!id ? buildFallbackTalent(currentUser) : null);
         if (fallback) {
@@ -301,7 +313,6 @@ export default function PerfilAluno() {
         } else if (id) {
           try {
             const cleanTarget = decodeURIComponent(String(targetId)).trim();
-            const cleanLower = cleanTarget.toLowerCase();
             const usersCol = collection(db, 'public_profiles');
             const queries = [
               query(usersCol, where('name', '==', cleanTarget), limit(1))
@@ -321,6 +332,7 @@ export default function PerfilAluno() {
                     period: d.period || 'Em andamento',
                     city: d.city || 'Ivaiporã',
                     avatar: d.avatar || d.photoURL || '',
+                    banner: d.banner || d.coverImage || '',
                     skills: Array.isArray(d.skills) ? d.skills : [],
                     isVerifiedStudent: normalizeUserRole(d.role) === 'aluno' &&
                       Boolean(d.isVerifiedStudent || d.institutionalValidationStatus === 'VALIDADO'),
@@ -461,20 +473,74 @@ export default function PerfilAluno() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    const input = e.target;
     if (!isOwner) {
+      if (input) input.value = '';
       showToast('Você só pode editar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
-    if (file) {
-      showToast('Enviando foto para o Firebase Storage...');
-      const res = await uploadUserProfilePicture(file, currentUser?.uid || talent?.id);
-      if (res.success) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    showToast('Enviando foto de perfil...');
+    try {
+      const targetUid = currentUser?.uid || currentUser?.id || talent?.id;
+      const res = await uploadUserProfilePicture(file, targetUid, 'avatar');
+      if (res.success && res.url) {
         setEditData(d => ({ ...d, avatar: res.url }));
-        showToast('Foto de perfil salva na nuvem com sucesso!');
+        setTalent(prev => (prev ? { ...prev, avatar: res.url } : prev));
+        if (currentUser) {
+          setCurrentUser({ ...currentUser, avatar: res.url });
+        }
+        if (targetUid) {
+          await syncPublicProfile(targetUid, { ...(currentUser || {}), ...(talent || {}), avatar: res.url });
+        }
+        showToast('Foto de perfil salva com sucesso!', 'success');
       } else {
-        showToast(res.error || 'Erro ao enviar foto.');
+        showToast(res.error || 'Erro ao enviar foto.', 'error');
       }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar foto.', 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleBannerFileChange = async (e) => {
+    const input = e.target;
+    if (!isOwner) {
+      if (input) input.value = '';
+      showToast('Você só pode editar o seu próprio perfil.', 'error');
+      return;
+    }
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+
+    setUploadingBanner(true);
+    showToast('Enviando imagem de capa...');
+    try {
+      const targetUid = currentUser?.uid || currentUser?.id || talent?.id;
+      const res = await uploadUserProfilePicture(file, targetUid, 'cover');
+      if (res.success && res.url) {
+        setEditData(d => ({ ...d, banner: res.url }));
+        setTalent(prev => (prev ? { ...prev, banner: res.url } : prev));
+        if (currentUser) {
+          setCurrentUser({ ...currentUser, banner: res.url });
+        }
+        if (targetUid) {
+          await syncPublicProfile(targetUid, { ...(currentUser || {}), ...(talent || {}), banner: res.url });
+        }
+        showToast('Imagem de capa atualizada com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar imagem de capa.', 'error');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar imagem de capa.', 'error');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 
@@ -488,14 +554,16 @@ export default function PerfilAluno() {
     if (isSavingProfile) return;
     setIsSavingProfile(true);
     try {
-      const targetId = talent?.id || currentUser?.uid || currentUser?.id;
+      const { newSkill: _newSkill, ...cleanEditData } = editData;
+      const targetId = currentUser?.uid || currentUser?.id || talent?.id;
       if (targetId) {
-        updateTalentProfile(targetId, editData);
+        updateTalentProfile(targetId, cleanEditData);
         try {
           await setDoc(doc(db, 'users', String(targetId)), {
-            ...editData,
+            ...cleanEditData,
             updatedAt: new Date().toISOString()
           }, { merge: true });
+          await syncPublicProfile(targetId, { ...(currentUser || {}), ...(talent || {}), ...cleanEditData });
         } catch (dbErr) {
           console.warn('[PerfilAluno] Erro ao sincronizar edição no Firestore:', dbErr);
         }
@@ -505,16 +573,16 @@ export default function PerfilAluno() {
       if (isOwner && currentUser) {
         setCurrentUser({
           ...currentUser,
-          ...editData
+          ...cleanEditData
         });
       }
 
       setTalent(prev => ({
         ...prev,
-        ...editData
+        ...cleanEditData
       }));
 
-      showToast('Foto de perfil, currículo e redes sociais salvos com sucesso!');
+      showToast('Foto de perfil, capa, currículo e redes sociais salvos com sucesso!', 'success');
       handleCloseEditModal();
     } catch (err) {
       console.error('[PerfilAluno] Erro ao salvar perfil:', err);
@@ -611,14 +679,43 @@ export default function PerfilAluno() {
 
       {/* Hero / Header do Perfil Gupy */}
       <div className="bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-10 sm:py-12 relative overflow-hidden">
+        {talent.banner && (
+          <>
+            <img
+              src={talent.banner}
+              alt={`Capa de ${talent.name}`}
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-[#051944]/80 to-[#0A1128]/65" />
+          </>
+        )}
         <div className="container relative z-10">
           
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-6 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
-          >
-            <ArrowLeft size={14} /> Voltar para a página anterior
-          </button>
+          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-gray-200 hover:text-white bg-black/35 hover:bg-black/55 backdrop-blur-md px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Voltar para a página anterior
+            </button>
+
+            {isOwner && (
+              <label
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-black/40 hover:bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-md"
+                title="Alterar imagem de capa do perfil"
+              >
+                {uploadingBanner ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                <span>{uploadingBanner ? 'Enviando capa...' : 'Alterar Capa'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingBanner}
+                  onChange={handleBannerFileChange}
+                />
+              </label>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 max-w-full flex-1">
@@ -637,13 +734,19 @@ export default function PerfilAluno() {
                   </div>
                 )}
                 {isOwner && (
-                  <button
-                    onClick={() => setActiveTab('edit')}
-                    className="absolute -bottom-2 -right-2 bg-primary-blue text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-blue-600 transition-all cursor-pointer"
+                  <label
+                    className="absolute -bottom-2 -right-2 bg-primary-blue text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-blue-600 transition-all cursor-pointer flex items-center justify-center"
                     title="Alterar Foto de Perfil"
                   >
-                    <Camera size={14} />
-                  </button>
+                    {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingAvatar}
+                      onChange={handleAvatarFileChange}
+                    />
+                  </label>
                 )}
               </div>
 
@@ -705,7 +808,7 @@ export default function PerfilAluno() {
                   ) : (
                     isOwner && (
                       <button
-                        onClick={() => setActiveTab('edit')}
+                        onClick={() => setEditModalOpen(true)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#0A66C2]/30 hover:bg-[#0A66C2] text-blue-100 border border-blue-400/40 px-3 py-1.5 rounded-full transition-all"
                       >
                         + Adicionar LinkedIn
@@ -727,7 +830,7 @@ export default function PerfilAluno() {
                   ) : (
                     isOwner && (
                       <button
-                        onClick={() => setActiveTab('edit')}
+                        onClick={() => setEditModalOpen(true)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-gray-200 border border-white/20 px-3 py-1.5 rounded-full transition-all"
                       >
                         + Adicionar GitHub
@@ -1485,6 +1588,9 @@ export default function PerfilAluno() {
         role={currentUser?.role || talent?.role || 'aluno'}
         handleSaveProfile={handleSaveProfile}
         handleAvatarFileChange={handleAvatarFileChange}
+        handleBannerFileChange={handleBannerFileChange}
+        uploadingAvatar={uploadingAvatar}
+        uploadingBanner={uploadingBanner}
         addExperience={addExperience}
         removeExperience={removeExperience}
         addProject={addProject}

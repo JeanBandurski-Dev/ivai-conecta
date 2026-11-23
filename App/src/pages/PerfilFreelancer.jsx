@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   Wrench, MapPin, Phone, Star, ShieldCheck, CheckCircle2,
   Edit3, ArrowLeft, Plus, MessageSquare, Globe, ExternalLink,
-  Briefcase, FileText, Camera
+  Briefcase, FileText, Camera, Loader2
 } from 'lucide-react';
 import {
   getServices, subscribeToServices, updateAuthUser,
@@ -41,22 +41,27 @@ export default function PerfilFreelancer() {
   }, [searchParams]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedServiceToOrder, setSelectedServiceToOrder] = useState(null);
   const [editingService, setEditingService] = useState(null);
 
-  // Escuta dados em tempo real do documento do usuário no Firestore
+  // Escuta dados em tempo real do documento do usuário no Firestore (dono lê `users`, visitante lê `public_profiles`)
   useEffect(() => {
     if (!freelancerId) return;
+    const currentUid = String(currentUser?.uid || currentUser?.id || '').trim();
+    const isOwnerDoc = Boolean(currentUid && (!id || String(id) === 'freelancer' || String(id) === currentUid));
+    const collectionName = isOwnerDoc ? 'users' : 'public_profiles';
     try {
-      const unsub = onSnapshot(doc(db, 'users', String(freelancerId)), (snap) => {
+      const unsub = onSnapshot(doc(db, collectionName, String(freelancerId)), (snap) => {
         if (snap.exists()) {
           setLiveUserDoc({ id: snap.id, firestoreId: snap.id, ...snap.data() });
         }
       }, () => {});
       return () => unsub();
     } catch {}
-  }, [freelancerId]);
+  }, [freelancerId, currentUser?.uid, currentUser?.id, id]);
 
   // Monta objeto do perfil mesclando Firestore, currentUser e dados de cadastro
   const freelancer = useMemo(() => {
@@ -164,7 +169,7 @@ export default function PerfilFreelancer() {
   });
 
   useEffect(() => {
-    if (freelancer) {
+    if (freelancer && !editModalOpen) {
       setEditData({
         name: freelancer.name || '',
         specialty: freelancer.specialty || freelancer.title || 'Profissional Autônomo',
@@ -181,7 +186,7 @@ export default function PerfilFreelancer() {
         banner: freelancer.banner || DEFAULT_COVER
       });
     }
-  }, [freelancer]);
+  }, [freelancer, editModalOpen]);
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
@@ -224,34 +229,64 @@ export default function PerfilFreelancer() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    const input = e.target;
     if (!isOwner) {
+      if (input) input.value = '';
       showToast('Você só pode alterar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
+    const file = input?.files?.[0];
+    if (input) input.value = '';
     if (!file) return;
+    setUploadingAvatar(true);
     showToast('Enviando foto de perfil...');
-    const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id);
-    if (res.success && res.url) {
-      setEditData(prev => ({ ...prev, avatar: res.url }));
-      await updateAuthUser({ avatar: res.url }, currentUser);
-      showToast('Foto atualizada com sucesso!');
+    try {
+      const targetUid = currentUser?.uid || currentUser?.id || freelancer?.id;
+      const res = await uploadUserProfilePicture(file, targetUid, 'avatar');
+      if (res.success && res.url) {
+        setEditData(prev => ({ ...prev, avatar: res.url }));
+        setLiveUserDoc(prev => (prev ? { ...prev, avatar: res.url } : { ...freelancer, avatar: res.url }));
+        const updated = await updateAuthUser({ avatar: res.url }, currentUser);
+        if (updated) setCurrentUser(updated);
+        showToast('Foto de perfil atualizada com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar foto de perfil.', 'error');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar foto de perfil.', 'error');
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
   const handleBannerFileChange = async (e) => {
+    const input = e.target;
     if (!isOwner) {
+      if (input) input.value = '';
       showToast('Você só pode alterar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
+    const file = input?.files?.[0];
+    if (input) input.value = '';
     if (!file) return;
+    setUploadingBanner(true);
     showToast('Enviando imagem de capa...');
-    const res = await uploadUserProfilePicture(file, currentUser.uid || currentUser.id, 'cover');
-    if (res.success && res.url) {
-      setEditData(prev => ({ ...prev, banner: res.url }));
-      await updateAuthUser({ banner: res.url }, currentUser);
-      showToast('Capa atualizada com sucesso!');
+    try {
+      const targetUid = currentUser?.uid || currentUser?.id || freelancer?.id;
+      const res = await uploadUserProfilePicture(file, targetUid, 'cover');
+      if (res.success && res.url) {
+        setEditData(prev => ({ ...prev, banner: res.url }));
+        setLiveUserDoc(prev => (prev ? { ...prev, banner: res.url } : { ...freelancer, banner: res.url }));
+        const updated = await updateAuthUser({ banner: res.url }, currentUser);
+        if (updated) setCurrentUser(updated);
+        showToast('Imagem de capa atualizada com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar imagem de capa.', 'error');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar imagem de capa.', 'error');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 
@@ -330,12 +365,28 @@ export default function PerfilFreelancer() {
             </button>
 
             {isOwner && (
-              <button
-                onClick={() => setEditModalOpen(true)}
-                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-primary-blue/90 hover:bg-primary-blue backdrop-blur-md px-4 py-2 rounded-xl transition-all cursor-pointer shadow-md"
-              >
-                <Edit3 size={14} /> Editar Perfil
-              </button>
+              <div className="flex items-center gap-2.5">
+                <label
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-black/45 hover:bg-black/65 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20 transition-all cursor-pointer shadow-md"
+                  title="Alterar imagem de capa"
+                >
+                  {uploadingBanner ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                  <span>{uploadingBanner ? 'Enviando capa...' : 'Alterar Capa'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingBanner}
+                    onChange={handleBannerFileChange}
+                  />
+                </label>
+                <button
+                  onClick={() => setEditModalOpen(true)}
+                  className="inline-flex items-center gap-2 text-xs font-bold text-white bg-primary-blue/90 hover:bg-primary-blue backdrop-blur-md px-4 py-2 rounded-xl transition-all cursor-pointer shadow-md"
+                >
+                  <Edit3 size={14} /> Editar Perfil
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -363,11 +414,12 @@ export default function PerfilFreelancer() {
                       className="absolute bottom-2 right-2 p-1.5 rounded-xl bg-primary-blue text-white shadow-md hover:bg-blue-600 transition-colors cursor-pointer"
                       title="Alterar foto de perfil"
                     >
-                      <Camera size={14} />
+                      {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
+                        disabled={uploadingAvatar}
                         onChange={handleAvatarFileChange}
                       />
                     </label>
@@ -800,6 +852,8 @@ export default function PerfilFreelancer() {
           handleSaveProfile={handleSaveProfile}
           handleAvatarFileChange={handleAvatarFileChange}
           handleBannerFileChange={handleBannerFileChange}
+          uploadingAvatar={uploadingAvatar}
+          uploadingBanner={uploadingBanner}
           isSaving={isSaving}
         />
       )}

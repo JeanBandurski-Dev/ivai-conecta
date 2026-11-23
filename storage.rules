@@ -15,17 +15,19 @@ service firebase.storage {
         request.auth.token.admin == true;
     }
 
-    // Fotos e logotipos usados publicamente em perfis e murais.
+    // Fotos de perfil, logotipos e imagens de capa usados publicamente em perfis e murais.
     match /users/{userId}/{fileName} {
-      allow read: if fileName.matches('^avatar_.*');
+      allow read: if fileName.matches('^(avatar|cover|banner)_.*');
 
       allow write: if isOwner(userId)
-        && fileName.matches('^avatar_.*')
+        && fileName.matches('^(avatar|cover|banner)_.*')
         && request.resource.size <= 10 * 1024 * 1024
         && request.resource.contentType in [
           'image/jpeg',
+          'image/jpg',
           'image/png',
-          'image/webp'
+          'image/webp',
+          'image/gif'
         ];
 
       allow delete: if isOwner(userId) || isAdmin();

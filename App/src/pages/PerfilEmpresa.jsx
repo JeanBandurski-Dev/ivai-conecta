@@ -165,22 +165,24 @@ export default function PerfilEmpresa() {
         blockedReason: currentUser.blockedReason || null,
       }));
 
-      setEditCompanyData(prev => ({
-        ...prev,
-        name: companyDisplayName,
-        tradingName: companyTradingName,
-        cnpj: currentUser.cnpj || prev.cnpj || '',
-        city: currentUser.city || prev.city || 'Ivaiporã',
-        industry: currentUser.sector || prev.industry || 'Comércio & Serviços',
-        size: currentUser.size || prev.size || '1-10 funcionários',
-        avatar: currentUser.avatar || prev.avatar || '',
-        coverImage: currentUser.banner || prev.coverImage || DEFAULT_BANNER,
-        website: currentUser.website || prev.website || '',
-        email: currentUser.email || prev.email || '',
-        phone: currentUser.phone || currentUser.whatsapp || prev.phone || '',
-        linkedin: currentUser.linkedin || prev.linkedin || '',
-        instagram: currentUser.instagram || prev.instagram || ''
-      }));
+      if (!editModal) {
+        setEditCompanyData(prev => ({
+          ...prev,
+          name: companyDisplayName,
+          tradingName: companyTradingName,
+          cnpj: currentUser.cnpj || prev.cnpj || '',
+          city: currentUser.city || prev.city || 'Ivaiporã',
+          industry: currentUser.sector || prev.industry || 'Comércio & Serviços',
+          size: currentUser.size || prev.size || '1-10 funcionários',
+          avatar: currentUser.avatar || prev.avatar || '',
+          coverImage: currentUser.banner || prev.coverImage || DEFAULT_BANNER,
+          website: currentUser.website || prev.website || '',
+          email: currentUser.email || prev.email || '',
+          phone: currentUser.phone || currentUser.whatsapp || prev.phone || '',
+          linkedin: currentUser.linkedin || prev.linkedin || '',
+          instagram: currentUser.instagram || prev.instagram || ''
+        }));
+      }
     } else if (id) {
       const decodedId = decodeURIComponent(id).toLowerCase().trim();
       // Busca dados atualizados do perfil no Firestore
@@ -286,52 +288,68 @@ export default function PerfilEmpresa() {
   const closedJobsCount = jobs.filter(j => j.status === 'Encerrada').length;
 
   const handleLogoUpload = async (e) => {
+    const input = e.target;
     if (!isCompanyOwner) {
+      if (input) input.value = '';
       showToast('Você só pode alterar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
+    const file = input?.files?.[0];
+    if (input) input.value = '';
     if (!file) return;
     setUploadingLogo(true);
-    showToast('⏳ Enviando logotipo para o Firebase Storage...');
-    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id);
-    setUploadingLogo(false);
-    if (res.success) {
-      setCompany(c => ({ ...c, logo: res.url }));
-      setEditCompanyData(d => ({ ...d, avatar: res.url }));
-      if (currentUser) {
-        const updated = { ...currentUser, avatar: res.url };
-        setCurrentUser(updated);
-        updateAuthUser({ avatar: res.url });
+    showToast('Enviando logotipo...');
+    try {
+      const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id, 'avatar');
+      if (res.success && res.url) {
+        setCompany(c => ({ ...c, logo: res.url }));
+        setEditCompanyData(d => ({ ...d, avatar: res.url }));
+        if (currentUser) {
+          const updated = { ...currentUser, avatar: res.url };
+          setCurrentUser(updated);
+          await updateAuthUser({ avatar: res.url }, updated);
+        }
+        showToast('Logotipo atualizado com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar logotipo.', 'error');
       }
-      showToast('Logotipo atualizado e salvo no Storage com sucesso!');
-    } else {
-      showToast(res.error || 'Erro ao enviar logotipo.');
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar logotipo.', 'error');
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
   const handleBannerUpload = async (e) => {
+    const input = e.target;
     if (!isCompanyOwner) {
+      if (input) input.value = '';
       showToast('Você só pode alterar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
+    const file = input?.files?.[0];
+    if (input) input.value = '';
     if (!file) return;
     setUploadingBanner(true);
-    showToast('⏳ Atualizando imagem de capa no Storage...');
-    const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id);
-    setUploadingBanner(false);
-    if (res.success) {
-      setCompany(c => ({ ...c, banner: res.url }));
-      setEditCompanyData(d => ({ ...d, coverImage: res.url }));
-      if (currentUser) {
-        const updated = { ...currentUser, banner: res.url };
-        setCurrentUser(updated);
-        updateAuthUser({ banner: res.url });
+    showToast('Atualizando imagem de capa...');
+    try {
+      const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id, 'cover');
+      if (res.success && res.url) {
+        setCompany(c => ({ ...c, banner: res.url }));
+        setEditCompanyData(d => ({ ...d, coverImage: res.url }));
+        if (currentUser) {
+          const updated = { ...currentUser, banner: res.url };
+          setCurrentUser(updated);
+          await updateAuthUser({ banner: res.url }, updated);
+        }
+        showToast('Imagem de capa atualizada com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar imagem de capa.', 'error');
       }
-      showToast('🎨 Imagem de capa atualizada com sucesso!');
-    } else {
-      showToast(`⚠️ ${res.error || 'Erro ao enviar imagem de capa.'}`);
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar imagem de capa.', 'error');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 

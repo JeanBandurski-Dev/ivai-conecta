@@ -600,7 +600,8 @@ export default function EditCompanyProfileModal({
                       </label>
 
                       <input
-                        type="url"
+                        type="text"
+                        inputMode="url"
                         value={editData.coverImage || ''}
                         onChange={e => handleCoverUrlChange(e.target.value)}
                         onBlur={handleCoverUrlBlur}
@@ -676,7 +677,8 @@ export default function EditCompanyProfileModal({
 
                     <div>
                       <input
-                        type="url"
+                        type="text"
+                        inputMode="url"
                         value={editData.avatar || ''}
                         onChange={e => handleAvatarUrlChange(e.target.value)}
                         onBlur={handleAvatarUrlBlur}

@@ -15,7 +15,7 @@ import {
   sendPasswordResetEmail,
   deleteUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { seedFirestoreIfEmpty } from './seedFirestore.js';
 import { validateCNPJ, maskCNPJ, cleanCNPJ } from './cnpjService.js';
@@ -26,6 +26,7 @@ import {
   syncGoogleStudentVerification,
 } from './studentVerificationService.js';
 import { isGenericPlaceholderAvatar } from './chatService.js';
+import { syncPublicProfileSafe } from './publicProfileSync.js';
 
 import {
   STORAGE_KEY_AUTH_USER,
@@ -173,26 +174,7 @@ async function syncPublicCompanyProfile(uid, sourceData) {
   );
   if (role !== 'empresa') return;
 
-  await setDoc(doc(db, 'public_profiles', String(uid)), {
-    uid: String(uid),
-    name: String(sourceData.name || sourceData.razaoSocial || sourceData.nomeFantasia || '').slice(0, 120),
-    city: String(sourceData.city || 'Ivaiporã').slice(0, 100),
-    avatar: String(sourceData.avatar || sourceData.photoURL || sourceData.logo || '').slice(0, 2048),
-    photoURL: String(sourceData.photoURL || sourceData.avatar || sourceData.logo || '').slice(0, 2048),
-    bio: String(sourceData.bio || sourceData.about || '').slice(0, 1000),
-    razaoSocial: String(sourceData.razaoSocial || '').slice(0, 120),
-    nomeFantasia: String(sourceData.nomeFantasia || '').slice(0, 120),
-    sector: String(sourceData.sector || '').slice(0, 160),
-    about: String(sourceData.about || '').slice(0, 1000),
-    cnpj: deleteField(),
-    isVerifiedCompany: Boolean(sourceData.isVerifiedCompany),
-    companyVerificationStatus: String(sourceData.companyVerificationStatus || '').slice(0, 30),
-    isActive: sourceData.blocked !== true && String(sourceData.status || '').toLowerCase() !== 'blocked' && sourceData.isDeactivated !== true,
-    blocked: sourceData.blocked === true,
-    status: sourceData.blocked === true || String(sourceData.status || '').toLowerCase() === 'blocked' ? 'blocked' : 'active',
-    role: 'empresa',
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  await syncPublicProfileSafe(uid, { ...sourceData, role: 'empresa' });
 }
 
 /**
@@ -291,35 +273,49 @@ async function ensureUserProfile(fbUser, preferredRole = null) {
 
 export async function getUserProfile(uid) {
   if (!uid) return { success: false, errorCode: 'profile/invalid-id' };
+  const cleanId = String(uid).trim();
+  const cleanLower = cleanId.toLowerCase();
+
   try {
-    const cleanId = String(uid).trim();
-    const userDocRef = doc(db, 'users', cleanId);
-    const snap = await getDoc(userDocRef);
-    if (snap.exists()) {
-      return { success: true, profile: { uid: snap.id, id: snap.id, ...snap.data() } };
-    }
-
-    const cleanLower = cleanId.toLowerCase();
-
-    // 1. Busca por e-mail
-    if (cleanLower.includes('@')) {
-      const qEmail = query(collection(db, 'users'), where('email', '==', cleanLower), limit(1));
-      const qSnap = await getDocs(qEmail);
-      if (!qSnap.empty) {
-        const found = qSnap.docs[0];
-        return { success: true, profile: { uid: found.id, id: found.id, ...found.data() } };
+    // 1. Busca direta no documento privado (se dono/admin)
+    try {
+      const snap = await getDoc(doc(db, 'users', cleanId));
+      if (snap.exists()) {
+        return { success: true, profile: { uid: snap.id, id: snap.id, ...snap.data() } };
       }
+    } catch {
+      // Visitantes não têm permissão em `users/{id}`; segue para `public_profiles`
     }
 
-    // 2. Busca por nome, razão social ou nome fantasia
-    const usersCol = collection(db, 'users');
-    const queries = [
-      query(usersCol, where('name', '==', cleanId), limit(1)),
-      query(usersCol, where('nomeFantasia', '==', cleanId), limit(1)),
-      query(usersCol, where('razaoSocial', '==', cleanId), limit(1))
+    // 2. Busca direta em public_profiles
+    try {
+      const pubSnap = await getDoc(doc(db, 'public_profiles', cleanId));
+      if (pubSnap.exists()) {
+        return { success: true, profile: { uid: pubSnap.id, id: pubSnap.id, ...pubSnap.data() } };
+      }
+    } catch {}
+
+    // 3. Busca por e-mail em users (apenas para dono/admin)
+    if (cleanLower.includes('@')) {
+      try {
+        const qEmail = query(collection(db, 'users'), where('email', '==', cleanLower), limit(1));
+        const qSnap = await getDocs(qEmail);
+        if (!qSnap.empty) {
+          const found = qSnap.docs[0];
+          return { success: true, profile: { uid: found.id, id: found.id, ...found.data() } };
+        }
+      } catch {}
+    }
+
+    // 4. Busca por nome, razão social ou nome fantasia em public_profiles
+    const publicCol = collection(db, 'public_profiles');
+    const publicQueries = [
+      query(publicCol, where('name', '==', cleanId), limit(1)),
+      query(publicCol, where('nomeFantasia', '==', cleanId), limit(1)),
+      query(publicCol, where('razaoSocial', '==', cleanId), limit(1))
     ];
 
-    for (const q of queries) {
+    for (const q of publicQueries) {
       try {
         const qSnap = await getDocs(q);
         if (!qSnap.empty) {
@@ -329,7 +325,7 @@ export async function getUserProfile(uid) {
       } catch {}
     }
 
-    // 3. Fallback no cache local
+    // 5. Fallback no cache local
     const localUsers = getUsersDB();
     const localFound = localUsers.find(u =>
       (u.uid && String(u.uid).toLowerCase() === cleanLower) ||
@@ -2109,7 +2105,7 @@ export function updateAuthUser(data, userOverride = null) {
       try {
         await setDoc(doc(db, 'users', uid), payload, { merge: true });
         firestoreSyncSucceeded = true;
-        await syncPublicCompanyProfile(uid, { ...updated, ...payload });
+        await syncPublicProfileSafe(uid, { ...updated, ...payload });
       } catch (err) {
         console.warn(`[Firestore] Sync erro updateAuthUser para uid ${uid}:`, err.message);
         // Se as regras de segurança do Firestore bloquearem a mutação direta da chave 'role',
@@ -2118,6 +2114,7 @@ export function updateAuthUser(data, userOverride = null) {
           const { role: _forbiddenRole, ...safePayload } = payload;
           await setDoc(doc(db, 'users', uid), safePayload, { merge: true });
           firestoreSyncSucceeded = true;
+          await syncPublicProfileSafe(uid, { ...updated, ...safePayload });
         } catch (fallbackErr) {
           console.warn(`[Firestore] Fallback seguro erro para uid ${uid}:`, fallbackErr.message);
         }

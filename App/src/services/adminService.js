@@ -1,4 +1,4 @@
-﻿// Admin Service for Ivaí Conecta
+// Admin Service for Ivaí Conecta
 // Operations strictly using real Firestore collections (users, jobs, services, applications)
 // Zero Mock Policy: No hardcoded sample arrays or fake fallback counts.
 
@@ -6,6 +6,7 @@ import { db, functions } from '../lib/firebase.js';
 import { httpsCallable } from 'firebase/functions';
 import { normalizeUserRole, getAuthUser } from './authService.js';
 import { getVerifiedTeachers } from './talentsService.js';
+import { syncPublicProfileSafe } from './publicProfileSync.js';
 import {
   collection,
   getDocs,
@@ -20,7 +21,6 @@ import {
   orderBy,
   startAfter,
   getCountFromServer,
-  deleteField,
 } from 'firebase/firestore';
 
 function getEffectiveUserRole(user) {
@@ -246,38 +246,7 @@ export async function syncPublicCompanyProfiles() {
         continue;
       }
 
-      const isActive = data.blocked !== true && data.status !== 'blocked';
-
-      await setDoc(doc(db, 'public_profiles', userDoc.id), {
-        uid: userDoc.id,
-        name: String(data.name || data.displayName || data.razaoSocial || data.nomeFantasia || '').slice(0, 120),
-        city: String(data.city || 'Ivaiporã').slice(0, 100),
-        institution: String(data.institution || '').slice(0, 160),
-        course: String(data.course || '').slice(0, 160),
-        period: String(data.period || '').slice(0, 80),
-        avatar: String(data.avatar || data.photoURL || data.logo || '').slice(0, 2048),
-        photoURL: String(data.photoURL || data.avatar || data.logo || '').slice(0, 2048),
-        skills: Array.isArray(data.skills) ? data.skills.slice(0, 100) : [],
-        experiences: Array.isArray(data.experiences) ? data.experiences.slice(0, 100) : [],
-        projects: Array.isArray(data.projects) ? data.projects.slice(0, 100) : [],
-        education: Array.isArray(data.education) ? data.education.slice(0, 100) : [],
-        bio: String(data.bio || data.about || '').slice(0, 1000),
-        endorsements: Array.isArray(data.endorsements) ? data.endorsements.slice(0, 100) : [],
-        endorsementCount: Math.max(0, Math.min(100, Number(data.endorsementCount || 0) || 0)),
-        isVerifiedStudent: Boolean(data.isVerifiedStudent),
-        razaoSocial: String(data.razaoSocial || '').slice(0, 120),
-        nomeFantasia: String(data.nomeFantasia || '').slice(0, 120),
-        sector: String(data.sector || '').slice(0, 160),
-        about: String(data.about || '').slice(0, 1000),
-        cnpj: deleteField(),
-        isVerifiedCompany: Boolean(data.isVerifiedCompany),
-        companyVerificationStatus: String(data.companyVerificationStatus || '').slice(0, 30),
-        isActive,
-        blocked: Boolean(data.blocked),
-        status: String(data.status || (isActive ? 'active' : 'blocked')).slice(0, 30),
-        role,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      await syncPublicProfileSafe(userDoc.id, { ...data, role });
       migrated += 1;
     }
 

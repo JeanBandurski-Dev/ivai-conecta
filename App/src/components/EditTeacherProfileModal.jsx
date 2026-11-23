@@ -3,7 +3,7 @@ import {
   X, Camera, Upload, Plus, Trash2, GraduationCap,
   Globe, Sparkles, Save, BookOpen, Building2, User,
   Mail, Calendar, Award, ExternalLink, Link2, MapPin,
-  Loader2
+  Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { CITIES } from '../lib/ivaiConecta';
 import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
@@ -15,6 +15,13 @@ const TEACHER_AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
   'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250'
+];
+
+const TEACHER_COVER_PRESETS = [
+  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=1200',
+  'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=1200'
 ];
 
 const DISCIPLINE_SUGGESTIONS = [
@@ -37,6 +44,9 @@ export default function EditTeacherProfileModal({
   setEditData,
   handleSaveProfile,
   handleAvatarFileChange,
+  handleBannerFileChange,
+  uploadingAvatar = false,
+  uploadingBanner = false,
   isSaving = false
 }) {
   const [activeTab, setActiveTab] = useState('general');
@@ -258,13 +268,15 @@ export default function EditTeacherProfileModal({
                   <div className="flex-1 min-w-[240px] space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-2 shadow-xs">
-                        <Upload size={13} /> Escolher Foto do Computador
-                        <input type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
+                        {uploadingAvatar ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                        <span>{uploadingAvatar ? 'Enviando Foto...' : 'Escolher Foto do Computador'}</span>
+                        <input type="file" accept="image/*" onChange={handleAvatarFileChange} disabled={uploadingAvatar} className="hidden" />
                       </label>
                     </div>
 
                     <input
-                      type="url"
+                      type="text"
+                      inputMode="url"
                       value={editData.avatar || ''}
                       onChange={e => setEditData(d => ({ ...d, avatar: e.target.value }))}
                       placeholder="Ou cole a URL direta de uma imagem..."
@@ -291,6 +303,77 @@ export default function EditTeacherProfileModal({
                         }`}
                       >
                         <img src={url} alt={`Preset ${i}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Imagem de Capa do Docente */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 sm:p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                    <ImageIcon size={16} className="text-primary-blue dark:text-blue-400" /> Imagem de Capa do Perfil
+                  </h3>
+                  <span className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">
+                    Recomendado: 1200x350px
+                  </span>
+                </div>
+
+                <div className="relative rounded-2xl overflow-hidden h-32 sm:h-36 border-2 border-dashed border-gray-300 dark:border-slate-700 group bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)]">
+                  {editData.banner && (
+                    <img
+                      src={editData.banner}
+                      alt="Pré-visualização da capa"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    {handleBannerFileChange && (
+                      <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-md">
+                        {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                        <span>{uploadingBanner ? 'Enviando Capa...' : 'Alterar Capa do Computador'}</span>
+                        <input type="file" accept="image/*" onChange={handleBannerFileChange} disabled={uploadingBanner} className="hidden" />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {handleBannerFileChange && (
+                    <label className="btn btn-primary btn-sm text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shrink-0 shadow-xs">
+                      {uploadingBanner ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                      <span>{uploadingBanner ? 'Enviando Capa...' : 'Escolher Capa do PC'}</span>
+                      <input type="file" accept="image/*" onChange={handleBannerFileChange} disabled={uploadingBanner} className="hidden" />
+                    </label>
+                  )}
+                  <input
+                    type="text"
+                    inputMode="url"
+                    value={editData.banner || ''}
+                    onChange={e => setEditData(d => ({ ...d, banner: e.target.value }))}
+                    placeholder="Ou cole a URL direta de uma imagem de capa..."
+                    className="form-control text-xs flex-1 min-w-[200px]"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-gray-200/80 dark:border-slate-700/80">
+                  <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 mb-2">
+                    Ou selecione uma capa acadêmica rápida:
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {TEACHER_COVER_PRESETS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setEditData(d => ({ ...d, banner: preset }))}
+                        className={`h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                          editData.banner === preset
+                            ? 'border-primary-blue ring-2 ring-blue-400/50 scale-[1.02]'
+                            : 'border-transparent opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={preset} alt={`Capa preset ${idx}`} className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>

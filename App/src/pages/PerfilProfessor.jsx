@@ -1,14 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Award, Building2, ShieldCheck,
-  Edit3, ArrowLeft, ArrowRight, BookOpen, GraduationCap, Users, Plus, MessageSquare, Calendar
+  Edit3, ArrowLeft, ArrowRight, BookOpen, GraduationCap, Users, Plus, MessageSquare, Calendar,
+  Camera, Loader2
 } from 'lucide-react';
 import {
   getTeacherById, getTalents, subscribeToTalents, updateTeacherProfile,
   subscribeToEndorsementRequests, deduplicateRequestsByStudent,
   hasTeacherEndorsedStudent, sanitizeUniqueEndorsements, isSameProfessor, getTalentById,
-  uploadUserProfilePicture
+  uploadUserProfilePicture, syncPublicProfile
 } from '../lib/ivaiConecta';
 import { db } from '../lib/firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -28,15 +29,18 @@ export default function PerfilProfessor() {
 
   useEffect(() => {
     if (!teacherId) return;
+    const currentUid = String(currentUser?.uid || currentUser?.id || '').trim();
+    const isOwnerDoc = Boolean(currentUid && (!id || String(id) === 'professor' || String(id) === currentUid));
+    const collectionName = isOwnerDoc ? 'users' : 'public_profiles';
     try {
-      const unsub = onSnapshot(doc(db, 'users', String(teacherId)), (snap) => {
+      const unsub = onSnapshot(doc(db, collectionName, String(teacherId)), (snap) => {
         if (snap.exists()) {
           setLiveTeacherDoc({ id: snap.id, firestoreId: snap.id, ...snap.data() });
         }
       }, () => {});
       return () => unsub();
     } catch {}
-  }, [teacherId]);
+  }, [teacherId, currentUser?.uid, currentUser?.id, id]);
 
   const teacher = useMemo(() => {
     return liveTeacherDoc || getTeacherById(teacherId) || (currentUser?.role === 'professor' ? {
@@ -49,6 +53,7 @@ export default function PerfilProfessor() {
       discipline: currentUser.discipline || 'Ensino Superior & Técnico',
       endorsementCount: currentUser.endorsementCount || 0,
       avatar: currentUser.avatar || '',
+      banner: currentUser.banner || currentUser.coverImage || '',
       bio: currentUser.bio || '',
       classes: currentUser.classes || [],
       education: currentUser.education || [],
@@ -145,11 +150,15 @@ export default function PerfilProfessor() {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const wasEditModalOpenRef = useRef(false);
 
   // Edit form state
   const [editData, setEditData] = useState({
     name: teacher?.name || '',
     avatar: teacher?.avatar || '',
+    banner: teacher?.banner || '',
     degree: teacher?.degree || '',
     institution: teacher?.institution || 'IFPR Campus Ivaiporã',
     discipline: teacher?.discipline || '',
@@ -161,10 +170,11 @@ export default function PerfilProfessor() {
   });
 
   useEffect(() => {
-    if (teacher && editModal) {
+    if (editModal && !wasEditModalOpenRef.current && teacher) {
       setEditData({
         name: teacher.name || '',
         avatar: teacher.avatar || '',
+        banner: teacher.banner || teacher.coverImage || '',
         degree: teacher.degree || '',
         institution: teacher.institution || 'IFPR Campus Ivaiporã',
         discipline: teacher.discipline || '',
@@ -175,6 +185,7 @@ export default function PerfilProfessor() {
         newEdu: { degree: '', institution: '', period: '' }
       });
     }
+    wasEditModalOpenRef.current = editModal;
   }, [teacher, editModal]);
 
   const handleSaveProfile = async (e) => {
@@ -187,15 +198,17 @@ export default function PerfilProfessor() {
     if (!teacher) return;
     setIsSaving(true);
     try {
-      const targetId = teacher.firestoreId || teacher.id;
-      await updateTeacherProfile(targetId, editData);
+      const { newClass: _newClass, newEdu: _newEdu, ...cleanEditData } = editData;
+      const targetId = currentUser?.uid || currentUser?.id || teacher.firestoreId || teacher.id;
+      await updateTeacherProfile(targetId, cleanEditData);
+      setLiveTeacherDoc(prev => (prev ? { ...prev, ...cleanEditData } : { ...teacher, ...cleanEditData }));
       if (isOwner && currentUser && typeof setCurrentUser === 'function') {
         setCurrentUser({
           ...currentUser,
-          ...editData
+          ...cleanEditData
         });
       }
-      showToast('🎉 Perfil acadêmico e matérias atualizados com sucesso!');
+      showToast('Perfil acadêmico, foto e matérias atualizados com sucesso!', 'success');
       setEditModal(false);
     } catch (err) {
       console.error('Erro ao atualizar perfil docente:', err);
@@ -206,21 +219,74 @@ export default function PerfilProfessor() {
   };
 
   const handleAvatarFileChange = async (e) => {
+    const input = e.target;
     if (!isOwner) {
+      if (input) input.value = '';
       showToast('Você só pode alterar o seu próprio perfil.', 'error');
       return;
     }
-    const file = e.target.files?.[0];
-    if (file) {
-      showToast('Enviando foto para o Firebase Storage...');
-      const targetId = teacher?.firestoreId || teacher?.id || currentUser?.uid;
-      const res = await uploadUserProfilePicture(file, targetId);
-      if (res.success) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    showToast('Enviando foto de perfil...');
+    try {
+      const targetId = currentUser?.uid || currentUser?.id || teacher?.firestoreId || teacher?.id;
+      const res = await uploadUserProfilePicture(file, targetId, 'avatar');
+      if (res.success && res.url) {
         setEditData(d => ({ ...d, avatar: res.url }));
-        showToast('Foto do docente salva com sucesso!');
+        setLiveTeacherDoc(prev => (prev ? { ...prev, avatar: res.url } : { ...teacher, avatar: res.url }));
+        if (currentUser && typeof setCurrentUser === 'function') {
+          setCurrentUser({ ...currentUser, avatar: res.url });
+        }
+        if (targetId) {
+          await syncPublicProfile(targetId, { ...(currentUser || {}), ...(teacher || {}), role: 'professor', avatar: res.url });
+        }
+        showToast('Foto do docente salva com sucesso!', 'success');
       } else {
-        showToast(res.error || 'Erro ao enviar foto.');
+        showToast(res.error || 'Erro ao enviar foto.', 'error');
       }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar foto.', 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleBannerFileChange = async (e) => {
+    const input = e.target;
+    if (!isOwner) {
+      if (input) input.value = '';
+      showToast('Você só pode alterar o seu próprio perfil.', 'error');
+      return;
+    }
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+
+    setUploadingBanner(true);
+    showToast('Enviando imagem de capa...');
+    try {
+      const targetId = currentUser?.uid || currentUser?.id || teacher?.firestoreId || teacher?.id;
+      const res = await uploadUserProfilePicture(file, targetId, 'cover');
+      if (res.success && res.url) {
+        setEditData(d => ({ ...d, banner: res.url }));
+        setLiveTeacherDoc(prev => (prev ? { ...prev, banner: res.url } : { ...teacher, banner: res.url }));
+        if (currentUser && typeof setCurrentUser === 'function') {
+          setCurrentUser({ ...currentUser, banner: res.url });
+        }
+        if (targetId) {
+          await syncPublicProfile(targetId, { ...(currentUser || {}), ...(teacher || {}), role: 'professor', banner: res.url });
+        }
+        showToast('Imagem de capa atualizada com sucesso!', 'success');
+      } else {
+        showToast(res.error || 'Erro ao enviar imagem de capa.', 'error');
+      }
+    } catch (err) {
+      showToast(err?.message || 'Erro ao enviar imagem de capa.', 'error');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 
@@ -241,29 +307,75 @@ export default function PerfilProfessor() {
     <>
       {/* Hero Header */}
       <div className="bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)] text-white py-10 sm:py-12 relative overflow-hidden">
+        {teacher.banner && (
+          <>
+            <img
+              src={teacher.banner}
+              alt={`Capa de ${teacher.name}`}
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-[#051944]/80 to-[#0A1128]/65" />
+          </>
+        )}
         <div className="container relative z-10">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white mb-6 bg-white/10 px-3.5 py-1.5 rounded-full transition-colors"
-          >
-            <ArrowLeft size={14} /> Voltar para a tela anterior
-          </button>
+          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-gray-200 hover:text-white bg-black/35 hover:bg-black/55 backdrop-blur-md px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Voltar para a tela anterior
+            </button>
+
+            {isOwner && (
+              <label
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-black/40 hover:bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-md"
+                title="Alterar imagem de capa"
+              >
+                {uploadingBanner ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                <span>{uploadingBanner ? 'Enviando capa...' : 'Alterar Capa'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingBanner}
+                  onChange={handleBannerFileChange}
+                />
+              </label>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 flex-1 max-w-full">
-              {teacher.avatar && !isGenericPlaceholderAvatar(teacher.avatar) ? (
-                <img
-                  src={teacher.avatar}
-                  alt={teacher.name}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
-                />
-              ) : (
-                <div
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(teacher.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
-                >
-                  {(teacher.name || 'P').slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <div className="relative group shrink-0">
+                {teacher.avatar && !isGenericPlaceholderAvatar(teacher.avatar) ? (
+                  <img
+                    src={teacher.avatar}
+                    alt={teacher.name}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
+                  />
+                ) : (
+                  <div
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(teacher.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
+                  >
+                    {(teacher.name || 'P').slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                {isOwner && (
+                  <label
+                    className="absolute -bottom-2 -right-2 bg-primary-blue text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-blue-600 transition-all cursor-pointer flex items-center justify-center"
+                    title="Alterar Foto de Perfil"
+                  >
+                    {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingAvatar}
+                      onChange={handleAvatarFileChange}
+                    />
+                  </label>
+                )}
+              </div>
 
               <div className="min-w-0 flex-1 max-w-full">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -549,6 +661,9 @@ export default function PerfilProfessor() {
         setEditData={setEditData}
         handleSaveProfile={handleSaveProfile}
         handleAvatarFileChange={handleAvatarFileChange}
+        handleBannerFileChange={handleBannerFileChange}
+        uploadingAvatar={uploadingAvatar}
+        uploadingBanner={uploadingBanner}
         isSaving={isSaving}
       />
     </>
