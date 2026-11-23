@@ -210,6 +210,12 @@ const useAppStore = create((set, get) => ({
   // ─── Toast State ──────────────────────────────────────
   toasts: [],
 
+  // ─── Help Assistant Global State ──────────────────────
+  isHelpOpen: false,
+  openHelp: () => set({ isHelpOpen: true }),
+  closeHelp: () => set({ isHelpOpen: false }),
+  toggleHelp: () => set((state) => ({ isHelpOpen: !state.isHelpOpen })),
+
   // ─── Chat Global State ────────────────────────────────
   isChatOpen: false,
   activeChatThreadId: null,
@@ -218,6 +224,7 @@ const useAppStore = create((set, get) => ({
   openChat: (threadId = null) => {
     set({
       isChatOpen: true,
+      isHelpOpen: false,
       ...(threadId ? { activeChatThreadId: threadId } : {})
     });
   },

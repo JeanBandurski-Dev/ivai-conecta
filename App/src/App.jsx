@@ -8,6 +8,7 @@ import CustomConfirmModal from './components/ui/CustomConfirmModal';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import GuestRoute from './components/auth/GuestRoute';
 import ChatModal from './components/ChatModal';
+const HelpAssistantWidget = lazy(() => import('./components/HelpAssistantWidget'));
 import useAppStore from './store/useAppStore';
 import { seedFirestoreIfEmpty } from './services/seedFirestore';
 import { normalizeUserRole } from './services/authService';
@@ -161,6 +162,11 @@ function AppContent() {
       <Toast />
       <CustomConfirmModal />
 
+      {!isAdminRoute && (
+        <Suspense fallback={null}>
+          <HelpAssistantWidget />
+        </Suspense>
+      )}
       {isChatOpen && <ChatModal onClose={closeChat} />}
     </div>
   );
