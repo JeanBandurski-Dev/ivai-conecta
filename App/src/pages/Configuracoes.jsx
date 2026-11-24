@@ -152,6 +152,7 @@ export default function Configuracoes() {
   );
   const [submittingStudentEmail, setSubmittingStudentEmail] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(Boolean(currentUser?.studentEmailVerificationSentAt));
+  const [checkingStatusManual, setCheckingStatusManual] = useState(false);
 
   // ─── ESTADO: VERIFICAÇÃO DE CNPJ (EMPRESA) ──────────────────────────
   const [cnpj, setCnpj] = useState(currentUser?.cnpj || '');
@@ -221,8 +222,14 @@ export default function Configuracoes() {
     };
   }, [currentUser?.uid, currentUser?.id, isAluno]);
 
+  const isStudentVerified = Boolean(
+    currentUser?.isVerifiedStudent === true ||
+    currentUser?.institutionalValidationStatus === 'VALIDADO' ||
+    verificationSubmitted
+  );
+
   useEffect(() => {
-    if (!isAluno || verificationSubmitted) return;
+    if (!isAluno || isStudentVerified) return;
 
     let isMounted = true;
     let isCheckingAutomatically = false;
@@ -231,38 +238,59 @@ export default function Configuracoes() {
     const checkAutomatically = async () => {
       if (!isMounted || isCheckingAutomatically) return;
       const now = Date.now();
-      if (now - lastCheckAt < 500) return;
+      // Não executa mais de uma vez a cada 3 segundos para evitar rate limiting e flicker
+      if (now - lastCheckAt < 3000) return;
       lastCheckAt = now;
       isCheckingAutomatically = true;
       try {
         const result = await checkStudentVerification();
         if (isMounted && result.success && result.verified) {
           setVerificationSubmitted(true);
-          if (result.user) setCurrentUser(result.user);
-          showToast('Seu e-mail institucional foi validado automaticamente!');
+          setVerificationEmailSent(false);
+          if (result.user) {
+            setCurrentUser(result.user);
+          } else {
+            setCurrentUser(prev => ({
+              ...prev,
+              isVerifiedStudent: true,
+              institutionalValidationStatus: 'VALIDADO',
+              emailVerified: true
+            }));
+          }
+          showToast('🎉 Seu e-mail institucional foi validado com sucesso!');
         }
       } catch {
-        // A próxima verificação automática tentará novamente.
+        // Falha silenciosa; a verificação poderá ser tentada manualmente ou ao focar a aba
       } finally {
-        isCheckingAutomatically = false;
+        if (isMounted) {
+          isCheckingAutomatically = false;
+        }
       }
     };
 
-    const intervalId = window.setInterval(checkAutomatically, 1000);
+    // Polling contínuo de 4s somente se o envio do e-mail de verificação já tiver ocorrido
+    const hasSentEmail = verificationEmailSent || Boolean(currentUser?.studentEmailVerificationSentAt);
+    let intervalId = null;
+    if (hasSentEmail) {
+      intervalId = window.setInterval(checkAutomatically, 4000);
+    }
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') checkAutomatically();
+      if (document.visibilityState === 'visible') {
+        checkAutomatically();
+      }
     };
+
     window.addEventListener('focus', checkAutomatically);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    checkAutomatically();
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
+      if (intervalId) window.clearInterval(intervalId);
       window.removeEventListener('focus', checkAutomatically);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isAluno, verificationSubmitted, setCurrentUser, showToast]);
+  }, [isAluno, isStudentVerified, verificationEmailSent, currentUser?.studentEmailVerificationSentAt, setCurrentUser, showToast]);
 
   if (!currentUser) {
     return (
@@ -523,6 +551,36 @@ export default function Configuracoes() {
       showToast(err?.message || 'Não foi possível enviar o link de validação.');
     } finally {
       setSubmittingStudentEmail(false);
+    }
+  };
+
+  const handleCheckVerificationManually = async () => {
+    if (checkingStatusManual) return;
+    setCheckingStatusManual(true);
+    try {
+      const result = await checkStudentVerification();
+      if (result.success && result.verified) {
+        setVerificationSubmitted(true);
+        setVerificationEmailSent(false);
+        if (result.user) {
+          setCurrentUser(result.user);
+        } else {
+          setCurrentUser(prev => ({
+            ...prev,
+            isVerifiedStudent: true,
+            institutionalValidationStatus: 'VALIDADO',
+            emailVerified: true
+          }));
+        }
+        showToast(result.message || '🎉 Validação confirmada! Seu Selo de Estudante foi ativado com sucesso.');
+      } else {
+        showToast(result.message || '⚠️ Confirmação ainda não detectada. Abra a mensagem em sua caixa postal e clique no link de ativação.');
+      }
+    } catch (err) {
+      console.warn('[Configuracoes] Erro na checagem manual:', err);
+      showToast('Erro ao consultar verificação. Tente novamente em instantes.');
+    } finally {
+      setCheckingStatusManual(false);
     }
   };
 
@@ -1763,14 +1821,35 @@ export default function Configuracoes() {
                           <div className="space-y-1">
                             <p className="font-semibold">Confirmação pendente na sua caixa postal institucional!</p>
                             <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                              Enviamos um link para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra-o e depois clique em verificar status.
+                              Enviamos um link para <strong>{studentInstEmail || currentUser?.studentEmail || currentUser?.email}</strong>. Abra-o e confirme seu endereço.
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                          <Loader2 size={14} className="animate-spin" />
-                          <span>Verificando automaticamente após a confirmação do link...</span>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
+                          <div className="flex items-center gap-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                            <Loader2 size={14} className="animate-spin text-emerald-600 dark:text-emerald-400" />
+                            <span>Verificando automaticamente após confirmação...</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCheckVerificationManually}
+                            disabled={checkingStatusManual}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-primary-blue hover:bg-primary-hover text-white transition-all shadow-xs disabled:opacity-60 cursor-pointer"
+                          >
+                            {checkingStatusManual ? (
+                              <>
+                                <Loader2 size={13} className="animate-spin" />
+                                <span>Checando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={13} />
+                                <span>Já confirmei meu e-mail</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
                     )}

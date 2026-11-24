@@ -186,7 +186,21 @@ service cloud.firestore {
         email.matches('^[^@]+@faculdadeivaipora\\.com\\.br$') ||
         email.matches('^[^@]+@faculdadeivaipora\\.edu\\.br$') ||
         email.matches('^[^@]+@fatec\\.edu\\.br$') ||
-        email.matches('^[^@]+@fatecivaipora\\.edu\\.br$')
+        email.matches('^[^@]+@fatecivaipora\\.edu\\.br$') ||
+        email.matches('^[^@]+@uenp\\.edu\\.br$') ||
+        email.matches('^[^@]+@.*\\.uenp\\.edu\\.br$') ||
+        email.matches('^[^@]+@utfpr\\.edu\\.br$') ||
+        email.matches('^[^@]+@alunos\\.utfpr\\.edu\\.br$') ||
+        email.matches('^[^@]+@uel\\.br$') ||
+        email.matches('^[^@]+@uem\\.br$') ||
+        email.matches('^[^@]+@unicesumar\\.edu\\.br$') ||
+        email.matches('^[^@]+@unicentro\\.br$') ||
+        email.matches('^[^@]+@fafiman\\.br$') ||
+        email.matches('^[^@]+@escola\\.pr\\.gov\\.br$') ||
+        email.matches('^[^@]+@seed\\.pr\\.gov\\.br$') ||
+        email.matches('^[^@]+@estudante\\.seed\\.pr\\.gov\\.br$') ||
+        email.matches('^[^@]+@.*\\.edu\\.br$') ||
+        email.matches('^[^@]+@.*\\.edu$')
       );
     }
 
@@ -247,8 +261,16 @@ service cloud.firestore {
             request.resource.data.isVerifiedStudent == true &&
             request.resource.data.institutionalValidationStatus == 'VALIDADO' &&
             request.auth.token.email_verified == true &&
-            request.resource.data.studentEmail == request.auth.token.email &&
-            isAuthorizedStudentInstitutionEmail(request.resource.data.studentEmail)
+            (
+              request.resource.data.studentEmail == request.auth.token.email ||
+              ('studentEmail' in resource.data && resource.data.studentEmail == request.auth.token.email) ||
+              ('email' in resource.data && resource.data.email == request.auth.token.email)
+            ) &&
+            (
+              isAuthorizedStudentInstitutionEmail(request.resource.data.studentEmail) ||
+              ('studentEmail' in resource.data && isAuthorizedStudentInstitutionEmail(resource.data.studentEmail)) ||
+              ('email' in resource.data && isAuthorizedStudentInstitutionEmail(resource.data.email))
+            )
           )
         )
       );
@@ -268,7 +290,7 @@ service cloud.firestore {
       allow create: if (isOwner(userId) || isAdmin()) &&
         request.resource.data.keys().hasOnly([
           'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
-          'photoURL', 'banner', 'coverImage', 'skills', 'experiences', 'projects',
+          'photoURL', 'banner', 'coverImage', 'avatarFileId', 'bannerFileId', 'skills', 'experiences', 'projects',
           'education', 'bio', 'endorsements', 'endorsementCount', 'isVerifiedStudent',
           'role', 'razaoSocial', 'nomeFantasia', 'sector', 'about',
           'isVerifiedCompany', 'companyVerificationStatus',

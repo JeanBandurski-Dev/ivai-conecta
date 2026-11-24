@@ -1,7 +1,6 @@
-// Storage Service for Ivaí Conecta (Firebase Cloud Storage + Resilient Image Compression Fallback)
-import { storage, db, auth } from '../lib/firebase.js';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc } from 'firebase/firestore';
+// Central public/private file storage adapter for Ivaí Conecta.
+import { db, auth } from '../lib/firebase.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateAuthUser } from './authService.js';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
@@ -15,13 +14,7 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
 ]);
 
 function getStorageErrorMessage(error) {
-  if (error?.code === 'storage/unauthorized') {
-    return 'Permissão negada pelo armazenamento. Verifique sua conta e tente novamente.';
-  }
-  if (error?.code === 'storage/canceled' || error?.message === 'storage/timeout') {
-    return 'O envio excedeu o tempo limite e foi cancelado.';
-  }
-  return 'Não foi possível concluir o armazenamento do arquivo. Tente novamente.';
+  return error?.message || 'Não foi possível concluir o armazenamento do arquivo. Tente novamente.';
 }
 
 function isSupportedImageFile(file) {
@@ -33,48 +26,113 @@ function isSupportedImageFile(file) {
   return IMAGE_EXTENSIONS.has(ext);
 }
 
-function uploadToStorage(storageRef, file, metadata, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(storageRef, file, metadata);
-    let settled = false;
+const IMAGEKIT_AUTH_ENDPOINT =
+  String(import.meta.env?.VITE_IMAGEKIT_UPLOAD_AUTH_ENDPOINT || '').trim() || '/api/imagekit-auth';
+const IMAGEKIT_DELETE_ENDPOINT =
+  String(import.meta.env?.VITE_IMAGEKIT_DELETE_ENDPOINT || '').trim() || '/api/imagekit-delete';
 
-    const timeoutId = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try {
-        task.cancel();
-      } catch {
-        // Ignora erro de cancelamento
-      }
-      reject(new Error('storage/timeout'));
-    }, timeoutMs);
+async function getFirebaseIdToken() {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Usuário não autenticado.');
+  if (typeof currentUser.getIdToken !== 'function') {
+    throw new Error('Sessão Firebase inválida.');
+  }
+  return currentUser.getIdToken();
+}
 
-    task.on(
-      'state_changed',
-      () => {},
-      (error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        reject(error);
-      },
-      async () => {
-        if (settled) return;
-        try {
-          const downloadUrl = await getDownloadURL(task.snapshot.ref);
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          resolve(downloadUrl);
-        } catch (error) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          reject(error);
-        }
-      }
-    );
+export async function uploadPublicImageToImageKit(file, uid, folder, kind = 'post') {
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('A imagem excede o limite máximo permitido de 10MB.');
+  }
+  if (!isSupportedImageFile(file)) {
+    throw new Error('Formato inválido. Por favor, envie uma imagem (JPG, PNG, WEBP ou GIF).');
+  }
+
+  const idToken = await getFirebaseIdToken();
+  const authResponse = await fetch(IMAGEKIT_AUTH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ uid, folder, kind }),
   });
+  if (!authResponse.ok) {
+    const payload = await authResponse.json().catch(() => ({}));
+    throw new Error(payload.error || 'O serviço de imagens não está configurado.');
+  }
+
+  const authData = await authResponse.json();
+  if (!authData.publicKey || !authData.token || !authData.signature || !authData.expire) {
+    throw new Error('Resposta inválida do serviço de imagens.');
+  }
+
+  const extension = String(file.name || '').split('.').pop()?.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'jpg';
+  const form = new FormData();
+  form.append('file', file);
+  form.append('fileName', `${kind}_${Date.now()}.${extension}`);
+  form.append('publicKey', authData.publicKey);
+  form.append('signature', authData.signature);
+  form.append('expire', String(authData.expire));
+  form.append('token', authData.token);
+  form.append('folder', authData.folder);
+  form.append('useUniqueFileName', 'true');
+  form.append('isPrivateFile', 'false');
+
+  const uploadResponse = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+    method: 'POST',
+    body: form,
+  });
+  const payload = await uploadResponse.json().catch(() => ({}));
+  if (!uploadResponse.ok) {
+    throw new Error(payload.message || 'Falha ao enviar a imagem.');
+  }
+  if (!payload.url || !payload.fileId) {
+    throw new Error('O serviço de imagens não retornou a URL do arquivo.');
+  }
+  return { url: payload.url, fileId: payload.fileId };
+}
+
+export async function deletePublicImage(fileId, uid) {
+  if (!fileId || String(fileId).startsWith('data:')) return { success: true };
+  const idToken = await getFirebaseIdToken();
+  const response = await fetch(IMAGEKIT_DELETE_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ uid, fileId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || 'Não foi possível excluir a imagem anterior.');
+  }
+  return { success: true };
+}
+
+export async function getPrivateDocumentUrl(privateReference) {
+  if (!privateReference || !String(privateReference).startsWith('supabase://')) {
+    return { success: false, error: 'O documento não possui uma referência privada suportada.' };
+  }
+  try {
+    const idToken = await getFirebaseIdToken();
+    const response = await fetch('/api/supabase-private-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ privateReference }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || 'Não foi possível abrir o documento privado.');
+    }
+    return { success: true, url: payload.url };
+  } catch (error) {
+    return { success: false, error: getStorageErrorMessage(error) };
+  }
 }
 
 function readFileAsDataUrl(file) {
@@ -213,64 +271,44 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
     return { success: false, error: 'Usuário não identificado. Faça login novamente.' };
   }
 
-  const rawExt = String(file.name || '').split('.').pop()?.toLowerCase() || 'jpg';
-  const fileExt = IMAGE_EXTENSIONS.has(rawExt) ? rawExt : 'jpg';
-  const prefix = normalizedKind === 'cover' ? 'cover' : 'avatar';
-  const filePath = `users/${cleanUid}/${prefix}_${Date.now()}.${fileExt}`;
-
-  let finalUrl = null;
-  let storageMode = 'cloud';
-
-  if (!_storageBucketUnavailable) {
-    try {
-      const storageRef = ref(storage, filePath);
-      const metadata = {
-        contentType: file.type || (fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg'),
-        customMetadata: {
-          kind: normalizedKind,
-          uploadedBy: cleanUid,
-          uploadedAt: new Date().toISOString(),
-        },
-      };
-
-      const downloadUrl = await uploadToStorage(storageRef, file, metadata, 12 * 1000);
-      if (typeof downloadUrl === 'string' && /^https?:\/\//i.test(downloadUrl)) {
-        finalUrl = downloadUrl;
-      }
-    } catch (cloudError) {
-      const errCode = String(cloudError?.code || '').toLowerCase();
-      const errMsg = String(cloudError?.message || '').toLowerCase();
-      if (
-        errCode === 'storage/bucket-not-found' ||
-        errCode === 'storage/project-not-found' ||
-        errMsg.includes('not found') ||
-        errMsg.includes('404')
-      ) {
-        _storageBucketUnavailable = true;
-      }
-      console.warn(`[Firebase Storage] Upload de ${normalizedKind} indisponível, ativando compressão resiliente:`, cloudError?.message || cloudError?.code);
-    }
+  let previousFileId = '';
+  try {
+    const [userSnapshot, publicSnapshot] = await Promise.all([
+      getDoc(doc(db, 'users', cleanUid)),
+      getDoc(doc(db, 'public_profiles', cleanUid)),
+    ]);
+    const userData = userSnapshot.exists() ? userSnapshot.data() : {};
+    const publicData = publicSnapshot.exists() ? publicSnapshot.data() : {};
+    previousFileId =
+      normalizedKind === 'cover'
+        ? String(publicData.bannerFileId || userData.bannerFileId || '')
+        : String(publicData.avatarFileId || userData.avatarFileId || '');
+  } catch {
+    previousFileId = '';
   }
 
-  if (!finalUrl) {
-    try {
-      finalUrl = await compressImageFileToDataUrl(file, {
-        isCover: normalizedKind === 'cover',
-      });
-      storageMode = 'compressed';
-    } catch (fallbackErr) {
-      console.error(`[Storage Fallback] Falha ao processar imagem (${normalizedKind}):`, fallbackErr);
-      return {
-        success: false,
-        error: fallbackErr?.message || 'Não foi possível processar a imagem selecionada.',
-      };
-    }
+  let uploaded;
+  try {
+    uploaded = await uploadPublicImageToImageKit(
+      file,
+      cleanUid,
+      `ivai-conecta/users/${cleanUid}`,
+      normalizedKind
+    );
+  } catch (uploadError) {
+    return {
+      success: false,
+      error: getStorageErrorMessage(uploadError),
+    };
   }
+
+  const finalUrl = uploaded.url;
+  const storageMode = 'imagekit';
 
   const patch =
     normalizedKind === 'cover'
-      ? { banner: finalUrl }
-      : { avatar: finalUrl, photoURL: finalUrl };
+      ? { banner: finalUrl, bannerFileId: uploaded.fileId }
+      : { avatar: finalUrl, photoURL: finalUrl, avatarFileId: uploaded.fileId };
 
   try {
     await setDoc(
@@ -286,14 +324,37 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
   }
 
   try {
+    await setDoc(
+      doc(db, 'public_profiles', cleanUid),
+      {
+        ...patch,
+        uid: cleanUid,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (publicProfileErr) {
+    console.warn(`[Storage] Aviso ao atualizar ${normalizedKind} no perfil público:`, publicProfileErr?.message);
+  }
+
+  try {
     await updateAuthUser(patch);
   } catch (authErr) {
     console.warn(`[Storage] Aviso ao sincronizar sessão local (${normalizedKind}):`, authErr?.message);
   }
 
+  if (previousFileId && previousFileId !== uploaded.fileId) {
+    try {
+      await deletePublicImage(previousFileId, cleanUid);
+    } catch (deleteError) {
+      console.warn(`[Storage] Não foi possível excluir a imagem anterior (${normalizedKind}):`, deleteError?.message);
+    }
+  }
+
   return {
     success: true,
     url: finalUrl,
+    fileId: uploaded.fileId,
     kind: normalizedKind,
     storageMode,
   };
@@ -325,35 +386,47 @@ export async function uploadUserDocument(file, uid, docType = 'document') {
     return { success: false, error: 'Formato inválido. Envie PDF, JPG, PNG ou WEBP.' };
   }
 
-  const cleanUid = String(uid || 'anon_' + Date.now());
-  const cleanFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const filePath = `users/${cleanUid}/docs/${docType}_${Date.now()}_${cleanFilename}`;
-  const storageRef = ref(storage, filePath);
+  const cleanUid = String(uid || '').trim();
+  if (!cleanUid) {
+    return { success: false, error: 'Usuário não identificado. Faça login novamente.' };
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  const base64 = btoa(binary);
 
   try {
-    const metadata = {
-      contentType: file.type || 'application/pdf',
-      customMetadata: {
-        docType,
-        originalName: file.name,
-        uploadedBy: cleanUid,
-        uploadedAt: new Date().toISOString(),
+    const idToken = await getFirebaseIdToken();
+    const response = await fetch('/api/supabase-private-upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
       },
-    };
-
-    const downloadUrl = await uploadToStorage(storageRef, file, metadata, 60 * 1000);
-    if (typeof downloadUrl !== 'string' || !/^https:\/\//i.test(downloadUrl)) {
-      throw new Error('storage/url-not-confirmed');
+      body: JSON.stringify({
+        uid: cleanUid,
+        docType,
+        fileName: file.name,
+        contentType: file.type || 'application/pdf',
+        fileBase64: base64,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || 'O armazenamento privado não está configurado.');
     }
-
     return {
       success: true,
-      url: downloadUrl,
+      url: payload.privateReference,
       filename: file.name,
       sizeMB: (file.size / (1024 * 1024)).toFixed(2),
     };
   } catch (error) {
-    console.warn('[Firebase Storage Doc] Upload falhou:', error.message);
     return {
       success: false,
       filename: file.name,

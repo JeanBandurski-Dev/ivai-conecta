@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { connectAuthEmulator, getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { connectStorageEmulator, getStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 import { connectFirestoreEmulator } from 'firebase/firestore';
 
@@ -36,14 +35,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 
 if (env.DEV && env.VITE_USE_FIREBASE_EMULATORS === 'true') {
   connectAuthEmulator(auth, env.VITE_FIREBASE_AUTH_EMULATOR_URL || 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST || '127.0.0.1', Number(env.VITE_FIREBASE_FIRESTORE_EMULATOR_PORT || 8080));
-  connectStorageEmulator(storage, env.VITE_FIREBASE_STORAGE_EMULATOR_HOST || '127.0.0.1', Number(env.VITE_FIREBASE_STORAGE_EMULATOR_PORT || 9199));
   connectFunctionsEmulator(functions, env.VITE_FIREBASE_FUNCTIONS_EMULATOR_HOST || '127.0.0.1', Number(env.VITE_FIREBASE_FUNCTIONS_EMULATOR_PORT || 5001));
 }
 export const isFirebaseInitialized = true;

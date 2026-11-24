@@ -62,7 +62,8 @@ O **Ivaí Conecta** preenche a lacuna de comunicação entre o ecossistema acad�
 - **BaaS (Backend as a Service):** [Firebase](https://firebase.google.com/)
   - **Firebase Authentication:** Autenticação por e-mail/senha e Google OAuth.
   - **Cloud Firestore:** Banco de dados NoSQL em tempo real para vagas, usuários, mensagens e candidaturas.
-  - **Cloud Storage:** Armazenamento seguro de fotos de perfil, comprovantes e currículos.
+  - **ImageKit:** Armazenamento público de fotos de perfil e imagens públicas.
+  - **Firebase Storage (legado):** Mantido temporariamente para referências antigas e arquivos privados ainda não migrados.
 - **Ícones:** [Lucide React](https://lucide.dev/)
 - **Linter & Qualidade:** [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) e script de verificação contra dados fictícios (`check-no-mocks`).
 
@@ -144,6 +145,34 @@ VITE_FIREBASE_MEASUREMENT_ID=seu_measurement_id
 ```
 
 > 💡 **Nota:** O repositório já disponibiliza as credenciais do ambiente de homologação/desenvolvimento diretamente no `.env.example`. Para iniciar de forma imediata, basta copiar o arquivo. Caso utilize seu próprio projeto do Firebase, substitua os valores pelos dados obtidos nas **Configurações do Projeto > Seus Aplicativos (Web)** no [Firebase Console](https://console.firebase.google.com/).
+
+#### Variáveis de armazenamento na Vercel
+
+Configure as seguintes variáveis no painel da Vercel. Nunca coloque os valores secretos em `VITE_*`.
+
+```env
+# ImageKit - públicas/servidor
+IMAGEKIT_PUBLIC_KEY=<public_key_do_imagekit>
+IMAGEKIT_PRIVATE_KEY=<private_key_do_imagekit>
+IMAGEKIT_URL_ENDPOINT=<url_endpoint_do_imagekit>
+
+# Firebase - necessária no backend para validar o ID Token
+FIREBASE_API_KEY=<api_key_web_do_firebase>
+
+# Supabase - somente para documentos privados
+SUPABASE_URL=<url_do_projeto_supabase>
+SUPABASE_SERVICE_ROLE_KEY=<service_role_secret_do_supabase>
+SUPABASE_PRIVATE_BUCKET=<nome_do_bucket_privado>
+```
+
+No frontend, configure opcionalmente:
+
+```env
+VITE_IMAGEKIT_UPLOAD_AUTH_ENDPOINT=/api/imagekit-auth
+VITE_IMAGEKIT_DELETE_ENDPOINT=/api/imagekit-delete
+```
+
+Os arquivos públicos do ImageKit devem ser entregues sem acesso administrativo direto pelo navegador. O upload utiliza assinatura temporária criada pelos endpoints serverless da Vercel. Os documentos privados serão enviados ao Supabase somente após `SUPABASE_*` estar configurado; não use o bucket privado como público.
 
 ---
 

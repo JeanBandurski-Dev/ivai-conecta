@@ -48,6 +48,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   const [isVerified, setIsVerified] = useState(() => {
     if (currentUser && userRole !== 'aluno') return true;
     if (currentUser?.isVerifiedStudent === true) return true;
+    if (currentUser?.emailVerified === true) return true;
+    if (auth.currentUser?.emailVerified === true) return true;
     if (userRole === 'aluno') return false;
     return false;
   });
@@ -63,31 +65,38 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       setIsVerified(true);
       return;
     }
-    if (currentUser?.isVerifiedStudent === true) {
+    if (currentUser?.isVerifiedStudent === true || currentUser?.emailVerified === true) {
       setIsVerified(true);
       return;
     }
-    if (auth.currentUser) {
-      setIsVerified(currentUser?.isVerifiedStudent === true);
+    if (auth.currentUser?.emailVerified === true) {
+      setIsVerified(true);
+      return;
     }
-  }, [currentUser, userRole]);
+    setIsVerified(false);
+  }, [currentUser?.isVerifiedStudent, currentUser?.emailVerified, userRole]);
 
   // Checagem silenciosa automática ao montar o componente (apenas para alunos)
   useEffect(() => {
     let isMounted = true;
     async function checkSilently() {
-      if (userRole === 'aluno' && currentUser?.isVerifiedStudent !== true && auth.currentUser) {
+      if (userRole === 'aluno' && !isVerified && auth.currentUser) {
         try {
           await auth.currentUser.reload();
-          const result = await checkStudentVerification(auth.currentUser);
-          if (result.verified && isMounted) {
-            setIsVerified(true);
-            setCurrentUser(prev => ({
-              ...prev,
-              isVerifiedStudent: true,
-              institutionalValidationStatus: 'VALIDADO',
-              emailVerified: true
-            }));
+          if (auth.currentUser.emailVerified) {
+            const result = await checkStudentVerification(auth.currentUser);
+            if (isMounted) {
+              setIsVerified(true);
+              const isStudentVal = result.isStudentVerified || result.verified;
+              setCurrentUser(prev => ({
+                ...prev,
+                emailVerified: true,
+                ...(isStudentVal ? {
+                  isVerifiedStudent: true,
+                  institutionalValidationStatus: 'VALIDADO'
+                } : {})
+              }));
+            }
           }
         } catch {
           // Falhas silenciosas ignoradas; botão manual "Já verifiquei" permanece ativo
@@ -98,7 +107,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return () => {
       isMounted = false;
     };
-  }, [userRole, setCurrentUser, currentUser?.isVerifiedStudent]);
+  }, [userRole, isVerified, setCurrentUser]);
 
   // Timer regressivo para o botão de reenvio
   useEffect(() => {
@@ -197,19 +206,21 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       if (user.emailVerified) {
         setStatusWarning('');
         const result = await checkStudentVerification(user);
-        if (result.verified) {
+        const isStudentVal = result.isStudentVerified || result.verified;
         const updatedUser = {
           ...(currentUser || {}),
-            emailVerified: true,
+          emailVerified: true,
+          ...(isStudentVal ? {
             isVerifiedStudent: true,
             institutionalValidationStatus: 'VALIDADO'
-          };
-          setCurrentUser(updatedUser);
-          setIsVerified(true);
+          } : {})
+        };
+        setCurrentUser(updatedUser);
+        setIsVerified(true);
+        if (isStudentVal) {
           showToast('🎉 Validação estudantil confirmada! Acesso liberado.');
         } else {
-          setStatusWarning('A confirmação de e-mail não substitui a validação institucional estudantil.');
-          showToast('Continue pela validação oficial de estudante.');
+          showToast('🎉 E-mail verificado com sucesso! Acesso liberado.');
         }
       } else {
         setStatusWarning('O Firebase ainda não detectou o clique no link. Abra seu e-mail institucional/pessoal, clique no link de confirmação recebido e tente clicar em "Já verifiquei" novamente.');

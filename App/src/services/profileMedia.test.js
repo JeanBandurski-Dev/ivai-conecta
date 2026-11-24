@@ -2,38 +2,21 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const setDocMock = vi.fn().mockResolvedValue(undefined);
 const docMock = vi.fn((_db, col, id) => ({ col, id }));
+const getDocMock = vi.fn().mockResolvedValue({ exists: () => false, data: () => ({}) });
 const updateAuthUserMock = vi.fn().mockResolvedValue({});
 
 vi.mock('../lib/firebase.js', () => ({
   storage: {},
   db: {},
-  auth: { currentUser: { uid: 'user_123' } },
+  auth: { currentUser: { uid: 'user_123', getIdToken: vi.fn().mockResolvedValue('test-token') } },
   googleProvider: {},
   functions: {},
-}));
-
-vi.mock('firebase/storage', () => ({
-  ref: vi.fn((_storage, path) => ({ path })),
-  uploadBytesResumable: vi.fn(() => {
-    const handlers = {};
-    const task = {
-      snapshot: { ref: {} },
-      cancel: vi.fn(),
-      on: vi.fn((_evt, _progress, onError) => {
-        handlers.onError = onError;
-        setTimeout(() => {
-          onError({ code: 'storage/unknown', message: 'Not Found' });
-        }, 0);
-      }),
-    };
-    return task;
-  }),
-  getDownloadURL: vi.fn(),
 }));
 
 vi.mock('firebase/firestore', () => ({
   doc: (...args) => docMock(...args),
   setDoc: (...args) => setDocMock(...args),
+  getDoc: (...args) => getDocMock(...args),
   deleteField: () => '__DELETE_FIELD__',
 }));
 
@@ -48,7 +31,32 @@ describe('publicProfileSync & storageService', () => {
   beforeEach(() => {
     setDocMock.mockClear();
     docMock.mockClear();
+    getDocMock.mockClear();
     updateAuthUserMock.mockClear();
+    globalThis.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/imagekit-auth')) {
+        return {
+          ok: true,
+          json: async () => ({
+            publicKey: 'test-public-key',
+            token: 'test-token',
+            signature: 'test-signature',
+            expire: 4102444800,
+            folder: 'ivai-conecta/users/user_123',
+          }),
+        };
+      }
+      if (String(url).includes('upload.imagekit.io')) {
+        return {
+          ok: true,
+          json: async () => ({
+            url: 'https://ik.imagekit.io/test/uploaded.jpg',
+            fileId: 'test-file-id',
+          }),
+        };
+      }
+      return { ok: false, json: async () => ({ error: 'Erro de teste.' }) };
+    });
   });
 
   it('preserves base64 data URLs without truncating them at 2048 chars', () => {
@@ -83,41 +91,34 @@ describe('publicProfileSync & storageService', () => {
     expect(payload.cnpj).toBe('__DELETE_FIELD__');
   });
 
-  it('uploads cover image to banner without overwriting avatar when Storage is unavailable', async () => {
-    const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  it('uploads cover image to ImageKit and writes banner fields', async () => {
+    const dataUrl = 'https://ik.imagekit.io/test/uploaded.jpg';
     const file = new File(['dummy-image'], 'capa.png', { type: 'image/png' });
-    // Polyfill FileReader for Node test environment
-    globalThis.FileReader = class {
-      readAsDataURL() {
-        this.result = dataUrl;
-        setTimeout(() => this.onload?.(), 0);
-      }
-    };
 
     const res = await uploadUserProfilePicture(file, 'user_123', 'cover');
 
     expect(res.success).toBe(true);
     expect(res.kind).toBe('cover');
-    expect(res.storageMode).toBe('compressed');
+    expect(res.storageMode).toBe('imagekit');
     expect(res.url).toBe(dataUrl);
 
-    expect(setDocMock).toHaveBeenCalledTimes(1);
-    const [, writtenData] = setDocMock.mock.calls[0];
-    expect(writtenData.banner).toBe(dataUrl);
-    expect(writtenData.avatar).toBeUndefined();
+    expect(setDocMock).toHaveBeenCalledTimes(2);
+    const [, writtenUserData] = setDocMock.mock.calls[0];
+    expect(writtenUserData.banner).toBe(dataUrl);
+    expect(writtenUserData.avatar).toBeUndefined();
+    const [, writtenPublicData] = setDocMock.mock.calls[1];
+    expect(writtenPublicData.banner).toBe(dataUrl);
+    expect(writtenPublicData.uid).toBe('user_123');
 
-    expect(updateAuthUserMock).toHaveBeenCalledWith({ banner: dataUrl });
+    expect(updateAuthUserMock).toHaveBeenCalledWith({
+      banner: dataUrl,
+      bannerFileId: 'test-file-id',
+    });
   });
 
-  it('uploads avatar image to avatar/photoURL without touching banner', async () => {
-    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2w==';
+  it('uploads avatar image to ImageKit and writes avatar/photoURL', async () => {
+    const dataUrl = 'https://ik.imagekit.io/test/uploaded.jpg';
     const file = new File(['dummy-avatar'], 'perfil.jpg', { type: 'image/jpeg' });
-    globalThis.FileReader = class {
-      readAsDataURL() {
-        this.result = dataUrl;
-        setTimeout(() => this.onload?.(), 0);
-      }
-    };
 
     const res = await uploadUserProfilePicture(file, 'user_123', 'avatar');
 
@@ -125,14 +126,20 @@ describe('publicProfileSync & storageService', () => {
     expect(res.kind).toBe('avatar');
     expect(res.url).toBe(dataUrl);
 
-    const [, writtenData] = setDocMock.mock.calls[0];
-    expect(writtenData.avatar).toBe(dataUrl);
-    expect(writtenData.photoURL).toBe(dataUrl);
-    expect(writtenData.banner).toBeUndefined();
+    expect(setDocMock).toHaveBeenCalledTimes(2);
+    const [, writtenUserData] = setDocMock.mock.calls[0];
+    expect(writtenUserData.avatar).toBe(dataUrl);
+    expect(writtenUserData.photoURL).toBe(dataUrl);
+    expect(writtenUserData.banner).toBeUndefined();
+    const [, writtenPublicData] = setDocMock.mock.calls[1];
+    expect(writtenPublicData.avatar).toBe(dataUrl);
+    expect(writtenPublicData.photoURL).toBe(dataUrl);
+    expect(writtenPublicData.uid).toBe('user_123');
 
     expect(updateAuthUserMock).toHaveBeenCalledWith({
       avatar: dataUrl,
       photoURL: dataUrl,
+      avatarFileId: 'test-file-id',
     });
   });
 

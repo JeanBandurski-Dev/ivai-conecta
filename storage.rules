@@ -17,7 +17,7 @@ service firebase.storage {
 
     // Fotos de perfil, logotipos e imagens de capa usados publicamente em perfis e murais.
     match /users/{userId}/{fileName} {
-      allow read: if fileName.matches('^(avatar|cover|banner)_.*');
+      allow read: if true;
 
       allow write: if isOwner(userId)
         && fileName.matches('^(avatar|cover|banner)_.*')

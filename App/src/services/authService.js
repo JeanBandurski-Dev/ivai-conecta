@@ -1684,8 +1684,12 @@ export function watchAuthState(callback) {
           // Sincronização em tempo real da Prova de Propriedade:
           // Se o Firebase Auth confirmar user.emailVerified === true para um aluno com e-mail estudantil válido,
           // promove automaticamente seu status no Firestore e na sessão.
-          if (role === 'aluno' && !isVerifiedStudent && fbUser.emailVerified) {
-            const studentCheck = validateStudentEmail(fbUser.email);
+          if (role === 'aluno' && !isVerifiedStudent && (fbUser.emailVerified || profileRes.profile?.emailVerified)) {
+            const emailToCheck = fbUser.email || profileRes.profile?.studentEmail;
+            let studentCheck = validateStudentEmail(emailToCheck);
+            if (!studentCheck.isValid && profileRes.profile?.studentEmail) {
+              studentCheck = validateStudentEmail(profileRes.profile.studentEmail);
+            }
             if (studentCheck.isValid) {
               isVerifiedStudent = true;
               institutionalStatusValidated = true;
@@ -1695,7 +1699,8 @@ export function watchAuthState(callback) {
                   {
                     isVerifiedStudent: true,
                     emailVerified: true,
-                    studentEmail: fbUser.email.toLowerCase().trim(),
+                    institutionalValidationStatus: 'VALIDADO',
+                    studentEmail: (profileRes.profile?.studentEmail || fbUser.email).toLowerCase().trim(),
                     institution:
                       profileRes.profile?.institution ||
                       studentCheck.institution,
@@ -1743,7 +1748,7 @@ export function watchAuthState(callback) {
             uid: fbUser.uid,
             id: fbUser.uid,
             email: fbUser.email,
-            emailVerified: role === 'aluno' ? isStudentVerified : true,
+            emailVerified: Boolean(fbUser.emailVerified || profileRes.profile?.emailVerified || isStudentVerified),
             name:
               profileRes.profile?.name ||
               fbUser.displayName ||
@@ -1874,9 +1879,11 @@ export function watchAuthState(callback) {
                 const updatedUser = {
                   ...sessionUser,
                   ...profile,
-                  emailVerified: role === 'aluno'
-                    ? Boolean(profile?.isVerifiedStudent === true && profile?.institutionalValidationStatus === 'VALIDADO')
-                    : true,
+                  emailVerified: Boolean(
+                    fbUser.emailVerified ||
+                    profile?.emailVerified ||
+                    (profile?.isVerifiedStudent && profile?.institutionalValidationStatus === 'VALIDADO')
+                  ),
                   isVerifiedStudent: role === 'aluno'
                     ? Boolean(profile?.isVerifiedStudent === true && profile?.institutionalValidationStatus === 'VALIDADO')
                     : true,
