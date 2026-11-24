@@ -1896,12 +1896,13 @@ export function watchAuthState(callback) {
                   JSON.stringify(updatedUser)
                 );
 
-                // Auto-sincroniza avatar/capa já existentes em users/{uid} com public_profiles/{uid}
-                const mediaSignature = `${updatedUser.avatar || ''}|${updatedUser.banner || ''}|${updatedUser.name || ''}|${updatedUser.role || ''}`;
+                // Auto-sincroniza avatar/capa e dados docentes já existentes em users/{uid} com public_profiles/{uid}
+                const normalizedRoleForSync = normalizeUserRole(updatedUser.role);
+                const mediaSignature = `${updatedUser.avatar || ''}|${updatedUser.banner || ''}|${updatedUser.name || ''}|${normalizedRoleForSync}|${updatedUser.discipline || ''}|${Array.isArray(updatedUser.classes) ? updatedUser.classes.join(',') : ''}`;
                 if (
                   mediaSignature !== lastPublicSyncSignature &&
-                  (updatedUser.avatar || updatedUser.banner) &&
-                  ['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(normalizeUserRole(updatedUser.role))
+                  (updatedUser.avatar || updatedUser.banner || normalizedRoleForSync === 'professor') &&
+                  ['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(normalizedRoleForSync)
                 ) {
                   lastPublicSyncSignature = mediaSignature;
                   syncPublicProfileSafe(fbUser.uid, updatedUser).catch(() => {});

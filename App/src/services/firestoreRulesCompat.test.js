@@ -51,6 +51,9 @@ import { getOrCreateChat, sendChatMessage } from './chatService.js';
 import {
   subscribeToEndorsementRequests,
   subscribeToStudentEndorsementRequests,
+  requestTeacherEndorsement,
+  approveEndorsementRequest,
+  rejectEndorsementRequest,
 } from './talentsService.js';
 
 describe('firestore.rules compatibility fixes', () => {
@@ -164,10 +167,53 @@ describe('firestore.rules compatibility fixes', () => {
       .filter((t) => t && t.__collection && !t.id && !t.constraints);
 
     expect(unfilteredTargets).toEqual([]);
+    expect(whereMock).toHaveBeenCalledWith('profUid', '==', 'user_uid_1');
     expect(whereMock).toHaveBeenCalledWith('profEmail', '==', 'usuario@ifpr.edu.br');
     expect(whereMock).toHaveBeenCalledWith('studentId', '==', 'user_uid_1');
 
     unsubProf();
     unsubStudent();
+  });
+
+  it('allows requesting, approving, and rejecting teacher endorsement without typing professor email', async () => {
+    const reqRes = await requestTeacherEndorsement(
+      '',
+      'Professor Arthur',
+      'Programação Web',
+      { uid: 'user_uid_1', name: 'Luan Trainotti', email: 'luan@estudantes.ifpr.edu.br' },
+      { uid: 'prof_arthur_uid', id: 'prof_arthur_uid', name: 'Professor Arthur', institution: 'IFPR', discipline: 'Programação Web' },
+      'Fui aluno no 3º semestre.'
+    );
+
+    expect(reqRes.success).toBe(true);
+    const createdCall = setDocMock.mock.calls.find(([ref]) => ref.__collection === 'endorsement_requests');
+    expect(createdCall).toBeTruthy();
+    const [createdRef, createdData] = createdCall;
+    expect(createdData.profUid).toBe('prof_arthur_uid');
+    expect(createdData.targetTeacherId).toBe('prof_arthur_uid');
+    expect(createdData.studentId).toBe('user_uid_1');
+    expect(createdData.status).toBe('Pendente');
+
+    const approveRes = await approveEndorsementRequest(
+      { id: createdRef.id, firestoreId: createdRef.id, studentId: 'user_uid_1', studentName: 'Luan Trainotti', discipline: 'Programação Web' },
+      'Excelente desempenho prático.',
+      { uid: 'prof_arthur_uid', name: 'Professor Arthur', email: 'arthur@ifpr.edu.br', institution: 'IFPR' }
+    );
+    expect(approveRes.success).toBe(true);
+    expect(updateDocMock).toHaveBeenCalledWith(
+      { __collection: 'endorsement_requests', id: createdRef.id },
+      expect.objectContaining({ status: 'Aprovado', quote: 'Excelente desempenho prático.' })
+    );
+
+    updateDocMock.mockClear();
+    const rejectRes = await rejectEndorsementRequest(
+      { id: createdRef.id, firestoreId: createdRef.id, studentId: 'user_uid_1' },
+      { uid: 'prof_arthur_uid', name: 'Professor Arthur' }
+    );
+    expect(rejectRes.success).toBe(true);
+    expect(updateDocMock).toHaveBeenCalledWith(
+      { __collection: 'endorsement_requests', id: createdRef.id },
+      expect.objectContaining({ status: 'Recusado' })
+    );
   });
 });

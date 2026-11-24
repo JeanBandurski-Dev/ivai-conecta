@@ -20,6 +20,7 @@ import PublishJobModal from '../components/PublishJobModal';
 import JobActionModal from '../components/JobActionModal';
 import JobCard from '../components/JobCard';
 import JobDetailModal from '../components/JobDetailModal';
+import SafeAvatar from '../components/ui/SafeAvatar';
 
 export default function MinhasVagas() {
   const { currentUser, favoriteJobs = [], showToast, startChatWith } = useAppStore();
@@ -168,9 +169,8 @@ export default function MinhasVagas() {
     });
 
     // Inclui também estudantes que possuem recomendação deste professor
-    const profEmail = (currentUser?.email || '').toLowerCase().trim();
-    if (profEmail) {
-      const endorsedTalents = getTeacherEndorsedStudents(profEmail);
+    if (currentUser) {
+      const endorsedTalents = getTeacherEndorsedStudents(currentUser);
       endorsedTalents.forEach(t => {
         if (!seenStudentIds.has(String(t.id))) {
           const endorsement = t.endorsements?.find(e => isSameProfessor(e, currentUser));
@@ -309,42 +309,57 @@ export default function MinhasVagas() {
     forceUpdate(n => n + 1);
   };
 
-  const handleApproveTeacherRequest = async (reqId) => {
+  const handleApproveTeacherRequest = async (reqOrId) => {
+    const reqKey = typeof reqOrId === 'object' ? (reqOrId.firestoreId || reqOrId.id) : reqOrId;
     if (processingRequestId) return;
-    setProcessingRequestId(reqId);
+    setProcessingRequestId(reqKey);
     setProcessingActionType('approve');
     try {
-      const quoteText = customQuote[reqId] || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio lógico em disciplinas práticas.';
-      const res = await approveEndorsementRequest(reqId, quoteText, currentUser);
+      const quoteText = customQuote[reqKey] || 'Estudante com excelente desempenho acadêmico, postura ética e ótimo raciocínio lógico em disciplinas práticas.';
+      const res = await approveEndorsementRequest(reqOrId, quoteText, currentUser);
       if (res.success) {
-        showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!');
+        setLiveTeacherRequests(prev =>
+          prev.map(r => (String(r.firestoreId || r.id) === String(reqKey) ? { ...r, status: 'Aprovado', quote: quoteText } : r))
+        );
+        showToast('Parecer pedagógico concedido e selo verificado atribuído ao perfil do aluno!', 'success');
         forceUpdate(n => n + 1);
       } else if (res.alreadyEndorsed) {
+        setLiveTeacherRequests(prev =>
+          prev.map(r => (String(r.firestoreId || r.id) === String(reqKey) ? { ...r, status: 'Aprovado' } : r))
+        );
         showToast('Você já recomendou este aluno. A solicitação foi concluída sem duplicar pareceres.');
         forceUpdate(n => n + 1);
       } else {
-        showToast(res.error || 'Erro ao conceder parecer.');
+        showToast(res.error || 'Erro ao conceder parecer.', 'error');
       }
     } catch (err) {
       console.error('Erro ao aprovar solicitação:', err);
-      showToast('Erro ao conceder parecer.');
+      showToast('Erro ao conceder parecer.', 'error');
     } finally {
       setProcessingRequestId(null);
       setProcessingActionType(null);
     }
   };
 
-  const handleRejectTeacherRequest = async (reqId) => {
+  const handleRejectTeacherRequest = async (reqOrId) => {
+    const reqKey = typeof reqOrId === 'object' ? (reqOrId.firestoreId || reqOrId.id) : reqOrId;
     if (processingRequestId) return;
-    setProcessingRequestId(reqId);
+    setProcessingRequestId(reqKey);
     setProcessingActionType('reject');
     try {
-      await rejectEndorsementRequest(reqId, currentUser);
+      const res = await rejectEndorsementRequest(reqOrId, currentUser);
+      if (res?.success === false) {
+        showToast(res.error || 'Erro ao recusar solicitação.', 'error');
+        return;
+      }
+      setLiveTeacherRequests(prev =>
+        prev.map(r => (String(r.firestoreId || r.id) === String(reqKey) ? { ...r, status: 'Recusado' } : r))
+      );
       showToast('Solicitação recusada.');
       forceUpdate(n => n + 1);
     } catch (err) {
       console.error('Erro ao recusar solicitação:', err);
-      showToast('Erro ao recusar solicitação.');
+      showToast('Erro ao recusar solicitação.', 'error');
     } finally {
       setProcessingRequestId(null);
       setProcessingActionType(null);
@@ -428,18 +443,19 @@ export default function MinhasVagas() {
               <div className="space-y-4">
                 {pendingTeacherRequests.map(req => {
                   const student = getTalentById(req.studentId);
+                  const reqKey = req.firestoreId || req.id;
 
                   return (
-                    <div key={req.id || req.firestoreId} className="card p-6 space-y-4 border-l-4 border-l-amber-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xs rounded-2xl">
+                    <div key={reqKey} className="card p-6 space-y-4 border-l-4 border-l-amber-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xs rounded-2xl">
                       <div className="flex items-start justify-between flex-wrap gap-4">
                         <div className="flex items-center gap-3.5">
-                          <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950 text-primary-blue dark:text-blue-400 font-heading font-black text-lg flex items-center justify-center shrink-0 overflow-hidden border border-blue-200/50 shadow-xs">
-                            {(req.studentAvatar || student?.avatar) ? (
-                              <img src={req.studentAvatar || student?.avatar} alt={req.studentName} className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{(req.studentName || 'E').charAt(0).toUpperCase()}</span>
-                            )}
-                          </div>
+                          <SafeAvatar
+                            src={req.studentAvatar || student?.avatar}
+                            name={req.studentName || 'Estudante'}
+                            className="w-12 h-12 rounded-2xl shrink-0 border border-blue-200/50 shadow-xs"
+                            fallbackClassName="font-heading font-black text-lg"
+                            initialsLength={1}
+                          />
                           <div>
                             <div className="font-heading text-lg sm:text-xl font-bold text-primary-dark dark:text-white flex items-center flex-wrap gap-2">
                               {req.studentName}
@@ -473,8 +489,8 @@ export default function MinhasVagas() {
                         <label className="form-label text-xs">Escreva seu Parecer / Avaliação Pedagógica:</label>
                         <textarea
                           disabled={Boolean(processingRequestId)}
-                          value={customQuote[req.id] || ''}
-                          onChange={e => setCustomQuote({ ...customQuote, [req.id]: e.target.value })}
+                          value={customQuote[reqKey] || ''}
+                          onChange={e => setCustomQuote({ ...customQuote, [reqKey]: e.target.value })}
                           className="form-control text-xs disabled:opacity-60"
                           rows={2}
                           placeholder="Ex: Estudante com excelente raciocínio prático, boa assiduidade e ótimo trabalho em equipe."
@@ -485,10 +501,10 @@ export default function MinhasVagas() {
                         <button
                           type="button"
                           disabled={Boolean(processingRequestId)}
-                          onClick={() => handleRejectTeacherRequest(req.id)}
+                          onClick={() => handleRejectTeacherRequest(req)}
                           className="btn btn-outline border-red-200 text-red-600 dark:text-red-400 hover:bg-red-50 btn-sm text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
                         >
-                          {processingRequestId === req.id && processingActionType === 'reject' ? (
+                          {processingRequestId === reqKey && processingActionType === 'reject' ? (
                             <>
                               <Loader2 size={14} className="animate-spin" />
                               <span>Recusando...</span>
@@ -503,10 +519,10 @@ export default function MinhasVagas() {
                         <button
                           type="button"
                           disabled={Boolean(processingRequestId)}
-                          onClick={() => handleApproveTeacherRequest(req.id)}
+                          onClick={() => handleApproveTeacherRequest(req)}
                           className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
-                          {processingRequestId === req.id && processingActionType === 'approve' ? (
+                          {processingRequestId === reqKey && processingActionType === 'approve' ? (
                             <>
                               <Loader2 size={15} className="animate-spin" />
                               <span>Concedendo Selo...</span>
@@ -538,13 +554,13 @@ export default function MinhasVagas() {
                   {finishedTeacherRequests.map(req => (
                     <div key={req.id || req.studentId} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 flex items-center justify-between flex-wrap gap-4 shadow-xs">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-heading font-black text-base flex items-center justify-center shrink-0 overflow-hidden border border-emerald-200/50 shadow-xs">
-                          {req.studentAvatar ? (
-                            <img src={req.studentAvatar} alt={req.studentName} className="w-full h-full object-cover" />
-                          ) : (
-                            <span>{(req.studentName || 'E').charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
+                        <SafeAvatar
+                          src={req.studentAvatar}
+                          name={req.studentName || 'Estudante'}
+                          className="w-11 h-11 rounded-2xl shrink-0 border border-emerald-200/50 shadow-xs"
+                          fallbackClassName="font-heading font-black text-base"
+                          initialsLength={1}
+                        />
                         <div>
                           <div className="font-heading font-bold text-gray-900 dark:text-white text-base flex items-center gap-2 flex-wrap">
                             {req.studentName}

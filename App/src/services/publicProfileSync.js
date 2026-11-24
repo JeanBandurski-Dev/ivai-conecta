@@ -94,7 +94,7 @@ export function buildPublicProfilePayload(uid, sourceData = {}) {
     ).slice(0, 120),
     city: String(sourceData.city || 'Ivaiporã').slice(0, 100),
     institution: String(sourceData.institution || '').slice(0, 160),
-    course: String(sourceData.course || sourceData.specialty || '').slice(0, 160),
+    course: String(sourceData.course || sourceData.specialty || sourceData.discipline || '').slice(0, 160),
     period: String(sourceData.period || '').slice(0, 80),
     avatar,
     photoURL,
@@ -120,6 +120,14 @@ export function buildPublicProfilePayload(uid, sourceData = {}) {
 
   if (role && VALID_PUBLIC_ROLES.has(role)) {
     payload.role = role;
+  }
+
+  if (role === 'professor') {
+    payload.discipline = String(sourceData.discipline || sourceData.course || '').slice(0, 160);
+    payload.degree = String(sourceData.degree || '').slice(0, 160);
+    payload.classes = Array.isArray(sourceData.classes)
+      ? sourceData.classes.map(c => String(c || '').trim()).filter(Boolean).slice(0, 50)
+      : [];
   }
 
   if (role === 'empresa') {
@@ -160,6 +168,9 @@ export async function syncPublicProfileSafe(uid, sourceData = {}) {
         const legacyPayload = { ...payload };
         delete legacyPayload.banner;
         delete legacyPayload.coverImage;
+        delete legacyPayload.discipline;
+        delete legacyPayload.degree;
+        delete legacyPayload.classes;
         if (typeof legacyPayload.avatar === 'string' && legacyPayload.avatar.length > 2048) {
           delete legacyPayload.avatar;
         }

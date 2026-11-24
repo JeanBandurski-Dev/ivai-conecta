@@ -292,7 +292,7 @@ service cloud.firestore {
           'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
           'photoURL', 'banner', 'coverImage', 'avatarFileId', 'bannerFileId', 'skills', 'experiences', 'projects',
           'education', 'bio', 'endorsements', 'endorsementCount', 'isVerifiedStudent',
-          'role', 'razaoSocial', 'nomeFantasia', 'sector', 'about',
+          'role', 'discipline', 'degree', 'classes', 'razaoSocial', 'nomeFantasia', 'sector', 'about',
           'isVerifiedCompany', 'companyVerificationStatus',
           'isActive', 'blocked', 'status',
           'createdAt', 'updatedAt'
@@ -302,6 +302,9 @@ service cloud.firestore {
         (!('city' in request.resource.data) || (request.resource.data.city is string && request.resource.data.city.size() <= 100)) &&
         (!('institution' in request.resource.data) || (request.resource.data.institution is string && request.resource.data.institution.size() <= 160)) &&
         (!('course' in request.resource.data) || (request.resource.data.course is string && request.resource.data.course.size() <= 160)) &&
+        (!('discipline' in request.resource.data) || (request.resource.data.discipline is string && request.resource.data.discipline.size() <= 160)) &&
+        (!('degree' in request.resource.data) || (request.resource.data.degree is string && request.resource.data.degree.size() <= 160)) &&
+        (!('classes' in request.resource.data) || (request.resource.data.classes is list && request.resource.data.classes.size() <= 50)) &&
         (!('period' in request.resource.data) || (request.resource.data.period is string && request.resource.data.period.size() <= 80)) &&
         (!('avatar' in request.resource.data) || (request.resource.data.avatar is string && request.resource.data.avatar.size() <= 250000)) &&
         (!('photoURL' in request.resource.data) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 250000)) &&
@@ -329,9 +332,9 @@ service cloud.firestore {
       allow update: if (isOwner(userId) || isAdmin()) &&
         request.resource.data.keys().hasOnly([
           'uid', 'name', 'city', 'institution', 'course', 'period', 'avatar',
-          'photoURL', 'banner', 'coverImage', 'skills', 'experiences', 'projects',
+          'photoURL', 'banner', 'coverImage', 'avatarFileId', 'bannerFileId', 'skills', 'experiences', 'projects',
           'education', 'bio', 'endorsements', 'endorsementCount', 'isVerifiedStudent',
-          'role', 'razaoSocial', 'nomeFantasia', 'sector', 'about',
+          'role', 'discipline', 'degree', 'classes', 'razaoSocial', 'nomeFantasia', 'sector', 'about',
           'isVerifiedCompany', 'companyVerificationStatus',
           'isActive', 'blocked', 'status',
           'createdAt', 'updatedAt'
@@ -341,6 +344,9 @@ service cloud.firestore {
         (!('city' in request.resource.data) || (request.resource.data.city is string && request.resource.data.city.size() <= 100)) &&
         (!('institution' in request.resource.data) || (request.resource.data.institution is string && request.resource.data.institution.size() <= 160)) &&
         (!('course' in request.resource.data) || (request.resource.data.course is string && request.resource.data.course.size() <= 160)) &&
+        (!('discipline' in request.resource.data) || (request.resource.data.discipline is string && request.resource.data.discipline.size() <= 160)) &&
+        (!('degree' in request.resource.data) || (request.resource.data.degree is string && request.resource.data.degree.size() <= 160)) &&
+        (!('classes' in request.resource.data) || (request.resource.data.classes is list && request.resource.data.classes.size() <= 50)) &&
         (!('period' in request.resource.data) || (request.resource.data.period is string && request.resource.data.period.size() <= 80)) &&
         (!('avatar' in request.resource.data) || (request.resource.data.avatar is string && request.resource.data.avatar.size() <= 250000)) &&
         (!('photoURL' in request.resource.data) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 250000)) &&
@@ -616,25 +622,38 @@ service cloud.firestore {
     //   - Aluno: NÃO PODE aprovar o próprio parecer. Pode apenas cancelar enquanto pendente.
     // Exclusão: Aluno, Professor ou Admin.
     // -------------------------------------------------------------
+    function isEndorsementProfessor(data) {
+      return (
+        ('profUid' in data && data.profUid == request.auth.uid) ||
+        ('targetTeacherId' in data && data.targetTeacherId == request.auth.uid) ||
+        ('profEmail' in data && data.profEmail is string && data.profEmail.size() > 0 && data.profEmail == request.auth.token.email)
+      );
+    }
+
     match /endorsement_requests/{requestId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||
         resource.data.studentId == request.auth.uid ||
-        resource.data.profEmail == request.auth.token.email
+        isEndorsementProfessor(resource.data)
       );
       
       allow create: if isAuthenticated() && (
         isAdmin() ||
         (
           request.resource.data.studentId == request.auth.uid &&
-          (!('status' in request.resource.data) || request.resource.data.status == 'Pendente')
+          (!('status' in request.resource.data) || request.resource.data.status == 'Pendente') &&
+          (
+            ('profUid' in request.resource.data && request.resource.data.profUid is string && request.resource.data.profUid.size() > 0) ||
+            ('targetTeacherId' in request.resource.data && request.resource.data.targetTeacherId is string && request.resource.data.targetTeacherId.size() > 0) ||
+            ('profEmail' in request.resource.data && request.resource.data.profEmail is string && request.resource.data.profEmail.size() > 0)
+          )
         )
       );
       
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (
-          resource.data.profEmail == request.auth.token.email &&
+          isEndorsementProfessor(resource.data) &&
           request.resource.data.studentId == resource.data.studentId
         ) ||
         (
@@ -648,7 +667,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (
         isAdmin() ||
         resource.data.studentId == request.auth.uid ||
-        resource.data.profEmail == request.auth.token.email
+        isEndorsementProfessor(resource.data)
       );
     }
 
