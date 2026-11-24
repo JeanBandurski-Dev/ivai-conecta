@@ -4,7 +4,7 @@
 **Data:** 04 de Setembro de 2026  
 --
 ---
-
+--
 ## 📌 Contexto e Escopo da Auditoria
 Auditoria técnica completa realizada na camada de backend, serviços e banco de dados do projeto **Ivaí Conecta**, abrangendo:
 - Regras de segurança e autorização: `firestore.rules` e `storage.rules`
