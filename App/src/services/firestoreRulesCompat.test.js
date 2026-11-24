@@ -79,6 +79,47 @@ describe('firestore.rules compatibility fixes', () => {
     unsub();
   });
 
+  it('ApplicationRepository falls back to direct Firestore create matching firestore.rules when Cloud Function is unavailable', async () => {
+    getDocMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        status: 'Ativa',
+        createdBy: 'company_uid_9',
+        company: 'MICROSOFT',
+        title: 'Desenvolvedor(a) Full Stack',
+        recruiterEmail: 'notszmb@gmail.com',
+      }),
+    });
+
+    const repo = new ApplicationRepository();
+    const created = await repo.createApplicationAtomically(
+      {
+        jobId: 'job_abc',
+        candidateUid: 'user_uid_1',
+        candidateName: 'Candidato Normal',
+        candidateRole: 'candidato',
+        candidateEmail: 'usuario@ifpr.edu.br',
+        company: 'MICROSOFT',
+        title: 'Desenvolvedor(a) Full Stack',
+        status: 'Candidatura Enviada',
+      },
+      'job_abc'
+    );
+
+    expect(created.id).toBe('job_abc_user_uid_1');
+    expect(docMock).toHaveBeenCalledWith({}, 'jobs', 'job_abc');
+    expect(setDocMock).toHaveBeenCalledTimes(1);
+    const [appRef, appPayload] = setDocMock.mock.calls[0];
+    expect(appRef).toEqual({ __collection: 'applications', id: 'job_abc_user_uid_1' });
+    expect(appPayload.candidateUid).toBe('user_uid_1');
+    expect(appPayload.candidateEmail).toBe('usuario@ifpr.edu.br');
+    expect(appPayload.recruiterUid).toBe('company_uid_9');
+    expect(appPayload.companyUid).toBe('company_uid_9');
+    expect(appPayload.recruiterEmail).toBe('notszmb@gmail.com');
+    expect(appPayload.jobId).toBe('job_abc');
+    expect(appPayload.firestoreJobId).toBe('job_abc');
+  });
+
   it('chatService creates UID-based chats using public_profiles and updates metadata via updateDoc', async () => {
     getDocMock.mockResolvedValue({
       exists: () => true,

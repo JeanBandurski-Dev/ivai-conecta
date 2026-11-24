@@ -1249,12 +1249,17 @@ export async function applyToJob(jobOrId, user) {
     newApp.firestoreId = created.firestoreId;
   } catch (err) {
     console.warn('[ApplicationRepository] Falha ao persistir candidatura:', err.message);
-    if (err?.code === 'already-exists') {
+    if (err?.code === 'already-exists' || String(err?.message || '').includes('já se candidatou')) {
       return { success: false, message: 'Você já se candidatou a esta vaga!' };
     }
+    const friendlyMessage = err?.code === 'permission-denied'
+      ? 'Permissão negada ao registrar candidatura. Verifique se sua conta está ativa e tente novamente.'
+      : (err?.message && !String(err.message).includes('createApplicationAtomically')
+          ? err.message
+          : 'Não foi possível confirmar sua candidatura. Tente novamente.');
     return {
       success: false,
-      message: 'Não foi possível confirmar sua candidatura. Tente novamente.',
+      message: friendlyMessage,
       error: err?.code || 'persistence-error'
     };
   }

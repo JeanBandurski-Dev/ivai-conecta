@@ -4,12 +4,16 @@
  */
 
 import {
+  doc,
+  getDoc,
+  setDoc,
   where,
   query,
   getDocs,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase.js';
+import { auth, db, functions } from '../lib/firebase.js';
 import { BaseRepository, handleFirestoreError } from './BaseRepository.js';
 import {
   normalizeApplicationDTO,
@@ -17,6 +21,52 @@ import {
   validateStageTransitionDTO,
 } from '../models/ApplicationDTO.js';
 import { ApplicationStage, ApplicationStatus } from '../models/enums.js';
+
+const ALLOWED_APPLICATION_CREATE_KEYS = new Set([
+  'id', 'firestoreId', 'jobId', 'firestoreJobId', 'originalJobId',
+  'companyUid', 'company', 'companyLogo', 'recruiterEmail', 'recruiterUid', 'recruiterPhone',
+  'candidateUid', 'candidateId', 'candidateName', 'candidateRole', 'candidateEmail',
+  'candidateAvatar', 'candidateCourse', 'candidateInstitution', 'candidateCity', 'candidatePhone',
+  'isVerifiedStudent', 'skills', 'title', 'city', 'type', 'appliedAt', 'appliedTimestamp',
+  'matchScore', 'status', 'stage', 'statusClass', 'currentStageIndex', 'nextStepNote', 'stages',
+  'createdAt', 'updatedAt', '_timestamp',
+]);
+
+const ALLOWED_INITIAL_STATUSES = new Set([
+  'Pendente',
+  'Enviada',
+  'Candidatura Enviada',
+  'Proposta PJ Enviada',
+  'Em Análise',
+  'Triagem de Currículo',
+]);
+
+function isCallableUnavailableError(err) {
+  const code = String(err?.code || '').toLowerCase();
+  const msg = String(err?.message || '').toLowerCase();
+  // Rejeições explícitas de regra de negócio NÃO devem acionar fallback
+  if (
+    code.includes('already-exists') ||
+    code.includes('failed-precondition') ||
+    code.includes('invalid-argument') ||
+    code.includes('permission-denied') ||
+    code.includes('unauthenticated')
+  ) {
+    return false;
+  }
+  return (
+    code.includes('not-found') ||
+    code.includes('unavailable') ||
+    code.includes('unimplemented') ||
+    code.includes('internal') ||
+    code.includes('unknown') ||
+    msg.includes('not found') ||
+    msg.includes('404') ||
+    msg.includes('cors') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('network')
+  );
+}
 
 export class ApplicationRepository extends BaseRepository {
   constructor() {
@@ -104,8 +154,89 @@ export class ApplicationRepository extends BaseRepository {
   }
 
   /**
+   * Fallback direto no Cloud Firestore compatível 100% com `firestore.rules`
+   * para ambientes sem Cloud Functions implantadas (ex.: plano Spark).
+   * @param {Object} normalized
+   * @param {string} jobDocId
+   * @returns {Promise<Object>}
+   */
+  async _createApplicationDirectInFirestore(normalized, jobDocId) {
+    const cleanJobId = String(jobDocId || '').trim();
+    const authUid = String(auth?.currentUser?.uid || normalized.candidateUid || '').trim();
+    const authEmail = String(auth?.currentUser?.email || normalized.candidateEmail || '').trim();
+
+    if (!authUid || !authEmail) {
+      throw new Error('Sua sessão expirou. Faça login novamente para concluir a candidatura.');
+    }
+
+    // 1. Lê o documento oficial da vaga para garantir correspondência exata com `applicationDataMatchesJob`
+    const jobSnap = await getDoc(doc(db, 'jobs', cleanJobId));
+    if (!jobSnap.exists()) {
+      throw new Error('Esta vaga não foi encontrada ou não está mais disponível.');
+    }
+    const jobData = jobSnap.data() || {};
+    if (jobData.status && jobData.status !== 'Ativa') {
+      throw new Error('Esta vaga não está mais ativa para novas candidaturas.');
+    }
+
+    // 2. Evita duplicidade consultando candidaturas do próprio usuário
+    try {
+      const alreadyApplied = await this.hasApplied(cleanJobId, authUid, authEmail);
+      if (alreadyApplied) {
+        const dupErr = new Error('Você já se candidatou a esta vaga!');
+        dupErr.code = 'already-exists';
+        throw dupErr;
+      }
+    } catch (dupCheckErr) {
+      if (dupCheckErr?.code === 'already-exists') throw dupCheckErr;
+    }
+
+    const appId = `${cleanJobId}_${authUid}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const canonicalOwnerUid = String(jobData.createdBy || normalized.recruiterUid || normalized.companyUid || '').trim();
+    const canonicalRecruiterEmail = Object.prototype.hasOwnProperty.call(jobData, 'recruiterEmail')
+      ? jobData.recruiterEmail
+      : (normalized.recruiterEmail || '');
+    const initialStatus = ALLOWED_INITIAL_STATUSES.has(normalized.status)
+      ? normalized.status
+      : 'Candidatura Enviada';
+
+    const merged = {
+      ...normalized,
+      id: appId,
+      firestoreId: appId,
+      jobId: cleanJobId,
+      firestoreJobId: cleanJobId,
+      originalJobId: cleanJobId,
+      companyUid: canonicalOwnerUid,
+      recruiterUid: canonicalOwnerUid,
+      company: String(jobData.company || normalized.company || '').trim(),
+      title: String(jobData.title || normalized.title || '').trim(),
+      recruiterEmail: canonicalRecruiterEmail,
+      candidateUid: authUid,
+      candidateId: authUid,
+      candidateEmail: authEmail,
+      status: initialStatus,
+      createdAt: normalized.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      _timestamp: serverTimestamp(),
+    };
+
+    // Mantém estritamente os campos autorizados em firestore.rules
+    const safePayload = {};
+    for (const [key, value] of Object.entries(merged)) {
+      if (ALLOWED_APPLICATION_CREATE_KEYS.has(key) && value !== undefined) {
+        safePayload[key] = value;
+      }
+    }
+
+    await setDoc(doc(db, 'applications', appId), safePayload);
+    return normalizeApplicationDTO({ ...safePayload, id: appId, firestoreId: appId });
+  }
+
+  /**
    * Cria a candidatura e atualiza o contador da vaga em uma unica transacao.
-   * O ID deterministico impede candidaturas simultaneas duplicadas.
+   * Tenta a Cloud Function `createJobApplication` primeiro e faz fallback direto no Firestore
+   * (respeitando integralmente `firestore.rules`) caso Cloud Functions não estejam implantadas.
    * @param {Object} rawData
    * @param {string} jobDocId
    * @returns {Promise<Object>}
@@ -127,10 +258,23 @@ export class ApplicationRepository extends BaseRepository {
           originalJobId: String(jobDocId),
         },
       });
-      const data = result.data || {};
+      const data = result?.data || {};
+      if (!data.id) {
+        throw Object.assign(new Error('Callable createJobApplication indisponível'), { code: 'functions/not-found' });
+      }
       return normalizeApplicationDTO({ ...normalized, id: data.id, firestoreId: data.id });
     } catch (err) {
       if (err?.code === 'already-exists') throw err;
+
+      if (isCallableUnavailableError(err)) {
+        try {
+          return await this._createApplicationDirectInFirestore(normalized, jobDocId);
+        } catch (directErr) {
+          if (directErr?.code === 'already-exists') throw directErr;
+          throw handleFirestoreError(directErr, 'createApplicationAtomically(direct)', this.collectionName);
+        }
+      }
+
       throw handleFirestoreError(err, 'createApplicationAtomically', this.collectionName);
     }
   }
