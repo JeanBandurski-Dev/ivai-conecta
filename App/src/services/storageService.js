@@ -5,6 +5,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { updateAuthUser } from './authService.js';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
+let _storageBucketUnavailable = false;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
@@ -220,23 +221,35 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
   let finalUrl = null;
   let storageMode = 'cloud';
 
-  try {
-    const storageRef = ref(storage, filePath);
-    const metadata = {
-      contentType: file.type || (fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg'),
-      customMetadata: {
-        kind: normalizedKind,
-        uploadedBy: cleanUid,
-        uploadedAt: new Date().toISOString(),
-      },
-    };
+  if (!_storageBucketUnavailable) {
+    try {
+      const storageRef = ref(storage, filePath);
+      const metadata = {
+        contentType: file.type || (fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg'),
+        customMetadata: {
+          kind: normalizedKind,
+          uploadedBy: cleanUid,
+          uploadedAt: new Date().toISOString(),
+        },
+      };
 
-    const downloadUrl = await uploadToStorage(storageRef, file, metadata, 12 * 1000);
-    if (typeof downloadUrl === 'string' && /^https?:\/\//i.test(downloadUrl)) {
-      finalUrl = downloadUrl;
+      const downloadUrl = await uploadToStorage(storageRef, file, metadata, 12 * 1000);
+      if (typeof downloadUrl === 'string' && /^https?:\/\//i.test(downloadUrl)) {
+        finalUrl = downloadUrl;
+      }
+    } catch (cloudError) {
+      const errCode = String(cloudError?.code || '').toLowerCase();
+      const errMsg = String(cloudError?.message || '').toLowerCase();
+      if (
+        errCode === 'storage/bucket-not-found' ||
+        errCode === 'storage/project-not-found' ||
+        errMsg.includes('not found') ||
+        errMsg.includes('404')
+      ) {
+        _storageBucketUnavailable = true;
+      }
+      console.warn(`[Firebase Storage] Upload de ${normalizedKind} indisponível, ativando compressão resiliente:`, cloudError?.message || cloudError?.code);
     }
-  } catch (cloudError) {
-    console.warn(`[Firebase Storage] Upload de ${normalizedKind} indisponível, ativando compressão resiliente:`, cloudError?.message || cloudError?.code);
   }
 
   if (!finalUrl) {

@@ -242,32 +242,7 @@ function buildDefaultProfileForFirebaseUser(fbUser, preferredRole = null) {
 async function ensureUserProfile(fbUser, preferredRole = null) {
   const profile = buildDefaultProfileForFirebaseUser(fbUser, preferredRole);
   await setDoc(doc(db, 'users', fbUser.uid), profile, { merge: true });
-  await setDoc(doc(db, 'public_profiles', fbUser.uid), {
-    uid: fbUser.uid,
-    name: String(profile.name || profile.displayName || '').slice(0, 120),
-    city: String(profile.city || '').slice(0, 100),
-    razaoSocial: String(profile.razaoSocial || '').slice(0, 120),
-    nomeFantasia: String(profile.nomeFantasia || '').slice(0, 120),
-    sector: String(profile.sector || '').slice(0, 160),
-    about: String(profile.about || '').slice(0, 1000),
-    isVerifiedCompany: Boolean(profile.isVerifiedCompany),
-    companyVerificationStatus: String(profile.companyVerificationStatus || '').slice(0, 30),
-    institution: String(profile.institution || '').slice(0, 160),
-    course: String(profile.course || '').slice(0, 160),
-    period: String(profile.period || '').slice(0, 80),
-    avatar: String(profile.avatar || profile.photoURL || '').slice(0, 2048),
-    photoURL: String(profile.photoURL || profile.avatar || '').slice(0, 2048),
-    skills: Array.isArray(profile.skills) ? profile.skills.slice(0, 100) : [],
-    experiences: Array.isArray(profile.experiences) ? profile.experiences.slice(0, 100) : [],
-    projects: Array.isArray(profile.projects) ? profile.projects.slice(0, 100) : [],
-    education: Array.isArray(profile.education) ? profile.education.slice(0, 100) : [],
-    bio: String(profile.bio || '').slice(0, 1000),
-    endorsements: Array.isArray(profile.endorsements) ? profile.endorsements.slice(0, 100) : [],
-    endorsementCount: Number(profile.endorsementCount || 0) || 0,
-    isVerifiedStudent: Boolean(profile.isVerifiedStudent),
-    role: String(profile.role || '').slice(0, 30),
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  await syncPublicProfileSafe(fbUser.uid, profile);
   return profile;
 }
 
@@ -915,36 +890,11 @@ export async function register(data) {
       ...roleSpecific
     };
     await setDoc(doc(db, 'users', fbUser.uid), profileData);
-    await syncPublicCompanyProfile(fbUser.uid, profileData);
     seedFirestoreIfEmpty();
 
     // Sincroniza public_profiles para que os perfis públicos apareçam imediatamente
-    try {
-      if (['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(selectedRole)) {
-        await setDoc(doc(db, 'public_profiles', fbUser.uid), {
-          uid: fbUser.uid,
-          name: cleanName,
-          city: city || 'Ivaiporã',
-          institution: String(profileData.institution || '').slice(0, 160),
-          course: String(profileData.course || '').slice(0, 160),
-          period: String(profileData.period || '').slice(0, 80),
-          avatar: profileData.avatar || '',
-          photoURL: profileData.avatar || '',
-          skills: Array.isArray(profileData.skills) ? profileData.skills : [],
-          bio: String(profileData.bio || '').slice(0, 1000),
-          isVerifiedStudent: Boolean(profileData.isVerifiedStudent),
-          razaoSocial: String(profileData.razaoSocial || '').slice(0, 120),
-          nomeFantasia: String(profileData.nomeFantasia || '').slice(0, 120),
-          sector: String(profileData.sector || '').slice(0, 160),
-          about: String(profileData.about || '').slice(0, 1000),
-          isVerifiedCompany: Boolean(profileData.isVerifiedCompany),
-          companyVerificationStatus: String(profileData.companyVerificationStatus || '').slice(0, 30),
-          role: selectedRole,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
-    } catch (pubErr) {
-      console.warn('[register] Aviso ao criar public_profiles:', pubErr?.message);
+    if (['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(selectedRole)) {
+      await syncPublicProfileSafe(fbUser.uid, profileData);
     }
 
     const sessionUser = {
@@ -1063,6 +1013,11 @@ export async function loginWithGoogle() {
       }
     }
 
+    const resolvedGoogleAvatar =
+      ((profileRes.profile?.avatar && !isGenericPlaceholderAvatar(profileRes.profile.avatar)) ? profileRes.profile.avatar : '') ||
+      ((fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL)) ? fbUser.photoURL : '') ||
+      '';
+
     const sessionUser = {
       ...profileRes.profile,
       uid: fbUser.uid,
@@ -1075,9 +1030,7 @@ export async function loginWithGoogle() {
       activeRole: role,
       selectedRole: role,
       badge: roleMeta.badge,
-      avatar: (fbUser.photoURL && !isGenericPlaceholderAvatar(fbUser.photoURL))
-        ? fbUser.photoURL
-        : ((profileRes.profile?.avatar && !isGenericPlaceholderAvatar(profileRes.profile.avatar)) ? profileRes.profile.avatar : ''),
+      avatar: resolvedGoogleAvatar,
       isVerifiedStudent: profileRes.profile?.isVerifiedStudent ?? (role === 'aluno' ? isGoogleStudent : false),
       isVerifiedCompany: role === 'empresa'
         ? (profileRes.profile?.companyVerificationStatus === 'VALIDADA' && profileRes.profile?.isVerifiedCompany === true)
@@ -1094,8 +1047,7 @@ export async function loginWithGoogle() {
         degree: 'Docente / Pesquisador',
         discipline: 'Docência & Orientação Acadêmica',
         verified: true
-      } : {}),
-      ...profileRes.profile
+      } : {})
     };
 
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(sessionUser));
@@ -1160,30 +1112,14 @@ export async function completeUserProfile(uid, additionalData) {
     };
 
     await setDoc(doc(db, 'users', uid), payload, { merge: true });
-    await syncPublicCompanyProfile(uid, payload);
 
     if (['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(additionalData.role)) {
-      await setDoc(doc(db, 'public_profiles', uid), {
-        uid,
-        name: cleanName,
-        city: String(additionalData.city || 'Ivaiporã').slice(0, 100),
+      await syncPublicProfileSafe(uid, {
+        ...additionalData,
+        ...payload,
         avatar,
         photoURL: avatar,
-        institution: String(payload.institution || '').slice(0, 160),
-        course: String(additionalData.course || '').slice(0, 160),
-        period: String(additionalData.period || '').slice(0, 80),
-        skills: Array.isArray(additionalData.skills) ? additionalData.skills.slice(0, 100) : [],
-        bio: String(additionalData.bio || '').slice(0, 1000),
-        isVerifiedStudent: Boolean(payload.isVerifiedStudent),
-        razaoSocial: String(additionalData.razaoSocial || '').slice(0, 120),
-        nomeFantasia: String(additionalData.nomeFantasia || '').slice(0, 120),
-        sector: String(additionalData.sector || '').slice(0, 160),
-        about: String(additionalData.about || '').slice(0, 1000),
-        isVerifiedCompany: Boolean(payload.isVerifiedCompany),
-        companyVerificationStatus: String(payload.companyVerificationStatus || '').slice(0, 30),
-        role: additionalData.role,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
     }
 
     const updated = updateAuthUser({
@@ -1850,6 +1786,7 @@ export function watchAuthState(callback) {
           // ============================================================
 
           const userDocRef = doc(db, 'users', fbUser.uid);
+          let lastPublicSyncSignature = '';
 
           unsubscribeProfile = onSnapshot(
             userDocRef,
@@ -1951,6 +1888,17 @@ export function watchAuthState(callback) {
                   STORAGE_KEY_AUTH_USER,
                   JSON.stringify(updatedUser)
                 );
+
+                // Auto-sincroniza avatar/capa já existentes em users/{uid} com public_profiles/{uid}
+                const mediaSignature = `${updatedUser.avatar || ''}|${updatedUser.banner || ''}|${updatedUser.name || ''}|${updatedUser.role || ''}`;
+                if (
+                  mediaSignature !== lastPublicSyncSignature &&
+                  (updatedUser.avatar || updatedUser.banner) &&
+                  ['aluno', 'candidato', 'freelancer', 'professor', 'empresa'].includes(normalizeUserRole(updatedUser.role))
+                ) {
+                  lastPublicSyncSignature = mediaSignature;
+                  syncPublicProfileSafe(fbUser.uid, updatedUser).catch(() => {});
+                }
 
                 callback(updatedUser);
               } catch (snapshotError) {

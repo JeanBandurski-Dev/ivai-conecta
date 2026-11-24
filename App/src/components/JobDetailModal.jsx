@@ -13,6 +13,10 @@ import {
 import {
   getApplicationEligibility, isPjOrFreelanceJob, isInternshipJob
 } from '../services/jobsService';
+import { getCompanyLogoByRef } from '../services/companiesService';
+import SafeAvatar from './ui/SafeAvatar';
+
+const DEFAULT_DETAIL_COMPANY_LOGO = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150';
 
 export default function JobDetailModal({ job, onClose, matchScore }) {
   const { currentUser, showToast, startChatWith, favoriteJobs = [], toggleFavoriteJob } = useAppStore();
@@ -37,7 +41,12 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
   const jobId = job.id || job.firestoreId || '';
   const title = job.title || 'Oportunidade Profissional';
   const company = job.company || 'Empresa Regional';
-  const companyLogo = job.companyLogo;
+  const companyLogo = getCompanyLogoByRef({
+    companyUid: job.companyUid,
+    createdBy: job.createdBy,
+    companyName: company,
+    fallbackLogo: job.companyLogo,
+  });
   const city = job.city || 'Ivaiporã';
   const type = job.type || 'Tempo Integral';
 
@@ -303,10 +312,12 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
               className="shrink-0 group/logo"
               title={`Ver perfil da empresa ${company}`}
             >
-              <img
-                src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
-                alt={company}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 object-cover shadow-brand-md shrink-0 bg-white dark:bg-slate-800 group-hover/logo:scale-105 group-hover/logo:border-white/60 transition-all cursor-pointer"
+              <SafeAvatar
+                src={companyLogo}
+                name={company}
+                allowGenericPlaceholder
+                fallbackSrc={DEFAULT_DETAIL_COMPANY_LOGO}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/30 shadow-brand-md shrink-0 bg-white dark:bg-slate-800 group-hover/logo:scale-105 group-hover/logo:border-white/60 transition-all cursor-pointer"
               />
             </Link>
             <div className="pr-8">

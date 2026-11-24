@@ -7,13 +7,35 @@ import {
 } from 'lucide-react';
 import { getJobs, getCompanies, uploadUserProfilePicture, updateAuthUser, subscribeToJobs } from '../lib/ivaiConecta';
 import { getUserProfile, isProfileOwner, normalizeUserRole } from '../services/authService';
+import { db } from '../lib/firebase.js';
+import { doc, onSnapshot, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import JobCard from '../components/JobCard';
 import useAppStore from '../store/useAppStore';
 import PublishJobModal from '../components/PublishJobModal';
 import EditCompanyProfileModal from '../components/EditCompanyProfileModal';
+import SafeAvatar from '../components/ui/SafeAvatar';
 import { validateCompanyProfileForm } from '../utils/formValidation';
 
 const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600';
+const DEFAULT_COMPANY_LOGO = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250';
+
+async function syncCompanyLogoToActiveJobs(companyUid, logoUrl) {
+  if (!companyUid || !logoUrl) return;
+  try {
+    const jobsSnap = await getDocs(
+      query(collection(db, 'jobs'), where('createdBy', '==', String(companyUid)))
+    );
+    const updates = jobsSnap.docs.map((jobDoc) =>
+      updateDoc(doc(db, 'jobs', jobDoc.id), {
+        companyLogo: logoUrl,
+        updatedAt: new Date().toISOString(),
+      }).catch(() => {})
+    );
+    await Promise.all(updates);
+  } catch (err) {
+    console.warn('[PerfilEmpresa] Não foi possível sincronizar logo nas vagas:', err?.message);
+  }
+}
 
 const _BANNER_PRESETS = [
   { id: 'office', name: 'Corporativo Moderno', url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600' },
@@ -144,8 +166,12 @@ export default function PerfilEmpresa() {
     if (isOwnerByAuthOrId && currentUser) {
       const companyDisplayName = currentUser.razaoSocial || currentUser.nomeFantasia || currentUser.name || 'Empresa Cadastrada';
       const companyTradingName = currentUser.nomeFantasia || companyDisplayName;
+      const resolvedLogo = currentUser.avatar || currentUser.logo || currentUser.photoURL || '';
+      const resolvedBanner = currentUser.banner || currentUser.coverImage || DEFAULT_BANNER;
       setCompany(prev => ({
         ...prev,
+        uid: currentUser.uid || currentUser.id || prev.uid,
+        id: currentUser.uid || currentUser.id || prev.id,
         name:     companyDisplayName,
         tradingName: companyTradingName,
         city:     currentUser.city || 'Ivaiporã',
@@ -154,8 +180,8 @@ export default function PerfilEmpresa() {
         cnpj:     currentUser.cnpj || '',
         rating:   currentUser.rating || 5.0,
         reviews:  currentUser.reviewsCount || 0,
-        logo:     currentUser.avatar || '',
-        banner:   currentUser.banner || DEFAULT_BANNER,
+        logo:     resolvedLogo,
+        banner:   resolvedBanner,
         website:  currentUser.website || '',
         phone:    currentUser.phone || currentUser.whatsapp || '',
         about:    currentUser.about || 'Informações institucionais da empresa cadastradas no Ivaí Conecta.',
@@ -174,8 +200,8 @@ export default function PerfilEmpresa() {
           city: currentUser.city || prev.city || 'Ivaiporã',
           industry: currentUser.sector || prev.industry || 'Comércio & Serviços',
           size: currentUser.size || prev.size || '1-10 funcionários',
-          avatar: currentUser.avatar || prev.avatar || '',
-          coverImage: currentUser.banner || prev.coverImage || DEFAULT_BANNER,
+          avatar: resolvedLogo || prev.avatar || '',
+          coverImage: resolvedBanner || prev.coverImage || DEFAULT_BANNER,
           website: currentUser.website || prev.website || '',
           email: currentUser.email || prev.email || '',
           phone: currentUser.phone || currentUser.whatsapp || prev.phone || '',
@@ -183,35 +209,61 @@ export default function PerfilEmpresa() {
           instagram: currentUser.instagram || prev.instagram || ''
         }));
       }
-    } else if (id) {
-      const decodedId = decodeURIComponent(id).toLowerCase().trim();
-      // Busca dados atualizados do perfil no Firestore
+      return;
+    }
+
+    if (id) {
+      let isMounted = true;
+      const cleanId = String(id).trim();
+      const decodedId = decodeURIComponent(cleanId).toLowerCase().trim();
+
+      const applyProfileData = (profile) => {
+        if (!isMounted || !profile) return;
+        const resolvedLogo = profile.avatar || profile.logo || profile.photoURL || '';
+        const resolvedBanner = profile.banner || profile.coverImage || '';
+        setCompany(prev => ({
+          ...prev,
+          uid: profile.uid || profile.id || prev.uid,
+          id: profile.uid || profile.id || prev.id,
+          blocked: profile.blocked || profile.status === 'blocked',
+          status: profile.status || (profile.blocked ? 'blocked' : 'active'),
+          blockedReason: profile.blockedReason || null,
+          name: profile.razaoSocial || profile.nomeFantasia || profile.name || prev.name,
+          city: profile.city || prev.city,
+          sector: profile.sector || prev.sector,
+          size: profile.size || prev.size,
+          cnpj: profile.cnpj || prev.cnpj,
+          rating: profile.rating || prev.rating,
+          reviews: profile.reviewsCount || profile.reviews || prev.reviews,
+          logo: resolvedLogo || prev.logo,
+          banner: resolvedBanner || prev.banner || DEFAULT_BANNER,
+          about: profile.about || profile.bio || prev.about,
+          history: profile.history || profile.culture || prev.history,
+          website: profile.website || prev.website,
+          phone: profile.phone || profile.whatsapp || prev.phone,
+          perks: Array.isArray(profile.perks) && profile.perks.length > 0 ? profile.perks : prev.perks,
+        }));
+      };
+
+      // 1. Escuta em tempo real em public_profiles/{id} para refletir logo/capa instantaneamente
+      let unsubPublic = () => {};
+      try {
+        unsubPublic = onSnapshot(doc(db, 'public_profiles', cleanId), (snap) => {
+          if (snap.exists()) {
+            applyProfileData({ uid: snap.id, id: snap.id, ...snap.data() });
+          }
+        }, () => {});
+      } catch {}
+
+      // 2. Busca complementar (suporta busca por nome/razão social e fallback local)
       if (typeof getUserProfile === 'function') {
-        getUserProfile(id).then(res => {
+        getUserProfile(cleanId).then(res => {
           if (res && res.success && res.profile) {
-            setCompany(prev => ({
-              ...prev,
-              uid: res.profile.uid || res.profile.id,
-              id: res.profile.uid || res.profile.id,
-              blocked: res.profile.blocked || res.profile.status === 'blocked',
-              status: res.profile.status || (res.profile.blocked ? 'blocked' : 'active'),
-              blockedReason: res.profile.blockedReason || null,
-              name: res.profile.razaoSocial || res.profile.nomeFantasia || res.profile.name || prev.name,
-              city: res.profile.city || prev.city,
-              sector: res.profile.sector || prev.sector,
-              size: res.profile.size || prev.size,
-              cnpj: res.profile.cnpj || prev.cnpj,
-              rating: res.profile.rating || prev.rating,
-              reviews: res.profile.reviewsCount || res.profile.reviews || prev.reviews,
-              logo: res.profile.avatar || prev.logo,
-              banner: res.profile.banner || prev.banner,
-              about: res.profile.about || prev.about,
-              website: res.profile.website || prev.website,
-              phone: res.profile.phone || res.profile.whatsapp || prev.phone,
-            }));
+            applyProfileData(res.profile);
           }
         }).catch(() => {});
       }
+
       const allCompanies = getCompanies('Todas as Cidades');
       const matchCompany = allCompanies.find(c =>
         (c.id && String(c.id).toLowerCase() === decodedId) ||
@@ -231,8 +283,8 @@ export default function PerfilEmpresa() {
           cnpj: matchCompany.cnpj || prev.cnpj,
           rating: matchCompany.rating || prev.rating,
           reviews: matchCompany.reviews || prev.reviews,
-          logo: matchCompany.logo || prev.logo,
-          banner: matchCompany.banner || prev.banner || DEFAULT_BANNER,
+          logo: matchCompany.logo || matchCompany.avatar || prev.logo,
+          banner: matchCompany.banner || matchCompany.coverImage || prev.banner || DEFAULT_BANNER,
           website: matchCompany.website || prev.website || '',
           phone: matchCompany.phone || matchCompany.whatsapp || prev.phone || '',
           about: matchCompany.about || prev.about,
@@ -252,11 +304,16 @@ export default function PerfilEmpresa() {
             uid: matchJob.companyUid || matchJob.createdBy,
             name: matchJob.company || prev.name,
             city: matchJob.city || prev.city,
-            logo: matchJob.companyLogo || prev.logo,
+            logo: prev.logo || matchJob.companyLogo || '',
             banner: prev.banner || DEFAULT_BANNER,
           }));
         }
       }
+
+      return () => {
+        isMounted = false;
+        unsubPublic();
+      };
     }
   }, [currentUser, id]);
 
@@ -300,14 +357,16 @@ export default function PerfilEmpresa() {
     setUploadingLogo(true);
     showToast('Enviando logotipo...');
     try {
-      const res = await uploadUserProfilePicture(file, currentUser?.uid || currentUser?.id, 'avatar');
+      const companyUid = currentUser?.uid || currentUser?.id;
+      const res = await uploadUserProfilePicture(file, companyUid, 'avatar');
       if (res.success && res.url) {
         setCompany(c => ({ ...c, logo: res.url }));
         setEditCompanyData(d => ({ ...d, avatar: res.url }));
         if (currentUser) {
-          const updated = { ...currentUser, avatar: res.url };
+          const updated = { ...currentUser, avatar: res.url, photoURL: res.url };
           setCurrentUser(updated);
-          await updateAuthUser({ avatar: res.url }, updated);
+          await updateAuthUser({ avatar: res.url, photoURL: res.url }, updated);
+          syncCompanyLogoToActiveJobs(companyUid, res.url);
         }
         showToast('Logotipo atualizado com sucesso!', 'success');
       } else {
@@ -462,6 +521,9 @@ export default function PerfilEmpresa() {
       }));
 
       await updateAuthUser(payload);
+      if (editCompanyData.avatar) {
+        syncCompanyLogoToActiveJobs(currentUser?.uid || currentUser?.id, editCompanyData.avatar);
+      }
       if (currentUser) {
         setCurrentUser({
           ...currentUser,
@@ -486,6 +548,12 @@ export default function PerfilEmpresa() {
         <img
           src={company.banner || DEFAULT_BANNER}
           alt={`Capa de ${company.name}`}
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            if (e.currentTarget.src !== DEFAULT_BANNER) {
+              e.currentTarget.src = DEFAULT_BANNER;
+            }
+          }}
           className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 hover:scale-105"
         />
 
@@ -547,10 +615,12 @@ export default function PerfilEmpresa() {
               <div className="relative shrink-0 -mb-1 sm:-mb-2">
                 {/* Moldura da Foto com Borda e Overflow Perfeitos */}
                 <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-3xl overflow-hidden border-4 border-white/95 shadow-2xl bg-white group/avatar">
-                  <img
-                    src={company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=250'}
-                    alt={company.name}
-                    className={`w-full h-full object-cover transition-transform duration-300 ${
+                  <SafeAvatar
+                    src={company.logo}
+                    name={company.name}
+                    allowGenericPlaceholder
+                    fallbackSrc={DEFAULT_COMPANY_LOGO}
+                    className={`w-full h-full transition-transform duration-300 ${
                       uploadingLogo ? 'scale-105 filter blur-[1px]' : 'group-hover/avatar:scale-105'
                     }`}
                   />

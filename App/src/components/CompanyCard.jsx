@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { MapPin, ShieldCheck, Briefcase, Star, MessageSquare, ArrowRight } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
+import SafeAvatar from './ui/SafeAvatar';
+
+const DEFAULT_COMPANY_LOGO = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200';
 
 export default function CompanyCard({ company }) {
   const { currentUser, showToast, startChatWith } = useAppStore();
@@ -9,7 +12,7 @@ export default function CompanyCard({ company }) {
 
   const id = company.id || company.uid || encodeURIComponent(company.name);
   const name = company.name || 'Empresa Regional';
-  const logo = company.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200';
+  const logo = company.logo || company.avatar || company.photoURL || '';
   const city = company.city || 'Ivaiporã';
   const sector = company.sector || 'Comércio & Serviços';
   const isVerified = Boolean(company.isVerified || company.cnpj);
@@ -58,13 +61,12 @@ export default function CompanyCard({ company }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <img
+          <SafeAvatar
             src={logo}
-            alt={name}
-            className="w-12 h-12 rounded-2xl object-cover border border-gray-200 dark:border-slate-700 shadow-xs shrink-0 bg-white p-0.5"
-            onError={(e) => {
-              e.target.src = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=200';
-            }}
+            name={name}
+            allowGenericPlaceholder
+            fallbackSrc={DEFAULT_COMPANY_LOGO}
+            className="w-12 h-12 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs shrink-0 bg-white p-0.5"
           />
           <div className="min-w-0">
             <h3 className="font-bold text-gray-900 dark:text-white text-base leading-tight group-hover:text-primary-blue dark:group-hover:text-blue-400 transition-colors truncate">

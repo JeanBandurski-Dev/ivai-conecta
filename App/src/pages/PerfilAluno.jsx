@@ -17,7 +17,7 @@ import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import ResumePDFModal from '../components/ResumePDFModal';
 import EditProfileModal from '../components/EditProfileModal';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import SafeAvatar from '../components/ui/SafeAvatar';
 import useAppStore from '../store/useAppStore';
 import { isProfileOwner, normalizeUserRole } from '../services/authService';
 
@@ -261,29 +261,30 @@ export default function PerfilAluno() {
       if (!isMounted) return;
       if (docSnap.exists()) {
         const data = docSnap.data();
+        const ownerFallback = isOwnerProfile ? currentUser : null;
         const mergedTalent = {
           id: docSnap.id,
           firestoreId: docSnap.id,
-          name: data.name || data.displayName || (currentUser && String(currentUser.uid) === String(docSnap.id) ? currentUser.name : 'Estudante'),
-          course: data.course || (currentUser?.course) || 'Graduação / Ensino Técnico',
-          institution: data.institution || (currentUser?.institution) || 'IFPR Campus Ivaiporã',
-          period: data.period || (currentUser?.period) || 'Em andamento',
-          city: data.city || (currentUser?.city) || 'Ivaiporã',
-          avatar: data.avatar || data.photoURL || (currentUser?.avatar) || '',
-          banner: data.banner || data.coverImage || (currentUser?.banner) || '',
-          skills: Array.isArray(data.skills) ? data.skills : (currentUser?.skills || []),
-          isVerifiedStudent: (normalizeUserRole(data.role || currentUser?.role) === 'aluno') &&
+          name: data.name || data.displayName || ownerFallback?.name || 'Estudante',
+          course: data.course || ownerFallback?.course || 'Graduação / Ensino Técnico',
+          institution: data.institution || ownerFallback?.institution || 'IFPR Campus Ivaiporã',
+          period: data.period || ownerFallback?.period || 'Em andamento',
+          city: data.city || ownerFallback?.city || 'Ivaiporã',
+          avatar: data.avatar || data.photoURL || ownerFallback?.avatar || '',
+          banner: data.banner || data.coverImage || ownerFallback?.banner || '',
+          skills: Array.isArray(data.skills) ? data.skills : (ownerFallback?.skills || []),
+          isVerifiedStudent: (normalizeUserRole(data.role || ownerFallback?.role) === 'aluno') &&
             Boolean(data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO'),
-          studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (currentUser?.studentEmail || '')),
-          email: data.email || (currentUser?.email) || '',
-          raNumber: data.raNumber || (currentUser?.raNumber) || '',
-          linkedin: data.linkedin || (currentUser?.linkedin) || '',
-          github: data.github || (currentUser?.github) || '',
-          bio: data.bio || (currentUser?.bio) || '',
-          experiences: Array.isArray(data.experiences) ? data.experiences : (currentUser?.experiences || []),
-          projects: Array.isArray(data.projects) ? data.projects : (currentUser?.projects || []),
-          education: Array.isArray(data.education) ? data.education : (currentUser?.education || []),
-          endorsements: Array.isArray(data.endorsements) ? data.endorsements : (currentUser?.endorsements || [])
+          studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (ownerFallback?.studentEmail || '')),
+          email: data.email || ownerFallback?.email || '',
+          raNumber: data.raNumber || ownerFallback?.raNumber || '',
+          linkedin: data.linkedin || ownerFallback?.linkedin || '',
+          github: data.github || ownerFallback?.github || '',
+          bio: data.bio || ownerFallback?.bio || '',
+          experiences: Array.isArray(data.experiences) ? data.experiences : (ownerFallback?.experiences || []),
+          projects: Array.isArray(data.projects) ? data.projects : (ownerFallback?.projects || []),
+          education: Array.isArray(data.education) ? data.education : (ownerFallback?.education || []),
+          endorsements: Array.isArray(data.endorsements) ? data.endorsements : (ownerFallback?.endorsements || [])
         };
 
         setTalent(mergedTalent);
@@ -656,8 +657,6 @@ export default function PerfilAluno() {
     );
   }
 
-  const hasCustomAvatar = talent.avatar && !isGenericPlaceholderAvatar(talent.avatar);
-
   return (
     <>
       {/* Alerta de Perfil Não Verificado para o próprio aluno */}
@@ -684,6 +683,10 @@ export default function PerfilAluno() {
             <img
               src={talent.banner}
               alt={`Capa de ${talent.name}`}
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
               className="absolute inset-0 w-full h-full object-cover object-center"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-[#051944]/80 to-[#0A1128]/65" />
@@ -720,19 +723,12 @@ export default function PerfilAluno() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 max-w-full flex-1">
               <div className="relative group shrink-0">
-                {hasCustomAvatar ? (
-                  <img
-                    src={talent.avatar}
-                    alt={talent.name}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg bg-white dark:bg-slate-800"
-                  />
-                ) : (
-                  <div
-                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(talent.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
-                  >
-                    {(talent.name || 'A').slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <SafeAvatar
+                  src={talent.avatar || talent.photoURL}
+                  name={talent.name}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 shadow-brand-lg bg-white dark:bg-slate-800 shrink-0"
+                  fallbackClassName="font-extrabold text-2xl sm:text-3xl"
+                />
                 {isOwner && (
                   <label
                     className="absolute -bottom-2 -right-2 bg-primary-blue text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-blue-600 transition-all cursor-pointer flex items-center justify-center"

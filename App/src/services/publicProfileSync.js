@@ -153,6 +153,9 @@ export async function syncPublicProfileSafe(uid, sourceData = {}) {
   } catch (err) {
     // Fallback para compatibilidade caso firestore.rules no servidor ainda não tenha sido reimplantado
     if (err?.code === 'permission-denied' || String(err?.message || '').toLowerCase().includes('permission')) {
+      console.error(
+        '[publicProfileSync] Permissão negada em public_profiles/{uid}. Execute `firebase deploy --only firestore:rules` para habilitar avatar/capa comprimidos no servidor.'
+      );
       try {
         const legacyPayload = { ...payload };
         delete legacyPayload.banner;

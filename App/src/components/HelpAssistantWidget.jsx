@@ -314,7 +314,7 @@ export default function HelpAssistantWidget() {
         <section
           role="dialog"
           aria-label="Assistente de Ajuda Ivaí Conecta"
-          className="mb-3 w-[calc(100vw-2rem)] sm:w-[400px] h-[min(580px,calc(100vh-6.5rem))] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700/90 rounded-3xl shadow-brand-xl flex flex-col overflow-hidden animate-smooth-in"
+          className="mb-3 w-[calc(100vw-2rem)] sm:w-[400px] h-[min(540px,calc(100dvh-10.5rem))] sm:h-[min(560px,calc(100dvh-11rem))] max-h-[calc(100dvh-10.5rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700/90 rounded-3xl shadow-brand-xl flex flex-col overflow-hidden animate-smooth-in"
         >
           {/* Cabeçalho */}
           <header className="px-4 py-3.5 bg-gradient-to-r from-primary-dark via-slate-900 to-primary-blue text-white flex items-center justify-between gap-2 shrink-0">

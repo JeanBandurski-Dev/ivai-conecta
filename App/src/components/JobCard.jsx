@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import { calculateMatchScore, safeSkillsArray, isJobFavorited, UserRole } from '../lib/ivaiConecta';
 import { getUserApplications, isPjOrFreelanceJob, isInternshipJob } from '../services/jobsService';
+import { getCompanyLogoByRef } from '../services/companiesService';
+import SafeAvatar from './ui/SafeAvatar';
+
+const DEFAULT_JOB_COMPANY_LOGO = 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150';
 
 export default function JobCard({ job, matchScore, onSelect }) {
   const { currentUser, favoriteJobs = [], toggleFavoriteJob, showToast } = useAppStore();
@@ -12,7 +16,12 @@ export default function JobCard({ job, matchScore, onSelect }) {
   const id = job.id || job.firestoreId || '';
   const title = job.title || 'Vaga de Emprego';
   const company = job.company || 'Empresa Regional';
-  const companyLogo = job.companyLogo;
+  const companyLogo = getCompanyLogoByRef({
+    companyUid: job.companyUid,
+    createdBy: job.createdBy,
+    companyName: company,
+    fallbackLogo: job.companyLogo,
+  });
   const city = job.city || 'Ivaiporã';
   const type = job.type || 'Tempo Integral';
 
@@ -110,10 +119,12 @@ export default function JobCard({ job, matchScore, onSelect }) {
               className="shrink-0 group/logo"
               title={`Ver perfil da empresa ${company}`}
             >
-              <img
-                src={companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&q=80&w=150'}
-                alt={company}
-                className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800 shadow-2xs group-hover/logo:scale-105 group-hover/logo:border-primary-blue/50 transition-all cursor-pointer"
+              <SafeAvatar
+                src={companyLogo}
+                name={company}
+                allowGenericPlaceholder
+                fallbackSrc={DEFAULT_JOB_COMPANY_LOGO}
+                className="w-10 h-10 rounded-xl border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800 shadow-2xs group-hover/logo:scale-105 group-hover/logo:border-primary-blue/50 transition-all cursor-pointer"
               />
             </Link>
             <div className="min-w-0">

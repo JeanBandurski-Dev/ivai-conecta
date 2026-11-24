@@ -80,6 +80,11 @@ function getRoleBadge(role) {
 
 function UserAvatar({ src, name, className = 'w-9 h-9', isOnline = undefined }) {
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   const initials = (name || 'U')
     .split(' ')
     .filter(Boolean)
@@ -96,6 +101,7 @@ function UserAvatar({ src, name, className = 'w-9 h-9', isOnline = undefined }) 
         <img
           src={src}
           alt={name || 'Usuário'}
+          referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
           className={`${className} rounded-full object-cover border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800`}
         />

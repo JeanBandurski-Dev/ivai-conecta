@@ -15,7 +15,7 @@ import { db } from '../lib/firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
 import TalentCard from '../components/TalentCard';
 import EditTeacherProfileModal from '../components/EditTeacherProfileModal';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import SafeAvatar from '../components/ui/SafeAvatar';
 import useAppStore from '../store/useAppStore';
 import { isProfileOwner } from '../services/authService';
 
@@ -312,6 +312,10 @@ export default function PerfilProfessor() {
             <img
               src={teacher.banner}
               alt={`Capa de ${teacher.name}`}
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
               className="absolute inset-0 w-full h-full object-cover object-center"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-[#051944]/80 to-[#0A1128]/65" />
@@ -347,19 +351,12 @@ export default function PerfilProfessor() {
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-5 sm:gap-6 min-w-0 flex-1 max-w-full">
               <div className="relative group shrink-0">
-                {teacher.avatar && !isGenericPlaceholderAvatar(teacher.avatar) ? (
-                  <img
-                    src={teacher.avatar}
-                    alt={teacher.name}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 object-cover shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
-                  />
-                ) : (
-                  <div
-                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 bg-gradient-to-tr ${getAvatarGradient(teacher.name)} text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-brand-lg shrink-0`}
-                  >
-                    {(teacher.name || 'P').slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <SafeAvatar
+                  src={teacher.avatar || teacher.photoURL}
+                  name={teacher.name}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-white/30 shadow-brand-lg shrink-0 bg-white dark:bg-slate-800"
+                  fallbackClassName="font-extrabold text-2xl sm:text-3xl"
+                />
                 {isOwner && (
                   <label
                     className="absolute -bottom-2 -right-2 bg-primary-blue text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-blue-600 transition-all cursor-pointer flex items-center justify-center"

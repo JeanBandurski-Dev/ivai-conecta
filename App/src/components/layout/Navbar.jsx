@@ -5,8 +5,9 @@ import {
   Building2, Menu, X, Sun, Moon, MessageSquare, Bookmark, ShieldAlert, FileText
 } from 'lucide-react';
 import Logo from '../ui/Logo';
+import SafeAvatar from '../ui/SafeAvatar';
 import useAppStore from '../../store/useAppStore';
-import { subscribeToUnreadCount, isGenericPlaceholderAvatar, getAvatarGradient } from '../../services/chatService';
+import { subscribeToUnreadCount } from '../../services/chatService';
 import { normalizeUserRole } from '../../services/authService';
 
 export default function Navbar() {
@@ -181,13 +182,13 @@ export default function Navbar() {
                     aria-label="Menu da conta de usuário"
                   >
                     <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-light dark:bg-blue-900/50 flex items-center justify-center border border-primary-blue/20 shrink-0">
-                      {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
-                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold text-xs flex items-center justify-center`}>
-                          {(currentUser.name || 'U').charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <SafeAvatar
+                        src={currentUser.avatar || currentUser.photoURL}
+                        name={currentUser.name}
+                        className="w-full h-full rounded-full"
+                        fallbackClassName="font-bold text-xs"
+                        initialsLength={1}
+                      />
                     </div>
                     <span className="text-sm font-semibold text-gray-700 dark:text-slate-200 max-w-[120px] truncate">
                       {currentUser.name.split(' ')[0]}
@@ -201,13 +202,13 @@ export default function Navbar() {
                       className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-brand-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                          {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
-                            <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold flex items-center justify-center`}>
-                              {(currentUser.name || 'U').charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <SafeAvatar
+                            src={currentUser.avatar || currentUser.photoURL}
+                            name={currentUser.name}
+                            className="w-full h-full rounded-full"
+                            fallbackClassName="font-bold text-sm"
+                            initialsLength={1}
+                          />
                         </div>
                         <div className="overflow-hidden min-w-0 flex-1">
                           <div className="font-semibold text-sm text-gray-800 dark:text-white truncate">{currentUser.name}</div>
@@ -365,13 +366,13 @@ export default function Navbar() {
                   <div className="border-t border-gray-100 dark:border-slate-800 my-2.5" />
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl mb-2">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-light dark:bg-blue-950 border border-primary-blue/30 shrink-0">
-                      {currentUser.avatar && !isGenericPlaceholderAvatar(currentUser.avatar) ? (
-                        <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className={`w-full h-full bg-gradient-to-tr ${getAvatarGradient(currentUser.name)} text-white font-bold flex items-center justify-center`}>
-                          {(currentUser.name || 'U').charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <SafeAvatar
+                        src={currentUser.avatar || currentUser.photoURL}
+                        name={currentUser.name}
+                        className="w-full h-full rounded-full"
+                        fallbackClassName="font-bold text-sm"
+                        initialsLength={1}
+                      />
                     </div>
                     <div className="overflow-hidden min-w-0 flex-1">
                       <div className="font-semibold text-base text-gray-800 dark:text-white truncate">{currentUser.name}</div>

@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { CheckCircle, Bookmark, MessageSquare, Sparkles } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { isTalentFavorited } from '../lib/ivaiConecta';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import { isGenericPlaceholderAvatar } from '../services/chatService';
+import SafeAvatar from './ui/SafeAvatar';
 
 export default function TalentCard({ talent, isHighlighted = false }) {
   const { favoriteTalents = [], toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
@@ -39,19 +40,12 @@ export default function TalentCard({ talent, isHighlighted = false }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          {avatar && !isGenericPlaceholderAvatar(avatar) ? (
-            <img
-              src={avatar}
-              alt={name}
-              className="w-11 h-11 rounded-full object-cover border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
-            />
-          ) : (
-            <div
-              className={`w-11 h-11 rounded-full bg-gradient-to-tr ${getAvatarGradient(name)} text-white font-bold text-xs flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}
-            >
-              {(name || 'T').slice(0, 2).toUpperCase()}
-            </div>
-          )}
+          <SafeAvatar
+            src={avatar}
+            name={name}
+            className="w-11 h-11 rounded-full border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
+            fallbackClassName="font-bold text-xs border border-white/20 shadow-xs"
+          />
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight truncate">{name}</h3>
             <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 mt-0.5 truncate">{course || 'Perfil em formação'}</div>

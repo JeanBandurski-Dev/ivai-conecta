@@ -84,7 +84,7 @@ export function getCompanies(city = 'Todas as Cidades') {
       recruiterEmail: u.recruiterEmail || u.email || '',
       city: u.city || 'Ivaiporã',
       sector: u.sector || 'Comércio & Serviços',
-      logo: u.avatar || u.logo || '',
+      logo: u.avatar || u.logo || u.photoURL || '',
       banner: u.banner || u.coverImage || '',
       about: u.about || 'Empresa atuante no Vale do Ivaí.',
       cnpj: u.cnpj || '',
@@ -173,6 +173,47 @@ export function getCompanies(city = 'Todas as Cidades') {
     matchCity(c.city, city) ||
     (c.activeJobs && c.activeJobs.some(j => matchCity(j.city, city)))
   );
+}
+
+export function getCompanyLogoByRef({ uid, companyUid, createdBy, companyName, fallbackLogo = '' } = {}) {
+  const targetIds = [uid, companyUid, createdBy].filter(Boolean).map(v => String(v).trim().toLowerCase());
+  const cleanName = String(companyName || '').trim().toLowerCase();
+
+  const authUser = getAuthUser();
+  if (authUser && isCompanyUser(authUser)) {
+    const authIds = [authUser.uid, authUser.id].filter(Boolean).map(v => String(v).trim().toLowerCase());
+    const authNames = [authUser.razaoSocial, authUser.nomeFantasia, authUser.name]
+      .filter(Boolean)
+      .map(v => String(v).trim().toLowerCase());
+    const matchesAuth =
+      (targetIds.length > 0 && targetIds.some(id => authIds.includes(id))) ||
+      (cleanName && authNames.includes(cleanName));
+    if (matchesAuth) {
+      const authLogo = authUser.avatar || authUser.logo || authUser.photoURL || '';
+      if (authLogo) return authLogo;
+    }
+  }
+
+  const sources = _memPublicCompanyUsers.length > 0
+    ? _memPublicCompanyUsers
+    : (Array.isArray(_memCompanyUsers) ? _memCompanyUsers : getUsersDB().filter(isCompanyUser));
+
+  for (const u of sources) {
+    if (!u) continue;
+    const uIds = [u.uid, u.id].filter(Boolean).map(v => String(v).trim().toLowerCase());
+    const uNames = [u.razaoSocial, u.nomeFantasia, u.name]
+      .filter(Boolean)
+      .map(v => String(v).trim().toLowerCase());
+    const matched =
+      (targetIds.length > 0 && targetIds.some(id => uIds.includes(id))) ||
+      (cleanName && uNames.includes(cleanName));
+    if (matched) {
+      const liveLogo = u.avatar || u.logo || u.photoURL || '';
+      if (liveLogo) return liveLogo;
+    }
+  }
+
+  return fallbackLogo || '';
 }
 
 export function getRegisteredCompaniesCount() {

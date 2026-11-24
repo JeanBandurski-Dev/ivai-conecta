@@ -9,7 +9,7 @@ import {
 } from '../lib/ivaiConecta';
 import TalentCard from '../components/TalentCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import SafeAvatar from '../components/ui/SafeAvatar';
 import useAppStore from '../store/useAppStore';
 
 const AREAS = [
@@ -346,7 +346,12 @@ export default function BancoDeTalentos() {
                   <div key={t.id} className="card p-6 space-y-4 hover:border-primary-blue/40 transition-all flex flex-col justify-between min-w-0 overflow-hidden">
                     <div className="space-y-3">
                       <div className="flex items-start gap-4 min-w-0">
-                        <img src={t.avatar} alt={t.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white dark:bg-slate-800" />
+                        <SafeAvatar
+                          src={t.avatar || t.photoURL}
+                          name={t.name}
+                          className="w-14 h-14 rounded-2xl border-2 border-primary-blue/30 shadow-xs shrink-0 bg-white dark:bg-slate-800"
+                          fallbackClassName="font-bold text-base"
+                        />
                         <div className="min-w-0 flex-1">
                           <h3 className="font-heading font-bold text-lg text-primary-dark dark:text-white leading-snug truncate">{t.name}</h3>
                           <div className="text-xs font-semibold text-primary-blue dark:text-blue-400 mt-0.5 truncate">{t.degree || 'Docente / Orientador'}</div>
@@ -563,13 +568,12 @@ export default function BancoDeTalentos() {
                 getTeacherEndorsedStudents(selectedTeacherForEndorsements.email).map(student => (
                   <div key={student.id} className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
-                      {student.avatar && !isGenericPlaceholderAvatar(student.avatar) ? (
-                        <img src={student.avatar} alt={student.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 bg-white" />
-                      ) : (
-                        <div className={`w-12 h-12 rounded-full bg-gradient-to-tr ${getAvatarGradient(student.name)} text-white font-bold text-sm flex items-center justify-center shrink-0 border border-white/20 shadow-xs`}>
-                          {(student.name || 'A').slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                      <SafeAvatar
+                        src={student.avatar || student.photoURL}
+                        name={student.name}
+                        className="w-12 h-12 rounded-full border border-gray-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800"
+                        fallbackClassName="font-bold text-sm border border-white/20 shadow-xs"
+                      />
                       <div>
                         <div className="font-bold text-gray-800 dark:text-white text-base">{student.name}</div>
                         <div className="text-xs text-primary-blue dark:text-blue-400 font-semibold">{student.course} ({student.institution})</div>

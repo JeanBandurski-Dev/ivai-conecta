@@ -5,7 +5,7 @@ import {
   User, ExternalLink, AlertCircle, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { validateSkill } from '../lib/ivaiConecta';
-import { isGenericPlaceholderAvatar, getAvatarGradient } from '../services/chatService';
+import SafeAvatar from './ui/SafeAvatar';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
@@ -54,6 +54,16 @@ export default function EditProfileModal({
   const [activeTab, setActiveTab] = useState('general');
   const [skillInputError, setSkillInputError] = useState('');
   const [isCurrentlyWorking, setIsCurrentlyWorking] = useState(false);
+  const [avatarUrlInvalid, setAvatarUrlInvalid] = useState(false);
+  const [bannerUrlInvalid, setBannerUrlInvalid] = useState(false);
+
+  useEffect(() => {
+    setAvatarUrlInvalid(false);
+  }, [editData?.avatar]);
+
+  useEffect(() => {
+    setBannerUrlInvalid(false);
+  }, [editData?.banner]);
 
   // Fechamento pelo botão Escape
   useEffect(() => {
@@ -241,18 +251,22 @@ export default function EditProfileModal({
 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="relative group shrink-0">
-                    {editData.avatar && !isGenericPlaceholderAvatar(editData.avatar) ? (
+                    <SafeAvatar
+                      src={editData.avatar}
+                      name={editData.name}
+                      alt="Pré-visualização"
+                      className="w-20 h-20 rounded-2xl border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800"
+                      fallbackClassName="font-extrabold text-2xl"
+                    />
+                    {editData.avatar && /^https?:\/\//i.test(editData.avatar.trim()) && (
                       <img
-                        src={editData.avatar}
-                        alt="Pré-visualização"
-                        className="w-20 h-20 rounded-2xl object-cover border-2 border-primary-blue shadow-md bg-white dark:bg-slate-800"
+                        src={editData.avatar.trim()}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        onLoad={() => setAvatarUrlInvalid(false)}
+                        onError={() => setAvatarUrlInvalid(true)}
+                        className="hidden"
                       />
-                    ) : (
-                      <div
-                        className={`w-20 h-20 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(editData.name)} text-white font-extrabold text-2xl flex items-center justify-center border-2 border-primary-blue shadow-md`}
-                      >
-                        {(editData.name || 'U').slice(0, 2).toUpperCase()}
-                      </div>
                     )}
                     <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none">
                       <Camera size={18} />
@@ -274,8 +288,14 @@ export default function EditProfileModal({
                       value={editData.avatar || ''}
                       onChange={e => setEditData(d => ({ ...d, avatar: e.target.value }))}
                       placeholder="Ou cole a URL direta de uma imagem..."
-                      className="form-control text-xs"
+                      className={`form-control text-xs ${avatarUrlInvalid ? 'border-amber-500 focus:border-amber-500' : ''}`}
                     />
+                    {avatarUrlInvalid && (
+                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 m-0">
+                        <AlertCircle size={12} className="shrink-0" />
+                        Este link não carregou como imagem. Use "Escolher Foto do Computador" ou um link direto de imagem (.jpg, .png, .webp).
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -315,10 +335,13 @@ export default function EditProfileModal({
                 </div>
 
                 <div className="relative rounded-2xl overflow-hidden h-32 sm:h-36 border-2 border-dashed border-gray-300 dark:border-slate-700 group bg-[linear-gradient(135deg,#0A1128_0%,#051944_45%,#0052FF_100%)]">
-                  {editData.banner && (
+                  {editData.banner && !bannerUrlInvalid && (
                     <img
                       src={editData.banner}
                       alt="Pré-visualização da capa"
+                      referrerPolicy="no-referrer"
+                      onLoad={() => setBannerUrlInvalid(false)}
+                      onError={() => setBannerUrlInvalid(true)}
                       className="w-full h-full object-cover"
                     />
                   )}
