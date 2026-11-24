@@ -349,14 +349,16 @@ export async function incrementServiceContact(id) {
 }
 
 let _memServicesCache = null;
+let _memPublicReviewsCache = [];
 
 /**
- * Enriquece os dados de um serviço consolidando avaliações provenientes de ordens de serviço finalizadas
+ * Enriquece os dados de um serviço consolidando avaliações provenientes de ordens de serviço finalizadas e service_reviews
  */
-export function enrichServiceWithOrders(service, orders = []) {
+export function enrichServiceWithOrders(service, orders = [], publicReviews = _memPublicReviewsCache) {
   if (!service) return service;
   const ordersWithReviews = (orders || []).filter(o => o.status === 'avaliado' && o.review);
-  if (ordersWithReviews.length === 0) return service;
+  const pubList = Array.isArray(publicReviews) ? publicReviews : [];
+  if (ordersWithReviews.length === 0 && pubList.length === 0) return service;
 
   const sId = String(service.firestoreId || service.id || '').trim();
   const sProvUid = String(service.createdBy || service.providerUid || '').trim();
@@ -370,19 +372,39 @@ export function enrichServiceWithOrders(service, orders = []) {
     return false;
   });
 
-  if (matchingOrders.length === 0) return service;
+  const matchingPublicReviews = pubList.filter(r => {
+    if (!r || !r.comment) return false;
+    if (r.serviceId && sId && String(r.serviceId).trim() === sId) return true;
+    if (sProvUid && r.providerUid && String(r.providerUid).trim() === sProvUid && !r.serviceId) return true;
+    return false;
+  });
 
-  const orderReviews = matchingOrders.map(o => ({
-    orderId: String(o.id || o.firestoreId),
-    rating: Number(o.review.rating) || 5,
-    stars: Number(o.review.rating) || 5,
-    comment: o.review.comment,
-    author: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
-    client: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
-    avatar: o.review.avatar || '',
-    date: o.review.date || o.createdAt,
-    timestamp: o.review.timestamp || Date.now()
-  }));
+  if (matchingOrders.length === 0 && matchingPublicReviews.length === 0) return service;
+
+  const orderReviews = [
+    ...matchingOrders.map(o => ({
+      orderId: String(o.id || o.firestoreId),
+      rating: Number(o.review.rating) || 5,
+      stars: Number(o.review.rating) || 5,
+      comment: o.review.comment,
+      author: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+      client: o.review.author || o.clientName || 'Cliente Ivaí Conecta',
+      avatar: o.review.avatar || '',
+      date: o.review.date || o.createdAt,
+      timestamp: o.review.timestamp || Date.now()
+    })),
+    ...matchingPublicReviews.map(r => ({
+      orderId: String(r.orderId || r.id || ''),
+      rating: Number(r.rating || r.stars) || 5,
+      stars: Number(r.stars || r.rating) || 5,
+      comment: r.comment,
+      author: r.author || r.client || 'Cliente Ivaí Conecta',
+      client: r.client || r.author || 'Cliente Ivaí Conecta',
+      avatar: r.avatar || '',
+      date: r.date || '',
+      timestamp: typeof r.timestamp === 'number' ? r.timestamp : Date.now()
+    }))
+  ];
 
   const existingReviews = Array.isArray(service.reviews) ? service.reviews : [];
   const combined = [...existingReviews];
@@ -438,9 +460,17 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
   }
 
   try {
+    let unsubPublicReviews = () => {};
+    try {
+      unsubPublicReviews = onSnapshot(collection(db, 'service_reviews'), (snap) => {
+        _memPublicReviewsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        callback(getServices(city));
+      }, () => {});
+    } catch {}
+
     const unsub = serviceRepository.subscribeToServices((remoteServices) => {
       const orders = getServiceOrders();
-      const enriched = remoteServices.map(s => enrichServiceWithOrders(s, orders));
+      const enriched = remoteServices.map(s => enrichServiceWithOrders(s, orders, _memPublicReviewsCache));
       _memServicesCache = enriched;
       if (typeof localStorage !== 'undefined') {
         try {
@@ -462,6 +492,7 @@ export function subscribeToServices(city = 'Todas as Cidades', callback) {
 
     return () => {
       unsub();
+      if (typeof unsubPublicReviews === 'function') unsubPublicReviews();
       if (typeof window !== 'undefined') {
         window.removeEventListener('ivai:services-updated', handleCustomEvent);
         window.removeEventListener('ivai_service_orders_updated', handleOrdersUpdated);
@@ -499,10 +530,10 @@ export function getServices(city = 'Todas as Cidades') {
     }
   }
 
-  // Enriquece os serviços locais com avaliações de ordens finalizadas
+  // Enriquece os serviços locais com avaliações de ordens finalizadas e service_reviews públicas
   const orders = getServiceOrders();
-  if (orders.length > 0) {
-    services = services.map(s => enrichServiceWithOrders(s, orders));
+  if (orders.length > 0 || _memPublicReviewsCache.length > 0) {
+    services = services.map(s => enrichServiceWithOrders(s, orders, _memPublicReviewsCache));
   }
 
   services = services.filter(s =>
@@ -878,34 +909,211 @@ export async function submitServiceReview(orderId, {
   clientName,
   clientAvatar
 }) {
-  const submitReview = httpsCallable(functions, 'submitServiceReview');
-  const result = await submitReview({
-    orderId: String(orderId),
-    rating,
-    comment: String(comment || '').trim()
-  });
+  const docId = String(orderId || '').trim();
+  const cleanRating = Number(rating);
+  const cleanComment = String(comment || '').trim();
 
-  const reviewData = result.data?.review || {
-    orderId: String(orderId),
-    rating: Number(rating),
-    stars: Number(rating),
-    comment: String(comment || '').trim(),
-    author: clientName || 'Cliente Ivaí Conecta',
-    client: clientName || 'Cliente Ivaí Conecta',
-    avatar: clientAvatar || '',
-    date: new Date().toLocaleDateString('pt-BR'),
-    timestamp: Date.now()
-  };
+  if (!docId) {
+    throw new Error('Ordem de serviço inválida.');
+  }
+  if (!Number.isInteger(cleanRating) || cleanRating < 1 || cleanRating > 5) {
+    throw new Error('A nota deve ser um número inteiro entre 1 e 5.');
+  }
+  if (cleanComment.length < 15 || cleanComment.length > 500) {
+    throw new Error('O comentário deve ter entre 15 e 500 caracteres.');
+  }
 
-  // Atualiza cache local com review e prepara patch com identificadores para Firestore
   const currentOrders = getServiceOrders();
   const existingOrder = currentOrders.find(o => o.id === orderId || o.firestoreId === orderId);
+
+  let reviewData = null;
+  let handledByCallable = false;
+
+  // 1. Tenta via Cloud Function (quando implantada em projeto Blaze)
+  try {
+    const submitReview = httpsCallable(functions, 'submitServiceReview');
+    const result = await submitReview({
+      orderId: docId,
+      rating: cleanRating,
+      comment: cleanComment
+    });
+    if (result?.data?.review) {
+      reviewData = result.data.review;
+    }
+    handledByCallable = true;
+  } catch (callableErr) {
+    const errCode = String(callableErr?.code || '').toLowerCase();
+    // Erros explícitos de regra de negócio vindos da Cloud Function não devem cair em fallback
+    const businessRuleCodes = [
+      'functions/already-exists',
+      'already-exists',
+      'functions/permission-denied',
+      'permission-denied',
+      'functions/failed-precondition',
+      'failed-precondition',
+      'functions/invalid-argument',
+      'invalid-argument',
+      'functions/unauthenticated',
+      'unauthenticated'
+    ];
+    if (businessRuleCodes.includes(errCode)) {
+      throw callableErr;
+    }
+    console.warn('[submitServiceReview] Cloud Function indisponível, aplicando persistência direta no Firestore:', callableErr?.message || callableErr);
+  }
+
+  const authorName = String(clientName || existingOrder?.clientName || 'Cliente Ivaí Conecta').trim().slice(0, 120);
+  const safeAvatar = String(clientAvatar || '').trim().slice(0, 250000);
+  const nowDate = new Date().toLocaleDateString('pt-BR');
+  const nowIso = new Date().toISOString();
+
+  if (!reviewData) {
+    reviewData = {
+      orderId: docId,
+      rating: cleanRating,
+      stars: cleanRating,
+      comment: cleanComment,
+      author: authorName,
+      client: authorName,
+      avatar: safeAvatar,
+      date: nowDate,
+      timestamp: Date.now()
+    };
+  }
+
+  // 2. Fallback direto no Firestore (compatível com projetos Spark sem Cloud Functions implantadas)
+  if (!handledByCallable) {
+    const authUid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : '';
+    if (!authUid) {
+      throw new Error('Sessão expirada. Faça login novamente para enviar sua avaliação.');
+    }
+
+    const historyItem = {
+      status: 'avaliado',
+      date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+      note: `Cliente avaliou o atendimento com ${cleanRating} estrelas.`
+    };
+    const updatedHistory = [...(existingOrder?.history || []), historyItem];
+
+    let savedChats = false;
+    let savedOrderStatus = false;
+    let lastErr = null;
+
+    // 2a. Grava avaliação completa em 'chats/{orderId}.serviceOrder' (permitido por isAllowedChatUpdate em firestore.rules)
+    try {
+      await updateDoc(doc(db, 'chats', docId), {
+        'serviceOrder.review': reviewData,
+        'serviceOrder.rating': cleanRating,
+        'serviceOrder.status': 'avaliado',
+        'serviceOrder.history': updatedHistory,
+        'serviceOrder.updatedAt': nowIso,
+        updatedAt: nowIso
+      });
+      savedChats = true;
+    } catch {
+      try {
+        const cUid = String(existingOrder?.clientUid || existingOrder?.clientId || authUid).trim();
+        const pUid = String(existingOrder?.providerUid || existingOrder?.providerId || providerId || '').trim();
+        const cEmail = String(existingOrder?.clientEmail || auth?.currentUser?.email || '').toLowerCase().trim();
+        const pEmail = String(existingOrder?.providerEmail || providerEmail || '').toLowerCase().trim();
+        const participants = Array.from(new Set([cEmail, pEmail, cUid, pUid].filter(Boolean)));
+        const participantUids = Array.from(new Set([cUid, pUid].filter(Boolean)));
+
+        await setDoc(doc(db, 'chats', docId), {
+          isServiceOrder: true,
+          participants,
+          participantUids,
+          clientEmail: cEmail,
+          providerEmail: pEmail,
+          clientId: cUid,
+          clientUid: cUid,
+          providerId: pUid,
+          providerUid: pUid,
+          serviceOrder: {
+            ...existingOrder,
+            id: docId,
+            firestoreId: docId,
+            serviceId: String(existingOrder?.serviceId || serviceId || ''),
+            serviceTitle: String(existingOrder?.serviceTitle || serviceTitle || ''),
+            status: 'avaliado',
+            review: reviewData,
+            rating: cleanRating,
+            history: updatedHistory,
+            updatedAt: nowIso
+          },
+          updatedAt: nowIso
+        }, { merge: true });
+        savedChats = true;
+      } catch (chatErr) {
+        lastErr = chatErr;
+        console.warn('[Firestore chats] Aviso ao gravar avaliação:', chatErr?.message || chatErr);
+      }
+    }
+
+    // 2b. Atualiza status e histórico em 'service_orders/{orderId}' (e review/rating se as regras atualizadas estiverem publicadas)
+    try {
+      await updateDoc(doc(db, 'service_orders', docId), {
+        status: 'avaliado',
+        review: reviewData,
+        rating: cleanRating,
+        history: updatedHistory,
+        updatedAt: nowIso
+      });
+      savedOrderStatus = true;
+    } catch {
+      try {
+        await updateDoc(doc(db, 'service_orders', docId), {
+          status: 'avaliado',
+          history: updatedHistory,
+          updatedAt: nowIso
+        });
+        savedOrderStatus = true;
+      } catch (ordErr) {
+        if (!lastErr) lastErr = ordErr;
+        console.warn('[Firestore service_orders] Aviso ao atualizar status avaliado:', ordErr?.message || ordErr);
+      }
+    }
+
+    // 2c. Registra avaliação pública em 'service_reviews/{orderId}' quando permitido por firestore.rules (sem PII)
+    const resolvedServiceId = String(existingOrder?.serviceId || serviceId || '').trim();
+    const resolvedProviderUid = String(existingOrder?.providerUid || existingOrder?.providerId || providerId || '').trim();
+    if (resolvedServiceId) {
+      try {
+        const publicReviewDoc = {
+          orderId: docId,
+          serviceId: resolvedServiceId,
+          providerUid: resolvedProviderUid,
+          reviewerUid: authUid,
+          rating: cleanRating,
+          stars: cleanRating,
+          comment: cleanComment,
+          author: authorName,
+          client: authorName,
+          avatar: safeAvatar,
+          date: nowDate,
+          createdAt: nowIso,
+          timestamp: Date.now()
+        };
+        await setDoc(doc(db, 'service_reviews', docId), publicReviewDoc);
+        _memPublicReviewsCache = [
+          publicReviewDoc,
+          ..._memPublicReviewsCache.filter(r => r.orderId !== docId && r.id !== docId)
+        ];
+      } catch {
+        // Regras antigas em produção ainda bloqueiam escrita direta em service_reviews; chats e service_orders já garantem a avaliação
+      }
+    }
+
+    if (!savedChats && !savedOrderStatus) {
+      throw lastErr || new Error('Não foi possível salvar a avaliação no banco de dados.');
+    }
+  }
 
   const orderPatch = {
     review: reviewData,
     rating: reviewData.rating,
     status: 'avaliado',
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
     ...(existingOrder ? {
       clientId: existingOrder.clientId || existingOrder.clientUid,
       clientUid: existingOrder.clientUid || existingOrder.clientId,
@@ -920,7 +1128,7 @@ export async function submitServiceReview(orderId, {
   saveServiceOrders(updatedOrders);
   notifyOrdersUpdated(updatedOrders);
 
-  return { success: true };
+  return { success: true, review: reviewData };
 }
 
 export function subscribeToServiceOrders(user, callback) {
@@ -977,11 +1185,30 @@ export function subscribeToServiceOrders(user, callback) {
   const unsubs = [];
   let remoteAttachedUid = null;
 
+  const mergeOrderRecord = (prev, next) => {
+    if (!prev) return next;
+    return {
+      ...prev,
+      ...next,
+      review: next.review || prev.review || null,
+      rating: next.rating ?? prev.rating ?? (next.review?.rating ?? prev.review?.rating ?? null),
+      history: (Array.isArray(next.history) && next.history.length >= (prev.history?.length || 0))
+        ? next.history
+        : (prev.history || next.history || [])
+    };
+  };
+
   const mergeAndNotify = (newOrders) => {
     const local = getServiceOrders();
     const map = new Map();
-    local.forEach(o => map.set(o.firestoreId || o.id, o));
-    newOrders.forEach(o => map.set(o.firestoreId || o.id, o));
+    local.forEach(o => {
+      const k = o.firestoreId || o.id;
+      if (k) map.set(k, mergeOrderRecord(map.get(k), o));
+    });
+    newOrders.forEach(o => {
+      const k = o.firestoreId || o.id;
+      if (k) map.set(k, mergeOrderRecord(map.get(k), o));
+    });
 
     const merged = Array.from(map.values()).sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0));
     saveServiceOrders(merged);

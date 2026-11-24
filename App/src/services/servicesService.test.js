@@ -11,13 +11,14 @@ const docMock = vi.fn((_db, col, id) => ({ __collection: col, id }));
 const queryMock = vi.fn((colRef, ...constraints) => ({ __collection: colRef.__collection, constraints }));
 const whereMock = vi.fn((field, op, value) => ({ field, op, value }));
 
-const { authState } = vi.hoisted(() => ({
+const { authState, callableFnMock } = vi.hoisted(() => ({
   authState: {
     currentUser: {
       uid: 'freelancer_uid_1',
       email: 'freela@ivaiconecta.com.br',
     },
   },
+  callableFnMock: vi.fn(),
 }));
 let authChangeHandler = null;
 const onAuthStateChangedMock = vi.fn((_authObj, cb) => {
@@ -36,7 +37,7 @@ vi.mock('firebase/auth', () => ({
 }));
 
 vi.mock('firebase/functions', () => ({
-  httpsCallable: vi.fn(() => vi.fn()),
+  httpsCallable: vi.fn(() => (...args) => callableFnMock(...args)),
 }));
 
 vi.mock('firebase/firestore', () => ({
@@ -66,6 +67,7 @@ import {
   updateService,
   deleteService,
   createServiceOrder,
+  submitServiceReview,
   subscribeToServiceOrders,
 } from './servicesService.js';
 
@@ -76,6 +78,7 @@ describe('servicesService', () => {
     deleteMock.mockReset();
     setDocMock.mockReset();
     updateDocMock.mockReset();
+    callableFnMock.mockReset();
     onSnapshotMock.mockClear();
     collectionMock.mockClear();
     docMock.mockClear();
@@ -217,5 +220,56 @@ describe('servicesService', () => {
 
     authState.currentUser = prevUser;
     unsub();
+  });
+
+  it('falls back to Firestore chats and service_orders when submitServiceReview Cloud Function is not deployed', async () => {
+    const undeployedErr = new Error('INTERNAL');
+    undeployedErr.code = 'functions/internal';
+    callableFnMock.mockRejectedValue(undeployedErr);
+
+    // Simula regras antigas em produção rejeitando review/rating direto em service_orders, mas aceitando status/history
+    updateDocMock.mockImplementation(async (ref, payload) => {
+      if (ref.__collection === 'service_orders' && payload.review) {
+        throw new Error('permission-denied on review field');
+      }
+      return undefined;
+    });
+
+    const res = await submitServiceReview('ord_999', {
+      rating: 5,
+      comment: 'guilherme é muito bom no atendimento',
+      serviceId: 'srv_1',
+      providerId: 'prov_uid_2',
+      serviceTitle: 'Manutenção em Hardware',
+      clientName: 'Amigo Candidato',
+      clientAvatar: '',
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.review.rating).toBe(5);
+
+    const chatUpdate = updateDocMock.mock.calls.find(([ref]) => ref.__collection === 'chats' && ref.id === 'ord_999');
+    expect(chatUpdate).toBeTruthy();
+    expect(chatUpdate[1]['serviceOrder.status']).toBe('avaliado');
+    expect(chatUpdate[1]['serviceOrder.rating']).toBe(5);
+
+    const orderStatusFallback = updateDocMock.mock.calls.find(
+      ([ref, payload]) => ref.__collection === 'service_orders' && ref.id === 'ord_999' && !payload.review
+    );
+    expect(orderStatusFallback).toBeTruthy();
+    expect(orderStatusFallback[1].status).toBe('avaliado');
+  });
+
+  it('rethrows explicit business-rule errors from submitServiceReview callable', async () => {
+    const dupErr = new Error('Esta ordem já possui uma avaliação.');
+    dupErr.code = 'functions/already-exists';
+    callableFnMock.mockRejectedValue(dupErr);
+
+    await expect(
+      submitServiceReview('ord_999', {
+        rating: 5,
+        comment: 'guilherme é muito bom no atendimento',
+      })
+    ).rejects.toThrow('Esta ordem já possui uma avaliação.');
   });
 });

@@ -47,9 +47,15 @@ service cloud.firestore {
     //   - status: string (Pendente, Aprovado, Recusado; aluno não pode se auto-recomendar)
     //
     // Collection: service_orders/{orderId}
-    //   - clientUid: string (cliente solicitante)
-    //   - providerUid: string (prestador do serviço)
-    //   - status: string
+    //   - clientUid: string (cliente solicitante, imutável)
+    //   - providerUid: string (prestador do serviço, imutável)
+    //   - status: string (solicitado, aceito, recusado, em_andamento, concluido, avaliado)
+    //   - review, rating: avaliação única enviada pelo clientUid após conclusão (1 a 5 estrelas)
+    //
+    // Collection: service_reviews/{reviewId}
+    //   - orderId: string (igual a reviewId; 1 avaliação imutável por ordem concluída)
+    //   - serviceId, providerUid, reviewerUid: strings (sem PII)
+    //   - rating, stars: int (1 a 5), comment: string (15 a 500 chars)
     //
     // Collection: favorites/{favoriteId}
     //   - userUid: string (proprietário do favorito)
@@ -512,14 +518,70 @@ service cloud.firestore {
       );
     }
 
+    function isValidServiceReviewCreate(reviewId) {
+      let data = request.resource.data;
+      let orderPath = /databases/$(database)/documents/service_orders/$(reviewId);
+      return isAuthenticated() &&
+        !exists(/databases/$(database)/documents/service_reviews/$(reviewId)) &&
+        exists(orderPath) &&
+        (get(orderPath).data.clientUid == request.auth.uid || get(orderPath).data.clientId == request.auth.uid) &&
+        (!('providerUid' in get(orderPath).data) || get(orderPath).data.providerUid != request.auth.uid) &&
+        (!('providerId' in get(orderPath).data) || get(orderPath).data.providerId != request.auth.uid) &&
+        get(orderPath).data.status in ['concluido', 'concluído', 'avaliado'] &&
+        data.keys().hasOnly([
+          'orderId', 'serviceId', 'providerUid', 'reviewerUid',
+          'rating', 'stars', 'comment', 'author', 'client',
+          'avatar', 'date', 'createdAt', 'timestamp'
+        ]) &&
+        data.orderId == reviewId &&
+        data.reviewerUid == request.auth.uid &&
+        data.serviceId is string && data.serviceId.size() >= 1 && data.serviceId.size() <= 128 &&
+        data.serviceId == get(orderPath).data.serviceId &&
+        data.providerUid is string && data.providerUid.size() <= 128 &&
+        data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+        data.stars == data.rating &&
+        data.comment is string && data.comment.size() >= 15 && data.comment.size() <= 500 &&
+        data.author is string && data.author.size() >= 1 && data.author.size() <= 120 &&
+        data.client is string && data.client.size() >= 1 && data.client.size() <= 120 &&
+        (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 250000)) &&
+        data.date is string && data.date.size() >= 1 && data.date.size() <= 30 &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 40)) &&
+        (!('timestamp' in data) || data.timestamp is number || data.timestamp is timestamp);
+    }
+
+    function isValidServiceOrderReviewUpdate() {
+      let data = request.resource.data;
+      let prev = resource.data;
+      return (prev.clientUid == request.auth.uid || prev.clientId == request.auth.uid) &&
+        (!('providerUid' in prev) || prev.providerUid != request.auth.uid) &&
+        (!('providerId' in prev) || prev.providerId != request.auth.uid) &&
+        prev.status in ['concluido', 'concluído'] &&
+        (!('review' in prev) || prev.review == null) &&
+        (!('clientUid' in prev) || data.clientUid == prev.clientUid) &&
+        (!('providerUid' in prev) || data.providerUid == prev.providerUid) &&
+        data.diff(prev).affectedKeys().hasOnly(['status', 'review', 'rating', 'history', 'updatedAt']) &&
+        data.status == 'avaliado' &&
+        data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+        data.review is map &&
+        data.review.keys().hasOnly([
+          'orderId', 'rating', 'stars', 'comment', 'author', 'client', 'avatar', 'date', 'timestamp'
+        ]) &&
+        data.review.rating == data.rating &&
+        data.review.stars == data.rating &&
+        data.review.comment is string && data.review.comment.size() >= 15 && data.review.comment.size() <= 500 &&
+        data.review.author is string && data.review.author.size() >= 1 && data.review.author.size() <= 120 &&
+        (!('avatar' in data.review) || (data.review.avatar is string && data.review.avatar.size() <= 250000));
+    }
+
     // -------------------------------------------------------------
     // 4.1 Coleção SERVICE_REVIEWS
-    // Uma avaliação por ordem de serviço, criada apenas pela Cloud Function.
-    // O cliente não pode criar, alterar ou excluir documentos diretamente.
+    // Uma avaliação imutável por ordem de serviço concluída, sem PII,
+    // criada pela Cloud Function ou pelo próprio cliente da ordem validado pelas regras.
     // -------------------------------------------------------------
     match /service_reviews/{reviewId} {
       allow read: if true;
-      allow create, update, delete: if false;
+      allow create: if isValidServiceReviewCreate(reviewId);
+      allow update, delete: if false;
     }
 
     // -------------------------------------------------------------
@@ -712,7 +774,8 @@ service cloud.firestore {
           (!('clientUid' in resource.data) || request.resource.data.clientUid == resource.data.clientUid) &&
           (!('providerUid' in resource.data) || request.resource.data.providerUid == resource.data.providerUid) &&
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['review', 'rating', 'reviews'])
-        )
+        ) ||
+        isValidServiceOrderReviewUpdate()
       );
 
       allow delete: if isAuthenticated() && (

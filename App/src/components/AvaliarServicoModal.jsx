@@ -73,7 +73,10 @@ export default function AvaliarServicoModal({ order, onClose, onSuccess }) {
       onClose();
     } catch (err) {
       console.error('[AvaliarServicoModal] Erro ao enviar avaliação:', err);
-      setErrorMsg('Erro ao salvar avaliação no banco de dados. Tente novamente.');
+      const customMsg = err?.message && !String(err.message).toLowerCase().includes('internal')
+        ? err.message
+        : 'Erro ao salvar avaliação no banco de dados. Tente novamente.';
+      setErrorMsg(customMsg);
     } finally {
       setIsSubmitting(false);
     }
