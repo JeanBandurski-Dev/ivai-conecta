@@ -9,6 +9,7 @@ import {
   getDoc,
   addDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   getDocs,
   writeBatch,
@@ -346,13 +347,19 @@ export function getThreadUnreadCount(thread, userEmail) {
 /**
  * Retorna o total geral de mensagens não lidas do usuário
  */
+function isThreadMember(thread, cleanEmail, uid = '') {
+  if (!thread) return false;
+  const byEmail = Boolean(cleanEmail && thread.participants?.some(p => matchesUserEmail(p, cleanEmail)));
+  const byUid = Boolean(uid && thread.participantUids?.includes(uid));
+  return byEmail || byUid;
+}
+
 export function getTotalUnreadMessagesCount(userEmail) {
   if (!userEmail) return 0;
   const cleanEmail = userEmail.toLowerCase().trim();
+  const currentUid = auth.currentUser?.uid || '';
   const allThreads = getChatThreads();
-  const myThreads = allThreads.filter(t =>
-    t.participants?.some(p => matchesUserEmail(p, cleanEmail))
-  );
+  const myThreads = allThreads.filter(t => isThreadMember(t, cleanEmail, currentUid));
 
   let total = 0;
   for (const t of myThreads) {
@@ -663,6 +670,7 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
   if (!chatId) return () => { };
 
   const cleanEmail = currentUserEmail ? currentUserEmail.toLowerCase().trim() : '';
+  const currentUid = auth.currentUser?.uid || '';
 
   const emitLocal = () => {
     const all = getChatThreads();
@@ -672,7 +680,7 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
       return;
     }
 
-    if (cleanEmail && thread.participants && !thread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+    if ((cleanEmail || currentUid) && !isThreadMember(thread, cleanEmail, currentUid)) {
       console.warn('[Chat] Acesso negado: usuário não é participante desta conversa.');
       callback([]);
       return;
@@ -736,7 +744,7 @@ export function subscribeToMessages(chatId, callback, currentUserEmail = '') {
         threadIndex = 0;
       }
 
-      if (cleanEmail && currentThread.participants && !currentThread.participants.some(p => matchesUserEmail(p, cleanEmail))) {
+      if ((cleanEmail || currentUid) && !isThreadMember(currentThread, cleanEmail, currentUid)) {
         return;
       }
 
@@ -876,6 +884,7 @@ export async function sendChatMessage(chatId, senderUser, text) {
       console.warn('[Chat] Falha na persistência da mensagem no Firestore:', err);
     });
 
+    const threadRef = doc(db, 'chats', chatId);
     const threadUpdate = {
       lastMessage: cleanText,
       lastMessageAt: timeFormatted,
@@ -884,16 +893,16 @@ export async function sendChatMessage(chatId, senderUser, text) {
       updatedAt: serverTimestamp()
     };
 
-    if (currentThread) {
-      if (currentThread.participants) threadUpdate.participants = currentThread.participants;
-      if (currentThread.participantUids) threadUpdate.participantUids = currentThread.participantUids;
-      if (currentThread.participantNames) threadUpdate.participantNames = currentThread.participantNames;
-      if (currentThread.participantAvatars) threadUpdate.participantAvatars = currentThread.participantAvatars;
-      if (currentThread.participantRoles) threadUpdate.participantRoles = currentThread.participantRoles;
-      if (currentThread.contextTitle) threadUpdate.contextTitle = currentThread.contextTitle;
-    }
-
-    setDoc(threadRef, threadUpdate, { merge: true }).catch(err => {
+    updateDoc(threadRef, threadUpdate).catch(() => {
+      const fallbackDoc = { ...threadUpdate };
+      if (currentThread?.participants) fallbackDoc.participants = currentThread.participants;
+      if (currentThread?.participantUids) fallbackDoc.participantUids = currentThread.participantUids;
+      if (currentThread?.participantNames) fallbackDoc.participantNames = currentThread.participantNames;
+      if (currentThread?.participantAvatars) fallbackDoc.participantAvatars = currentThread.participantAvatars;
+      if (currentThread?.participantRoles) fallbackDoc.participantRoles = currentThread.participantRoles;
+      if (currentThread?.contextTitle) fallbackDoc.contextTitle = currentThread.contextTitle;
+      return setDoc(threadRef, fallbackDoc, { merge: true });
+    }).catch(err => {
       console.warn('[Chat] Falha ao atualizar dados da thread no Firestore:', err);
     });
   } catch (err) {
@@ -915,46 +924,54 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     throw new Error('Valide seu e-mail institucional antes de usar o chat.');
   }
 
-  const user1Email = (currentUser?.email || '').toLowerCase().trim();
-  const currentUid = currentUser?.uid || currentUser?.id || '';
-  const targetUid = targetUser?.uid || targetUser?.id || '';
+  const user1Email = (auth.currentUser?.email || currentUser?.email || '').toLowerCase().trim();
+  const currentUid = String(auth.currentUser?.uid || currentUser?.uid || currentUser?.id || '').trim();
+  const targetUid = String(targetUser?.uid || targetUser?.id || '').trim();
   let user2Email = (targetUser?.email || '').toLowerCase().trim();
 
-  // Se o destinatário não possui e-mail no objeto, busca o e-mail real pelo UID no Firestore
-  if ((!user2Email || !user2Email.includes('@')) && targetUid) {
+  // Busca dados públicos do destinatário em public_profiles quando e-mail ou nome não vieram completos
+  if (targetUid && (!user2Email || !targetUser?.name)) {
     try {
-      const userSnap = await getDoc(doc(db, 'users', String(targetUid)));
-      if (userSnap.exists()) {
-        const uData = userSnap.data();
-        user2Email = (uData.email || uData.studentEmail || '').toLowerCase().trim();
+      const pubSnap = await getDoc(doc(db, 'public_profiles', targetUid));
+      if (pubSnap.exists()) {
+        const uData = pubSnap.data();
         targetUser.name = resolveDisplayName(uData) || targetUser.name;
         targetUser.company = uData.company || uData.nomeFantasia || targetUser.company;
         targetUser.avatar = resolveAvatar(uData) || targetUser.avatar;
         targetUser.role = uData.role || targetUser.role;
       }
     } catch (err) {
-      console.warn('[Chat] Não foi possível carregar usuário pelo UID:', err);
+      console.warn('[Chat] Não foi possível carregar perfil público pelo UID:', err?.message || err);
     }
   }
 
-  if (!user1Email || !user1Email.includes('@')) {
-    throw new Error('Você precisa estar autenticado com um e-mail válido para usar o chat.');
+  if (!user1Email && !currentUid) {
+    throw new Error('Você precisa estar autenticado para usar o chat.');
   }
 
-  if (!user2Email || !user2Email.includes('@')) {
+  if ((!user2Email || !user2Email.includes('@')) && !targetUid) {
     throw new Error('O usuário selecionado não possui um canal de mensagens configurado.');
   }
 
   // Bloqueio rigoroso: ninguém (empresa, freelancer ou aluno) pode criar chat consigo mesmo
-  if (isSameUser(currentUser, targetUser) || user1Email === user2Email) {
+  if (isSameUser(currentUser, targetUser) || (user1Email && user2Email && user1Email === user2Email) || (currentUid && targetUid && currentUid === targetUid)) {
     console.warn('[Chat] Tentativa de iniciar conversa consigo mesmo bloqueada.');
     throw new Error('Você não pode iniciar uma conversa consigo mesmo.');
   }
 
-  // ID determinístico único
-  const sortedEmails = [user1Email, user2Email].sort();
-  const chatId = `chat_${sortedEmails[0].replace(/[@.]/g, '_')}_${sortedEmails[1].replace(/[@.]/g, '_')}`;
-  const participantUids = [currentUid, targetUid].filter(Boolean);
+  // ID determinístico único (por e-mail quando ambos disponíveis, ou por UID quando apenas UID público está disponível)
+  const hasBothEmails = Boolean(user1Email && user1Email.includes('@') && user2Email && user2Email.includes('@'));
+  const chatId = hasBothEmails
+    ? (() => {
+        const sortedEmails = [user1Email, user2Email].sort();
+        return `chat_${sortedEmails[0].replace(/[@.]/g, '_')}_${sortedEmails[1].replace(/[@.]/g, '_')}`;
+      })()
+    : `chat_uid_${[currentUid, targetUid].filter(Boolean).sort().join('_')}`;
+
+  const participantUids = Array.from(new Set([currentUid, targetUid].filter(Boolean)));
+  const participants = Array.from(new Set([user1Email, user2Email].filter(Boolean)));
+  const senderKey = user1Email || currentUid;
+  const targetKey = user2Email || targetUid;
 
   const senderName = resolveDisplayName(currentUser);
   const targetName = resolveDisplayName(targetUser);
@@ -969,19 +986,19 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
   if (!thread) {
     thread = {
       id: chatId,
-      participants: [user1Email, user2Email],
+      participants,
       participantUids,
       participantNames: {
-        [user1Email]: senderName,
-        [user2Email]: targetName
+        [senderKey]: senderName,
+        [targetKey]: targetName
       },
       participantAvatars: {
-        [user1Email]: senderAvatar,
-        [user2Email]: targetAvatar
+        [senderKey]: senderAvatar,
+        [targetKey]: targetAvatar
       },
       participantRoles: {
-        [user1Email]: senderRole,
-        [user2Email]: targetRole
+        [senderKey]: senderRole,
+        [targetKey]: targetRole
       },
       contextTitle,
       lastMessage: 'Conversa iniciada',
@@ -993,15 +1010,16 @@ export async function getOrCreateChat(currentUser, targetUser, contextTitle = 'C
     saveChatThreads(allThreads);
   } else {
     // Atualiza nomes, papéis e contexto caso tenham mudado
+    thread.participants = Array.from(new Set([...(thread.participants || []), ...participants]));
     thread.participantNames = {
       ...thread.participantNames,
-      [user1Email]: senderName,
-      [user2Email]: targetName
+      [senderKey]: senderName,
+      [targetKey]: targetName
     };
     thread.participantRoles = {
       ...thread.participantRoles,
-      [user1Email]: senderRole,
-      [user2Email]: targetRole
+      [senderKey]: senderRole,
+      [targetKey]: targetRole
     };
     if (participantUids.length > 0) {
       thread.participantUids = Array.from(new Set([...(thread.participantUids || []), ...participantUids]));

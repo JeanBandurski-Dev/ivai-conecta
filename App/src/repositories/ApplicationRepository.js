@@ -36,19 +36,10 @@ export class ApplicationRepository extends BaseRepository {
     try {
       const q = isEmail
         ? query(this.collectionRef, where('candidateEmail', '==', key.toLowerCase()))
-        : query(this.collectionRef, where('candidateId', '==', key));
+        : query(this.collectionRef, where('candidateUid', '==', key));
 
       const snap = await getDocs(q);
-      let apps = snap.docs.map(d => normalizeApplicationDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
-
-      // Se buscou por UID mas pode haver registros com candidateUid legado
-      if (!isEmail && apps.length === 0) {
-        const qLegacy = query(this.collectionRef, where('candidateUid', '==', key));
-        const snapLegacy = await getDocs(qLegacy);
-        apps = snapLegacy.docs.map(d => normalizeApplicationDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
-      }
-
-      return apps;
+      return snap.docs.map(d => normalizeApplicationDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
     } catch (err) {
       throw handleFirestoreError(err, 'findByCandidate', this.collectionName);
     }
@@ -212,7 +203,7 @@ export class ApplicationRepository extends BaseRepository {
     const key = String(candidateUidOrEmail || '').trim();
     const isEmail = key.includes('@');
     const constraints = [
-      where(isEmail ? 'candidateEmail' : 'candidateId', '==', isEmail ? key.toLowerCase() : key)
+      where(isEmail ? 'candidateEmail' : 'candidateUid', '==', isEmail ? key.toLowerCase() : key)
     ];
 
     return this.subscribe(

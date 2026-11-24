@@ -167,7 +167,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
 
     try {
       const clientId = currentUser.uid || currentUser.id || 'usr_guest';
-      const providerId = service.createdBy || service.providerUid || '';
+      const providerId = service.providerUid || service.createdBy || service.providerId || '';
 
       const order = await createServiceOrder({
         serviceId: service.firestoreId || service.id,

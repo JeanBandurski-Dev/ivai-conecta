@@ -225,19 +225,18 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
     let targetEmail = companyUser?.email || 
       (job.recruiterEmail && String(job.recruiterEmail).includes('@') ? job.recruiterEmail : null);
 
-    // Se não encontrou no cache local, busca o documento oficial da empresa no Firestore pelo UID
+    // Se não encontrou no cache local, busca o perfil público da empresa no Firestore pelo UID
     if (!targetEmail && companyUid && typeof companyUid === 'string' && companyUid.length > 5 && !companyUid.includes('@')) {
       try {
         const { getDoc, doc } = await import('firebase/firestore');
         const { db } = await import('../lib/firebase');
-        const userDoc = await getDoc(doc(db, 'users', companyUid));
-        if (userDoc.exists()) {
-          const uData = userDoc.data();
-          targetEmail = uData.email;
-          if (!companyUser) companyUser = { uid: userDoc.id, ...uData };
+        const pubDoc = await getDoc(doc(db, 'public_profiles', companyUid));
+        if (pubDoc.exists()) {
+          const uData = pubDoc.data();
+          if (!companyUser) companyUser = { uid: pubDoc.id, ...uData };
         }
       } catch (err) {
-        console.warn('Erro ao buscar dados da empresa pelo UID:', err);
+        console.warn('Erro ao buscar dados públicos da empresa pelo UID:', err);
       }
     }
 

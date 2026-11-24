@@ -1,4 +1,5 @@
 import { db, auth, functions } from '../lib/firebase.js';
+import { onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import {
   collection,
@@ -10,7 +11,7 @@ import {
   where
 } from 'firebase/firestore';
 import { STORAGE_KEY_SERVICES, CITIES } from '../data/seedData.js';
-import { serviceRepository, serviceOrderRepository } from '../repositories/index.js';
+import { serviceRepository } from '../repositories/index.js';
 import {
   hasProfanity,
   validateProfessionalText,
@@ -328,7 +329,6 @@ export async function incrementServiceContact(id) {
   if (!id) return;
   const services = getServices('Todas as Cidades');
   const target = services.find(s => s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id);
-  const docId = target?.firestoreId || target?.id || id;
 
   const currentContacts = target?.analytics?.contacts || 0;
   const newContacts = currentContacts + 1;
@@ -341,13 +341,8 @@ export async function incrementServiceContact(id) {
     conversionRate: newConversion
   };
 
-  if (docId) {
-    try {
-      await updateDoc(doc(db, 'services', String(docId)), { analytics: updatedAnalytics });
-    } catch { }
-  }
-
   const updated = services.map(s => (s.id === Number(id) || s.id === id || String(s.id) === String(id) || s.firestoreId === id ? { ...s, analytics: updatedAnalytics } : s));
+  _memServicesCache = updated;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_SERVICES, JSON.stringify(updated));
   }
@@ -683,10 +678,16 @@ function notifyOrdersUpdated(orders) {
 export async function createServiceOrder(orderData) {
   const orderId = orderData.id || `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-  const clientEmail = (orderData.clientEmail || '').toLowerCase().trim();
+  const authUid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : '';
+  const authEmail = auth?.currentUser?.email ? String(auth.currentUser.email).toLowerCase().trim() : '';
+  const clientEmail = (authEmail || orderData.clientEmail || '').toLowerCase().trim();
   const providerEmail = (orderData.providerEmail || '').toLowerCase().trim();
-  const clientId = String(orderData.clientId || orderData.clientUid || '').trim();
+  const clientId = authUid || String(orderData.clientId || orderData.clientUid || '').trim();
   const providerId = String(orderData.providerId || orderData.providerUid || '').trim();
+
+  if (!clientId) {
+    throw new Error('Sessão expirada ou usuário não autenticado. Faça login novamente para enviar o pedido.');
+  }
 
   const newOrder = {
     status: 'solicitado',
@@ -718,11 +719,30 @@ export async function createServiceOrder(orderData) {
     providerId
   ].filter(Boolean)));
 
-  // 1. Salva no Firestore sob a coleção 'chats' (garante permissões e sincronização em tempo real entre partes)
+  const participantUids = Array.from(new Set([
+    clientId,
+    providerId
+  ].filter(Boolean)));
+
+  let savedToOrders = false;
+  let savedToChats = false;
+  let lastError = null;
+
+  // 1. Registra na coleção oficial 'service_orders'
+  try {
+    await setDoc(doc(db, 'service_orders', orderId), newOrder, { merge: true });
+    savedToOrders = true;
+  } catch (err) {
+    lastError = err;
+    console.warn('[Firestore service_orders] Falha ao registrar ordem de serviço:', err?.message || err);
+  }
+
+  // 2. Salva também em 'chats' com participantUids (compatível com firestore.rules) para sincronização em tempo real
   try {
     await setDoc(doc(db, 'chats', orderId), {
       isServiceOrder: true,
       participants,
+      participantUids,
       clientEmail,
       providerEmail,
       clientId,
@@ -732,14 +752,15 @@ export async function createServiceOrder(orderData) {
       serviceOrder: newOrder,
       updatedAt: new Date().toISOString()
     });
+    savedToChats = true;
   } catch (err) {
-    console.warn('[Firestore chats] Falha ao registrar ordem de serviço:', err.message);
+    if (!lastError) lastError = err;
+    console.warn('[Firestore chats] Falha ao registrar ordem de serviço:', err?.message || err);
   }
 
-  // 2. Tenta também registrar na coleção direta 'service_orders'
-  try {
-    await setDoc(doc(db, 'service_orders', orderId), newOrder, { merge: true });
-  } catch { }
+  if (!savedToOrders && !savedToChats) {
+    throw lastError || new Error('Não foi possível registrar a solicitação no servidor.');
+  }
 
   // 3. Atualiza cache local e notifica componentes
   const all = getServiceOrders();
@@ -777,8 +798,20 @@ export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
   };
 
   const docId = String(order?.firestoreId || order?.id || orderId);
+  let updatedOrdersRemote = false;
+  let updatedChatsRemote = false;
+  let lastError = null;
 
-  // 1. Atualiza no Firestore sob a coleção 'chats'
+  // 1. Atualiza 'service_orders'
+  try {
+    await setDoc(doc(db, 'service_orders', docId), patch, { merge: true });
+    updatedOrdersRemote = true;
+  } catch (err) {
+    lastError = err;
+    console.warn('[Firestore service_orders] Erro ao atualizar status:', err?.message || err);
+  }
+
+  // 2. Atualiza no Firestore sob a coleção 'chats'
   try {
     const chatDocRef = doc(db, 'chats', docId);
     await updateDoc(chatDocRef, {
@@ -787,23 +820,42 @@ export async function updateServiceOrderStatus(orderId, newStatus, note = '') {
       'serviceOrder.updatedAt': new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+    updatedChatsRemote = true;
   } catch {
-    try {
-      const chatDocRef = doc(db, 'chats', docId);
-      await setDoc(chatDocRef, {
-        isServiceOrder: true,
-        serviceOrder: { ...order, ...patch },
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch (err) {
-      console.warn('[Firestore] Erro ao atualizar status no chat:', err.message);
+    if (order) {
+      try {
+        const chatDocRef = doc(db, 'chats', docId);
+        const cUid = String(order.clientUid || order.clientId || '').trim();
+        const pUid = String(order.providerUid || order.providerId || '').trim();
+        const cEmail = String(order.clientEmail || '').toLowerCase().trim();
+        const pEmail = String(order.providerEmail || '').toLowerCase().trim();
+        const participants = Array.from(new Set([cEmail, pEmail, cUid, pUid].filter(Boolean)));
+        const participantUids = Array.from(new Set([cUid, pUid].filter(Boolean)));
+
+        await setDoc(chatDocRef, {
+          isServiceOrder: true,
+          participants,
+          participantUids,
+          clientEmail: cEmail,
+          providerEmail: pEmail,
+          clientId: cUid,
+          clientUid: cUid,
+          providerId: pUid,
+          providerUid: pUid,
+          serviceOrder: { ...order, ...patch },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        updatedChatsRemote = true;
+      } catch (err) {
+        if (!lastError) lastError = err;
+        console.warn('[Firestore chats] Erro ao atualizar status:', err?.message || err);
+      }
     }
   }
 
-  // 2. Tenta atualizar 'service_orders'
-  try {
-    await setDoc(doc(db, 'service_orders', docId), patch, { merge: true });
-  } catch { }
+  if (!updatedOrdersRemote && !updatedChatsRemote) {
+    throw lastError || new Error('Não foi possível atualizar o status da demanda no servidor.');
+  }
 
   // 3. Atualiza cache local e notifica
   const updatedList = orders.map(o => (o.id === orderId || o.firestoreId === orderId ? { ...o, ...patch } : o));
@@ -920,12 +972,10 @@ export function subscribeToServiceOrders(user, callback) {
     };
   }
 
-  const userEmail = (user.email || '').toLowerCase().trim();
   const userUid = String(user.uid || user.id || '').trim();
-  const queryField = userEmail || userUid;
 
-  let unsubChats = () => { };
-  let unsubDirect = () => { };
+  const unsubs = [];
+  let remoteAttachedUid = null;
 
   const mergeAndNotify = (newOrders) => {
     const local = getServiceOrders();
@@ -938,46 +988,103 @@ export function subscribeToServiceOrders(user, callback) {
     callback(filterForUser(merged), merged);
   };
 
-  // 1. Assina coleção direta 'service_orders' via ServiceOrderRepository
-  try {
-    unsubDirect = serviceOrderRepository.subscribe((directOrders) => {
-      mergeAndNotify(directOrders);
-    }, (error) => {
-      console.warn('[ServiceOrderRepository realtime] Aviso:', error.message);
-    });
-  } catch (err) {
-    console.warn('[ServiceOrderRepository realtime] Erro:', err.message);
-  }
+  const attachRemoteListeners = (fbUser) => {
+    const authUid = fbUser?.uid ? String(fbUser.uid).trim() : '';
+    if (!authUid) return;
+    if (userUid && userUid !== authUid) return;
+    if (remoteAttachedUid === authUid) return;
 
-  // 2. Assina chats relacionados a ordens de serviço
-  if (queryField) {
-    try {
-      const q = query(
-        collection(db, 'chats'),
-        where('participants', 'array-contains', queryField)
-      );
+    remoteAttachedUid = authUid;
+    const authTokenEmail = fbUser?.email ? String(fbUser.email).trim() : '';
+    const effectiveUid = authUid;
 
-      unsubChats = onSnapshot(q, (snapshot) => {
-        const remoteOrders = snapshot.docs
-          .filter(d => d.data()?.isServiceOrder === true && d.data()?.serviceOrder)
-          .map(d => ({
+    // 1. Assina coleção direta 'service_orders' com queries filtradas estritas compatíveis com firestore.rules
+    const orderQueries = [
+      query(collection(db, 'service_orders'), where('providerUid', '==', effectiveUid)),
+      query(collection(db, 'service_orders'), where('providerId', '==', effectiveUid)),
+      query(collection(db, 'service_orders'), where('clientUid', '==', effectiveUid)),
+      query(collection(db, 'service_orders'), where('clientId', '==', effectiveUid)),
+    ];
+    if (authTokenEmail) {
+      orderQueries.push(query(collection(db, 'service_orders'), where('providerEmail', '==', authTokenEmail)));
+      orderQueries.push(query(collection(db, 'service_orders'), where('clientEmail', '==', authTokenEmail)));
+    }
+
+    orderQueries.forEach((orderQuery) => {
+      try {
+        const unsub = onSnapshot(orderQuery, (snapshot) => {
+          const remoteOrders = snapshot.docs.map(d => ({
             id: d.id,
             firestoreId: d.id,
-            ...d.data().serviceOrder
+            ...d.data()
           }));
+          if (remoteOrders.length > 0) {
+            mergeAndNotify(remoteOrders);
+          }
+        }, (error) => {
+          console.warn('[Firestore service_orders realtime] Aviso:', error?.message || error);
+        });
+        unsubs.push(unsub);
+      } catch (err) {
+        console.warn('[Firestore service_orders realtime] Erro ao assinar:', err?.message || err);
+      }
+    });
 
-        mergeAndNotify(remoteOrders);
-      }, (error) => {
-        console.warn('[Firestore chats realtime] Aviso:', error.message);
+    // 2. Assina chats relacionados a ordens de serviço por participantUids (regra principal) e participants (e-mail)
+    const chatQueries = [
+      query(collection(db, 'chats'), where('participantUids', 'array-contains', effectiveUid))
+    ];
+    const chatEmails = Array.from(new Set([
+      authTokenEmail,
+      authTokenEmail.toLowerCase()
+    ].filter(Boolean)));
+    chatEmails.forEach((emailVal) => {
+      chatQueries.push(query(collection(db, 'chats'), where('participants', 'array-contains', emailVal)));
+    });
+
+    chatQueries.forEach((chatQuery) => {
+      try {
+        const unsub = onSnapshot(chatQuery, (snapshot) => {
+          const remoteOrders = snapshot.docs
+            .filter(d => d.data()?.isServiceOrder === true && d.data()?.serviceOrder)
+            .map(d => ({
+              id: d.id,
+              firestoreId: d.id,
+              ...d.data().serviceOrder
+            }));
+
+          if (remoteOrders.length > 0) {
+            mergeAndNotify(remoteOrders);
+          }
+        }, (error) => {
+          console.warn('[Firestore chats realtime] Aviso:', error?.message || error);
+        });
+        unsubs.push(unsub);
+      } catch (err) {
+        console.warn('[Firestore chats realtime] Erro ao assinar:', err?.message || err);
+      }
+    });
+  };
+
+  if (auth?.currentUser?.uid) {
+    attachRemoteListeners(auth.currentUser);
+  } else if (typeof onAuthStateChanged === 'function') {
+    try {
+      const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+        if (fbUser?.uid) {
+          attachRemoteListeners(fbUser);
+        }
       });
-    } catch (err) {
-      console.warn('[Firestore chats realtime] Erro ao assinar:', err.message);
-    }
+      if (typeof unsubAuth === 'function') unsubs.push(unsubAuth);
+    } catch {}
   }
 
   return () => {
-    unsubDirect();
-    unsubChats();
+    unsubs.forEach(unsub => {
+      try {
+        if (typeof unsub === 'function') unsub();
+      } catch {}
+    });
     if (typeof window !== 'undefined') {
       window.removeEventListener('ivai_service_orders_updated', handleLocalUpdate);
     }

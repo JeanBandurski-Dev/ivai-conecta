@@ -3,16 +3,36 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const createMock = vi.fn();
 const updateMock = vi.fn();
 const deleteMock = vi.fn();
+const setDocMock = vi.fn();
+const updateDocMock = vi.fn();
+const onSnapshotMock = vi.fn(() => () => {});
+const collectionMock = vi.fn((_db, name) => ({ __collection: name }));
+const docMock = vi.fn((_db, col, id) => ({ __collection: col, id }));
+const queryMock = vi.fn((colRef, ...constraints) => ({ __collection: colRef.__collection, constraints }));
+const whereMock = vi.fn((field, op, value) => ({ field, op, value }));
 
-vi.mock('../lib/firebase.js', () => ({
-  db: {},
-  functions: {},
-  auth: {
+const { authState } = vi.hoisted(() => ({
+  authState: {
     currentUser: {
       uid: 'freelancer_uid_1',
       email: 'freela@ivaiconecta.com.br',
     },
   },
+}));
+let authChangeHandler = null;
+const onAuthStateChangedMock = vi.fn((_authObj, cb) => {
+  authChangeHandler = cb;
+  return () => {};
+});
+
+vi.mock('../lib/firebase.js', () => ({
+  db: {},
+  functions: {},
+  auth: authState,
+}));
+
+vi.mock('firebase/auth', () => ({
+  onAuthStateChanged: (...args) => onAuthStateChangedMock(...args),
 }));
 
 vi.mock('firebase/functions', () => ({
@@ -20,13 +40,13 @@ vi.mock('firebase/functions', () => ({
 }));
 
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(),
-  doc: vi.fn(),
-  updateDoc: vi.fn(),
-  onSnapshot: vi.fn(() => () => {}),
-  setDoc: vi.fn(),
-  query: vi.fn(),
-  where: vi.fn(),
+  collection: (...args) => collectionMock(...args),
+  doc: (...args) => docMock(...args),
+  updateDoc: (...args) => updateDocMock(...args),
+  onSnapshot: (...args) => onSnapshotMock(...args),
+  setDoc: (...args) => setDocMock(...args),
+  query: (...args) => queryMock(...args),
+  where: (...args) => whereMock(...args),
 }));
 
 vi.mock('../repositories/index.js', () => ({
@@ -41,13 +61,28 @@ vi.mock('../repositories/index.js', () => ({
   },
 }));
 
-import { addService, updateService, deleteService } from './servicesService.js';
+import {
+  addService,
+  updateService,
+  deleteService,
+  createServiceOrder,
+  subscribeToServiceOrders,
+} from './servicesService.js';
 
 describe('servicesService', () => {
   beforeEach(() => {
     createMock.mockReset();
     updateMock.mockReset();
     deleteMock.mockReset();
+    setDocMock.mockReset();
+    updateDocMock.mockReset();
+    onSnapshotMock.mockClear();
+    collectionMock.mockClear();
+    docMock.mockClear();
+    queryMock.mockClear();
+    whereMock.mockClear();
+    setDocMock.mockResolvedValue();
+    updateDocMock.mockResolvedValue();
   });
 
   it('creates service with rating 0 and reviewsCount 0 to satisfy firestore.rules', async () => {
@@ -92,5 +127,95 @@ describe('servicesService', () => {
 
     await expect(updateService('srv_123', { title: 'Eletricista' })).rejects.toThrow('Permissão negada no update');
     await expect(deleteService('srv_123')).rejects.toThrow('Permissão negada no delete');
+  });
+
+  it('creates service order with participantUids and authenticated clientUid', async () => {
+    const order = await createServiceOrder({
+      serviceId: 'srv_1',
+      serviceTitle: 'Manutenção Elétrica',
+      providerId: 'prov_uid_2',
+      providerUid: 'prov_uid_2',
+      providerName: 'João Eletricista',
+      providerEmail: '',
+      description: 'Preciso instalar 3 tomadas e revisar disjuntor.'
+    });
+
+    expect(order.clientUid).toBe('freelancer_uid_1');
+    expect(order.clientEmail).toBe('freela@ivaiconecta.com.br');
+
+    const ordersWrite = setDocMock.mock.calls.find(([ref]) => ref.__collection === 'service_orders');
+    const chatsWrite = setDocMock.mock.calls.find(([ref]) => ref.__collection === 'chats');
+
+    expect(ordersWrite).toBeTruthy();
+    expect(chatsWrite).toBeTruthy();
+    expect(chatsWrite[1].participantUids).toEqual(['freelancer_uid_1', 'prov_uid_2']);
+    expect(chatsWrite[1].isServiceOrder).toBe(true);
+  });
+
+  it('throws when both service_orders and chats persistence fail in createServiceOrder', async () => {
+    setDocMock.mockRejectedValue(new Error('permission-denied'));
+
+    await expect(
+      createServiceOrder({
+        serviceId: 'srv_1',
+        providerId: 'prov_uid_2',
+        description: 'Teste de falha simultânea'
+      })
+    ).rejects.toThrow('permission-denied');
+  });
+
+  it('subscribes to service_orders and chats with strict rule-compliant filters', () => {
+    const cb = vi.fn();
+    const unsub = subscribeToServiceOrders(
+      { uid: 'freelancer_uid_1', email: 'freela@ivaiconecta.com.br' },
+      cb
+    );
+
+    const queriedSpecs = queryMock.mock.calls.map(([, ...constraints]) => constraints);
+    const hasProviderUidFilter = queriedSpecs.some(cs => cs.some(c => c.field === 'providerUid' && c.value === 'freelancer_uid_1'));
+    const hasClientUidFilter = queriedSpecs.some(cs => cs.some(c => c.field === 'clientUid' && c.value === 'freelancer_uid_1'));
+    const hasParticipantUidsFilter = queriedSpecs.some(cs => cs.some(c => c.field === 'participantUids' && c.op === 'array-contains' && c.value === 'freelancer_uid_1'));
+
+    expect(hasProviderUidFilter).toBe(true);
+    expect(hasClientUidFilter).toBe(true);
+    expect(hasParticipantUidsFilter).toBe(true);
+
+    // Must not subscribe unfiltered on service_orders
+    const unfilteredCalls = onSnapshotMock.mock.calls.filter(([target]) => !target.constraints);
+    expect(unfilteredCalls.length).toBe(0);
+
+    unsub();
+  });
+
+  it('skips remote service_orders/chats queries when user is another profile (visitor view)', () => {
+    const cb = vi.fn();
+    const unsub = subscribeToServiceOrders(
+      { uid: 'other_freelancer_uid', email: 'other@ivaiconecta.com.br' },
+      cb
+    );
+
+    expect(onSnapshotMock).not.toHaveBeenCalled();
+    unsub();
+  });
+
+  it('attaches remote listeners once Firebase Auth finishes hydrating when currentUser starts null', () => {
+    const prevUser = authState.currentUser;
+    authState.currentUser = null;
+    authChangeHandler = null;
+
+    const cb = vi.fn();
+    const unsub = subscribeToServiceOrders(
+      { uid: 'freelancer_uid_1', email: 'freela@ivaiconecta.com.br' },
+      cb
+    );
+
+    expect(onSnapshotMock).not.toHaveBeenCalled();
+    expect(onAuthStateChangedMock).toHaveBeenCalledTimes(1);
+
+    authChangeHandler({ uid: 'freelancer_uid_1', email: 'freela@ivaiconecta.com.br' });
+    expect(onSnapshotMock).toHaveBeenCalled();
+
+    authState.currentUser = prevUser;
+    unsub();
   });
 });

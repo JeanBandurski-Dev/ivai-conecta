@@ -20,10 +20,17 @@ export class ServiceOrderRepository extends BaseRepository {
    */
   async findByClient(clientId) {
     if (!clientId) return [];
+    const key = String(clientId).trim();
     try {
-      const q = query(this.collectionRef, where('clientId', '==', String(clientId).trim()));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => normalizeServiceOrderDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
+      const [byUid, byLegacy] = await Promise.all([
+        getDocs(query(this.collectionRef, where('clientUid', '==', key))).catch(() => ({ docs: [] })),
+        getDocs(query(this.collectionRef, where('clientId', '==', key))).catch(() => ({ docs: [] })),
+      ]);
+      const map = new Map();
+      [...byUid.docs, ...byLegacy.docs].forEach(d => {
+        map.set(d.id, normalizeServiceOrderDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
+      });
+      return Array.from(map.values());
     } catch (err) {
       throw handleFirestoreError(err, 'findByClient', this.collectionName);
     }
@@ -36,10 +43,17 @@ export class ServiceOrderRepository extends BaseRepository {
    */
   async findByProvider(providerId) {
     if (!providerId) return [];
+    const key = String(providerId).trim();
     try {
-      const q = query(this.collectionRef, where('providerId', '==', String(providerId).trim()));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => normalizeServiceOrderDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
+      const [byUid, byLegacy] = await Promise.all([
+        getDocs(query(this.collectionRef, where('providerUid', '==', key))).catch(() => ({ docs: [] })),
+        getDocs(query(this.collectionRef, where('providerId', '==', key))).catch(() => ({ docs: [] })),
+      ]);
+      const map = new Map();
+      [...byUid.docs, ...byLegacy.docs].forEach(d => {
+        map.set(d.id, normalizeServiceOrderDTO({ id: d.id, firestoreId: d.id, ...d.data() }));
+      });
+      return Array.from(map.values());
     } catch (err) {
       throw handleFirestoreError(err, 'findByProvider', this.collectionName);
     }
@@ -113,7 +127,7 @@ export class ServiceOrderRepository extends BaseRepository {
    * @param {Function} [onError]
    * @returns {Function} Unsubscribe
    */
-  subscribeToUserOrders(userId, roleField = 'clientId', onOrdersUpdated, onError = null) {
+  subscribeToUserOrders(userId, roleField = 'clientUid', onOrdersUpdated, onError = null) {
     const constraints = [where(roleField, '==', String(userId).trim())];
     return this.subscribe(
       (docs) => {

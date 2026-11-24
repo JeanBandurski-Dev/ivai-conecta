@@ -121,19 +121,22 @@ function UserAvatar({ src, name, className = 'w-9 h-9', isOnline = undefined }) 
 function getOtherParticipant(thread, currentUser) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
   const myUid = String(currentUser?.uid || currentUser?.id || '');
-  const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) || thread.lastSenderEmail || '';
-
-  const name = thread.participantNames?.[otherEmail] || thread.participantName || resolveDisplayName({ email: otherEmail });
-  const rawAvatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatar || '';
-  const avatar = isGenericPlaceholderAvatar(rawAvatar) ? '' : rawAvatar;
-  const role = thread.participantRoles?.[otherEmail] || thread.participantRole || 'Usuário Conectado';
+  const otherEmail = (thread.participants || []).find(e => !matchesUserEmail(e, myEmail)) ||
+    (thread.lastSenderEmail && !matchesUserEmail(thread.lastSenderEmail, myEmail) ? thread.lastSenderEmail : '') ||
+    '';
 
   let uid = '';
   if (Array.isArray(thread.participantUids)) {
     uid = thread.participantUids.find(u => String(u) !== myUid) || '';
   }
 
-  return { email: otherEmail, name, avatar, role, uid };
+  const lookupKey = otherEmail || uid;
+  const name = thread.participantNames?.[otherEmail] || thread.participantNames?.[uid] || thread.participantName || resolveDisplayName({ email: otherEmail });
+  const rawAvatar = thread.participantAvatars?.[otherEmail] || thread.participantAvatars?.[uid] || thread.participantAvatar || '';
+  const avatar = isGenericPlaceholderAvatar(rawAvatar) ? '' : rawAvatar;
+  const role = thread.participantRoles?.[otherEmail] || thread.participantRoles?.[uid] || thread.participantRole || 'Usuário Conectado';
+
+  return { email: otherEmail, name, avatar, role, uid: uid || lookupKey };
 }
 
 export default function ChatModal({ onClose }) {
@@ -173,12 +176,12 @@ export default function ChatModal({ onClose }) {
   }, [onClose]);
   const textareaRef = useRef(null);
 
-  // Carrega lista de usuários reais do Firestore para novos contatos
+  // Carrega lista de perfis públicos reais do Firestore para novos contatos (compatível com firestore.rules)
   useEffect(() => {
     try {
-      const q = query(collection(db, 'users'), limit(150));
+      const q = query(collection(db, 'public_profiles'), limit(150));
       const unsub = onSnapshot(q, (snap) => {
-        const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+        const users = snap.docs.map(d => ({ uid: d.id, id: d.id, ...d.data() }));
         setRemoteUsers(users);
       }, () => {});
       return () => unsub();
@@ -325,8 +328,12 @@ export default function ChatModal({ onClose }) {
     const doDelete = async () => {
       await deleteChatThread(threadId);
       const myEmail = currentUser?.email?.toLowerCase().trim();
+      const myUid = String(currentUser?.uid || currentUser?.id || '');
       const all = getChatThreads();
-      const remaining = all.filter(t => t.participants?.some(p => matchesUserEmail(p, myEmail)));
+      const remaining = all.filter(t =>
+        t.participants?.some(p => matchesUserEmail(p, myEmail)) ||
+        (myUid && t.participantUids?.includes(myUid))
+      );
       setThreads(remaining);
       if (activeThreadId === threadId) {
         setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
@@ -352,10 +359,11 @@ export default function ChatModal({ onClose }) {
   const myEmail = currentUser?.email?.toLowerCase().trim();
   const availableContacts = allUsers.filter(u => {
     const contactEmail = (u.email || u.studentEmail || '').toLowerCase().trim();
+    const contactUid = String(u.uid || u.id || '').trim();
     return (
       !isSameUser(currentUser, u) &&
-      contactEmail &&
-      !matchesUserEmail(contactEmail, myEmail)
+      (Boolean(contactEmail) || Boolean(contactUid)) &&
+      (!contactEmail || !matchesUserEmail(contactEmail, myEmail))
     );
   });
 
@@ -739,7 +747,8 @@ export default function ChatModal({ onClose }) {
                     </div>
                   ) : (
                     sortedMessages.map((m, idx) => {
-                      const isMe = matchesUserEmail(m.senderEmail, currentUser?.email);
+                      const isMe = matchesUserEmail(m.senderEmail, currentUser?.email) ||
+                        Boolean(currentUser?.uid && m.senderId && String(m.senderId) === String(currentUser.uid));
                       const pCheck = detectProfanity(m.text || '');
 
                       return (

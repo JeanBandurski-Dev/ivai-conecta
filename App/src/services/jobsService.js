@@ -347,8 +347,10 @@ export function subscribeToJobApplicants(jobOrId, callback) {
     }
   }
 
-  if (!recruiterEmail) {
-    recruiterEmail = String(auth?.currentUser?.email || getAuthUserSafe()?.email || '').toLowerCase().trim();
+  const authUid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : '';
+  const authEmail = auth?.currentUser?.email ? String(auth.currentUser.email).trim() : '';
+  if (!recruiterEmail && authEmail) {
+    recruiterEmail = authEmail.toLowerCase();
   }
   if (!recruiterEmail && targetJob?.createdBy) {
     const cachedUsers = getUsersDBSafe();
@@ -357,8 +359,9 @@ export function subscribeToJobApplicants(jobOrId, callback) {
   }
 
   const cleanIds = Array.from(new Set(targetIds.filter(Boolean)));
+  const recruiterUid = String(targetJob?.createdBy || targetJob?.recruiterUid || targetJob?.companyUid || authUid || '').trim();
 
-  if (!recruiterEmail) {
+  if (!recruiterEmail && !recruiterUid) {
     const allApps = getUserApplications();
     const matched = allApps.filter(a => {
       const aJobId = String(a.jobId || '');
@@ -372,22 +375,33 @@ export function subscribeToJobApplicants(jobOrId, callback) {
 
   try {
     const appsRef = collection(db, 'applications');
-    const q = query(appsRef, where('recruiterEmail', '==', recruiterEmail));
+    const queries = [];
+    if (authUid && (!recruiterUid || recruiterUid === authUid)) {
+      queries.push(query(appsRef, where('recruiterUid', '==', authUid)));
+    }
+    const effectiveEmail = authEmail || recruiterEmail;
+    if (effectiveEmail) {
+      queries.push(query(appsRef, where('recruiterEmail', '==', effectiveEmail)));
+    }
 
-    return onSnapshot(q, (snapshot) => {
-      const applicants = snapshot.docs
-        .map(d => ({
-          id: d.id,
-          firestoreId: d.id,
-          firestoreApplicationId: d.id,
-          ...d.data()
-        }))
-        .filter(app => {
-          const aJobId = String(app.jobId || '');
-          const aFsId = app.firestoreJobId ? String(app.firestoreJobId) : '';
-          const aOrigId = app.originalJobId ? String(app.originalJobId) : '';
-          return cleanIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId);
-        });
+    const remoteMap = new Map();
+    const unsubs = queries.map((q) => onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach(d => {
+        const data = d.data();
+        const aJobId = String(data.jobId || '');
+        const aFsId = data.firestoreJobId ? String(data.firestoreJobId) : '';
+        const aOrigId = data.originalJobId ? String(data.originalJobId) : '';
+        if (cleanIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId)) {
+          remoteMap.set(d.id, {
+            id: d.id,
+            firestoreId: d.id,
+            firestoreApplicationId: d.id,
+            ...data
+          });
+        }
+      });
+
+      const applicants = Array.from(remoteMap.values());
 
       // Também sincroniza com cache local de applications
       const currentLocal = getUserApplications();
@@ -415,7 +429,11 @@ export function subscribeToJobApplicants(jobOrId, callback) {
         return cleanIds.some(tid => tid === aJobId || tid === aFsId || tid === aOrigId);
       });
       callback(matched);
-    });
+    }));
+
+    return () => {
+      unsubs.forEach(u => { try { if (typeof u === 'function') u(); } catch {} });
+    };
   } catch (error) {
     console.warn('[Firestore Job Applicants] Falha ao assinar:', error.message);
     if (callback) callback([]);
@@ -444,11 +462,13 @@ export function subscribeToCompanyApplications(companyUserOrUid, callback) {
   }
 
   // Fallbacks para usuário logado no auth do Firebase ou cache de sessão
-  if (!email && auth?.currentUser?.email) {
-    email = String(auth.currentUser.email).toLowerCase().trim();
+  const authUid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : '';
+  const authEmail = auth?.currentUser?.email ? String(auth.currentUser.email).trim() : '';
+  if (!email && authEmail) {
+    email = authEmail.toLowerCase();
   }
-  if (!uid && auth?.currentUser?.uid) {
-    uid = String(auth.currentUser.uid).trim();
+  if (!uid && authUid) {
+    uid = authUid;
   }
   if (!email) {
     const authUser = getAuthUserSafe();
@@ -461,7 +481,7 @@ export function subscribeToCompanyApplications(companyUserOrUid, callback) {
     if (foundUser?.email) email = String(foundUser.email).toLowerCase().trim();
   }
 
-  if (!email) {
+  if (!email && !uid) {
     const cached = getUserApplications();
     callback(cached, cached);
     return () => {};
@@ -469,16 +489,28 @@ export function subscribeToCompanyApplications(companyUserOrUid, callback) {
 
   try {
     const appsRef = collection(db, 'applications');
-    // Consulta filtrada estrita compatível com as regras de segurança do Firestore (recruiterEmail == auth.token.email)
-    const q = query(appsRef, where('recruiterEmail', '==', email));
+    // Consultas filtradas estritas compatíveis com firestore.rules (recruiterUid == auth.uid ou recruiterEmail == auth.token.email)
+    const queries = [];
+    if (authUid && (!uid || uid === authUid)) {
+      queries.push(query(appsRef, where('recruiterUid', '==', authUid)));
+    }
+    const effectiveEmail = authEmail || email;
+    if (effectiveEmail) {
+      queries.push(query(appsRef, where('recruiterEmail', '==', effectiveEmail)));
+    }
 
-    return onSnapshot(q, (snapshot) => {
-      const companyApps = snapshot.docs.map(d => ({
-        id: d.id,
-        firestoreId: d.id,
-        firestoreApplicationId: d.id,
-        ...d.data()
-      }));
+    const remoteMap = new Map();
+    const unsubs = queries.map((q) => onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach(d => {
+        remoteMap.set(d.id, {
+          id: d.id,
+          firestoreId: d.id,
+          firestoreApplicationId: d.id,
+          ...d.data()
+        });
+      });
+
+      const companyApps = Array.from(remoteMap.values());
 
       // Mescla com cache local para manter persistência resiliente
       const currentLocal = getUserApplications();
@@ -505,7 +537,11 @@ export function subscribeToCompanyApplications(companyUserOrUid, callback) {
       console.warn('[Firestore Company Applications Listener] Offline fallback:', error.message);
       const cached = getUserApplications();
       callback(cached, cached);
-    });
+    }));
+
+    return () => {
+      unsubs.forEach(u => { try { if (typeof u === 'function') u(); } catch {} });
+    };
   } catch (error) {
     console.warn('[Firestore Company Applications] Falha ao assinar:', error.message);
     const cached = getUserApplications();

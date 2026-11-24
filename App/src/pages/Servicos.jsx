@@ -189,17 +189,25 @@ export default function Servicos() {
 
   const receivedOrders = useMemo(() => {
     if (!currentUser) return [];
-    const uid = String(currentUser.uid || currentUser.id || '');
+    const uid = String(currentUser.uid || currentUser.id || '').trim();
+    const email = String(currentUser.email || '').toLowerCase().trim();
     return liveOrders.filter(o =>
-      Boolean(uid && (String(o.providerId) === uid || String(o.providerUid) === uid))
+      Boolean(
+        (uid && (String(o.providerId || '') === uid || String(o.providerUid || '') === uid)) ||
+        (email && String(o.providerEmail || '').toLowerCase().trim() === email)
+      )
     );
   }, [liveOrders, currentUser]);
 
   const sentOrders = useMemo(() => {
     if (!currentUser) return [];
-    const uid = String(currentUser.uid || currentUser.id || '');
+    const uid = String(currentUser.uid || currentUser.id || '').trim();
+    const email = String(currentUser.email || '').toLowerCase().trim();
     return liveOrders.filter(o =>
-      Boolean(uid && (String(o.clientId) === uid || String(o.clientUid) === uid))
+      Boolean(
+        (uid && (String(o.clientId || '') === uid || String(o.clientUid || '') === uid)) ||
+        (email && String(o.clientEmail || '').toLowerCase().trim() === email)
+      )
     );
   }, [liveOrders, currentUser]);
 
