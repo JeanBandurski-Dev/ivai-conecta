@@ -37,8 +37,9 @@ module.exports = async function handler(req, res) {
     return res.status(503).json({ error: 'ImageKit não configurado no servidor.' });
   }
 
-  const folder = String(req.body?.folder || '');
-  if (!folder.startsWith(`ivai-conecta/users/${uid}/`) || folder.includes('..')) {
+  const folder = String(req.body?.folder || '').replace(/\/+$/, '');
+  const allowedRoot = `ivai-conecta/users/${uid}`;
+  if ((folder !== allowedRoot && !folder.startsWith(`${allowedRoot}/`)) || folder.includes('..')) {
     return res.status(403).json({ error: 'Pasta de envio inválida.' });
   }
 

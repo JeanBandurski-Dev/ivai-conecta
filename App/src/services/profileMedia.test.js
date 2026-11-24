@@ -152,4 +152,33 @@ describe('publicProfileSync & storageService', () => {
     const bigRes = await uploadUserProfilePicture(bigFile, 'user_123', 'cover');
     expect(bigRes.success).toBe(false);
   });
+
+  it('falls back to compressed DataURL when ImageKit endpoint is unavailable', async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 405,
+      json: async () => {
+        throw new Error('Unexpected end of JSON input');
+      },
+    }));
+
+    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2w==';
+    globalThis.FileReader = class {
+      readAsDataURL() {
+        this.result = dataUrl;
+        setTimeout(() => this.onload?.(), 0);
+      }
+    };
+
+    const file = new File(['dummy-avatar'], 'aluno.jpg', { type: 'image/jpeg' });
+    const res = await uploadUserProfilePicture(file, 'user_123', 'avatar');
+
+    expect(res.success).toBe(true);
+    expect(res.storageMode).toBe('compressed');
+    expect(res.url).toBe(dataUrl);
+    expect(setDocMock).toHaveBeenCalledTimes(2);
+    const [, publicData] = setDocMock.mock.calls[1];
+    expect(publicData.avatar).toBe(dataUrl);
+    expect(publicData.photoURL).toBe('');
+  });
 });

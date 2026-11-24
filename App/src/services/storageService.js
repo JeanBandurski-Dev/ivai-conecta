@@ -287,28 +287,54 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
     previousFileId = '';
   }
 
-  let uploaded;
+  let finalUrl = '';
+  let uploadedFileId = '';
+  let storageMode = 'imagekit';
+
   try {
-    uploaded = await uploadPublicImageToImageKit(
+    const uploaded = await uploadPublicImageToImageKit(
       file,
       cleanUid,
       `ivai-conecta/users/${cleanUid}`,
       normalizedKind
     );
+    finalUrl = uploaded.url;
+    uploadedFileId = uploaded.fileId || '';
   } catch (uploadError) {
-    return {
-      success: false,
-      error: getStorageErrorMessage(uploadError),
-    };
+    console.warn(
+      `[Storage] ImageKit indisponível para ${normalizedKind}, ativando compressão resiliente:`,
+      uploadError?.message
+    );
+    try {
+      finalUrl = await compressImageFileToDataUrl(file, {
+        isCover: normalizedKind === 'cover',
+      });
+      storageMode = 'compressed';
+    } catch (fallbackErr) {
+      return {
+        success: false,
+        error: getStorageErrorMessage(fallbackErr) || getStorageErrorMessage(uploadError),
+      };
+    }
   }
-
-  const finalUrl = uploaded.url;
-  const storageMode = 'imagekit';
 
   const patch =
     normalizedKind === 'cover'
-      ? { banner: finalUrl, bannerFileId: uploaded.fileId }
-      : { avatar: finalUrl, photoURL: finalUrl, avatarFileId: uploaded.fileId };
+      ? { banner: finalUrl, ...(uploadedFileId ? { bannerFileId: uploadedFileId } : {}) }
+      : {
+          avatar: finalUrl,
+          photoURL: finalUrl,
+          ...(uploadedFileId ? { avatarFileId: uploadedFileId } : {}),
+        };
+
+  const publicPatch =
+    normalizedKind === 'cover'
+      ? { banner: finalUrl, ...(uploadedFileId ? { bannerFileId: uploadedFileId } : {}) }
+      : {
+          avatar: finalUrl,
+          photoURL: storageMode === 'compressed' ? '' : finalUrl,
+          ...(uploadedFileId ? { avatarFileId: uploadedFileId } : {}),
+        };
 
   try {
     await setDoc(
@@ -327,7 +353,7 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
     await setDoc(
       doc(db, 'public_profiles', cleanUid),
       {
-        ...patch,
+        ...publicPatch,
         uid: cleanUid,
         updatedAt: new Date().toISOString(),
       },
@@ -343,7 +369,7 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
     console.warn(`[Storage] Aviso ao sincronizar sessão local (${normalizedKind}):`, authErr?.message);
   }
 
-  if (previousFileId && previousFileId !== uploaded.fileId) {
+  if (storageMode === 'imagekit' && previousFileId && previousFileId !== uploadedFileId) {
     try {
       await deletePublicImage(previousFileId, cleanUid);
     } catch (deleteError) {
@@ -354,7 +380,7 @@ export async function uploadUserProfilePicture(file, uid, kind = 'avatar') {
   return {
     success: true,
     url: finalUrl,
-    fileId: uploaded.fileId,
+    ...(uploadedFileId ? { fileId: uploadedFileId } : {}),
     kind: normalizedKind,
     storageMode,
   };
