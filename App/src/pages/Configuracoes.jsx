@@ -69,6 +69,7 @@ export default function Configuracoes() {
   const isAdmin = userRole === 'admin';
   const isEmpresa = userRole === 'empresa';
   const isAluno = userRole === 'aluno';
+  const isProfessor = userRole === 'professor' || userRole === 'docente';
 
   // Define a aba inicial padrão
   const defaultTab = isAdmin ? 'account' : 'links';
@@ -294,12 +295,12 @@ export default function Configuracoes() {
 
   if (!currentUser) {
     return (
-      <main className="container section text-center py-24">
+      <div className="container section text-center py-24">
         <Settings size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
         <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Acesso restrito</h2>
         <p className="text-gray-500 dark:text-slate-300 mb-6">Você precisa estar logado para acessar as configurações da sua conta.</p>
         <Link to="/login" className="btn btn-primary px-6 py-2.5 font-bold">Entrar na Conta</Link>
-      </main>
+      </div>
     );
   }
 
@@ -722,7 +723,7 @@ export default function Configuracoes() {
         </div>
       </header>
 
-      <main className="container section">
+      <div className="container section">
         <div className="max-w-4xl mx-auto space-y-6">
 
           {/* ── NAVEGAÇÃO POR ABAS COESA E ADAPTÁVEL ── */}
@@ -844,7 +845,7 @@ export default function Configuracoes() {
                 </div>
 
                 <Link
-                  to={isEmpresa ? '/empresa' : isAluno ? '/perfil' : userRole === 'freelancer' ? '/freelancer' : '/perfil'}
+                  to={isEmpresa ? '/empresa' : isProfessor ? '/professor' : userRole === 'freelancer' ? '/freelancer' : '/perfil'}
                   className="btn btn-outline btn-sm text-xs font-bold shrink-0 flex items-center gap-1.5 self-stretch sm:self-auto justify-center"
                 >
                   <span>Editar Perfil Público</span>
@@ -856,12 +857,14 @@ export default function Configuracoes() {
               <div className="card p-6 sm:p-8 space-y-6">
                 <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
                   <h3 className="font-heading font-bold text-xl text-primary-dark dark:text-white">
-                    {isEmpresa ? 'Canais Oficiais da Empresa' : 'Redes Sociais & Portfólio Profissional'}
+                    {isEmpresa ? 'Canais Oficiais da Empresa' : isProfessor ? 'Canais Acadêmicos & Redes' : 'Redes Sociais & Portfólio Profissional'}
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                     {isEmpresa
                       ? 'Adicione os canais digitais onde candidatos e parceiros podem conhecer sua atuação.'
-                      : 'Mantenha seus links sempre atualizados para facilitar a avaliação de recrutadores e empresas parceiras.'}
+                      : isProfessor
+                        ? 'Mantenha seus links acadêmicos atualizados para facilitar o contato de estudantes e instituições parceiras.'
+                        : 'Mantenha seus links sempre atualizados para facilitar a avaliação de recrutadores e empresas parceiras.'}
                   </p>
                 </div>
 
@@ -1342,8 +1345,8 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="space-y-1 text-xs text-amber-900/80 dark:text-amber-300/80 pl-13">
-                  <p>• Seu perfil não aparecerá em buscas ou no Banco de Talentos durante a pausa;</p>
-                  <p>• Suas candidaturas em andamento ficarão suspensas;</p>
+                  <p>• {isProfessor ? 'Seu perfil docente ficará oculto para solicitações de parecer durante a pausa;' : 'Seu perfil não aparecerá em buscas ou no Banco de Talentos durante a pausa;'}</p>
+                  <p>• {isProfessor ? 'Seus pareceres já emitidos permanecerão vinculados aos alunos;' : 'Suas candidaturas em andamento ficarão suspensas;'}</p>
                   <p>• Você poderá reativar seu acesso a qualquer momento ao fazer login novamente.</p>
                 </div>
 
@@ -1375,7 +1378,9 @@ export default function Configuracoes() {
                         </span>
                       </div>
                       <p className="text-xs text-red-800 dark:text-red-300/90 mt-1 leading-relaxed">
-                        Excluir permanentemente sua conta removerá todos os seus dados pessoais do Ivaí Conecta, incluindo perfil, currículo, candidaturas ativas e credenciais de acesso. Esta operação é irreversível.
+                        {isProfessor
+                          ? 'Excluir permanentemente sua conta removerá todos os seus dados pessoais do Ivaí Conecta, incluindo perfil docente, matérias cadastradas e credenciais de acesso. Esta operação é irreversível.'
+                          : 'Excluir permanentemente sua conta removerá todos os seus dados pessoais do Ivaí Conecta, incluindo perfil, currículo, candidaturas ativas e credenciais de acesso. Esta operação é irreversível.'}
                       </p>
                     </div>
                   </div>
@@ -1440,7 +1445,7 @@ export default function Configuracoes() {
                     </h4>
 
                     {/* Processo Seletivo (Candidato/Aluno/Freelancer) */}
-                    {!isEmpresa && (
+                    {!isEmpresa && !isProfessor && (
                       <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
                         <div>
                           <div className="text-sm font-semibold text-gray-800 dark:text-white">
@@ -1464,26 +1469,28 @@ export default function Configuracoes() {
                     )}
 
                     {/* Convites para Entrevistas */}
-                    <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-800 dark:text-white">
-                          Convites e Agendamentos de Entrevistas
+                    {!isProfessor && (
+                      <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                            Convites e Agendamentos de Entrevistas
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            Receba avisos por e-mail com data, horário e link oficial de salas virtuais agendadas.
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                          Receba avisos por e-mail com data, horário e link oficial de salas virtuais agendadas.
-                        </p>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            disabled={!notifPrefs.emailNotifications}
+                            checked={notifPrefs.interviewInvites && notifPrefs.emailNotifications}
+                            onChange={e => setNotifPrefs(prev => ({ ...prev, interviewInvites: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                        </label>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          disabled={!notifPrefs.emailNotifications}
-                          checked={notifPrefs.interviewInvites && notifPrefs.emailNotifications}
-                          onChange={e => setNotifPrefs(prev => ({ ...prev, interviewInvites: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
-                      </label>
-                    </div>
+                    )}
 
                     {/* Novas Candidaturas (Empresa) */}
                     {isEmpresa && (
@@ -1509,6 +1516,30 @@ export default function Configuracoes() {
                       </div>
                     )}
 
+                    {/* Solicitações de Parecer Pedagógico (Professor) */}
+                    {isProfessor && (
+                      <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                            Solicitações de Parecer Pedagógico
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            Receba alertas quando um estudante solicitar sua recomendação acadêmica.
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            disabled={!notifPrefs.emailNotifications}
+                            checked={(notifPrefs.recommendationRequests ?? true) && notifPrefs.emailNotifications}
+                            onChange={e => setNotifPrefs(prev => ({ ...prev, recommendationRequests: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5.5 bg-gray-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-primary-blue peer-disabled:opacity-40"></div>
+                        </label>
+                      </div>
+                    )}
+
                     {/* Mensagens Diretas das Empresas */}
                     <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
                       <div>
@@ -1516,7 +1547,7 @@ export default function Configuracoes() {
                           Mensagens Diretas &amp; Comunicação
                         </div>
                         <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                          Notificações quando {isEmpresa ? 'candidatos' : 'empresas ou recrutadores'} enviarem mensagens no chat.
+                          Notificações quando {isEmpresa ? 'candidatos' : isProfessor ? 'alunos, empresas ou colegas docentes' : 'empresas ou recrutadores'} enviarem mensagens no chat.
                         </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -1610,13 +1641,13 @@ export default function Configuracoes() {
 
                 <form onSubmit={handleSavePrivacy} className="space-y-6">
                   {/* Visibilidade no Banco de Talentos */}
-                  {!isEmpresa && (
+                  {!isEmpresa && !isProfessor && (
                     <div className="form-group">
                       <label className="form-label">Visibilidade no Banco de Talentos Regional</label>
                       <select
                         value={privacySettings.talentDirectoryVisibility || 'public'}
                         onChange={e => setPrivacySettings(prev => ({ ...prev, talentDirectoryVisibility: e.target.value }))}
-                        className="form-control text-xs sm:text-sm font-medium"
+                        className="form-control text-xs sm:text-sm font-medium appearance-none"
                       >
                         <option value="public" className="dark:bg-slate-800">
                           Público: Visível para todas as empresas contratantes do ecossistema
@@ -1638,10 +1669,12 @@ export default function Configuracoes() {
                   <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between gap-4">
                     <div>
                       <div className="text-sm font-semibold text-gray-800 dark:text-white">
-                        Exibição de Canais Profissionais para Recrutadores
+                        {isProfessor ? 'Exibição de Canais Acadêmicos' : 'Exibição de Canais Profissionais para Recrutadores'}
                       </div>
                       <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                        Permitir que empresas parceiras visualizem seus links de LinkedIn e GitHub no seu currículo.
+                        {isProfessor
+                          ? 'Permitir que estudantes e instituições visualizem seus links acadêmicos e de contato no seu perfil.'
+                          : 'Permitir que empresas parceiras visualizem seus links de LinkedIn e GitHub no seu currículo.'}
                       </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -1662,7 +1695,9 @@ export default function Configuracoes() {
                         Recebimento de Mensagens no Chat Interno
                       </div>
                       <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                        Permitir que empresas iniciem conversas sobre oportunidades diretamente no sistema.
+                        {isProfessor
+                          ? 'Permitir que estudantes, empresas e colegas docentes iniciem conversas diretamente no sistema.'
+                          : 'Permitir que empresas iniciem conversas sobre oportunidades diretamente no sistema.'}
                       </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -2082,7 +2117,7 @@ export default function Configuracoes() {
           </div>
 
         </div>
-      </main>
+      </div>
 
       {/* ── MODAL: DESATIVAÇÃO TEMPORÁRIA DA CONTA ── */}
       {isDeactivateModalOpen && (

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle, Bookmark, MessageSquare, Sparkles } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
@@ -8,6 +9,7 @@ import SafeAvatar from './ui/SafeAvatar';
 export default function TalentCard({ talent, isHighlighted = false }) {
   const { favoriteTalents = [], toggleFavoriteTalent, showToast, startChatWith, currentUser } = useAppStore();
   const { id, name, course, institution, city, avatar, skills = [], endorsements = [] } = talent;
+  const [imgError, setImgError] = useState(false);
 
   const isFavorite = isTalentFavorited(talent, favoriteTalents);
 

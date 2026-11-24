@@ -773,7 +773,7 @@ export default function PerfilEmpresa() {
                     }}
                     className="btn bg-white dark:bg-slate-800 text-primary-dark dark:text-white font-bold btn-sm shadow-md hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 cursor-pointer border border-white/20"
                   >
-                    <MessageSquare size={15} /> 💬 Conversar com a Empresa
+                    <MessageSquare size={15} /> Conversar com a Empresa
                   </button>
                 </div>
               )
@@ -782,7 +782,7 @@ export default function PerfilEmpresa() {
         </div>
       </div>
 
-      <main className="container section space-y-8">
+      <div className="container section space-y-8">
 
         {/* ── ALERTA DE SUSPENSÃO ADMINISTRATIVA ── */}
         {(company.blocked || company.status === 'blocked' || (isCompanyOwner && (currentUser?.blocked || currentUser?.status === 'blocked'))) && (
@@ -926,7 +926,7 @@ export default function PerfilEmpresa() {
           </div>
 
         </div>
-      </main>
+      </div>
 
       {/* Modal Padronizado: Editar Perfil da Empresa */}
       {isCompanyOwner && (

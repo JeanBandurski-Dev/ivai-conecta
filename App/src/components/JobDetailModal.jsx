@@ -90,7 +90,11 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
       showToast('Não foi possível atualizar o favorito. Tente novamente.');
       return;
     }
-    showToast(added ? '⭐ Vaga salva em Minhas Candidaturas / Favoritos!' : 'Vaga removida dos Favoritos.');
+    showToast(
+      added
+        ? (isProfessor ? '⭐ Vaga salva nos seus Favoritos!' : '⭐ Vaga salva em Minhas Candidaturas / Favoritos!')
+        : 'Vaga removida dos Favoritos.'
+    );
   };
 
   // Freelancers só visualizam Match para vagas PJ/Freelance
@@ -611,9 +615,18 @@ export default function JobDetailModal({ job, onClose, matchScore }) {
                 <Building2 size={14} /> Empresas não se candidatam a vagas
               </span>
             ) : isProfessor ? (
-              <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-3.5 py-2 rounded-xl font-medium border border-blue-200 dark:border-blue-800/70 flex items-center gap-1.5">
-                <Users size={14} /> Docentes não realizam candidaturas
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-3 py-1.5 rounded-xl font-medium border border-blue-200 dark:border-blue-800/70 flex items-center gap-1.5">
+                  <Users size={14} /> Docentes não realizam candidaturas
+                </span>
+                <Link
+                  to="/talentos"
+                  onClick={onClose}
+                  className="btn btn-teal btn-sm text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                >
+                  <Sparkles size={14} /> Indicar Aluno
+                </Link>
+              </div>
             ) : !currentUser ? (
               <Link
                 to="/login"

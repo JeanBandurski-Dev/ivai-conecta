@@ -65,6 +65,7 @@ export default function PerfilAluno() {
     return id ? null : buildFallbackTalent(currentUser);
   });
   const [loading, setLoading] = useState(!talent);
+  const [avatarError, setAvatarError] = useState(false);
 
   // 2. Pedidos de endosso e professores verificados
   const [studentRequests, setStudentRequests] = useState([]);
@@ -73,6 +74,10 @@ export default function PerfilAluno() {
   // 3. Navegação, abas e modais
   const [activeTab, setActiveTab] = useState('overview');
   const [editModalOpen, setEditModalOpen] = useState(Boolean(searchParams.get('tab') === 'edit' || searchParams.get('edit') === 'true'));
+  const isEditModalOpenRef = useRef(editModalOpen);
+  useEffect(() => {
+    isEditModalOpenRef.current = editModalOpen;
+  }, [editModalOpen]);
   const [requestModal, setRequestModal] = useState(false);
   const [proactiveEndorseModal, setProactiveEndorseModal] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
@@ -296,6 +301,7 @@ export default function PerfilAluno() {
             Boolean(data.isVerifiedStudent || data.institutionalValidationStatus === 'VALIDADO'),
           studentEmail: data.studentEmail || (validateStudentEmail(data.email)?.isValid ? data.email : (ownerFallback?.studentEmail || '')),
           email: data.email || ownerFallback?.email || '',
+          phone: data.phone || ownerFallback?.phone || '',
           raNumber: data.raNumber || ownerFallback?.raNumber || '',
           linkedin: data.linkedin || ownerFallback?.linkedin || '',
           github: data.github || ownerFallback?.github || '',
@@ -305,6 +311,7 @@ export default function PerfilAluno() {
           education: Array.isArray(data.education) ? data.education : (ownerFallback?.education || []),
           endorsements: Array.isArray(data.endorsements) ? data.endorsements : (ownerFallback?.endorsements || [])
         };
+        setAvatarError(false);
 
         setTalent(mergedTalent);
         if (!editModalOpenRef.current) {
@@ -949,7 +956,7 @@ export default function PerfilAluno() {
                 activeTab === 'experience' ? 'border-accent-sky text-white' : 'border-transparent text-gray-300 hover:text-white'
               }`}
             >
-              Experiências &amp; Projetos ({talent.experiences?.length || 0})
+              Experiências &amp; Projetos ({(talent.experiences?.length || 0) + (talent.projects?.length || 0)})
             </button>
             <button
               onClick={() => setActiveTab('endorsements')}
@@ -964,7 +971,7 @@ export default function PerfilAluno() {
         </div>
       </div>
 
-      <main className="container section">
+      <div className="container section">
 
         {/* ── ABA 1: VISÃO GERAL ── */}
         {activeTab === 'overview' && (
@@ -1177,29 +1184,35 @@ export default function PerfilAluno() {
           </div>
         )}
 
-      </main>
+      </div>
 
       {/* Modal: Recomendação Proativa pelo Professor */}
       {proactiveEndorseModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => !isSubmittingProactive && setProactiveEndorseModal(false)}>
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="proactive-endorse-title"
+          onClick={() => !isSubmittingProactive && setProactiveEndorseModal(false)}
+        >
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-lg p-7" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-slate-800 pb-3">
-              <h3 className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
+              <h3 id="proactive-endorse-title" className="font-heading text-xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                 <Award size={20} className="text-amber-500 fill-amber-500" /> Recomendar {talent.name || 'Estudante'}
               </h3>
               <button
                 type="button"
+                aria-label="Fechar modal de recomendação"
                 disabled={isSubmittingProactive}
                 onClick={() => setProactiveEndorseModal(false)}
-                className="cursor-pointer disabled:opacity-50"
+                className="cursor-pointer disabled:opacity-50 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
               >
                 <X size={20} className="text-gray-400 hover:text-gray-600 dark:hover:text-white" />
               </button>
             </div>
 
             <p className="text-xs text-gray-500 dark:text-slate-400 mb-4 leading-relaxed">
-              Como docente autenticado, você pode emitir uma avaliação recomendando este aluno. O parecer exibirá seu nome, titulação e o selo de recomendação verificada.
+              Como docente autenticado, você pode emitir uma avaliação recomendando este aluno. O parecer ficará visível no perfil do estudante com seu nome, titulação e selo de recomendação verificada.
             </p>
 
             <form onSubmit={handleProactiveEndorseSubmit} className="space-y-4">
@@ -1209,6 +1222,7 @@ export default function PerfilAluno() {
                   type="text"
                   value={proactiveDiscipline}
                   onChange={e => setProactiveDiscipline(e.target.value)}
+                  maxLength={100}
                   className="form-control"
                   placeholder="Ex: Programação de Computadores"
                   required
@@ -1217,10 +1231,16 @@ export default function PerfilAluno() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Seu Parecer Pedagógico</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label mb-0">Seu Parecer Pedagógico</label>
+                  <span className="text-[11px] text-gray-400 dark:text-slate-500">
+                    {proactiveQuote.length}/600
+                  </span>
+                </div>
                 <textarea
                   value={proactiveQuote}
                   onChange={e => setProactiveQuote(e.target.value)}
+                  maxLength={600}
                   className="form-control"
                   rows={3}
                   placeholder="Escreva sobre a assiduidade, qualidade dos trabalhos e competências técnicas do aluno..."
@@ -1285,8 +1305,13 @@ export default function PerfilAluno() {
 
       {/* Modal: Pedir Recomendação a Professor (Para Alunos) */}
       {requestModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => { if (!isSubmittingRequest) { setRequestModal(false); } }}>
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Solicitar Recomendação Acadêmica"
+          onClick={() => { if (!isSubmittingRequest) { setRequestModal(false); } }}
+        >
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-6 sm:p-7 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-5 border-b border-gray-100 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1304,6 +1329,7 @@ export default function PerfilAluno() {
               </div>
               <button
                 type="button"
+                aria-label="Fechar modal de solicitação"
                 disabled={isSubmittingRequest}
                 onClick={() => { setRequestModal(false); }}
                 className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"

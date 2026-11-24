@@ -149,6 +149,7 @@ export default function PerfilProfessor() {
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students'
   const [editModal, setEditModal] = useState(false);
+  const [editModalTab, setEditModalTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -159,10 +160,14 @@ export default function PerfilProfessor() {
     name: teacher?.name || '',
     avatar: teacher?.avatar || '',
     banner: teacher?.banner || '',
+    city: teacher?.city || 'Ivaiporã',
+    email: teacher?.email || currentUser?.email || '',
     degree: teacher?.degree || '',
     institution: teacher?.institution || 'IFPR Campus Ivaiporã',
     discipline: teacher?.discipline || '',
     bio: teacher?.bio || '',
+    lattes: teacher?.lattes || '',
+    linkedin: teacher?.linkedin || '',
     classes: [...(teacher?.classes || [])],
     education: [...(teacher?.education || [])],
     newClass: '',
@@ -175,10 +180,14 @@ export default function PerfilProfessor() {
         name: teacher.name || '',
         avatar: teacher.avatar || '',
         banner: teacher.banner || teacher.coverImage || '',
+        city: teacher.city || 'Ivaiporã',
+        email: teacher.email || currentUser?.email || '',
         degree: teacher.degree || '',
         institution: teacher.institution || 'IFPR Campus Ivaiporã',
         discipline: teacher.discipline || '',
         bio: teacher.bio || '',
+        lattes: teacher.lattes || '',
+        linkedin: teacher.linkedin || '',
         classes: [...(teacher.classes || [])],
         education: [...(teacher.education || [])],
         newClass: '',
@@ -186,7 +195,7 @@ export default function PerfilProfessor() {
       });
     }
     wasEditModalOpenRef.current = editModal;
-  }, [teacher, editModal]);
+  }, [teacher, editModal, currentUser?.email]);
 
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
@@ -292,14 +301,14 @@ export default function PerfilProfessor() {
 
   if (!teacher) {
     return (
-      <main className="container section text-center py-24">
+      <div className="container section text-center py-24">
         <GraduationCap size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
         <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Perfil de Docente não encontrado</h2>
         <p className="text-gray-500 dark:text-slate-300 mb-6">O perfil do professor solicitado não foi localizado.</p>
         <button onClick={() => navigate('/')} className="btn btn-primary px-6 py-2.5 font-bold">
           Voltar para a Página Inicial
         </button>
-      </main>
+      </div>
     );
   }
 
@@ -384,11 +393,13 @@ export default function PerfilProfessor() {
 
                 <div className="text-accent-sky font-bold text-base sm:text-lg mb-1">{teacher.degree}</div>
 
-                <div className="flex items-center gap-3 text-gray-300 text-xs sm:text-sm flex-wrap">
-                  <span className="flex items-center gap-1.5"><Building2 size={14} />{teacher.institution}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1.5"><BookOpen size={14} />{teacher.discipline}</span>
-                  <span>·</span>
+                <div className="flex items-center gap-x-4 gap-y-1 text-gray-300 text-xs sm:text-sm flex-wrap">
+                  {teacher.institution && (
+                    <span className="flex items-center gap-1.5"><Building2 size={14} />{teacher.institution}</span>
+                  )}
+                  {teacher.discipline && (
+                    <span className="flex items-center gap-1.5"><BookOpen size={14} />{teacher.discipline}</span>
+                  )}
                   <span className="flex items-center gap-1.5">
                     <Award size={14} className="text-amber-400" />
                     {Math.max(teacher.endorsementCount || 0, endorsedStudents.length)} {Math.max(teacher.endorsementCount || 0, endorsedStudents.length) === 1 ? 'Indicação Concedida' : 'Indicações Concedidas'}
@@ -402,7 +413,7 @@ export default function PerfilProfessor() {
                 <Link to="/minhas-vagas" className="btn btn-teal text-white font-bold btn-sm shadow-md flex items-center gap-1.5 cursor-pointer">
                   <Award size={15} /> Pareceres de Alunos ({pendingRequests.length})
                 </Link>
-                <button onClick={() => setEditModal(true)} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md cursor-pointer">
+                <button onClick={() => { setEditModalTab('general'); setEditModal(true); }} className="btn btn-outline border-white/40 text-white font-bold btn-sm shadow-md cursor-pointer">
                   <Edit3 size={15} /> Editar Perfil Acadêmico
                 </button>
               </div>
@@ -471,7 +482,7 @@ export default function PerfilProfessor() {
         </div>
       </div>
 
-      <main className="container section">
+      <div className="container section">
 
         {/* ── ABA 1: VISÃO GERAL ── */}
         {activeTab === 'overview' && (
@@ -483,7 +494,15 @@ export default function PerfilProfessor() {
                 <h3 className="font-heading font-bold text-primary-dark dark:text-white mb-3 flex items-center gap-2">
                   <BookOpen size={18} className="text-primary-blue dark:text-blue-400" /> Sobre o Docente
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{teacher.bio}</p>
+                {teacher.bio?.trim() ? (
+                  <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{teacher.bio}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 dark:text-slate-500 italic">
+                    {isOwner
+                      ? 'Nenhuma biografia adicionada ainda. Clique em "Editar Perfil Acadêmico" para apresentar sua trajetória e linhas de pesquisa.'
+                      : 'Este docente ainda não adicionou uma apresentação acadêmica.'}
+                  </p>
+                )}
               </div>
 
               <div className="card">
@@ -511,7 +530,7 @@ export default function PerfilProfessor() {
                   </h3>
                   {isOwner && (
                     <button
-                      onClick={() => setEditModal(true)}
+                      onClick={() => { setEditModalTab('education'); setEditModal(true); }}
                       className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <Plus size={13} /> Gerenciar Formações
@@ -530,7 +549,7 @@ export default function PerfilProfessor() {
                     </p>
                     {isOwner && (
                       <button
-                        onClick={() => setEditModal(true)}
+                        onClick={() => { setEditModalTab('education'); setEditModal(true); }}
                         className="btn btn-teal btn-sm text-xs font-bold cursor-pointer"
                       >
                         <Plus size={13} /> Adicionar Formação
@@ -561,7 +580,7 @@ export default function PerfilProfessor() {
                   </h3>
                   {isOwner && (
                     <button
-                      onClick={() => setEditModal(true)}
+                      onClick={() => { setEditModalTab('classes'); setEditModal(true); }}
                       className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <Plus size={13} /> Gerenciar Matérias
@@ -580,7 +599,7 @@ export default function PerfilProfessor() {
                     </p>
                     {isOwner && (
                       <button
-                        onClick={() => setEditModal(true)}
+                        onClick={() => { setEditModalTab('classes'); setEditModal(true); }}
                         className="btn btn-teal btn-sm text-xs font-bold cursor-pointer"
                       >
                         <Plus size={13} /> Adicionar Minhas Matérias
@@ -648,11 +667,12 @@ export default function PerfilProfessor() {
           </div>
         )}
 
-      </main>
+      </div>
 
       {/* Modal Padronizado: Editar Perfil do Professor */}
       <EditTeacherProfileModal
         isOpen={isOwner && editModal}
+        initialTab={editModalTab}
         onClose={() => !isSaving && setEditModal(false)}
         editData={editData}
         setEditData={setEditData}

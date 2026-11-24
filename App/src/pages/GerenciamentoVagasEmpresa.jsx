@@ -1650,7 +1650,7 @@ export default function GerenciamentoVagasEmpresa() {
         );
       })()}
 
-      <main className="container-wide py-6">
+      <div className="container-wide py-6">
 
         {/* ═════════════════════════════════════════════════════════════════
             TAB 1: FUNIL DE RECRUTAMENTO & PIPELINE (KANBAN ATS REVAMP)
@@ -4413,7 +4413,7 @@ export default function GerenciamentoVagasEmpresa() {
                 </div>
               )}
 
-            </main>
+            </div>
 
       {/* ═════════════════════════════════════════════════════════════════
           MODAL / DRAWER: DETALHES COMPLETOS DO CANDIDATO

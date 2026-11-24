@@ -250,12 +250,12 @@ export default function MinhasVagas() {
 
   if (!currentUser) {
     return (
-      <main className="container section text-center py-24">
+      <div className="container section text-center py-24">
         <Briefcase size={54} className="mx-auto mb-4 text-gray-300 dark:text-slate-600" />
         <h2 className="font-heading text-2xl font-bold text-gray-700 dark:text-white mb-2">Acesso restrito</h2>
         <p className="text-gray-500 dark:text-slate-300 mb-6">Você precisa estar logado para acessar seu painel.</p>
         <Link to="/login" className="btn btn-primary px-6 py-2.5 font-bold">Entrar / Cadastrar</Link>
-      </main>
+      </div>
     );
   }
 
@@ -422,22 +422,25 @@ export default function MinhasVagas() {
         </div>
       </header>
 
-      <main className="container section py-8 sm:py-10">
+      <div className="container section py-8 sm:py-10">
 
         {/* ── VISÃO DO PROFESSOR / DOCENTE ── */}
         {isProfessor ? (
           <div className="space-y-6 max-w-4xl mx-auto">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <h2 className="font-heading text-2xl font-bold text-primary-dark dark:text-white flex items-center gap-2">
                 <Award className="text-amber-400 fill-amber-400" size={24} /> Solicitações de Recomendação Pendentes ({pendingTeacherRequests.length})
               </h2>
+              <Link to="/talentos" className="btn btn-outline btn-sm text-xs font-bold flex items-center gap-1.5">
+                <Users size={14} /> Explorar Banco de Talentos
+              </Link>
             </div>
 
             {pendingTeacherRequests.length === 0 ? (
               <div className="text-center py-16 text-gray-400 dark:text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 shadow-xs">
                 <Award size={48} className="mx-auto mb-3 text-gray-300 dark:text-slate-600" />
                 <p className="font-bold text-lg text-gray-700 dark:text-white mb-1">Nenhuma solicitação pendente no momento.</p>
-                <p className="text-sm text-gray-400 dark:text-slate-400">Todos os pedidos de parecer pedagógico foram avaliados e estão listados no histórico abaixo.</p>
+                <p className="text-sm text-gray-400 dark:text-slate-400">Quando estudantes solicitarem um parecer pedagógico, as solicitações pendentes aparecerão aqui para sua avaliação.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1059,7 +1062,7 @@ export default function MinhasVagas() {
           </div>
         )}
 
-      </main>
+      </div>
 
       {/* Modal: Detalhes da Vaga para Candidatura Direta */}
       {selectedJob && (

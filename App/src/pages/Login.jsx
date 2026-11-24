@@ -247,7 +247,7 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-80px)] flex items-center justify-center p-3 sm:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-3 sm:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
       <div className={`w-full max-w-5xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900 rounded-3xl border auth-card-transition overflow-hidden my-auto min-h-[560px] sm:min-h-[600px] lg:min-h-[640px] transition-all duration-500 ease-out ${
         tab === 'login'
           ? 'border-gray-200/90 dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,82,255,0.08)]'
@@ -850,7 +850,7 @@ export default function Login() {
                       <select
                         value={regCity}
                         onChange={e => setRegCity(e.target.value)}
-                        className="w-full appearance-none bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
+                        className="w-full appearance-none bg-none bg-slate-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 rounded-xl pl-3 pr-9 py-2 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:border-primary-blue focus:ring-4 focus:ring-blue-500/15 transition-all duration-200"
                         required
                       >
                         {CITIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
@@ -909,7 +909,15 @@ export default function Login() {
 
             {/* Termos & Políticas */}
             <p className="text-center text-[10px] text-gray-400 dark:text-slate-500 leading-tight pt-1">
-              Ao continuar, você concorda com os Termos de Uso e Política de Privacidade do ecossistema Ivaí Conecta.
+              Ao continuar, você concorda com os{' '}
+              <button
+                type="button"
+                onClick={() => showToast('Os Termos de Uso e Política de Privacidade (LGPD) estão disponíveis nas Configurações após o login.', 'info')}
+                className="underline hover:text-primary-blue dark:hover:text-blue-400 cursor-pointer font-semibold"
+              >
+                Termos de Uso e Política de Privacidade
+              </button>{' '}
+              do ecossistema Ivaí Conecta.
             </p>
 
           </div>
@@ -917,7 +925,7 @@ export default function Login() {
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }
 

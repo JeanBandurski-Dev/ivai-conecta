@@ -130,28 +130,36 @@ export default function Dashboard() {
     setSelectedSector('todos');
   }, []);
 
-  const metrics = useMemo(() => [
-    {
-      value: `${platformMetrics.talentsCount || 0}`,
-      label: 'Alunos & Candidatos',
-      color: 'text-[#4ADE80]'
-    },
-    {
-      value: `${platformMetrics.companiesCount || 0}`,
-      label: 'Empresas Parceiras',
-      color: 'text-[#A78BFA]'
-    },
-    {
-      value: `${platformMetrics.jobsCount || 0}`,
-      label: 'Vagas Ativas',
-      color: 'text-[#38BDF8]'
-    },
-    {
-      value: `${platformMetrics.servicesCount || 0}`,
-      label: 'Serviços no Marketplace',
-      color: 'text-[#FBBF24]'
-    },
-  ], [platformMetrics]);
+  const metrics = useMemo(() => {
+    const isAllCities = selectedCity === 'Todas as Cidades';
+    const liveJobsCount = isAllCities ? jobs.filter(isJobActive).length : 0;
+    const liveTalentsCount = isAllCities ? talents.length : 0;
+    const liveCompaniesCount = isAllCities ? companies.length : 0;
+    const liveServicesCount = isAllCities ? services.length : 0;
+
+    return [
+      {
+        value: `${Math.max(platformMetrics.talentsCount || 0, liveTalentsCount)}`,
+        label: 'Alunos & Candidatos',
+        color: 'text-[#4ADE80]'
+      },
+      {
+        value: `${Math.max(platformMetrics.companiesCount || 0, liveCompaniesCount)}`,
+        label: 'Empresas Parceiras',
+        color: 'text-[#A78BFA]'
+      },
+      {
+        value: `${Math.max(platformMetrics.jobsCount || 0, liveJobsCount)}`,
+        label: 'Vagas Ativas',
+        color: 'text-[#38BDF8]'
+      },
+      {
+        value: `${Math.max(platformMetrics.servicesCount || 0, liveServicesCount)}`,
+        label: 'Serviços no Marketplace',
+        color: 'text-[#FBBF24]'
+      },
+    ];
+  }, [platformMetrics, selectedCity, jobs, talents, companies, services]);
 
   return (
     <>

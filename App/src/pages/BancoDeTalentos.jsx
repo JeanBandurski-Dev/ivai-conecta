@@ -119,21 +119,24 @@ export default function BancoDeTalentos() {
   }, [all, city, area, institution, onlyEndorsed, onlyFavorites, selectedSkills, query, sortBy, favoriteTalents]);
 
   const userRole = String(currentUser?.role || '').toLowerCase().trim();
-  const isCompany = Boolean(currentUser && (userRole === 'empresa' || userRole === 'company' || userRole === 'recrutador'));
+  const canAccessTalents = Boolean(
+    currentUser &&
+    ['empresa', 'company', 'recrutador', 'professor', 'docente', 'admin'].includes(userRole)
+  );
 
-  if (!isCompany) {
+  if (!canAccessTalents) {
     return (
-      <main className="container section text-center py-24 max-w-xl mx-auto animate-in fade-in duration-200">
+      <div className="container section text-center py-24 max-w-xl mx-auto animate-in fade-in duration-200">
         <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-blue-950/60 text-primary-blue dark:text-blue-400 flex items-center justify-center mx-auto mb-5 shadow-inner">
           <ShieldCheck size={32} />
         </div>
         <h2 className="font-heading text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
-          Acesso Exclusivo para Empresas
+          Acesso Exclusivo para Empresas e Docentes
         </h2>
         <p className="text-gray-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed mb-8">
           {currentUser
-            ? 'O Banco de Talentos é uma ferramenta reservada para empresas e recrutadores contratantes avaliarem perfis profissionais e acadêmicos da região.'
-            : 'Faça login com uma conta corporativa de empresa ou recrutador para visualizar os perfis e habilidades do Banco de Talentos.'}
+            ? 'O Banco de Talentos é uma ferramenta reservada para empresas recrutadoras e professores parceiros avaliarem e recomendarem perfis acadêmicos da região.'
+            : 'Faça login com uma conta de empresa ou docente para visualizar os perfis e habilidades do Banco de Talentos.'}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           {!currentUser ? (
@@ -158,7 +161,7 @@ export default function BancoDeTalentos() {
             Voltar
           </button>
         </div>
-      </main>
+      </div>
     );
   }
 

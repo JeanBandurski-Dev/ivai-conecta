@@ -146,7 +146,7 @@ export default function PerfilFreelancer() {
   }, [allOrders, providerServices]);
 
   const ratingScore = useMemo(() => {
-    if (reviewsList.length === 0) return freelancer?.rating || 5.0;
+    if (reviewsList.length === 0) return Number(freelancer?.rating ?? 0);
     const sum = reviewsList.reduce((acc, r) => acc + (Number(r.stars || r.rating) || 5), 0);
     return Number((sum / reviewsList.length).toFixed(1));
   }, [reviewsList, freelancer]);

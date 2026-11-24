@@ -128,7 +128,7 @@ export default function Navbar() {
               <li><NavLink to="/" end className={navLinkClass}>Início</NavLink></li>
               <li><NavLink to="/vagas" className={navLinkClass}>Vagas &amp; Match</NavLink></li>
               <li><NavLink to="/servicos" className={navLinkClass}>Serviços Locais</NavLink></li>
-              {isCompany && (
+              {(isCompany || isProfessor || isAdmin) && (
                 <li><NavLink to="/talentos" className={navLinkClass}>Banco de Talentos</NavLink></li>
               )}
               {isAdmin && (
@@ -357,7 +357,7 @@ export default function Navbar() {
               <NavLink to="/" end className={mobileNavLinkClass} onClick={closeMobile}>Início</NavLink>
               <NavLink to="/vagas" className={mobileNavLinkClass} onClick={closeMobile}>Vagas &amp; Match</NavLink>
               <NavLink to="/servicos" className={mobileNavLinkClass} onClick={closeMobile}>Serviços Locais</NavLink>
-              {isCompany && (
+              {(isCompany || isProfessor || isAdmin) && (
                 <NavLink to="/talentos" className={mobileNavLinkClass} onClick={closeMobile}>Banco de Talentos</NavLink>
               )}
 

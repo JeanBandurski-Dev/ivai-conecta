@@ -289,7 +289,10 @@ const useAppStore = create((set, get) => ({
       type = typeOrDuration;
       if (typeof duration === 'number') dur = duration;
     }
-    set(state => ({ toasts: [...state.toasts, { id, message, type }] }));
+    set(state => {
+      const deduped = state.toasts.filter(t => t.message !== message);
+      return { toasts: [...deduped, { id, message, type }] };
+    });
     setTimeout(() => {
       set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
     }, dur);

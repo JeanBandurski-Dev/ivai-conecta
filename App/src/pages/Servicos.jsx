@@ -411,7 +411,7 @@ export default function Servicos() {
         </div>
       </header>
 
-      <main className="container section">
+      <div className="container section">
 
         {/* ── ABA MINHAS DEMANDAS & ORDENS DE SERVIÇO ── */}
         {activeTab === 'orders' ? (
@@ -878,7 +878,7 @@ export default function Servicos() {
           </>
         )}
 
-      </main>
+      </div>
 
       {/* Modal: Editar Serviço Freelancer */}
       {editingService && (

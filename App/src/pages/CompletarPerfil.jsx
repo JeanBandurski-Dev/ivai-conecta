@@ -231,7 +231,7 @@ export default function CompletarPerfil() {
   };
 
   return (
-    <main className="container section py-12">
+    <div className="container section py-12">
       <div className="max-w-[580px] mx-auto bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-brand-xl p-8 sm:p-10 transition-colors duration-300">
         
         {/* Header */}
@@ -568,6 +568,6 @@ export default function CompletarPerfil() {
 
         </form>
       </div>
-    </main>
+    </div>
   );
 }

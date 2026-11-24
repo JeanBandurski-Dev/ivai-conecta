@@ -1,5 +1,5 @@
 // Favorites Service for Ivaí Conecta (Firestore + User-Scoped Local Storage Sync)
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { collection, deleteDoc, doc, getDocs, setDoc, query, where } from 'firebase/firestore';
 import { STORAGE_KEY_FAV_JOBS, STORAGE_KEY_FAV_TALENTS } from '../data/seedData';
 
@@ -73,7 +73,9 @@ export function isJobFavorited(jobOrId, favoriteJobsList = []) {
 }
 
 export async function fetchUserFavoriteJobsFromFirestore(userUid) {
-  if (!userUid) return getFavoriteJobs(null);
+  if (!userUid || !auth.currentUser || auth.currentUser.uid !== String(userUid)) {
+    return getFavoriteJobs(userUid || null);
+  }
   try {
     const favRef = collection(db, 'favorites');
     const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'job'));
@@ -202,7 +204,9 @@ export function isTalentFavorited(talentOrId, favoriteTalentsList = []) {
 }
 
 export async function fetchUserFavoriteTalentsFromFirestore(userUid) {
-  if (!userUid) return getFavoriteTalents(null);
+  if (!userUid || !auth.currentUser || auth.currentUser.uid !== String(userUid)) {
+    return getFavoriteTalents(userUid || null);
+  }
   try {
     const favRef = collection(db, 'favorites');
     const q = query(favRef, where('userUid', '==', String(userUid)), where('targetType', '==', 'talent'));

@@ -454,6 +454,9 @@ export default function ChatModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mensagens Diretas e Chat"
         className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl shadow-brand-xl w-full max-w-4xl h-[86vh] sm:h-[84vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
@@ -493,6 +496,7 @@ export default function ChatModal({ onClose }) {
               onClick={onClose}
               className="p-2 hover:bg-gray-200/70 dark:hover:bg-slate-700/70 rounded-full text-gray-400 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white transition-colors cursor-pointer"
               title="Fechar chat"
+              aria-label="Fechar chat"
             >
               <X size={20} />
             </button>
@@ -568,11 +572,10 @@ export default function ChatModal({ onClose }) {
                           <UserAvatar src={cAvatar} name={cName} className="w-8 h-8 text-[11px]" isOnline={isContactOnline} />
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-xs text-gray-900 dark:text-white truncate">{cName}</div>
-                            <div className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
+                            <div className="text-[10px] text-gray-500 dark:text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                               <span>{badge.icon} {badge.label}</span>
-                              <span>·</span>
                               <span className={`flex items-center gap-1 ${isContactOnline ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-gray-400 dark:text-slate-500'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isContactOnline ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-slate-500'}`}></span>
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isContactOnline ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-slate-500'}`}></span>
                                 {contactPresence.label}
                               </span>
                             </div>
@@ -846,8 +849,8 @@ export default function ChatModal({ onClose }) {
                         e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
                       }}
                       onKeyDown={handleKeyDown}
-                      placeholder={`Mensagem para ${otherPerson.name}... (Enter para enviar, Shift+Enter para nova linha)`}
-                      className={`w-full input input-bordered text-sm py-3 px-4 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue resize-none overflow-y-auto min-h-[46px] max-h-[160px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 ${
+                      placeholder={`Mensagem para ${otherPerson.name}...`}
+                      className={`w-full input input-bordered text-sm py-3 px-4 rounded-xl dark:bg-slate-800 dark:text-white border-gray-200 dark:border-slate-700 focus:outline-hidden focus:border-primary-blue resize-none ${messageInput ? 'overflow-y-auto' : 'overflow-hidden'} min-h-[46px] max-h-[160px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 ${
                         sendError ? 'border-red-400 dark:border-red-600 focus:border-red-500 ring-1 ring-red-400/20' : ''
                       }`}
                       rows={1}

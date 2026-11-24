@@ -295,7 +295,7 @@ export default function Vagas() {
         </div>
       </header>
 
-      <main className="container section">
+      <div className="container section">
 
         {/* ── BARRA DE FILTROS ── */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 mb-8 shadow-brand-sm space-y-4 transition-colors duration-300">
@@ -609,7 +609,7 @@ export default function Vagas() {
             )}
           </>
         )}
-      </main>
+      </div>
 
       {/* Detail Job Modal */}
       {selectedJob && (

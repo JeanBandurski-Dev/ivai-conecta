@@ -209,6 +209,9 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
       onMouseUp={e => e.stopPropagation()}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Solicitação Formal de Serviço"
         className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-xl border border-gray-100 dark:border-slate-800 overflow-hidden my-auto"
         onClick={e => e.stopPropagation()}
         onMouseDown={e => e.stopPropagation()}
@@ -219,6 +222,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar formulário"
             className="absolute top-5 right-5 p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors cursor-pointer"
             title="Fechar formulário"
           >
@@ -376,7 +380,7 @@ export default function SolicitarServicoModal({ service, onClose, onSuccess }) {
                 <select
                   value={city}
                   onChange={e => setCity(e.target.value)}
-                  className="input pl-9.5 w-full text-xs font-semibold rounded-xl"
+                  className="form-control pl-9.5 text-xs font-semibold rounded-xl"
                 >
                   {CITIES.filter(c => c !== 'Todas as Cidades').map(c => (
                     <option key={c} value={c}>{c}</option>

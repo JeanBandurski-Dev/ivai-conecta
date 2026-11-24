@@ -309,19 +309,6 @@ export function subscribeToTalents(city = 'Todas as Cidades', callback) {
 
       _memTalentsCache = remoteTalents;
       if (typeof localStorage !== 'undefined') {
-    // Mescla professores do banco local de usuários
-    try {
-      const allLocalUsers = getUsersDB ? getUsersDB() : [];
-      allLocalUsers.forEach(u => {
-        if (!u) return;
-        const r = (u.role || '').toLowerCase().trim();
-        const id = String(u.uid || u.id || '');
-        const email = (u.profEmail || u.teacherEmail || u.email || '').toLowerCase().trim();
-        if ((r === 'professor' || r === 'docente') && !mockTeacherIds.has(id) && !mockTeacherEmails.has(email) && !id.startsWith('prof_')) {
-          teachers.push(normalizeTeacherDoc(u, id));
-        }
-      });
-    } catch {}
         try {
           localStorage.setItem(STORAGE_KEY_TALENTS, JSON.stringify(remoteTalents));
         } catch {}
@@ -675,7 +662,7 @@ export async function updateTeacherProfile(teacherId, data) {
     localStorage.setItem(STORAGE_KEY_TEACHERS, JSON.stringify(updated));
   }
 
-  // Sync imediato com a coleção 'users' e 'public_profiles' do Firestore
+  // Sync imediato com as coleções 'users' e 'public_profiles' do Firestore
   try {
     const docRef = doc(db, 'users', String(teacherId));
     const payload = {
